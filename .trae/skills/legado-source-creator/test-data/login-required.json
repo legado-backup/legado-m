@@ -1,0 +1,35 @@
+{
+  "bookSourceUrl": "http://www.xbiqugu.la",
+  "bookSourceName": "需登录书源-预期失败",
+  "bookSourceGroup": "测试,登录",
+  "bookSourceType": 0,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "bookSourceComment": "预期失败：设置了登录要求和无效Cookie，搜索请求会被拒绝",
+  "loginUrl": "http://www.xbiqugu.la/login.php",
+  "loginUi": "[{\"name\":\"username\",\"type\":\"text\"},{\"name\":\"password\",\"type\":\"password\"}]",
+  "loginCheckJs": "result.includes('退出登录') ? $.ok : $.no",
+  "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\",\"Cookie\":\"session=invalid_login_test_session\"}",
+  "searchUrl": "http://www.xbiqugu.la/modules/article/waps.php,{\"method\":\"POST\",\"body\":\"searchkey={{key}}\",\"headers\":{\"Cookie\":\"session=invalid_login_test_session; require_login=1\"}}",
+  "ruleSearch": {
+    "bookList": "table.grid tr:has(td)",
+    "name": "a.0@text",
+    "author": "td.2@text",
+    "bookUrl": "a.0@href",
+    "lastChapter": "a.1@text"
+  },
+  "ruleBookInfo": {
+    "name": "meta[property=og:novel:book_name]@content",
+    "author": "meta[property=og:novel:author]@content",
+    "intro": "meta[property=og:description]@content",
+    "coverUrl": "meta[property=og:image]@content"
+  },
+  "ruleToc": {
+    "chapterList": "#list dd a",
+    "chapterName": "@text",
+    "chapterUrl": "@href"
+  },
+  "ruleContent": {
+    "content": "#content@html"
+  }
+}

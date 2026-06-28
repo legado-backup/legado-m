@@ -1,0 +1,45 @@
+# 测试规范
+
+> 基于 Legado 项目源码深度分析提取的项目测试约定。
+
+---
+
+## 现状
+
+项目测试覆盖极度薄弱，仅有 2 个 JUnit 4 测试文件：
+
+| 文件 | 内容 |
+|------|------|
+| `app/src/test/java/io/legado/app/ExampleUnitTest.kt` | 自动生成占位测试 |
+| `app/src/test/java/io/legado/app/JsTest.kt` | Rhino JS 引擎测试（7 个方法） |
+
+androidTest/ 下有 6 个测试文件：ExampleInstrumentedTest.kt, AndroidJsTest.kt, HttpTest.kt, HttpTtsTest.kt, MigrationTest.kt, UpdateTest.kt
+
+## 新增测试规则
+
+### 单元测试
+
+- 框架：JUnit 4
+- 位置：`app/src/test/java/io/legado/app/`
+- 命名：`*Test.kt`
+- 重点测试对象：
+  - 规则引擎（AnalyzeRule, AnalyzeByJSoup, AnalyzeByJSonPath, AnalyzeByXPath）
+  - 内容处理管线（ContentProcessor）
+  - 本地书解析（TextFile, EpubFile）
+  - URL 模板引擎（AnalyzeUrl）
+
+### 书源/订阅源自测
+
+书源和订阅源必须经过自测通过后才能交付，详见 AGENTS.md「自测三阶段流水线」。
+
+### 运行测试
+
+```bash
+./gradlew test
+```
+
+### 注意事项
+
+- Room Schema 测试资源路径已配置：`androidTest.assets.srcDirs += files("$projectDir/schemas")`
+- 项目未引入 Mock 框架，如需 Mock 请先添加依赖到 `libs.versions.toml`
+- 协程测试需使用 `kotlinx-coroutines-test`

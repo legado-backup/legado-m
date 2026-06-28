@@ -1,0 +1,38 @@
+package io.legado.app.data.entities.rule
+
+import com.google.gson.JsonDeserializer
+import io.legado.app.utils.INITIAL_GSON
+import java.io.Serializable
+
+// 简化说明：移除 @Parcelize/: Parcelable，改为 Serializable | 已知上限：失去 Parcelable 高效序列化 | 升级路径：无
+/**
+ * 搜索结果处理规则
+ */
+data class SearchRule(
+    /**校验关键字**/
+    var checkKeyWord: String? = null,
+    override var bookList: String? = null,
+    override var name: String? = null,
+    override var author: String? = null,
+    override var intro: String? = null,
+    override var kind: String? = null,
+    override var lastChapter: String? = null,
+    override var updateTime: String? = null,
+    override var bookUrl: String? = null,
+    override var coverUrl: String? = null,
+    override var wordCount: String? = null
+) : BookListRule, Serializable {
+
+    companion object {
+
+        val jsonDeserializer = JsonDeserializer<SearchRule?> { json, _, _ ->
+            when {
+                json.isJsonObject -> INITIAL_GSON.fromJson(json, SearchRule::class.java)
+                json.isJsonPrimitive -> INITIAL_GSON.fromJson(json.asString, SearchRule::class.java)
+                else -> null
+            }
+        }
+
+    }
+
+}

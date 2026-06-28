@@ -1,0 +1,41 @@
+{
+  "bookSourceName": "JSONPath规则测试源",
+  "bookSourceUrl": "https://ixdzs8.com",
+  "bookSourceGroup": "测试,规则类型",
+  "bookSourceType": 0,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\"}",
+  "searchUrl": "https://ixdzs8.com/bsearch?q={{key}}",
+  "ruleSearch": {
+    "bookList": ".u-list li",
+    "name": "h3@text",
+    "author": "a.2@text",
+    "bookUrl": "a.1@href",
+    "coverUrl": "img@src",
+    "intro": "p.1@text",
+    "lastChapter": "a.-1@text",
+    "wordCount": "span.1@text",
+    "kind": "span.2:-1@text"
+  },
+  "ruleBookInfo": {
+    "init": "@put:{n:\"[property$=book_name]@content\",a:\"[property$=author]@content\",k:\"[property~=category|status|update_time]@content\",w:\"span.nsize@text\",l:\"[property$=latest_chapter_name]@content\",i:\"[property$=description]@content\",c:\"[property$=image]@content\"}",
+    "name": "@get:{n}",
+    "author": "@get:{a}",
+    "intro": "@get:{i}",
+    "coverUrl": "@get:{c}",
+    "kind": "@get:{k}",
+    "lastChapter": "@get:{l}",
+    "wordCount": "@get:{w}",
+    "tocUrl": "{{java.put(\"url\",baseUrl);\n\t\"https://ixdzs8.com/novel/clist/\"}},{\n  \"body\": \"bid={{baseUrl.match(/(\\d+).$/)[1]}}\",\n  \"headers\": {\n    \"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\",\n    \"X-Requested-With\": \"XMLHttpRequest\",\n    \"Referer\":\"{{baseUrl}}\"\n    },\n  \"method\": \"POST\"\n}"
+  },
+  "ruleToc": {
+    "chapterList": "$.data",
+    "chapterName": "$.title",
+    "chapterUrl": "@get:{url}p{{$.ordernum}}.html",
+    "isVolume": "$.ctype"
+  },
+  "ruleContent": {
+    "content": "article.page-content section>p@textNodes"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "bookSourceName": "缺失字段测试源",
+  "bookSourceGroup": "测试,边界测试",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "https://www.missing-fields-test.com/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "div.search-list li",
+    "name": "h3.title@text"
+  },
+  "ruleContent": {
+    "content": "div.content@html"
+  }
+}

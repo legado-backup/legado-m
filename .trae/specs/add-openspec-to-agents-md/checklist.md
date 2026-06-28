@@ -1,0 +1,7 @@
+- [x] AGENTS.md 中存在「🔴🔴 AI Agent 强制执行规则：OpenSpec 工作流程」章节
+- [x] 章节包含强制触发条件（新增功能/优化/Bug修复/重构）
+- [x] 章节包含四文档要求（README.md、spec.md、design.md、tasks.md）
+- [x] 章节包含三个强制检查点（设计审核、实施审核、最终验收）
+- [x] 章节包含反模式警告表
+- [x] 章节包含指向 docs/project-rules/openspec-workflow.md 的链接
+- [x] 章节格式与现有两个强制规则章节一致

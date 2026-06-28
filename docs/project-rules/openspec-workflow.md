@@ -1,0 +1,328 @@
+# OpenSpec 工作流程文档
+
+> **用途**：AGENTS.md 中强制规则的详细展开，AI Agent 在接到开发任务后按此流程执行
+> **最后更新**：2026-06-24
+> **方法论来源**：RFC 驱动开发（Stripe/Uber）+ ADR 架构决策记录 + OpenHands Action-Observation-Adapt + Cursor Diff 审查
+
+---
+
+## 概述
+
+OpenSpec 是一套结构化的功能设计文档体系，确保每个开发任务都有完整的**设计 → 确认 → 开发 → 测试 → 归档**闭环。
+
+**适用场景（全部强制）**：
+
+| 场景 | 说明 |
+|------|------|
+| 新功能开发 | 新增模块或功能点 |
+| Bug 修复 | 修复 Bug（无论大小） |
+| 优化改进 | 代码优化、性能改进 |
+| 重构 | 架构调整、代码重构 |
+
+**核心原则**：所有场景一律生成四文档（README.md + spec.md + design.md + tasks.md），不做级别区分。消除级别判定带来的执行漏洞，确保文档完整性。
+
+---
+
+## 文档结构
+
+### 文档目录
+
+所有 OpenSpec 文档统一存放在 `docs/specs/{功能名称}/` 目录下。
+
+`功能名称` 使用动词开头的短横线命名，如 `add-csv-output`、`fix-encoding-detection`。
+
+| 变更 | 路径 |
+|------|------|
+| 新文档 | `docs/specs/{功能名称}/` |
+| 历史文档 | `docs/specs/` 下的已有文档保持原位不迁移 |
+
+### 必须文档（4 个，不可省略）
+
+| 文档 | 核心内容 |
+|------|---------|
+| **README.md** | 功能概述、核心能力、文档索引、状态标记 |
+| **spec.md** | Intent、Scope、Approach（含 Alternatives Considered + Drawbacks）、Requirements、Scenarios |
+| **design.md** | Technical Approach、Architecture Decisions（ADR Y-Statement）、Data Flow、File Changes |
+| **tasks.md** | `- [ ] X.Y` 格式任务清单 + AOAdapt 日志 |
+
+**可选文档**：`checklist.md`（验证完整性和质量）
+
+### spec.md 必须包含
+
+1. **Intent**（意图）：为什么做这件事？解决什么问题？
+2. **Scope**（范围）：做什么、不做什么、影响哪些模块
+3. **Approach**（方法）：技术方向和方案选择，**必须包含以下子章节**：
+   - **Selected Approach**：选定的技术方案及理由
+   - **Alternatives Considered**：否决的替代方案及否决理由（表格形式）
+   - **Drawbacks**：选定方案的已知缺点和接受理由
+   - **Prior Art**：类似工作的参考（可选，避免重复造轮子）
+4. **Requirements**（需求）：具体的功能需求列表
+5. **Scenarios**（场景）：正常流程、异常流程、边界条件
+
+**Alternatives Considered 格式**：
+
+```markdown
+### Alternatives Considered
+| 方案 | 否决理由 |
+|------|---------|
+| 方案A | [为什么不用] |
+| 方案B | [为什么不用] |
+```
+
+**无替代方案时**：Alternatives Considered 写"无可行替代方案"并说明原因，不得省略该章节。
+
+### design.md 必须按以下顺序
+
+1. **Technical Approach**（技术方法）
+2. **Architecture Decisions**（架构决策）— 使用 ADR Y-Statement 模板
+3. **Data Flow**（数据流）
+4. **File Changes**（文件变更）
+
+**Architecture Decisions ADR 模板**：
+
+```markdown
+## Architecture Decisions
+
+### AD-01: [决策标题]
+- **Context**: [决策背景和约束]
+- **Concern**: [面临的问题]
+- **Decision**: [做出的决策]
+- **Goal**: [期望达到的目标]
+- **Tradeoff**: [接受的权衡]
+- **Status**: Proposed / Accepted / Deprecated
+- **Superseded-by**: AD-XX（如适用）
+```
+
+**ADR 规则**：
+- 每个架构决策必须用 AD-XX 编号
+- 新决策替代旧决策时，旧决策 Status 改为 Deprecated，Superseded-by 指向新决策编号
+- ADR 废弃链可追溯：AD-01 → AD-05 → AD-12
+
+### tasks.md 格式
+
+```markdown
+## 1. 准备工作
+- [ ] 1.1 确认需求范围
+- [ ] 1.2 阅读相关源码
+
+## 2. 核心实现
+- [ ] 2.1 实现 XXX
+- [ ] 2.2 实现 YYY
+
+## 3. 验证
+- [ ] 3.1 运行测试
+- [ ] 3.2 验证输出
+```
+
+完成后标注：`- [x] 1.1 确认需求范围 ✅ 2026-06-22`
+
+**AOAdapt 日志**（可选，任务遇到问题时必须记录）：
+
+```markdown
+- [ ] 2.1 实现 XXX
+  - Action: [执行了什么操作]
+  - Observation: [观察到了什么结果]
+  - Adapt: [基于观察做了什么调整]
+```
+
+| 场景 | AOAdapt 日志 |
+|------|-------------|
+| 任务按预期完成 | 可省略，直接标记完成 |
+| 实施中发现需要调整方案 | **必须记录**，说明偏差和调整策略 |
+| 任务失败需回退 | **必须记录**（Observation 记录失败原因），标记 ❌ 并说明回退计划 |
+
+---
+
+## 完整工作流程
+
+```
+步骤1: 用户提出需求
+    ↓
+步骤2: 需求分析
+    ├── 确认需求范围（做什么、不做什么）
+    ├── 识别影响范围（哪些文件/模块会变）
+    ├── 技术方向方案（怎么实现、为什么这样实现）
+    └── 边界条件和异常情况（空值、超时、并发等）
+    ↓
+步骤3: ⭐ 生成 OpenSpec 四文档（状态标记：🔄 设计中）
+    ├── 创建目录 docs/specs/{功能名称}/
+    ├── 生成 README.md + spec.md + design.md + tasks.md
+    ├── 可选生成 checklist.md
+    └── 更新 docs/INDEX.md（添加到"🔴 进行中的工作 → 设计中"）
+    ↓
+步骤4: 🛑 强制检查点 1 — 用户审查设计方案
+    ├── 向用户汇报文档已生成，请审查
+    └── 用户确认后 → 更新状态为"✅ 设计完成"
+    ↓
+步骤5: 开始开发实施（状态标记：🔄 开发中）
+    ├── 按 tasks.md 顺序执行，不可跳过中间任务
+    ├── 每完成一个任务：
+    │   ├── 运行验证（如适用）
+    │   ├── 🔴 子代理产出验证（使用 Task 工具时强制）
+    │   │   ├── 新增文件 → Read 确认文件存在 + 关键代码段存在
+    │   │   ├── 修改文件 → Grep 确认变更内容确实存在
+    │   │   ├── 代码编译 → RunCommand 运行编译 → 确认无错误
+    │   │   ├── 功能实现 → Grep+Read 确认函数签名存在 + 逻辑非空壳
+    │   │   ├── 测试通过 → RunCommand 运行测试 → 查看输出显示 PASS
+    │   │   └── 文档更新 → Read 确认更新内容确实存在
+    │   ├── 🔴 三级完成标准（禁止混用）
+    │   │   ├── Level 1 - 代码完成（⚠️）：文件存在 + 编译通过
+    │   │   ├── Level 2 - 功能验证（⚠️）：关键功能可运行 + 输出正确
+    │   │   └── Level 3 - 场景验证（✅）：真实数据回测通过
+    │   ├── 遇到问题时记录 AOAdapt 日志
+    │   └── 标记 tasks.md（⚠️ 或 ✅，注明完成级别和缺失项）
+    └── 核心变更 → 必须验证可运行
+    ↓
+步骤6: 🛑 强制检查点 2 — 用户审核实施结果
+    ├── 默认：阶段审查（每个阶段完成后审查）
+    └── 可选：任务审查（每个任务完成后展示 Diff，用户可接受/拒绝）
+    ↓
+步骤7: 完成阶段
+    ├── 状态更新为"✅ 已完成"
+    ├── tasks.md 全部标记 ✅
+    ├── 更新 docs/INDEX.md（移动到"✅ 已完成的功能"）
+    └── 向用户汇报完成情况
+    ↓
+步骤8: ⭐ 文档同步（强制执行，防止数据孤岛）
+    ├── 对照 AGENTS.md OpenSpec 章节的文档同步要求
+    ├── 逐项检查本次代码变更影响了哪些文档
+    ├── 更新 docs/project-flow/ 下对应的文档：
+    │   ├── 改了接口/模型/函数 → 更新 task-navigation.md
+    │   ├── 改了流程/操作方式 → 更新 task-navigation.md
+    │   ├── 改了模块结构/配置 → 更新 quick-reference.md
+    │   └── 改了目录/命令/环境变量 → 更新 quick-reference.md
+    └── 更新 docs/INDEX.md（功能状态变更）
+```
+
+**步骤8 详解 — 文档同步映射表**：
+
+| 代码变更类型 | 必须更新的文档 | 更新内容 |
+|-------------|--------------|---------|
+| 新增/修改 WebBook 方法 | `docs/project-flow/modules/webbook-search.md` | 更新方法表、参数、返回值 |
+| 新增/修改 BookSource 字段 | `docs/project-flow/database/entities.md` | 更新字段定义 |
+| 新增/修改 RuleEngine 逻辑 | `docs/project-flow/architecture/rule-engine.md` | 更新规则解析逻辑说明 |
+| 新增/修改 Skill 陷阱 | `.trae/skills/legado-source-creator/references/troubleshooting/` | 更新陷阱排查文档 |
+| 新增/修改 JVM 仿真器 | `.trae/skills/legado-source-creator/references/jvm-infrastructure.md` | 更新 JVM 仿真器文档 |
+| 新增/修改模块结构 | `docs/project-flow/task-navigation.md` | 更新模块代码锚点 |
+| 新增/修改配置文件结构 | `docs/project-flow/quick-reference.md` | 更新配置说明和速查 |
+| 新增/修改项目目录结构 | `docs/project-flow/quick-reference.md` | 更新项目结构树 |
+| 新增/修改构建/运行命令 | `docs/project-flow/quick-reference.md` | 更新常用命令 |
+| 功能完成/状态变更 | `docs/INDEX.md` | 更新已完成/待扩展列表 |
+
+**原则**：文档与代码不一致 = 文档不存在。改了代码不更新文档，下一个读者会按错误架构理解项目。
+
+---
+
+## 强制检查点（不可绕过）
+
+| 检查点 | 时机 | 需要做的事 | 可跳过条件 |
+|--------|------|-----------|-----------|
+| **检查点 1** | OpenSpec 文档生成后 | **停下来**，等待用户审查设计方案，确认前不得继续 | **不可跳过** |
+| **检查点 2** | 阶段/任务完成后 | **停下来**，等待用户审核实施结果 | **不可跳过** |
+| **检查点 3** | 所有任务完成后 | **停下来**，等待用户最终验收 | **不可跳过** |
+
+### 检查点2 审查模式
+
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| **阶段审查**（默认） | 每个阶段完成后审查 | 所有任务 |
+| **任务审查**（可选） | 每个任务完成后展示 Diff，用户可接受/拒绝 | 涉及核心模块变更 |
+
+**关键原则**：检查点的存在是为了确保用户在关键节点有审核和纠偏的机会。AI Agent 不得以"改动小"、"很紧急"为由跳过任何检查点。
+
+---
+
+## 正确示例 vs 错误示例
+
+### ✅ 正确示例
+
+**用户**："帮我加一个 CSV 输出格式"
+
+**AI Agent 应该**：
+1. ✅ 先做需求分析：CSV 输出的格式要求？哪些任务需要？与现有 Excel 输出的关系？
+2. ✅ 阅读相关源码：`src/service/output.py` 的输出架构
+3. ✅ 生成四文档（README.md、spec.md、design.md、tasks.md）
+4. ✅ spec.md 的 Approach 包含 Alternatives Considered（如：为什么不用纯文本输出？）和 Drawbacks（如：CSV 不支持多 Sheet）
+5. ✅ 更新 docs/INDEX.md
+6. 🛑 **停下来**，向用户汇报文档已生成，请审查
+7. ⏳ 等待用户确认后再继续
+
+### ❌ 错误示例
+
+**用户**："帮我加一个 CSV 输出格式"
+
+**AI Agent 不应该**：
+1. ❌ 直接打开 output.py 开始写代码
+2. ❌ 没有分析 CSV 格式要求（分隔符、编码、表头等）
+3. ❌ 没有考虑与现有输出架构的兼容性
+4. ❌ spec.md 的 Approach 只写"用 pandas 输出 CSV"，没有 Alternatives 和 Drawbacks
+5. ❌ 只生成 3 个文档，缺少 README.md
+6. ❌ 用户无法审核设计方向是否正确
+7. ❌ 写完后发现格式不符合用户预期，反复修改
+
+---
+
+## 文档状态流转
+
+| 类型 | 状态流转 |
+|------|---------|
+| 功能文档 | ⏳ 规划中 → 🔄 设计中 → ✅ 设计完成 → 🔄 开发中 → ✅ 已完成 → 📦 已归档 |
+| Bug | 🔴 新发现 → 🔄 处理中 → ✅ 已修复 |
+| 优化 | 💡 提议 → ✅ 已采纳 → 🔄 实施中 → ✅ 已完成 |
+
+### INDEX.md 同步规则
+
+| 操作 | 更新内容 |
+|------|---------|
+| 创建功能文档 | 添加到"🔴 进行中的工作 → 设计中" |
+| 设计完成 | 移动到"🟢 设计完成待实施" |
+| 开始开发 | 移动到"🔴 进行中的工作 → 开发中" |
+| 开发完成 | 移动到"✅ 已完成的功能" |
+| 发现 Bug | 添加到"🟡 待处理的问题" |
+| Bug 修复 | 从列表移除 |
+
+---
+
+## AI Agent OpenSpec 检查清单
+
+开始任何开发任务前，必须逐项确认：
+
+- [ ] 是否已生成四文档（README.md + spec.md + design.md + tasks.md）？
+- [ ] spec.md 是否包含 Intent、Scope、Approach（含 Alternatives Considered + Drawbacks）、Requirements、Scenarios？
+- [ ] design.md 的 Architecture Decisions 是否使用 ADR Y-Statement 模板？
+- [ ] tasks.md 是否使用 `- [ ] X.Y` 格式？
+- [ ] 文档是否放在 `docs/specs/{功能名称}/` 目录下？
+- [ ] 是否已更新 docs/INDEX.md？
+- [ ] 文档状态是否已标记？（🔄 设计中 → ✅ 设计完成 → 🔄 开发中）
+- [ ] 是否已停下来等待用户确认？（🛑 强制检查点）
+- [ ] 实施中遇到问题是否记录了 AOAdapt 日志？
+- [ ] 任务完成后是否执行了文档同步？（步骤8 — 对照映射表更新 docs/project-flow/）
+- [ ] docs/project-flow/ 下所有文档是否与当前代码一致？
+- [ ] 是否已清理临时文件和调试代码？
+
+---
+
+## 需求分析深度要求
+
+**浅层分析**（❌ 不够）：
+- "加一个 CSV 输出" → 直接写代码
+
+**深度分析**（✅ 必须）：
+- CSV 格式规范：分隔符（逗号/制表符）、编码（UTF-8/GBK）、表头、日期格式
+- 与现有输出架构的关系：复用 output.py 的哪些方法？需要新增哪些？
+- 配置层影响：tasks.yaml 的 output 段需要加什么字段？
+- 边界条件：空指标值怎么处理？特殊字符（逗号/引号）怎么转义？大数据量性能？
+- 向后兼容：现有 JSON/Markdown/Excel 输出是否受影响？
+- **替代方案**：为什么不选纯文本输出？为什么不选 TSV？
+- **方案缺点**：CSV 不支持多 Sheet、特殊字符转义复杂、大数据量内存占用
+
+---
+
+## 方法论来源
+
+| 来源 | 采纳要素 | 理由 |
+|------|---------|------|
+| **RFC 驱动开发**（Stripe/Uber） | Alternatives Considered + Drawbacks + Prior Art | 强制思考权衡，避免盲目实施 |
+| **ADR**（Architecture Decision Records） | Y-Statement 决策模板 + 废弃链 | 决策可追溯、可演进 |
+| **OpenHands/SWE-Agent** | Action-Observation-Adapt 循环 | 科学的试错范式，沉淀实施过程知识 |
+| **Cursor Spec Mode** | 任务级 Diff 审查 | 细粒度用户控制 |
