@@ -1,0 +1,197 @@
+{
+  "cms_type": "maccms-v10",
+  "version": "1.0",
+  "verified_date": "2026-06-14",
+  "verified_source": "GitHub magicblack/maccms10 默认模板",
+  "description": "苹果CMS V10 选择器映射，基于 GitHub 官方默认模板 + 常见部署站点实际结构。stui 前缀为旧版/常见模板，mac- 前缀为新版默认模板。",
+  "pages": {
+    "list": {
+      "description": "视频列表页（首页/分类页）",
+      "selectors": {
+        "articleList": {
+          "primary": ".stui-vodlist li",
+          "fallbacks": [".vodlist li", ".mac-catalog-show__grid li", ".module-items .module-item"],
+          "note": "视频列表项容器。stui-vodlist 为旧版常见模板，vodlist 为新版默认模板，mac-catalog-show__grid 为 AJAX 加载模式"
+        },
+        "title": {
+          "primary": "tag.a.0@title",
+          "fallbacks": ["tag.a.0@text", "tag.a@title", ".stui-vodlist__detail h4 a@title", ".title a@title"],
+          "note": "视频标题。优先取 a 标签的 title 属性，fallback 到文本内容"
+        },
+        "link": {
+          "primary": "tag.a.0@href",
+          "fallbacks": ["tag.a@href", ".stui-vodlist__thumb@href", ".vodlist_thumb@href"],
+          "note": "详情页链接。通常在列表项的第一个 a 标签上"
+        },
+        "image": {
+          "primary": "tag.img.0@data-original",
+          "fallbacks": ["tag.img.0@data-src", "tag.img.0@src", ".stui-vodlist__thumb@data-original", ".lazyload@data-original"],
+          "note": "封面图片。苹果CMS使用懒加载，data-original 优先于 src。部分站点用 data-src"
+        },
+        "description": {
+          "primary": ".pic-text@text",
+          "fallbacks": [".stui-vodlist__detail .text@text", ".module-item-note@text"],
+          "note": "备注/集数信息。pic-text 通常显示 HD/4K/TC 等清晰度标记"
+        },
+        "nextPage": {
+          "primary": ".stui-page a.page-next@href",
+          "fallbacks": [".stui-page a.next@href", ".mac-catalog-show__pager a.next@href", ".page-next@href"],
+          "note": "下一页链接。新版 AJAX 模式分页在 .mac-catalog-show__pager 中动态渲染"
+        }
+      }
+    },
+    "detail": {
+      "description": "视频详情页",
+      "selectors": {
+        "title": {
+          "primary": "h1.js-vod-name@text",
+          "fallbacks": ["h1.title@text", ".vod-detail-hero__top h1@text"],
+          "note": "视频标题。新版模板使用 js-vod-name 类名"
+        },
+        "cover": {
+          "primary": ".vodlist_thumb@data-original",
+          "fallbacks": [".vodlist_thumb img@data-original", ".content_thumb img@data-original"],
+          "note": "封面图片。与列表页相同，使用懒加载属性"
+        },
+        "playList": {
+          "primary": ".stui-content__playlist a",
+          "fallbacks": [".stui-content__playlist1 a", ".module-play-list a", ".playlist a", ".play_source_tab a"],
+          "note": "播放列表链接。stui-content__playlist1 为按源分组的子容器。新版模板使用 .js-vod-play-source-body AJAX 渲染"
+        },
+        "playSourceTab": {
+          "primary": ".play_source_tab a",
+          "fallbacks": ["#NumTab a", ".module-tab-item"],
+          "note": "播放源标签页切换按钮，data-sid 属性标识源序号"
+        },
+        "blurb": {
+          "primary": ".js-vod-blurb@text",
+          "fallbacks": [".stui-content__detail .desc@text", ".content_desc .js-vod-content-short@text"],
+          "note": "简介/摘要"
+        },
+        "content": {
+          "primary": ".js-vod-content-full@text",
+          "fallbacks": [".stui-content__detail .detail@text", ".content_desc .full_text@text"],
+          "note": "完整剧情介绍。默认隐藏，需展开显示"
+        },
+        "actor": {
+          "primary": ".js-vod-actor-line@text",
+          "fallbacks": [".stui-content__detail li:contains(主演)@text"],
+          "note": "主演信息"
+        },
+        "director": {
+          "primary": ".js-vod-director-line@text",
+          "fallbacks": [".stui-content__detail li:contains(导演)@text"],
+          "note": "导演信息"
+        }
+      }
+    },
+    "search": {
+      "description": "搜索页",
+      "selectors": {
+        "articleList": {
+          "primary": ".vodlist li",
+          "fallbacks": [".stui-vodlist li", ".module-items .module-item"],
+          "note": "搜索结果列表项。与 list 页结构基本一致"
+        },
+        "title": {
+          "primary": "tag.a.0@title",
+          "fallbacks": ["tag.a.0@text", ".stui-vodlist__detail h4 a@title"],
+          "note": "视频标题"
+        },
+        "link": {
+          "primary": "tag.a.0@href",
+          "fallbacks": ["tag.a@href", ".stui-vodlist__thumb@href"],
+          "note": "详情页链接"
+        },
+        "image": {
+          "primary": "tag.img.0@data-original",
+          "fallbacks": ["tag.img.0@data-src", "tag.img.0@src"],
+          "note": "封面图片"
+        },
+        "nextPage": {
+          "primary": ".stui-page a.page-next@href",
+          "fallbacks": ["#vodSearchPagination a.next@href", ".page-next@href"],
+          "note": "下一页链接。搜索分页在 #vodSearchPagination 中"
+        },
+        "searchUrl": {
+          "templates": [
+            "/index.php/vod/search/wd/{wd}.html",
+            "/index.php/vod/search/wd/{wd}/page/{page}.html",
+            "/vod/search/{wd}/page/{page}.html"
+          ],
+          "note": "搜索URL模板。不同站点URL格式可能不同，需根据实际站点调整"
+        }
+      }
+    },
+    "play": {
+      "description": "播放页",
+      "selectors": {
+        "playerVar": {
+          "primary": "player_aaaa",
+          "fallbacks": ["player_data", "player_info"],
+          "note": "苹果CMS播放页JS变量名。标准为 player_aaaa，部分站点使用 player_data 或 player_info。通过 js: JSON.parse(player_aaaa).url 提取播放地址"
+        },
+        "playerUrl": {
+          "primary": "js:JSON.parse(player_aaaa).url",
+          "fallbacks": ["js:player_aaaa.url", "js:JSON.parse(player_data).url"],
+          "note": "播放地址提取规则。player_aaaa 为 JSON 字符串，需解析后取 url 字段"
+        },
+        "playerName": {
+          "primary": "js:JSON.parse(player_aaaa).name",
+          "fallbacks": ["js:player_aaaa.name"],
+          "note": "当前集数名称"
+        },
+        "playList": {
+          "primary": ".stui-content__playlist a",
+          "fallbacks": [".stui-content__playlist1 a", ".play-but-strip a[href*='play']"],
+          "note": "播放列表链接（播放页通常也包含完整播放列表）"
+        },
+        "prevEpisode": {
+          "primary": ".play-but-item a:contains(上集)@href",
+          "fallbacks": ["a:has(.pre-t)@href"],
+          "note": "上一集链接"
+        },
+        "nextEpisode": {
+          "primary": ".play-but-item a:contains(下集)@href",
+          "fallbacks": ["a:has(.next-p)@href"],
+          "note": "下一集链接"
+        }
+      }
+    },
+    "sortUrl": {
+      "description": "分类URL模板",
+      "templates": {
+        "电影": "/index.php/vod/type/id/1.html",
+        "连续剧": "/index.php/vod/type/id/2.html",
+        "动漫": "/index.php/vod/type/id/3.html",
+        "综艺": "/index.php/vod/type/id/4.html"
+      },
+      "filterTemplates": {
+        "按类型": "/index.php/vod/type/id/{typeId}/class/{class}.html",
+        "按地区": "/index.php/vod/type/id/{typeId}/area/{area}.html",
+        "按年份": "/index.php/vod/type/id/{typeId}/year/{year}.html",
+        "按排序": "/index.php/vod/type/id/{typeId}/by/{by}.html",
+        "分页": "/index.php/vod/type/id/{typeId}/page/{page}.html"
+      },
+      "note": "苹果CMS标准分类URL格式。id 可能因站点而异，需根据实际站点调整。筛选参数可组合使用"
+    }
+  },
+  "commonPatterns": {
+    "lazyLoad": {
+      "attribute": "data-original",
+      "fallbacks": ["data-src", "data-lazy-src"],
+      "note": "苹果CMS使用 data-original 作为懒加载属性，非标准 src"
+    },
+    "urlFormat": {
+      "detail": "/vod/detail/id/{id}.html",
+      "play": "/vod/play/id/{id}/sid/{sid}/nid/{nid}.html",
+      "search": "/index.php/vod/search/wd/{wd}/page/{page}.html",
+      "type": "/index.php/vod/type/id/{typeId}/page/{page}.html",
+      "note": "标准URL格式。部分站点省略 index.php，使用 /vod/... 直接路径"
+    },
+    "ajaxMode": {
+      "indicators": ["data-list-mode=\"ajax\"", "mac-catalog-show", "js-vod-play-source-body"],
+      "note": "新版模板使用 AJAX 加载列表和播放源，HTML 中只有容器无内容，需通过 API 获取数据"
+    }
+  }
+}

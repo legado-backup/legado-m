@@ -1,0 +1,72 @@
+[
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:15:08.212020"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:15:08.217733"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:18:44.449129"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:18:44.460866"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:22:01.197871"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:22:01.204289"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:25:37.159118"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T10:25:37.163159"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T12:31:22.060904"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T12:31:22.066050"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T12:32:00.190135"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-24T12:32:00.195669"
+  },
+  {
+    "solution": "ruleBookInfo.name: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-26T21:56:18.554943"
+  },
+  {
+    "solution": "ruleBookInfo.author: 补全 @text 后缀",
+    "error_type": "rule_empty",
+    "timestamp": "2026-06-26T21:56:18.563408"
+  }
+]

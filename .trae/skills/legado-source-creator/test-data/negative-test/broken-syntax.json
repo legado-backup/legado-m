@@ -1,0 +1,27 @@
+{
+  "bookSourceName": "规则语法错误测试源",
+  "bookSourceUrl": "https://www.broken-syntax.com",
+  "bookSourceGroup": "测试,负面测试",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "https://www.broken-syntax.com/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "div.search-list li",
+    "name": "h3.title",
+    "author": "span.author",
+    "bookUrl": "a.book-link"
+  },
+  "ruleBookInfo": {
+    "name": "h1.book-title",
+    "intro": "div.intro",
+    "tocUrl": "a.toc"
+  },
+  "ruleToc": {
+    "chapterList": "ul.chapter-list li",
+    "chapterName": "a",
+    "chapterUrl": "a"
+  },
+  "ruleContent": {
+    "content": "div.content"
+  }
+}

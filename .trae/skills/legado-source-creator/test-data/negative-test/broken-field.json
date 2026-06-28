@@ -1,0 +1,28 @@
+{
+  "bookSourceName": "字段映射错误测试源",
+  "bookSourceUrl": "https://www.broken-field.com",
+  "bookSourceGroup": "测试,负面测试",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "https://www.broken-field.com/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "div.search-list li",
+    "bookName": "h3.title@text",
+    "bookAuthor": "span.author@text",
+    "bookUrl": "a.book-link@href"
+  },
+  "ruleBookInfo": {
+    "bookName": "h1.book-title@text",
+    "bookAuthor": "span.author-name@text",
+    "bookIntro": "div.intro@html",
+    "tocUrl": "a.toc@href"
+  },
+  "ruleToc": {
+    "chapterList": "ul.chapter-list li",
+    "chapterTitle": "a@text",
+    "chapterUrl": "a@href"
+  },
+  "ruleContent": {
+    "content": "div.content@html"
+  }
+}

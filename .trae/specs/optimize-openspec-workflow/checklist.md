@@ -1,0 +1,13 @@
+- [x] openspec-workflow.md 包含「必须文档（4个，不可省略）」章节（README.md + spec.md + design.md + tasks.md）
+- [x] spec.md 模板包含 Alternatives Considered、Drawbacks、Prior Art 三个必填子章节
+- [x] design.md 的 Architecture Decisions 使用 ADR Y-Statement 结构化模板（Context/Concern/Decision/Goal/Tradeoff/Status/Superseded-by）
+- [x] tasks.md 模板包含 AOAdapt 日志格式定义（Action/Observation/Adapt）
+- [x] 文档目录统一为 `docs/specs/{功能名称}/`
+- [x] 工作流程步骤3 改为「生成 OpenSpec 四文档」（不再按级别区分）
+- [x] 工作流程步骤5 包含任务级 AOAdapt 日志记录要求
+- [x] 检查点2 增加「任务级审查」可选模式
+- [x] 三个检查点全部不可跳过（删除 Minimal 级别可跳过条件）
+- [x] AI Agent OpenSpec 检查清单包含四文档生成确认、Alternatives/Drawbacks 确认、ADR 格式确认
+- [x] 正确示例 vs 错误示例统一为四文档示例（删除 Standard/Minimal 级别示例）
+- [x] AGENTS.md 中 OpenSpec 章节与 openspec-workflow.md 描述一致（统一四文档 + 检查点不可跳过 + 目录统一）
+- [x] 三级文档规模已废除，改为统一四文档（消除级别判定执行漏洞）

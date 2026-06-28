@@ -1,0 +1,26 @@
+{
+  "bookSourceName": "URL模板错误测试源",
+  "bookSourceUrl": "https://www.broken-url.com",
+  "bookSourceGroup": "测试,负面测试",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "div.search-list li",
+    "name": "h3.title@text",
+    "author": "span.author@text",
+    "bookUrl": "a.book-link@href"
+  },
+  "ruleBookInfo": {
+    "name": "h1.book-title@text",
+    "tocUrl": "toc/list"
+  },
+  "ruleToc": {
+    "chapterList": "ul.chapter-list li",
+    "chapterName": "a@text",
+    "chapterUrl": "chapter/1"
+  },
+  "ruleContent": {
+    "content": "div.content@html"
+  }
+}

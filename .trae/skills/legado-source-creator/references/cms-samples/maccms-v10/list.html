@@ -1,0 +1,146 @@
+<!-- CMS Sample: maccms-v10 | Source: GitHub magicblack/maccms10 template/default/html/vod/type.html | Desensitized: 2026-06-14 -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>视频列表 - 苹果CMS V10</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="/template/default/asset/css/type-show.css">
+</head>
+<body>
+    <!-- 头部导航 -->
+    <div class="stui-header__top">
+        <div class="container">
+            <ul class="stui-header__menu">
+                <li><a href="/">首页</a></li>
+                <li class="active"><a href="/index.php/vod/type/id/1.html">电影</a></li>
+                <li><a href="/index.php/vod/type/id/2.html">连续剧</a></li>
+                <li><a href="/index.php/vod/type/id/3.html">动漫</a></li>
+                <li><a href="/index.php/vod/type/id/4.html">综艺</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="stui-screen">
+        <div class="container">
+            <div class="stui-screen__list">
+                <div class="stui-screen__item">
+                    <span class="stui-screen__title">类型：</span>
+                    <a href="/index.php/vod/type/id/1.html" class="active">全部</a>
+                    <a href="/index.php/vod/type/id/1/class/动作.html">动作</a>
+                    <a href="/index.php/vod/type/id/1/class/喜剧.html">喜剧</a>
+                    <a href="/index.php/vod/type/id/1/class/爱情.html">爱情</a>
+                    <a href="/index.php/vod/type/id/1/class/科幻.html">科幻</a>
+                </div>
+                <div class="stui-screen__item">
+                    <span class="stui-screen__title">地区：</span>
+                    <a href="/index.php/vod/type/id/1.html" class="active">全部</a>
+                    <a href="/index.php/vod/type/id/1/area/大陆.html">大陆</a>
+                    <a href="/index.php/vod/type/id/1/area/香港.html">香港</a>
+                    <a href="/index.php/vod/type/id/1/area/美国.html">美国</a>
+                    <a href="/index.php/vod/type/id/1/area/韩国.html">韩国</a>
+                </div>
+                <div class="stui-screen__item">
+                    <span class="stui-screen__title">年份：</span>
+                    <a href="/index.php/vod/type/id/1.html" class="active">全部</a>
+                    <a href="/index.php/vod/type/id/1/year/2026.html">2026</a>
+                    <a href="/index.php/vod/type/id/1/year/2025.html">2025</a>
+                    <a href="/index.php/vod/type/id/1/year/2024.html">2024</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 关键结构：视频列表 -->
+    <div class="container">
+        <div class="stui-pannel">
+            <div class="stui-pannel__head">
+                <h3 class="title">电影</h3>
+                <div class="stui-pannel__more">
+                    <a href="/index.php/vod/type/id/1/by/time.html">按最新</a>
+                    <a href="/index.php/vod/type/id/1/by/hits.html">按最热</a>
+                    <a href="/index.php/vod/type/id/1/by/score.html">按评分</a>
+                </div>
+            </div>
+            <ul class="stui-vodlist clearfix">
+                <li>
+                    <div class="stui-vodlist__box">
+                        <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/101.html" title="电影标题1" data-original="https://example.com/pic1.jpg">
+                            <span class="pic-text text-right">HD</span>
+                        </a>
+                        <div class="stui-vodlist__detail">
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/101.html" title="电影标题1">电影标题1</a></h4>
+                            <p class="text text-overflow text-muted">导演: 张三</p>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="stui-vodlist__box">
+                        <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/102.html" title="电影标题2" data-original="https://example.com/pic2.jpg">
+                            <span class="pic-text text-right">TC</span>
+                        </a>
+                        <div class="stui-vodlist__detail">
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/102.html" title="电影标题2">电影标题2</a></h4>
+                            <p class="text text-overflow text-muted">导演: 李四</p>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="stui-vodlist__box">
+                        <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/103.html" title="电影标题3" data-original="https://example.com/pic3.jpg">
+                            <span class="pic-text text-right">4K</span>
+                        </a>
+                        <div class="stui-vodlist__detail">
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/103.html" title="电影标题3">电影标题3</a></h4>
+                            <p class="text text-overflow text-muted">导演: 王五</p>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="stui-vodlist__box">
+                        <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/104.html" title="电影标题4" data-original="https://example.com/pic4.jpg">
+                            <span class="pic-text text-right">BD</span>
+                        </a>
+                        <div class="stui-vodlist__detail">
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/104.html" title="电影标题4">电影标题4</a></h4>
+                            <p class="text text-overflow text-muted">导演: 赵六</p>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="stui-vodlist__box">
+                        <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/105.html" title="电影标题5" data-original="https://example.com/pic5.jpg">
+                            <span class="pic-text text-right">HD</span>
+                        </a>
+                        <div class="stui-vodlist__detail">
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/105.html" title="电影标题5">电影标题5</a></h4>
+                            <p class="text text-overflow text-muted">导演: 钱七</p>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 分页 -->
+    <div class="stui-page text-center clearfix">
+        <a class="page-prev" href="javascript:;">上一页</a>
+        <a class="active" href="/vod/type/id/1/page/1.html">1</a>
+        <a href="/vod/type/id/1/page/2.html">2</a>
+        <a href="/vod/type/id/1/page/3.html">3</a>
+        <a class="page-next" href="/vod/type/id/1/page/2.html">下一页</a>
+    </div>
+
+    <!-- 新版模板 AJAX 加载模式（参考 GitHub type.html） -->
+    <!--
+    <div id="show_page" class="mac-catalog-show" data-list-mode="ajax" data-mid="1" data-type-id="1" data-page-size="24">
+        <ul class="vodlist mac-catalog-show__grid vod-show-grid mac-hide"></ul>
+        <div class="mac-catalog-show__pager"></div>
+    </div>
+    -->
+
+</body>
+</html>

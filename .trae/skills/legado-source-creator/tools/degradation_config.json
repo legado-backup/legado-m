@@ -1,0 +1,14 @@
+{
+  "steps": ["auto_solve", "cookie_import", "manual_guide", "mark_unverifiable"],
+  "enabled": {
+    "auto_solve": true,
+    "cookie_import": true,
+    "manual_guide": true,
+    "mark_unverifiable": true
+  },
+  "timeout_seconds": {
+    "auto_solve": 30,
+    "cookie_import": 15,
+    "manual_guide": 120
+  }
+}
