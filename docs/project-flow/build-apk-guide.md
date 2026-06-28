@@ -310,6 +310,110 @@ APK 文件名格式：`legado_app_<flavor>_<version>.apk`
 | Cronet 下载失败 | 网络问题 | 配置代理或手动下载 Cronet JAR |
 | `Execution failed for ':app:kspDebugKotlin'` | Room schema 冲突 | `.\gradlew clean` 后重新构建 |
 | 编译 OOM | JVM 内存不足 | 在 `gradle.properties` 中调大 `-Xmx` |
+| **卡在 3%/下载慢** | 国内网络直连 Google/Maven 慢 | **启用国内镜像**（见 4.6） |
+| **Kotlin daemon AccessDeniedException** | 残留的 Kotlin daemon 临时文件 | 删除 `%LOCALAPPDATA%\kotlin\daemon` 后重试 |
+| **KSP 跨盘符路径错误** | Gradle 缓存和项目不在同一盘 | 设置 `GRADLE_USER_HOME` 到项目同盘（见 4.7） |
+| **transforms move 失败** | Windows 长路径限制(260字符) | 将 `GRADLE_USER_HOME` 设为极短路径如 `F:\gh` |
+
+### 4.6 国内 Gradle 镜像加速（重要！）
+
+> 国内直连 Google Maven / Maven Central 极慢，首次构建会卡住。**必须启用国内镜像**。
+
+项目 `settings.gradle` 已内置镜像配置，默认被注释掉了。打开 `settings.gradle`，找到以下内容并**取消注释**：
+
+**pluginManagement.repositories 部分：**
+
+```groovy
+// 注释掉原来的镜像注释行，改为：
+maven { url 'https://maven.aliyun.com/repository/google' }
+maven { url 'https://maven.aliyun.com/repository/public' }
+maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+```
+
+**dependencyResolutionManagement.repositories 部分：**
+
+```groovy
+maven { url 'https://maven.aliyun.com/repository/google' }
+maven { url 'https://maven.aliyun.com/repository/public' }
+maven { url 'https://repo.huaweicloud.com/repository/maven/' }
+```
+
+> 镜像放在原始仓库后面作为备用源。如果原始仓库能连上就用原始的，连不上自动走镜像。
+
+**Gradle 本体下载加速**（首次运行 gradlew 时下载 gradle-8.14.4-bin.zip）：
+
+编辑 `gradle/wrapper/gradle-wrapper.properties`，将 `distributionUrl` 改为腾讯镜像：
+
+```properties
+# 原始地址
+# distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.4-bin.zip
+
+# 腾讯镜像加速
+distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
+```
+
+构建完成后可改回原始地址。
+
+### 4.7 GRADLE_USER_HOME 配置（解决跨盘符和长路径问题）
+
+如果项目在 F 盘，Gradle 默认将缓存放在 `C:\Users\用户名\.gradle\`，会导致两个问题：
+1. **KSP 跨盘符错误**：`this and base files have different roots`
+2. **长路径限制**：Windows 260 字符限制导致 transforms move 失败
+
+**解决方法**：设置 `GRADLE_USER_HOME` 到项目同盘的短路径。
+
+**方式一：在构建脚本中设置**（见 10.4 一键构建脚本）
+
+**方式二：系统环境变量**
+
+```powershell
+# 设置系统环境变量（永久生效）
+[System.Environment]::SetEnvironmentVariable("GRADLE_USER_HOME", "F:\gh", "User")
+```
+
+> 路径越短越好：`F:\gh` 比 `F:\myself\...\temp\gradle-home` 好得多，避免嵌套路径过长。
+
+### 4.8 一键构建脚本（build-legado.bat）
+
+项目根目录已内置 `build-legado.bat`，自动处理环境变量、清理缓存、构建。
+
+**使用方法：**
+
+| 操作 | 命令 |
+|------|------|
+| 构建 Debug APK（默认包名） | 双击 `build-legado.bat` |
+| 构建 Release APK（默认包名） | `build-legado.bat release` |
+| 构建 Debug APK（自定义包名） | `build-legado.bat debug com.my.legado` |
+| 构建 Release APK（自定义包名） | `build-legado.bat release com.my.legado` |
+| 清理构建缓存 | `build-legado.bat clean` |
+
+**自定义包名说明：**
+
+第二个参数为自定义 applicationId，通过 Gradle 项目属性 `-PcustomAppId` 传入。
+
+- 不传第二个参数 → 使用默认包名 `io.legado.app`
+- 传入第二个参数 → 使用自定义包名，如 `com.myname.legado`
+
+自定义包名后，APK 可以和原版 Legado 同时安装在同一设备上（包名不同=不同应用）。
+
+> **原理**：`app/build.gradle` 中已改为：
+> ```groovy
+> applicationId project.hasProperty("customAppId") ? project.property("customAppId") : "io.legado.app"
+> ```
+> 不传 `-PcustomAppId` 时行为与原版完全一致，不会影响原版构建。
+
+**脚本自动做的事：**
+
+1. 检查 JDK 17 和 Android SDK 是否存在
+2. 设置 `GRADLE_USER_HOME=F:\gh`（短路径，避免跨盘符和长路径问题）
+3. 清理 Kotlin daemon 残留缓存（解决 `AccessDeniedException`）
+4. 清理旧的 Gradle transforms 缓存
+5. 停止残留的 Gradle daemon
+6. 使用 `--no-daemon` 构建（避免守护进程文件锁）
+7. 如有自定义包名，通过 `-PcustomAppId=xxx` 传入 Gradle
+8. 构建成功后列出 APK 文件路径和包名
+
+> **注意**：必须在**系统 CMD** 中运行，不能在 Trae CN 内置终端中运行（沙盒限制文件操作）。
 
 ---
 
@@ -518,7 +622,65 @@ adb install app\build\outputs\apk\app\debug\legado_app_app_*.apk
 
 ---
 
-## 十、参考链接
+## 十、已验证环境说明（本项目实测）
+
+> 以下环境已于 2026-06-28 实测验证，SDK 已安装到位。
+
+### 10.1 当前环境配置
+
+| 项目 | 路径/值 |
+|------|--------|
+| **项目目录** | `F:\myself\github\WeAgentChat\temp\legado` |
+| **JDK 17** | `C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot` |
+| **Android SDK** | `F:\myself\github\WeAgentChat\temp\legado\temp\android-sdk` |
+| **local.properties** | `sdk.dir=F:\\myself\\github\\WeAgentChat\\temp\\legado\\temp\\android-sdk` |
+| **GRADLE_USER_HOME** | `F:\gh`（短路径，解决跨盘符和长路径问题） |
+| **platforms** | android-36 (Android 15) |
+| **build-tools** | 36.0.0 + 35.0.0（Gradle 自动补装） |
+| **platform-tools** | adb.exe 等 |
+| **国内镜像** | 阿里云+华为云已启用（见 4.6） |
+
+### 10.2 在系统 PowerShell 中手动构建
+
+> **重要**：不能在 Trae CN 内置终端中构建！Gradle 的 transforms 缓存需要目录 move/rename 操作，被沙盒环境阻止。必须用系统原生终端。
+
+```powershell
+# 1. 打开系统 PowerShell（不是 Trae CN 终端）
+# Win+R → powershell → 回车
+
+# 2. 设置环境变量
+$env:JAVA_HOME = "C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot"
+$env:ANDROID_HOME = "F:\myself\github\WeAgentChat\temp\legado\temp\android-sdk"
+$env:GRADLE_USER_HOME = "F:\gh"
+
+# 3. 进入项目目录
+cd F:\myself\github\WeAgentChat\temp\legado
+
+# 4. 构建 Debug APK
+.\gradlew assembleAppDebug --no-daemon
+
+# 5. 构建成功后，APK 位于
+# app\build\outputs\apk\app\debug\legado_app_3.xx.xxxxxxdebug.apk
+```
+
+### 10.3 使用一键构建脚本（推荐）
+
+直接在系统 CMD 中双击 `build-legado.bat` 即可，脚本自动设置所有环境变量。详见 4.8 节。
+
+### 10.4 已修复的构建问题
+
+| 问题 | 原因 | 修复 |
+|------|------|------|
+| `For input string: ""` | `git rev-list HEAD --count` 返回空（无 Git 提交历史） | `app/build.gradle` 第 24 行改为 try-catch，默认 gitCommits=1 |
+| Gradle transforms move 失败 | Trae CN 沙盒限制目录 rename 操作 | 使用系统原生 CMD/PowerShell 构建 |
+| KSP 跨盘符路径错误 | Gradle 缓存(C:) 和项目(F:) 在不同盘 | 设置 `GRADLE_USER_HOME=F:\gh` |
+| 长路径 transforms 失败 | Windows 260 字符限制 | `GRADLE_USER_HOME` 用极短路径 `F:\gh` |
+| Kotlin daemon AccessDeniedException | 残留临时文件锁 | 构建前删除 `%LOCALAPPDATA%\kotlin\daemon` |
+| 首次构建卡在 3% | 国内网络直连 Google/Maven 慢 | 启用阿里云/华为云镜像（见 4.6） |
+
+---
+
+## 十一、参考链接
 
 | 资源 | 地址 |
 |------|------|
