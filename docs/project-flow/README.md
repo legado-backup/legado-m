@@ -21,6 +21,7 @@
 | 优化 TXT/EPUB 解析 | [modules/local-book.md](./modules/local-book.md) |
 | 了解 WebDAV/TTS/RSS | [modules/service-layer.md](./modules/service-layer.md) |
 | 修改 UI/Activity | [architecture/android-ui.md](./architecture/android-ui.md) |
+| 了解 Android 页面布局交互 | [architecture/android-ui.md](./architecture/android-ui.md) §9-10 |
 | 修改网络层/SSL | [architecture/network-layer.md](./architecture/network-layer.md) |
 | 修改配置项 | [modules/config-system.md](./modules/config-system.md) |
 | 新增后台 Service | [modules/android-services.md](./modules/android-services.md) |
@@ -34,6 +35,7 @@
 | 了解 MVVM/Base | [architecture/base-layer.md](./architecture/base-layer.md) |
 | 开发 RSS 订阅 | [modules/rss-subsystem.md](./modules/rss-subsystem.md) |
 | 修改工具类/协程/加密 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) |
+| 了解 help/ 辅助工具层 | [modules/help-layer.md](./modules/help-layer.md) |
 | 开发MOBI/WebDAV/主题 | [modules/custom-libraries.md](./modules/custom-libraries.md) |
 
 ---
@@ -43,7 +45,7 @@
 ``` 
 docs/project-flow/
 ├── README.md                          ← 你在这里
-├── INDEX.md                           ← 全局关键词索引（150+条目）
+├── INDEX.md                           ← 全局关键词索引（170+条目）
 ├── quick-reference.md                 ← 命令/文件/版本锁定速查
 ├── architecture/
 │   ├── overview.md                    ← 四层架构+数据流+设计模式
@@ -55,7 +57,7 @@ docs/project-flow/
 │   ├── frontend-components.md         ← 前端组件（路由设计+阅读器核心+通用组件）
 │   ├── frontend-stores.md             ← 前端状态管理（Pinia Stores+数据流）
 │   ├── api-dataflow.md                ← 接口数据流（HTTP/WS/Beacon完整链路+API表）
-│   ├── android-ui.md                  ← Android UI层（MainActivity+ReadBookActivity三层继承+RSS+Activity体系+Widget+Theme）
+│   ├── android-ui.md                  ← Android UI层（MainActivity+ReadBookActivity三层继承+RSS+Activity体系+Widget+Theme+核心页面布局与交互）
 │   ├── network-layer.md               ← 网络层（OkHttp拦截器链+SSL+Cookie+Cronet+代理）
 │   ├── app-init.md                    ← App初始化（50步启动+常量+EventBus+异常+监控）
 │   ├── base-layer.md                  ← ⭐ Base类与MVVM（BaseActivity/VM/Service+RecyclerAdapter+Diff）
@@ -83,7 +85,8 @@ docs/project-flow/
     ├── source-management.md           ← 书源管理（导入/导出/校验/调试/登录/18+全链路）
     ├── rss-subsystem.md               ← ⭐ RSS子系统（Rss调度+规则解析+标准解析+文章流UI）
     ├── tools-infrastructure.md         ← ⭐ 工具与辅助层（utils+协程+加密+广播接收器）
-    └── custom-libraries.md             ← ⭐ 自定义库层（MOBI解析引擎(KF6/KF8)+文件数量修正+语言映射+WebDAV+主题引擎+阿里云TTS）
+    ├── help-layer.md                   ← ⭐ Help辅助层（监控三件套+数据传递+渲染优化+规则辅助+缓存系统+默认数据）
+    └── custom-libraries.md             ← ⭐ 自定义库层（MOBI解析引擎+WebDAV+主题引擎+阿里云TTS+Cronet+权限+对话框+偏好控件）
 ```
 
 ---

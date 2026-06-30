@@ -9,6 +9,28 @@
 
 **目录**：[utils/](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/)（100+ 文件）
 
+```mermaid
+graph TB
+    UTILS[utils/ 工具类]
+
+    UTILS --> ENC[编码<br/>EncodingDetect<br/>EncoderUtils<br/>Utf8BomUtils]
+    UTILS --> CN[简繁转换<br/>ChineseUtils<br/>+OpenCC映射表]
+    UTILS --> COMP[压缩<br/>ZipUtils<br/>LibArchiveUtils]
+    UTILS --> POOL[池化<br/>ObjectPool<br/>BaseSafeObjectPool]
+    UTILS --> CANVAS[Canvas录制<br/>CanvasRecorder<br/>CanvasRecorderFactory]
+    UTILS --> VB[ViewBinding委托<br/>ActivityViewBindings<br/>FragmentViewBindings]
+    UTILS --> NET[网络<br/>NetworkUtils<br/>UrlUtil]
+    UTILS --> FILE[文件IO<br/>FileUtils<br/>DocumentUtils]
+    UTILS --> IMG[图片<br/>ImageUtils<br/>SvgUtils<br/>QRCodeUtils]
+    UTILS --> COROUTINE[协程<br/>CoroutineExtensions<br/>FlowExtensions<br/>Debounce/Throttle]
+    UTILS --> COLL[集合<br/>CollectionExtensions<br/>Array/Map扩展]
+    UTILS --> STR[字符串<br/>StringExtensions<br/>RegexExtensions]
+    UTILS --> JSON_CAT[JSON/Gson<br/>GsonExtensions<br/>JsonExtensions]
+    UTILS --> JSOUP_CAT[jsoup<br/>JsoupExtensions]
+    UTILS --> ANDROID[Android扩展<br/>Context/View<br/>Activity/Fragment]
+    UTILS --> OTHER[其他<br/>MD5/Color/Html<br/>SyncedRenderer]
+```
+
 ### 1.1 分类索引
 
 | 分类 | 核心文件 | 功能 |
@@ -220,6 +242,28 @@ launch (IO线程)
   → Semaphore.release
 ```
 
+```mermaid
+flowchart TB
+    START[Coroutine.async] --> SEM_ACQ[Semaphore.acquire 限流]
+    SEM_ACQ --> ON_START[onStart 主线程]
+    ON_START --> ACTIVE1[ensureActive 检查取消]
+    ACTIVE1 -->|未取消| BLOCK[执行 block IO线程]
+    BLOCK -->|有timeout| WITH_TO[withTimeout IO线程]
+    BLOCK -->|无timeout| EXEC[直接执行]
+    WITH_TO --> ACTIVE2[ensureActive]
+    EXEC --> ACTIVE2
+    ACTIVE2 -->|未取消| RESULT{执行结果}
+    RESULT -->|成功| ON_SUCCESS[onSuccess 主线程]
+    RESULT -->|异常| ON_ERROR[onError 主线程]
+    RESULT -->|异常+onErrorReturn| ON_DEFAULT[onErrorReturn 默认值]
+    ON_SUCCESS --> ON_FINALLY[onFinally 主线程]
+    ON_ERROR --> ON_FINALLY
+    ON_DEFAULT --> ON_FINALLY
+    ON_FINALLY --> SEM_REL[Semaphore.release]
+    ACTIVE1 -->|已取消| CANCEL[取消执行]
+    ACTIVE2 -->|已取消| CANCEL
+```
+
 ### 2.2 CoroutineContainer — 生命周期绑定
 
 ```kotlin
@@ -316,6 +360,26 @@ class SymmetricCryptoAndroid(
 [MediaButtonReceiver.kt:L1-L121](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/MediaButtonReceiver.kt)
 
 处理耳机/蓝牙设备的播放控制键：
+
+```mermaid
+flowchart TB
+    BTN[媒体按键事件] --> HANDLE[handleIntent]
+    HANDLE --> KEY{按键类型}
+
+    KEY -->|MEDIA_PREVIOUS| PREV{mediaButtonPerNext?}
+    PREV -->|true| PREV_CH[ReadBook.moveToPrevChapter]
+    PREV -->|false| PREV_PG[ReadAloud.prevParagraph]
+
+    KEY -->|MEDIA_NEXT| NEXT{mediaButtonPerNext?}
+    NEXT -->|true| NEXT_CH[ReadBook.moveToNextChapter]
+    NEXT -->|false| NEXT_PG[ReadAloud.nextParagraph]
+
+    KEY -->|其他媒体键| READ[readAloud]
+    READ --> IS_RUN{朗读/播放中?}
+    IS_RUN -->|BaseReadAloudService| PAUSE[pause/resume]
+    IS_RUN -->|AudioPlayService| PAUSE2[pause/resume]
+    IS_RUN -->|未在阅读| OPEN[打开最后一本书] --> START[开始朗读]
+```
 
 ```
 按键事件 → handleIntent()
@@ -418,6 +482,41 @@ App.onCreate()
 └── ChineseUtils.t2s/s2t → 正文简繁转换
 ```
 
+```mermaid
+flowchart LR
+    subgraph 阅读界面
+        RBA[ReadBookActivity] -->|注册| TBR[TimeBatteryReceiver]
+        RBA -->|注册| NCL[NetworkChangedListener]
+        RBA -->|接收| MBR[MediaButtonReceiver]
+        TBR -->|EventBus| TC[TIME_CHANGED]
+        TBR -->|EventBus| BC[BATTERY_CHANGED]
+        NCL -->|网络恢复| RETRY[自动重试]
+        MBR -->|媒体键| RA[ReadAloud控制]
+    end
+
+    subgraph 应用生命周期
+        APP[App.onCreate] --> LH[LifecycleHelp]
+        LH -->|onCreated| CC[CoroutineContainer绑定]
+        LH -->|onDestroyed| CANCEL[取消所有协程]
+    end
+
+    subgraph 备份加密
+        BK[BackupAES] --> SC[S symmetricCryptoAndroid]
+        SC -->|encryptBase64| ENC[加密备份文件]
+    end
+
+    subgraph 规则引擎
+        BS[BookSource] -->|concurrentRate| CRL[ConcurrentRateLimiter]
+        CRL -->|超频| CE[ConcurrentException]
+    end
+
+    subgraph 翻页渲染
+        CR[CanvasRecorder] -->|录制| ANIM[翻页动画]
+        OP[ObjectPool] -->|复用| CR
+        CU[ChineseUtils] -->|t2s/s2t| TEXT[正文简繁转换]
+    end
+```
+
 ---
 
 ## 7. TimeUtils — 时间格式化
@@ -486,3 +585,77 @@ class TimeUtils:
     def time_ago(date_str: str) -> str:
         """转为"3分钟前"形式的相对时间"""
 ```
+
+---
+
+## 8. NetworkUtils — 网络工具
+
+[NetworkUtils.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/NetworkUtils.kt)
+
+| API | 说明 |
+|-----|------|
+| `isNetworkAvailable()` | 是否有网络连接 |
+| `isWifiAvailable()` | 是否 WiFi 连接 |
+| `getNetworkIp()` | 获取本机 IP |
+| `isUrl(url)` | URL 合法性校验 |
+| `getProxy()` | 获取系统代理设置 |
+| `isPacProxy()` | 是否 PAC 代理 |
+
+---
+
+## 9. FlowExtensions — Flow 扩展
+
+[FlowExtensions.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/FlowExtensions.kt)
+
+| 扩展函数 | 说明 |
+|----------|------|
+| `Flow<T>.mapParallelSafe(mapper)` | 并行 map，异常项跳过不中断整个流 |
+| `Flow<T>.mapParallelOrdered(mapper)` | 并行 map，保持顺序 |
+
+---
+
+## 10. ViewBinding 委托详解
+
+[ActivityViewBindings.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/viewbindingdelegate/ActivityViewBindings.kt)
+[FragmentViewBindings.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/viewbindingdelegate/FragmentViewBindings.kt)
+
+```kotlin
+// Activity 使用
+class MyActivity : BaseActivity<ActivityMainBinding>() {
+    // 自动 inflate + setContentView + onDestroy 清理
+}
+
+// Fragment 使用
+class MyFragment : BaseFragment<FragmentMyBinding>() {
+    // onViewCreated 绑定 + onDestroyView 清理
+}
+```
+
+`ViewBindingProperty<R, T>` 实现 `ReadOnlyProperty<R, T>`，支持 `by viewBinder()` 委托语法：
+- `getValue`：已绑定则直接返回；未绑定则注册 `ClearOnDestroyLifecycleObserver`
+- DESTROYED 状态下获取：仍执行绑定但立即 post 清空
+- `clear()`：移除 LifecycleObserver，通过 `mainHandler.post { viewBinding = null }` 在主线程清空
+
+---
+
+## 11. CoroutineExtensions — 协程扩展
+
+[CoroutineExtensions.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/CoroutineExtensions.kt)
+
+| 扩展函数 | 说明 |
+|----------|------|
+| `CoroutineScope.launchUI(block)` | 在主线程启动协程 |
+| `CoroutineScope.launchIO(block)` | 在 IO 线程启动协程 |
+| `CoroutineScope.launchDefault(block)` | 在 Default 线程启动协程 |
+| `T.runOnIO(block)` | 切换到 IO 线程执行 |
+
+---
+
+## 12. 技术债务与注意事项
+
+| 项目 | 说明 |
+|------|------|
+| **ChineseUtils 排除词典** | 繁→简排除词典约 80+ 词组，新增误转换需手动添加 |
+| **CanvasRecorder API 版本** | API≥29 用 HardwareBuffer 硬件加速，低于 29 回退软件实现 |
+| **ViewBinding 委托** | DESTROYED 后访问会执行绑定但立即清空，可能产生短暂泄漏 |
+| **TimeUtils 相对时间** | "刚刚"/"N分钟前"等中文相对时间仅支持中文格式 |
