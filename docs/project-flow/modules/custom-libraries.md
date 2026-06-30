@@ -577,3 +577,309 @@ App 启动初始化
 │
 └── lib/prefs/ → ThemeStore / AppConfig 底层存储
 ```
+
+---
+
+## 7. lib/cronet/ — Chromium Cronet 网络引擎封装
+
+> **8个Kotlin文件，封装 Chromium Cronet 网络引擎，提供 OkHttp 兼容的拦截器，支持 QUIC/HTTP2/Brotli，动态下载 .so 库，证书信任绕过。**
+
+### 7.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| `CronetHelper.kt` | Cronet 引擎初始化 + OkHttp Request→Cronet UrlRequest 转换 + 域名映射 + 证书验证禁用 |
+| `CronetInterceptor.kt` | OkHttp Interceptor 实现，优先 Cronet 失败回退 OkHttp |
+| `CronetLoader.kt` | Cronet .so 原生库的下载/MD5校验/动态加载（object单例） |
+| `AbsCallBack.kt` | Cronet UrlRequest.Callback 抽象基类，桥接异步→同步 Response |
+| `CallbackResult.kt` | 回调步骤值容器（data class） |
+| `NewCallBack.kt` | API≥N 的 AbsCallBack 实现（基于 CompletableFuture） |
+
+### 7.2 架构
+
+```mermaid
+classDiagram
+    class CronetInterceptor {
+        +intercept(chain): Response
+    }
+    class CronetHelper {
+        +cronetEngine: ExperimentalCronetEngine?
+        +buildRequest(request, callback): UrlRequest
+    }
+    class CronetLoader {
+        +install(): Boolean
+        +preDownload()
+        +loadLibrary(libName)
+    }
+    class AbsCallBack {
+        +waitForDone(urlRequest): Response*
+        +onError(error)*
+        +onSuccess(response)*
+    }
+    class NewCallBack {
+        +waitForDone(urlRequest): Response
+    }
+    CronetInterceptor --> CronetHelper
+    CronetInterceptor --> AbsCallBack
+    CronetHelper --> CronetLoader
+    AbsCallBack <|-- NewCallBack
+```
+
+### 7.3 核心流程
+
+```
+OkHttp Chain
+  → CronetInterceptor.intercept()
+    → CronetLoader.install() 检查 .so 是否就绪
+      → 未就绪 → 降级 chain.proceed() (OkHttp 原生)
+    → cronetEngine 非空 → buildRequest() 转换请求
+      → customHost() 域名→IP映射 (AppConfig.hostMap + AnalyzeUrl.customIp)
+      → BodyUploadProvider / LargeBodyUploadProvider (>32KB)
+    → API≥N: NewCallBack(CompletableFuture) / API<N: OldCallback
+    → Cronet 请求成功 → 返回 OkHttp Response
+    → Cronet 失败 → 降级 chain.proceed() (仅 ERR_CERT_*/ERR_SSL_* 静默)
+```
+
+### 7.4 CronetLoader — 动态 .so 加载
+
+[CronetLoader.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/lib/cronet/CronetLoader.kt)
+
+```
+.so URL: https://storage.googleapis.com/chromium-cronet/android/{version}/Release/cronet/libs/{abi}/libcronet.{version}.so
+MD5: assets/cronet.json 按 CPU ABI 读取
+加载策略: System.loadLibrary → 失败 → 删历史文件 → 校验本地MD5 → 匹配则 System.load(path) → 不匹配则重新下载
+CPU ABI: 反射 ApplicationInfo.primaryCpuAbi, 失败回退 Build.SUPPORTED_ABIS[0]
+```
+
+### 7.5 证书信任绕过
+
+`disableCertificateVerify()`: 通过反射替换 `X509Util.sDefaultTrustManager/sTestTrustManager` 为 `SSLHelper.unsafeTrustManagerExtensions`，实现全站证书信任。
+
+### 7.6 与其他模块的依赖
+
+```
+CronetInterceptor
+├── 被注入到: OkHttp 客户端构建链 (model/webBook/WebBook 等)
+├── 依赖: AppConfig.hostMap (自定义域名映射)
+├── 依赖: AnalyzeUrl.customIp (URL 级域名映射)
+└── 依赖: SSLHelper (证书信任)
+```
+
+---
+
+## 8. lib/permission/ — 运行时权限管理
+
+> **3个核心文件 + 7个辅助文件，串行化权限请求队列，支持6种请求类型，Activity Result API。**
+
+### 8.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| `RequestManager.kt` | 权限请求队列管理器（internal object），Stack<Request> 串行化 |
+| `Permissions.kt` | 权限常量定义 + 分组（object） |
+| `PermissionActivity.kt` | 透明 Activity，处理6种权限请求 UI |
+
+### 8.2 RequestManager — 串行化队列
+
+```kotlin
+object RequestManager : OnPermissionsResultCallback {
+    val stack = Stack<Request>()
+    fun pushRequest(request?)  // 入栈，当前请求>5秒视为失效则立即启动
+    // 回调: onPermissionsGranted/onPermissionsDenied/onError → startNextRequest()
+}
+```
+
+### 8.3 6种请求类型
+
+| 类型 | 说明 |
+|------|------|
+| TYPE_PERMISSION | 普通 Android 权限请求 |
+| TYPE_SETTINGS | 跳转系统设置页 |
+| TYPE_ALL_FILES | Android 11+ 所有文件管理权限 |
+| TYPE_NOTIFICATION | Android 13+ 通知权限 |
+| TYPE_BATTERY_OPTIMIZATION | 电池优化白名单 |
+| TYPE_SYSTEM_ALERT_WINDOW | 悬浮窗权限 |
+
+### 8.4 Permissions — 权限常量
+
+```kotlin
+object Permissions {
+    const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
+    // ... 其他权限常量
+
+    object Group {
+        val STORAGE    // API≥R: MANAGE_EXTERNAL_STORAGE; 否则: READ+WRITE_EXTERNAL_STORAGE
+        val CAMERA     // CAMERA
+        val LOCATION   // ACCESS_FINE + ACCESS_COARSE
+        // ... 其他分组
+    }
+}
+```
+
+### 8.5 PermissionActivity — 透明 Activity
+
+- 拒绝计数持久化到 `SharedPreferences("permission_deny_count")`
+- 拒绝>5次自动跳过
+- 通知权限: API≥TIRAMISU直接请求; API≥O跳转通知频道; 低版本跳转应用设置
+- 电池优化: 直接打开 `RequestIgnoreBatteryOptimizations`
+- 进出动画均为0（透明过渡）
+
+---
+
+## 9. lib/dialogs/ — 对话框 DSL 封装
+
+> **3个文件，提供 Kotlin DSL 风格的对话框 API，支持墨水屏模式适配。**
+
+### 9.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| `AlertBuilder.kt` | 对话框构建器接口，DSL 风格 API（泛型返回类型） |
+| `AndroidAlertBuilder.kt` | Android 原生实现（委托 AlertDialog.Builder） |
+| `AndroidDialogs.kt` | Context/Fragment 扩展函数（alert/progressDialog） |
+
+### 9.2 AlertBuilder 接口
+
+```kotlin
+interface AlertBuilder<D> {
+    fun setTitle(title: CharSequence)
+    fun positiveButton(text: String, onClicked: ((DialogInterface) -> Unit)? = null)
+    fun negativeButton(text: String, onClicked: ((DialogInterface) -> Unit)? = null)
+    fun items(items: List<CharSequence>, onItemSelected: (Int) -> Unit)
+    fun singleChoiceItems(items: List<CharSequence>, checkedItem: Int, onClick: ((Int) -> Unit)?)
+    fun multiChoiceItems(items: List<CharSequence>, checkedItems: BooleanArray, onClick: ((Int, Boolean) -> Unit))
+    fun build(): D
+    fun show(): D
+    // 便捷: okButton/cancelButton/yesButton/noButton
+}
+```
+
+### 9.3 墨水屏适配
+
+`AndroidAlertBuilder.show()`:
+- `AppConfig.isEInkMode` 时: 禁用暗化(dimAmount=0f)、禁用窗口动画、使用 `bg_eink_border_dialog` 背景
+- 正常模式: 调用 `applyTint()` 为对话框着色
+
+### 9.4 顶层扩展函数
+
+```kotlin
+// Context 扩展
+context.alert(title?, message?, init?)  // 显示 AlertDialog
+context.progressDialog(title?, message?)  // 水平进度对话框
+context.indeterminateProgressDialog(title?, message?)  // 不确定进度
+
+// Fragment 扩展 (委托给 Activity)
+fragment.alert(...)
+fragment.progressDialog(...)
+```
+
+---
+
+## 10. lib/prefs/ — 偏好设置控件
+
+> **12个文件，自定义 Preference 控件体系，支持颜色选择/滑块/长按/底部栏着色。**
+
+### 10.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| `Preference.kt` | 自定义 Preference 基类，支持长按回调 + 底部栏着色 |
+| `PreferenceFragment.kt` | 自定义 PreferenceFragmentCompat，替换默认对话框 |
+| `ColorPreference.kt` | 颜色选择偏好控件（ColorPickerDialog） |
+| `SeekBarPreference.kt` | 滑块偏好控件（带+/-按钮，min/max范围） |
+| `EditTextPreferenceDialog.kt` | 自定义 EditText 对话框 |
+| `ListPreferenceDialog.kt` | 自定义 List 选择对话框 |
+| `MultiSelectListPreferenceDialog.kt` | 自定义多选对话框 |
+| `ColorPickerDialog*.kt` | 颜色选择器对话框（预设色/自定义/Alpha/色相深浅） |
+
+### 10.2 Preference 基类
+
+```kotlin
+open class Preference(context, attrs) : androidx.preference.Preference(context, attrs) {
+    var isBottomBackground: Boolean  // XML属性，启用时根据背景明暗自动调整文字色
+    fun onLongClick(listener)        // 长按监听
+
+    companion object {
+        fun bindView(...)  // 统一渲染 title/summary/icon/widget, icon着色为accentColor
+    }
+}
+```
+
+### 10.3 ColorPreference — 颜色选择
+
+```kotlin
+class ColorPreference : Preference, ColorPickerDialogListener {
+    var onSaveColor: ((color: Int) -> Boolean)?  // 颜色保存拦截
+    var presets: IntArray?                        // 预设色板
+
+    // XML属性: cpv_showDialog / cpv_dialogType / cpv_colorShape / cpv_allowPresets
+    //          cpv_allowCustom / cpv_showAlphaSlider / cpv_showColorShades
+    //          cpv_previewSize / cpv_colorPresets
+}
+```
+
+选择器功能：预设色网格 + 自定义色 HSV + Alpha 滑块 + 色相深浅条
+
+### 10.4 SeekBarPreference — 滑块
+
+```kotlin
+class SeekBarPreference : Preference {
+    var value: Int  // 当前值, setter自动coerceIn + persistInt + 更新UI
+    // XML属性: NumberPickerPreference_MinValue (默认0) / MaxValue (默认1000)
+    // +/- 按钮: seekPlus/seekReduce → progressAdd(±1)
+    // onStopTrackingTouch: callChangeListener验证后赋值
+}
+```
+
+### 10.5 PreferenceFragment — 对话框替换
+
+```kotlin
+abstract class PreferenceFragment : PreferenceFragmentCompat() {
+    override fun onDisplayPreferenceDialog(preference) {
+        // 拦截对话框显示，路由到自定义实现:
+        // EditTextPreference → EditTextPreferenceDialog
+        // ListPreference → ListPreferenceDialog
+        // MultiSelectListPreference → MultiSelectListPreferenceDialog
+    }
+}
+```
+
+---
+
+## 11. 各库完整依赖关系（更新版）
+
+```
+App 启动初始化
+│
+├── lib/permission/ → 动态权限申请 (所有需要权限的模块)
+│   ├── lib/cronet/ → WRITE_EXTERNAL_STORAGE (下载.so)
+│   └── 文件导入/导出 → READ/WRITE_EXTERNAL_STORAGE
+│
+├── lib/cronet/CronetInterceptor
+│   ├── 被注入到 OkHttp 客户端链
+│   ├── 依赖 AppConfig.hostMap (自定义域名映射)
+│   └── 依赖 SSLHelper (证书信任)
+│
+├── lib/dialogs/
+│   ├── 所有 AlertDialog/alert() 调用点
+│   └── 墨水屏模式适配
+│
+├── lib/prefs/
+│   ├── ConfigActivity → 各 ConfigFragment
+│   ├── ThemeConfigFragment → ColorPreference
+│   └── ReadBookConfig → SeekBarPreference
+│
+├── lib/theme/ThemeStore
+│   ├── 初始化时读取 SharedPreferences
+│   ├── 应用到所有 Activity/Widget
+│   └── TintHelper → 视图着色
+│
+├── lib/webdav/WebDav
+│   ├── Backup/Restore → 备份上传/下载
+│   └── RemoteBookWebDav → 远程书籍浏览
+│
+├── lib/mobi/MobiReader
+│   └── model/localBook/MobiFile → LocalBook 导入入口
+│
+└── lib/prefs/ → ThemeStore / AppConfig 底层存储
+```

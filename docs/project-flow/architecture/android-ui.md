@@ -271,6 +271,37 @@ ReadBookActivity
 └── ReadAloudDialog (朗读控制浮窗)
 ```
 
+```mermaid
+graph TB
+    RBA[ReadBookActivity] --> RB[ReadBook 全局单例]
+    RBA --> PV[PageView 自定义View]
+    RBA --> RM[ReadMenu 菜单覆盖层]
+    RBA --> RAD[ReadAloudDialog 朗读控制]
+
+    RB --> MODE{三种模式}
+    MODE -->|文字| TEXT[TextRead]
+    MODE -->|漫画| MANGA[ReadManga]
+    MODE -->|音频| AUDIO[AudioPlay]
+    RB --> CACHE[三章缓存<br/>prev/cur/next]
+    RB --> TOUCH[9宫格触摸映射]
+
+    PV --> ANIM[翻页动画 PageAnim]
+    ANIM --> COVER[覆盖]
+    ANIM --> SLIDE[滑动]
+    ANIM --> SIM[仿真]
+    ANIM --> NONE[无动画]
+    PV --> LAYOUT[排版引擎<br/>ReadBookConfig]
+    PV --> PAGE[分页计算]
+
+    RM --> TB[TitleBar<br/>书名/章节/书源]
+    RM --> BM[BottomMenu<br/>FAB+SeekBar+功能栏]
+    BM --> FAB1[fabSearch 全文搜索]
+    BM --> FAB2[fabAutoPage 自动翻页]
+    BM --> FAB3[fabReplaceRule 替换]
+    BM --> FAB4[fabNightTheme 夜间]
+    BM --> CATALOG[目录/书签/换源/朗读/设置]
+```
+
 **9宫格触摸区域**：[AppConfig.kt:L38-L46](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/help/config/AppConfig.kt#L38)
 ```
 ┌─────────┬─────────┬─────────┐
@@ -311,4 +342,486 @@ ReadBookActivity
                      ├─搜索结果 → BookInfo → ReadBook
                      ├─全文检索 → SearchBookActivity
                      └─发现详情 → ExploreActivity
+```
+
+```mermaid
+flowchart TB
+    START[应用启动] --> FIRST{首次?}
+    FIRST -->|是| PRIVACY[隐私协议] --> HELP[帮助文档MD] --> PWD[设置密码] --> MAIN
+    FIRST -->|更新| CHANGELOG[更新日志MD] --> MAIN
+    FIRST -->|正常| MAIN[MainActivity]
+
+    MAIN --> BOOK_SHELF[书架Tab]
+    MAIN --> EXPLORE[发现Tab]
+    MAIN --> RSS_TAB[RSS Tab]
+    MAIN --> MY[我的Tab]
+
+    BOOK_SHELF -->|点击书籍| BOOK_INFO[BookInfoActivity]
+    BOOK_SHELF -->|搜索按钮| SEARCH[SearchActivity]
+    BOOK_SHELF -->|长按| OPS[操作菜单]
+
+    BOOK_INFO -->|阅读| READ[ReadBookActivity]
+    BOOK_INFO -->|漫画| MANGA[ReadMangaActivity]
+    BOOK_INFO -->|换源| CHANGE_SRC[ChangeBookSourceDialog]
+    BOOK_INFO -->|缓存| CACHE_DL[缓存下载]
+
+    EXPLORE -->|搜索结果| BOOK_INFO
+    SEARCH -->|结果点击| BOOK_INFO
+    SEARCH -->|全文检索| SEARCH_BOOK[SearchBookActivity]
+
+    MY --> SRC_MGR[书源管理]
+    MY --> RSS_MGR[RSS管理]
+    MY --> BACKUP[备份恢复]
+    MY --> THEME[主题设置]
+    MY --> WEBDAV[WebDAV设置]
+```
+
+---
+
+## 9. 核心页面布局与交互详解
+
+### 9.1 书架页面 (BookshelfFragment1/2)
+
+**布局**：
+```
++-------------------------------------------+
+| TitleBar (搜索按钮/排序/更多)               |
++-------------------------------------------+
+|                                            |
+| SwipeRefreshLayout                         |
+|  +-- RecyclerView                          |
+|       样式1: GridLayoutManager(3列)        |
+|       样式2: 分组折叠 + GridLayoutManager  |
+|                                            |
++-------------------------------------------+
+```
+
+**状态变量**：
+| 变量 | 类型 | 用途 |
+|------|------|------|
+| books | List<Book> | 当前书籍列表 |
+| sort | Int | 排序模式 |
+| isSearch | Boolean | 是否搜索模式 |
+
+**交互**：长按→操作菜单(置顶/删除/换源/详情/缓存/导出)；下拉刷新→全局搜索更新；分组拖拽→DragSortRecyclerView
+
+### 9.2 搜索页面 (SearchActivity)
+
+**布局**：
+```
++-------------------------------------------+
+|  TitleBar + SearchView                     |
++-------------------------------------------+
+|  RefreshProgressBar                        |
++-------------------------------------------+
+|  A) 搜索结果: RecyclerView + SearchAdapter |
+|  B) 输入帮助:                              |
+|     书架书籍(FlexboxLayout+BookAdapter)    |
+|     搜索历史(FlexboxLayout+HistoryKeyAdapter)|
++-------------------------------------------+
+|  FAB (搜索开始/停止)                       |
++-------------------------------------------+
+```
+
+**状态变量**：
+| 变量 | 类型 | 用途 |
+|------|------|------|
+| groups | List<String>? | 书源分组 |
+| isManualStopSearch | Boolean | 是否手动停止 |
+| precisionSearchMenuItem | MenuItem? | 精准搜索 |
+
+**ViewModel LiveData**：
+| LiveData | 用途 |
+|----------|------|
+| isSearchLiveData | 搜索进行中 |
+| searchBookLiveData | 搜索结果 |
+| upAdapterLiveData | Adapter局部刷新 |
+| searchFinishLiveData | 搜索结束 |
+| searchScope.stateLiveData | 搜索范围 |
+
+**交互流程**：
+1. SearchView提交 → viewModel.search(key)
+2. 搜索文本变化 → stop() + upHistory(newText)
+3. 搜索范围选择 → menu_group_1/2 → searchScope.update/remove
+4. FAB → 搜索中stop(); 未搜索search("")
+5. 结果点击 → BookInfoActivity
+6. 历史关键字点击 → 直接搜索或补全
+7. 滚动到底部 → 自动加载更多
+
+### 9.3 书籍详情页面 (BookInfoActivity)
+
+**布局**：
+```
++-------------------------------------------+
+|  bg_book (模糊封面背景)                    |
+|  +-- vw_bg (半透明遮罩)                    |
+|  |   +-- TitleBar (Dark主题)               |
+|  |   +-- SwipeRefreshLayout                |
+|  |       +-- NestedScrollView              |
+|  |           ArcView (弧形顶部)            |
+|  |           CardView > CoverImageView     |
+|  |           tv_name (书名,居中)            |
+|  |           lb_kind (分类标签)             |
+|  |           tv_author / tv_origin         |
+|  |           tv_lasted (最新章)             |
+|  |           tv_group (分组)               |
+|  |           tv_toc (目录进度)              |
+|  |           tv_intro_container (简介)     |
+|  +-- fl_action (底部操作)                  |
+|      [tv_shelf: 加入/移出书架]             |
+|      [tv_read: 阅读]                       |
++-------------------------------------------+
+```
+
+**状态变量**：
+| 变量 | 类型 | 用途 |
+|------|------|------|
+| chapterChanged | Boolean | 章节变更 |
+| pooledWebView | PooledWebView? | WebView池 |
+| initIntroView | Boolean | 简介是否初始化 |
+
+**ViewModel LiveData**：
+| LiveData | 用途 |
+|----------|------|
+| bookData | 当前书籍 |
+| chapterListData | 章节列表 |
+| waitDialogData | 等待对话框 |
+| actionLive | 操作指令 |
+
+**交互**：
+- tvRead → 按bookType分发AudioPlay/VideoPlayer/ReadManga/ReadBook
+- tvShelf → 已加入:删除确认; 未加入:添加书架
+- tvChangeSource → ChangeBookSourceDialog
+- ivCover click → ChangeCoverDialog; long → PhotoDialog
+- 简介支持四种模式: `<useweb>`/`<usehtml>`/`<md>`/纯文本
+
+**菜单**：16项(menu_custom_btn, menu_edit, menu_share_it, menu_refresh, menu_login, menu_top, menu_set_source_variable, menu_set_book_variable, menu_copy_book_url, menu_copy_toc_url, menu_can_update, menu_clear_cache, menu_log, menu_split_long_chapter, menu_delete_alert, menu_upload)
+
+### 9.4 阅读界面 (ReadBookActivity)
+
+**布局**：
+```
+FrameLayout
+ +-- ReadView (全屏阅读视图, 自定义View)
+ +-- View (text_menu_position, 不可见锚点)
+ +-- ImageView (cursor_left, 文本选择左光标)
+ +-- ImageView (cursor_right, 文本选择右光标)
+ +-- ReadMenu (阅读菜单覆盖层, 默认gone)
+ |    +-- vwMenuBg (点击关闭菜单背景)
+ |    +-- TitleBar (书名/章节名/书源操作/自定义按钮)
+ |    +-- bottomMenu (ConstraintLayout)
+ |         +-- fabSearch / fabAutoPage / fabReplaceRule / fabNightTheme
+ |         +-- tvPre / tvNext (上一章/下一章)
+ |         +-- seekReadPage (进度SeekBar)
+ |         +-- llCatalog / llReadAloud / llFont / llSetting
+ |         +-- llBrightness (亮度控制条)
+ +-- SearchMenu (全文搜索菜单, 默认gone)
+ +-- View (navigation_bar, 底部导航栏占位)
+```
+
+**状态变量**：
+| 变量 | 类型 | 用途 |
+|------|------|------|
+| isInitFinish | Boolean | 数据初始化完成 |
+| menuLayoutIsVisible | Boolean | 菜单可见 |
+| isAutoPage | Boolean | 自动翻页 |
+| isScroll | Boolean | 滚动模式 |
+| isShowingSearchResult | Boolean | 全文搜索结果模式 |
+| isSelectingSearchResult | Boolean | 选择搜索结果 |
+| bookChanged | Boolean | 书籍变更 |
+| pageChanged | Boolean | 页面变更 |
+| confirmRestoreProcess | Boolean? | 恢复进度确认 |
+| searchContentQuery | String | 搜索关键词 |
+| searchResultList | List<SearchResult>? | 搜索结果 |
+| searchResultIndex | Int | 当前搜索索引 |
+
+**翻页交互 (5种)**：
+1. 触摸翻页: ReadView.OnTouchEvent → pageDelegate.turnPage()
+2. 音量键: VOLUME_UP/DOWN → volumeKeyPage()
+3. 键盘: PAGE_UP/DOWN/SPACE → handleKeyPage()
+4. 鼠标滚轮: SCROLL → mouseWheelPage()
+5. 自动翻页: autoPage() → readView.autoPager.start()
+
+**菜单显示/隐藏**：
+点击屏幕中央 → showActionMenu()
+  → 朗读中 → showReadAloudDialog()
+  → 自动翻页 → AutoReadDialog
+  → 全文搜索中 → searchMenu.runMenuIn()
+  → 否则 → readMenu.runMenuIn() (TitleBar下滑 + 底栏上滑)
+
+**文本选择交互**：
+长按文字 → ContentTextView选中 → cursorLeft/cursorRight显示
+拖拽光标 → selectStartMove/selectEndMove
+松手 → TextActionMenu (朗读/书签/替换/全文搜索/字典)
+
+**事件总线观察**：
+- TIME_CHANGED / BATTERY_CHANGED → 更新时间/电量
+- UP_CONFIG(array) → 更新配置(0=系统UI, 1=背景, 2=样式, 3=透明度, 4=翻页灵敏度, 5=重载内容, 6=更新内容...)
+- ALOUD_STATE → 朗读状态变化
+- TTS_PROGRESS → TTS进度
+- SEARCH_RESULT → 搜索结果
+- REFRESH_BOOK_CONTENT / REFRESH_BOOK_TOC → JS触发刷新
+
+### 9.5 书源管理页面 (BookSourceActivity)
+
+**布局**：
+```
++-------------------------------------------+
+|  TitleBar + SearchView                     |
++-------------------------------------------+
+|  FastScrollRecyclerView                    |
+|    LinearLayoutManager                     |
+|    BookSourceAdapter                       |
+|    DragSelectTouchHelper (滑动多选)        |
+|    ItemTouchHelper (拖拽排序)              |
++-------------------------------------------+
+|  SelectActionBar                           |
+|  [全选/反选] [删除] [启用/禁用/校验/...]   |
++-------------------------------------------+
+```
+
+**状态变量**：
+| 变量 | 类型 | 用途 |
+|------|------|------|
+| sort | BookSourceSort | 排序模式(Default/Weight/Name/Url/Update/Respond/Enable) |
+| sortAscending | Boolean | 升序/降序 |
+| groups | LinkedHashSet<String> | 书源分组 |
+| groupSourcesByDomain | Boolean | 按域名分组 |
+| snackBar | Snackbar? | 校验提示 |
+
+**搜索关键字**：支持"启用/禁用/需登录/无分组/启用发现/禁用发现/group:xxx"
+
+**批量操作**：启用/禁用/发现/校验/置顶/置底/加分组/移分组/导出/分享
+
+### 9.6 书源编辑页面 (BookSourceEditActivity)
+
+**布局**：
+```
++-------------------------------------------+
+|  TitleBar ("编辑书源")                     |
++-------------------------------------------+
+|  HorizontalScrollView (配置行)             |
+|  [Spinner:类型] [启用] [发现] [Cookie]     |
+|  [事件监听] [自定义按钮]                   |
++-------------------------------------------+
+|  TabLayout (6个Tab)                        |
+|  [基本] [搜索] [发现] [详情] [目录] [正文] |
++-------------------------------------------+
+|  RecyclerView (动态EditEntity列表)          |
++-------------------------------------------+
+```
+
+**6个Tab编辑项**：
+| Tab | 编辑项数 | 关键字段 |
+|-----|---------|---------|
+| 基本 | 13 | bookSourceUrl, bookSourceName, bookSourceGroup, loginUrl, loginUi, loginCheckJs, coverDecodeJs, bookUrlPattern, header, variableComment, concurrentRate, jsLib |
+| 搜索 | 11 | searchUrl, checkKeyWord, bookList, name, author, kind, wordCount, lastChapter, intro, coverUrl, bookUrl |
+| 发现 | 10 | exploreUrl, bookList, name, author, kind, wordCount, lastChapter, intro, coverUrl, bookUrl |
+| 详情 | 11 | init, name, author, kind, wordCount, lastChapter, intro, coverUrl, tocUrl, canReName, downloadUrls |
+| 目录 | 10 | preUpdateJs, chapterList, chapterName, chapterUrl, formatJs, isVolume, updateTime, isVip, isPay, nextTocUrl |
+| 正文 | 11 | content, nextContentUrl, subContent, replaceRegex, title, sourceRegex, imageStyle, imageDecode, webJs, payAction, callBackJs |
+
+**交互**：Tab切换→RecyclerView的EditEntity切换；保存→getSource()收集→viewModel.save()；调试→先保存→BookSourceDebugActivity；全屏编辑→CodeEditActivity；键盘工具→KeyboardToolPop(URL参数/教程/正则/文件)
+
+### 9.7 RSS订阅源页面 (RssSortActivity)
+
+**布局**：
+```
++-------------------------------------------+
+|  TitleBar                                  |
++-------------------------------------------+
+|  LinearLayout (tabs_container, 动态多行标签)|
+|  每行: HorizontalScrollView > TextView标签  |
+|  (<=10:1行, <=20:2行, >20:3行)            |
++-------------------------------------------+
+|  ViewPager                                 |
+|  +-- RssArticlesFragment (每分类一个)      |
++-------------------------------------------+
+```
+
+**5种文章样式**：
+| style | Adapter | LayoutManager | 说明 |
+|-------|---------|---------------|------|
+| 0 | RssArticlesAdapter | LinearLayoutManager | 标题+日期(左) + 缩略图(右110x68) |
+| 1 | RssArticlesAdapter1 | LinearLayoutManager | 大图(220dp高) + 标题 + 日期 |
+| 2 | RssArticlesAdapter2 | GridLayoutManager(2列) | 双列卡片 |
+| 3 | RssArticlesAdapter3 | StaggeredGridLayoutManager(竖2/横3) | 瀑布流CardView |
+| 4 | RssArticlesAdapter4 | GridLayoutManager(3列) | 三列紧凑 |
+
+切换：菜单 menu_switch_layout → articleStyle循环0→1→2→3→4→0
+
+### 9.8 RSS文章阅读页面 (ReadRssActivity)
+
+**布局**：
+```
+FrameLayout
+ +-- ConstraintLayout (主视图)
+ |    +-- TitleBar
+ |    +-- FrameLayout (web_view_container, WebView)
+ |    +-- RefreshProgressBar (1dp进度条)
+ +-- FrameLayout (custom_web_view, 全屏视频)
+```
+
+**内容加载三路分发**：
+1. 有link+有description → contentLiveData → loadDataWithBaseURL
+2. 有link+有ruleContent → Rss.getContent() → contentLiveData
+3. 有link+无ruleContent → urlLiveData → loadUrl
+4. 有startHtml → htmlLiveData → loadDataWithBaseURL
+
+**WebView交互**：长按图片→保存；URL跳转→shouldOverrideUrlLoading JS；黑白名单→shouldInterceptRequest过滤；JS注入→preloadJs；全屏视频→customWebView覆盖
+
+**返回导航**：全屏→关闭视频；WebView可后退→智能计算后退步数(跳过刷新重复)；无法后退→finish()
+
+### 9.9 配置页面 (ConfigActivity)
+
+**布局**：简单容器，通过configTag动态加载Fragment
+
+**Fragment路由表**：
+| configTag | Fragment | 功能 |
+|-----------|----------|------|
+| OTHER_CONFIG | OtherConfigFragment | 其他设置 |
+| THEME_CONFIG | ThemeConfigFragment | 主题设置 |
+| BACKUP_CONFIG | BackupConfigFragment | 备份设置 |
+| COVER_CONFIG | CoverConfigFragment | 封面设置 |
+| WELCOME_CONFIG | WelcomeConfigFragment | 欢迎页设置 |
+
+### 9.10 换源对话框 (ChangeBookSourceDialog)
+
+**布局**：
+```
++-------------------------------------------+
+|  Toolbar (书名/作者 + 菜单)                |
++-------------------------------------------+
+|  RefreshProgressBar                        |
++-------------------------------------------+
+|  FastScrollRecyclerView                    |
+|    ChangeBookSourceAdapter                 |
++-------------------------------------------+
+|  ll_bottom_bar                             |
+|  [当前源/进度] [跳顶部] [跳底部]          |
++-------------------------------------------+
+```
+
+**交互**：换源→changeTo()→类型确认→viewModel.getToc()→callBack.changeTo()；搜索控制→startOrStopSearch()；分组切换→AppConfig.searchGroup变更；滚动定位→scrollToDurSource()
+
+---
+
+## 10. 页面交互流程图
+
+### 10.1 阅读界面状态流转
+
+```
+[阅读中]
+  │
+  ├── 点击屏幕中央 ─→ [菜单可见]
+  │     ├── TitleBar: 书名/章节/书源操作/自定义按钮
+  │     ├── 目录 → TocDialog
+  │     ├── 朗读 → ReadAloudDialog
+  │     ├── 排版 → ReadStyleDialog
+  │     ├── 设置 → ReadBookConfigFragment
+  │     ├── FAB搜索 → SearchMenu
+  │     ├── FAB自动翻页 → AutoReadDialog
+  │     ├── FAB替换 → ReplaceRuleDialog
+  │     ├── FAB夜间 → 切换夜间模式
+  │     └── 点击空白 → 返回[阅读中]
+  │
+  ├── 长按文字 ─→ [文本选择]
+  │     ├── 朗读选中
+  │     ├── 添加书签
+  │     ├── 替换规则
+  │     ├── 全文搜索
+  │     └── 字典查询
+  │
+  ├── 音量键 ─→ 翻页
+  ├── 自动翻页 ─→ 定时翻页
+  └── 返回键 ─→ finish()
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> 阅读中
+
+    阅读中 --> 菜单可见 : 点击屏幕中央
+    阅读中 --> 文本选择 : 长按文字
+    阅读中 --> 翻页 : 音量键/触摸翻页
+    阅读中 --> 自动翻页 : 开启自动翻页
+    阅读中 --> [*] : 返回键
+
+    菜单可见 --> 目录 : 目录按钮
+    菜单可见 --> 朗读控制 : 朗读按钮
+    菜单可见 --> 排版设置 : 排版按钮
+    菜单可见 --> 阅读设置 : 设置按钮
+    菜单可见 --> 全文搜索 : FAB搜索
+    菜单可见 --> 自动翻页设置 : FAB自动翻页
+    菜单可见 --> 替换规则 : FAB替换
+    菜单可见 --> 阅读中 : 点击空白区域
+    菜单可见 --> 夜间模式切换 : FAB夜间
+
+    目录 --> 阅读中 : 选择章节
+    朗读控制 --> 阅读中 : 关闭
+    排版设置 --> 阅读中 : 关闭
+    阅读设置 --> 阅读中 : 关闭
+    全文搜索 --> 阅读中 : 关闭
+    夜间模式切换 --> 阅读中 : 自动
+
+    文本选择 --> 朗读选中 : 朗读
+    文本选择 --> 添加书签 : 书签
+    文本选择 --> 替换规则 : 替换
+    文本选择 --> 全文搜索 : 搜索
+    文本选择 --> 字典查询 : 字典
+    文本选择 --> 阅读中 : 取消选择
+
+    自动翻页 --> 阅读中 : 停止自动翻页
+    自动翻页设置 --> 阅读中 : 关闭
+```
+
+### 10.2 搜索→详情→阅读 完整流程
+
+```
+SearchActivity
+  │
+  ├── 输入关键词 → 搜索 → searchBookLiveData
+  │     ├── 结果点击 → BookInfoActivity
+  │     │     ├── tvRead → ReadBookActivity / ReadMangaActivity / AudioPlayActivity
+  │     │     ├── tvShelf → 加入/移出书架
+  │     │     ├── tvChangeSource → ChangeBookSourceDialog
+  │     │     └── ivCover → ChangeCoverDialog
+  │     │
+  │     └── 长按结果 → 快速加入书架
+  │
+  └── 搜索范围 → menu_group → 分组筛选
+```
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant SA as SearchActivity
+    participant VM as SearchViewModel
+    participant BIA as BookInfoActivity
+    participant RBA as ReadBookActivity
+
+    U->>SA: 输入关键词
+    SA->>VM: search(key)
+    VM->>VM: 遍历书源并发搜索
+    VM-->>SA: searchBookLiveData 更新
+    SA->>SA: SearchAdapter 展示结果
+
+    U->>SA: 点击搜索结果
+    SA->>BIA: startActivity(book)
+    BIA->>BIA: 加载书籍详情+目录
+
+    U->>BIA: 点击阅读
+    alt 文字书
+        BIA->>RBA: ReadBookActivity
+    else 漫画
+        BIA->>RBA: ReadMangaActivity
+    else 有声书
+        BIA->>RBA: AudioPlayActivity
+    end
+
+    U->>BIA: 点击换源
+    BIA->>BIA: ChangeBookSourceDialog
+
+    U->>BIA: 点击加入书架
+    BIA->>BIA: saveBook / deleteBook
 ```

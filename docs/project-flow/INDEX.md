@@ -20,6 +20,7 @@
 | App.kt 初始化 | [modules/service-layer.md](./modules/service-layer.md) | 1 应用初始化 |
 | AppConfig 全局配置 | [modules/config-system.md](./modules/config-system.md) | 1 AppConfig |
 | AppContextWrapper | [architecture/base-layer.md](./architecture/base-layer.md) | 6 语言切换 |
+| AppFreezeMonitor 冻结检测 | [modules/help-layer.md](./modules/help-layer.md) | 1.1 AppFreezeMonitor |
 | AudioPlay 音频播放 | [modules/reading-engine-media.md](./modules/reading-engine-media.md) | 3 AudioPlay |
 | AudioPlayService | [modules/android-services.md](./modules/android-services.md) | 5 AudioPlayService |
 | AutoMigration | [modules/data-layer.md](./modules/data-layer.md) | 6 迁移策略 |
@@ -81,6 +82,10 @@
 | CORS | [modules/web-service.md](./modules/web-service.md) | 2.2 CORS预检 |
 | Cronet | [modules/service-layer.md](./modules/service-layer.md) | 1.1 初始化流程 |
 | Cronet 加速 | [architecture/network-layer.md](./architecture/network-layer.md) | 5 Cronet加速 |
+| Cronet 网络引擎封装 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 7 lib/cronet/ |
+| CrashHandler 崩溃处理 | [modules/help-layer.md](./modules/help-layer.md) | 1.2 CrashHandler |
+| CacheManager 三级缓存 | [modules/help-layer.md](./modules/help-layer.md) | 7.1 CacheManager |
+| ColorPreference 颜色选择 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 10.3 ColorPreference |
 | CSS 分页 | [architecture/frontend-components.md](./architecture/frontend-components.md) | 3 阅读器核心 |
 | CustomExporter 分卷导出 | [modules/android-services.md](./modules/android-services.md) | 10 ExportBookService |
 
@@ -95,6 +100,9 @@
 | Debug（书源） | [modules/web-service.md](./modules/web-service.md) | 5.2 书源调试WebSocket |
 | Debug 调试状态机 | [modules/model-layer.md](./modules/model-layer.md) | 6 Debug |
 | DefaultData 默认数据 | [modules/config-system.md](./modules/config-system.md) | 8 DefaultData |
+| DirectLinkUpload 直链上传 | [modules/help-layer.md](./modules/help-layer.md) | 8.1 DirectLinkUpload |
+| DispatchersMonitor 调度器监控 | [modules/help-layer.md](./modules/help-layer.md) | 1.3 DispatchersMonitor |
+| Dialogs DSL对话框 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 9 lib/dialogs/ |
 | DiffRecyclerAdapter | [architecture/base-layer.md](./architecture/base-layer.md) | 4 RecyclerAdapter |
 | DownloadService | [modules/service-layer.md](./modules/service-layer.md) | 3 文件下载 |
 | Database 迁移 | [database/overview.md](./database/overview.md) | 3 迁移清单 |
@@ -133,6 +141,7 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | Glide 图片加载 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 2 Glide图片加载 |
+| GlideImageGetter HTML图片 | [modules/help-layer.md](./modules/help-layer.md) | 4.2 GlideImageGetter |
 | GSY Video 视频播放 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 3 GSY Video |
 | getContent 正文获取 | [modules/webbook-search.md](./modules/webbook-search.md) | 6.4 正文获取 |
 | getContent 七步管线 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 2 七步管线 |
@@ -146,6 +155,16 @@
 | HttpReadAloudService | [modules/android-services.md](./modules/android-services.md) | 4 HttpReadAloudService |
 | HttpServer 路由 | [modules/web-service.md](./modules/web-service.md) | 2 HttpServer路由 |
 | HTTP 拦截器 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 2 拦截器链 |
+| Help 辅助层 | [modules/help-layer.md](./modules/help-layer.md) | 全文 |
+
+---
+
+## I
+
+| 关键词 | 文档 | 章节 |
+|--------|------|------|
+| IntentData 大对象传递 | [modules/help-layer.md](./modules/help-layer.md) | 2.1 IntentData |
+| IntentHelp 系统Intent | [modules/help-layer.md](./modules/help-layer.md) | 2.3 IntentHelp |
 
 ---
 
@@ -179,7 +198,10 @@
 |--------|------|------|
 | LocalBook 门面 | [modules/local-book.md](./modules/local-book.md) | 1 架构总览 |
 | LocalConfig 本地状态 | [modules/config-system.md](./modules/config-system.md) | 5 LocalConfig |
+| LauncherIconHelp 图标更换 | [modules/help-layer.md](./modules/help-layer.md) | 6.3 LauncherIconHelp |
+| LayoutManager 布局工厂 | [modules/help-layer.md](./modules/help-layer.md) | 3.2 LayoutManager |
 | Lifecycle | [architecture/android-ui.md](./architecture/android-ui.md) | 4 生命周期 |
+| LifecycleHelp 生命周期 | [modules/help-layer.md](./modules/help-layer.md) | 3.1 LifecycleHelp |
 
 ---
 
@@ -191,6 +213,7 @@
 | MOBI 解析引擎 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 1 lib/mobi/ |
 | makeUpRule | [architecture/rule-engine.md](./architecture/rule-engine.md) | 2.4 运行时拼装 |
 | MediaButtonReceiver | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 4.1 MediaButtonReceiver |
+| MediaHelp 音频焦点 | [modules/help-layer.md](./modules/help-layer.md) | 6.2 MediaHelp |
 | Mode 枚举 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 2.1 Mode枚举 |
 | Mode 枚举6种 | [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 1 SourceRule初始化 |
 | Migration 迁移 | [database/overview.md](./database/overview.md) | 3 迁移清单 |
@@ -225,6 +248,9 @@
 | PDBFile 二进制容器 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 1.2 PDBFile |
 | PDF 解析 | [modules/local-book.md](./modules/local-book.md) | 4 PDF/MOBI/UMD |
 | PageDelegate 翻页动画 | [modules/reading-engine-pagination.md](./modules/reading-engine-pagination.md) | 4 翻页动画实现 |
+| PaintPool 画笔池 | [modules/help-layer.md](./modules/help-layer.md) | 4.1 PaintPool |
+| Permission 权限管理 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 8 lib/permission/ |
+| Prefs 偏好控件 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 10 lib/prefs/ |
 | Pinia Store | [architecture/frontend-stores.md](./architecture/frontend-stores.md) | 2 Pinia Stores |
 | PreferKey 偏好键 | [modules/config-system.md](./modules/config-system.md) | 7 PreferKey |
 | preDownload 预下载 | [modules/reading-engine.md](./modules/reading-engine.md) | 7 预下载策略 |
@@ -267,6 +293,8 @@
 | Rss 调度器 | [modules/rss-subsystem.md](./modules/rss-subsystem.md) | 3 Rss核心调度器 |
 | RuleAnalyzer | [architecture/rule-engine.md](./architecture/rule-engine.md) | 4 规则分割 |
 | RuleAnalyzer 完整算法 | [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 2 RuleAnalyzer |
+| RuleBigDataHelp 大数据 | [modules/help-layer.md](./modules/help-layer.md) | 5.2 RuleBigDataHelp |
+| RuleComplete 规则补全 | [modules/help-layer.md](./modules/help-layer.md) | 5.1 RuleComplete |
 | RuleUpdate 规则订阅 | [modules/model-layer.md](./modules/model-layer.md) | 7 RuleUpdate |
 | Room 数据库 | [database/entities.md](./database/entities.md) | 1 数据库定义 |
 
@@ -307,6 +335,8 @@
 | TintHelper 视图着色 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 3.4 TintHelper |
 | TimeBatteryReceiver | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 4.2 TimeBatteryReceiver |
 | TTS 朗读 | [modules/service-layer.md](./modules/service-layer.md) | 5 TTS朗读 |
+| TTS 封装 | [modules/help-layer.md](./modules/help-layer.md) | 6.1 TTS |
+| TextViewTagHandler HTML标签 | [modules/help-layer.md](./modules/help-layer.md) | 4.3 TextViewTagHandler |
 | TTSReadAloudService | [modules/android-services.md](./modules/android-services.md) | 3 TTSReadAloudService |
 | TypeConverter | [modules/data-layer.md](./modules/data-layer.md) | 7 TypeConverter |
 | 三章缓存 | [modules/reading-engine.md](./modules/reading-engine.md) | 4 三章缓存 |
