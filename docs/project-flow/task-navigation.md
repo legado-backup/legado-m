@@ -160,3 +160,111 @@
 2. 读取对应 Wiki 文档了解设计思想
 3. 查看代码锚点定位核心逻辑
 4. 修改后运行 `./gradlew test` 验证
+
+## 异常处理相关
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 异常体系架构 | [modules/exception-system.md](./modules/exception-system.md) | - |
+| NoStackTraceException 基类 | data/entities/NoStackTraceException.kt | - |
+| ContentEmptyException | data/entities/ContentEmptyException.kt | - |
+| ConcurrentException | data/entities/ConcurrentException.kt | - |
+| EmptyFileException | data/entities/EmptyFileException.kt | - |
+| RegexTimeoutException | data/entities/RegexTimeoutException.kt | - |
+| TocEmptyException | data/entities/TocEmptyException.kt | - |
+| 异常使用场景 | [modules/exception-system.md](./modules/exception-system.md) | 4 异常使用场景分析 |
+
+## 常量/配置键相关
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 常量系统架构 | [modules/constant-system.md](./modules/constant-system.md) | - |
+| AppLog 日志缓冲 | constant/AppLog.kt | - |
+| AppConst 应用常量 | constant/AppConst.kt | - |
+| BookType 位标志 | constant/BookType.kt | - |
+| BookSourceType 书源内容类型 | constant/BookSourceType.kt | - |
+| SourceType 源类型 | constant/SourceType.kt | - |
+| PreferKey 偏好键常量 | constant/PreferKey.kt | - |
+| PageAnim 翻页动画类型 | constant/PageAnim.kt | - |
+| NotificationId 通知ID | constant/NotificationId.kt | - |
+| IntentAction Intent动作 | constant/IntentAction.kt | - |
+| Status 播放状态 | constant/Status.kt | - |
+| EventBus 事件总线 | constant/EventBus.kt | - |
+| AppPattern 预编译正则 | constant/AppPattern.kt | - |
+| Theme 主题枚举 | constant/Theme.kt | - |
+
+## 图片/视频/WebView相关
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 三模块架构总览 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | - |
+| Glide ModelLoader+Fetcher | help/glide/MediaService.kt | - |
+| OkHttpStreamFetcher 图片加载 | help/glide/OkHttpStreamFetcher.kt | - |
+| ImageLoader 统一入口 | help/glide/ImageLoader.kt | - |
+| VideoPlayer 主播放器 | ui/video/VideoPlayer.kt | - |
+| FloatingPlayer 浮窗播放 | ui/video/FloatingPlayer.kt | - |
+| 弹幕系统 | ui/video/DanmakuAdapter.kt | - |
+| WebViewPool 对象池 | help/http/WebViewPool.kt | - |
+| WebJsExtensions JS桥接 | help/http/WebJsExtensions.kt | - |
+
+## HTTP请求/Cookie/WebView辅助
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| HTTP辅助层架构 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | - |
+| okHttpClient 拦截器链 | help/http/HttpHelper.kt | L51-127 |
+| CookieManager 会话分层 | help/http/CookieManager.kt | - |
+| BackstageWebView 双模式 | help/http/BackstageWebView.kt | - |
+| SSLHelper 信任策略 | help/http/SSLHelper.kt | L20-194 |
+| DecompressInterceptor 解压 | help/http/DecompressInterceptor.kt | - |
+| Cronet 加速引擎 | help/http/Cronet.kt | - |
+| OkHttpUtils 请求工具 | help/http/OkHttpUtils.kt | - |
+
+## 应用更新
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 更新系统架构 | [modules/update-system.md](./modules/update-system.md) | - |
+| AppUpdate 门面 | model/appUpdate/AppUpdate.kt | - |
+| AppUpdateGitHub 实现 | model/appUpdate/AppUpdateGitHub.kt | - |
+| AppUpdateGitee 实现 | model/appUpdate/AppUpdateGitee.kt | - |
+| AppReleaseInfo 数据结构 | model/appUpdate/AppReleaseInfo.kt | - |
+| AppVariant 变体枚举 | model/appUpdate/AppVariant.kt | - |
+
+## 源验证/源扩展
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 源辅助与扩展架构 | [modules/source-extensions.md](./modules/source-extensions.md) | - |
+| SourceHelp 门面 | model/source/SourceHelp.kt | - |
+| BookSourceExtensions 扩展 | model/source/BookSourceExtensions.kt | - |
+| RssSourceExtensions 扩展 | model/source/RssSourceExtensions.kt | - |
+| exploreKinds 三级缓存 | model/source/BookSourceExtensions.kt | - |
+| sortUrls 排序地址 | model/source/RssSourceExtensions.kt | - |
+| SourceVerificationHelp 校验 | model/source/SourceVerificationHelp.kt | - |
+| BaseSourceExtensions 类型判断 | model/source/BaseSourceExtensions.kt | - |
+
+## Rhino 脚本引擎
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| Rhino 模块架构 | [modules/rhino-module.md](./modules/rhino-module.md) | - |
+| 引擎单例+JSR-223入口 | `modules/rhino/.../RhinoScriptEngine.kt` | L88-125 |
+| 沙箱类名白名单 | `modules/rhino/.../RhinoClassShutter.kt` | - |
+| Java→JS类型桥接+安全过滤 | `modules/rhino/.../RhinoWrapFactory.kt` | - |
+| 协程桥接(suspendContinuation) | `modules/rhino/.../RhinoExtensions.kt` | - |
+| 递归保护+指令计数中断 | `modules/rhino/.../RhinoContext.kt` | - |
+| 顶层作用域(bindings/scope/sync) | `modules/rhino/.../RhinoTopLevel.kt` | - |
+| 受保护Java类包装 | `modules/rhino/.../ProtectedNativeJavaClass.kt` | - |
+
+## 自定义控件体系
+
+| 步骤 | 读取文件 | 行号 |
+|------|----------|------|
+| 控件体系架构 | [modules/widget-system.md](./modules/widget-system.md) | - |
+| 控件继承体系总览 | `ui/widget/` 目录 | - |
+| 阅读界面状态栏+进度条 | `ui/widget/ReaderInfoBarView.kt` | - |
+| 电池控件 | `ui/widget/BatteryView.kt` | - |
+| 竖向滑动条 | `ui/widget/VerticalSeekBar.kt` | - |
+| 精细滑动条 | `ui/widget/DetailSeekBar.kt` | - |
+| 主题感知机制 | `ui/widget/` + `lib/theme/ThemeStore.kt` | - |

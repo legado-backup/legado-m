@@ -30,6 +30,15 @@
 | App 启动流程 | [architecture/app-init.md](./architecture/app-init.md) | 1 50步启动流程 |
 | ajax 网络请求 | [modules/js-extensions.md](./modules/js-extensions.md) | 2 网络访问系列 |
 | ajaxAll 并发请求 | [modules/js-extensions.md](./modules/js-extensions.md) | 2 网络访问系列 |
+| AppLog 日志缓冲 | [modules/constant-system.md](./modules/constant-system.md) | 2 AppLog |
+| AppConst 应用常量 | [modules/constant-system.md](./modules/constant-system.md) | 3 AppConst |
+| AppPattern 预编译正则 | [modules/constant-system.md](./modules/constant-system.md) | 13 AppPattern |
+| AppReleaseInfo 更新数据 | [modules/update-system.md](./modules/update-system.md) | 3 AppReleaseInfo |
+| AppUpdate 更新检查 | [modules/update-system.md](./modules/update-system.md) | 1 更新检查流程 |
+| AppUpdateGitHub | [modules/update-system.md](./modules/update-system.md) | 2 策略模式架构 |
+| AppUpdateGitee | [modules/update-system.md](./modules/update-system.md) | 2 策略模式架构 |
+| AppVariant 变体匹配 | [modules/update-system.md](./modules/update-system.md) | 3 AppReleaseInfo |
+| AsyncRecycleBitmapPool 异步回收 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 6 AsyncRecycleBitmapPool |
 | 安全 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 8 版本锁定 |
 
 ---
@@ -58,7 +67,10 @@
 | BookSourceRule 字段 | [database/entities.md](./database/entities.md) | 2 BookSource字段详解 |
 | BookType | [modules/data-layer.md](./modules/data-layer.md) | 3 位标志系统 |
 | BookType 位标志 | [modules/reading-engine-media.md](./modules/reading-engine-media.md) | 1 BookType位标志 |
+| Build APK 构建 | [build-apk-guide.md](./build-apk-guide.md) | 构建指南 |
 | BOM 检测 | [modules/local-book.md](./modules/local-book.md) | 2.1 编码检测 |
+| BlurTransformation 模糊变换 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 5 BlurTransformation |
+| BookSourceType 书源内容类型 | [modules/constant-system.md](./modules/constant-system.md) | 5 BookSourceType |
 
 ---
 
@@ -87,6 +99,10 @@
 | CacheManager 三级缓存 | [modules/help-layer.md](./modules/help-layer.md) | 7.1 CacheManager |
 | ColorPreference 颜色选择 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 10.3 ColorPreference |
 | CSS 分页 | [architecture/frontend-components.md](./architecture/frontend-components.md) | 3 阅读器核心 |
+| ConcurrentException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| ContentEmptyException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| CookieManager 会话分层 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 2 CookieManager |
+| 常量系统 | [modules/constant-system.md](./modules/constant-system.md) | 1 常量模块全景 |
 | CustomExporter 分卷导出 | [modules/android-services.md](./modules/android-services.md) | 10 ExportBookService |
 
 ---
@@ -101,6 +117,8 @@
 | Debug 调试状态机 | [modules/model-layer.md](./modules/model-layer.md) | 6 Debug |
 | DefaultData 默认数据 | [modules/config-system.md](./modules/config-system.md) | 8 DefaultData |
 | DirectLinkUpload 直链上传 | [modules/help-layer.md](./modules/help-layer.md) | 8.1 DirectLinkUpload |
+| DecompressInterceptor 解压 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 5 DecompressInterceptor |
+| 弹幕系统 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 4 弹幕系统 |
 | DispatchersMonitor 调度器监控 | [modules/help-layer.md](./modules/help-layer.md) | 1.3 DispatchersMonitor |
 | Dialogs DSL对话框 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 9 lib/dialogs/ |
 | DiffRecyclerAdapter | [architecture/base-layer.md](./architecture/base-layer.md) | 4 RecyclerAdapter |
@@ -122,6 +140,9 @@
 | ExportBookService | [modules/android-services.md](./modules/android-services.md) | 10 ExportBookService |
 | exploreBook | [modules/webbook-search.md](./modules/webbook-search.md) | 6.1 发现页 |
 | ExoPlayer 音频 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 4 ExoPlayer |
+| EmptyFileException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| EventBus 事件总线常量 | [modules/constant-system.md](./modules/constant-system.md) | 12 EventBus |
+| exploreKinds 分类发现 | [modules/source-extensions.md](./modules/source-extensions.md) | 2 exploreKinds |
 
 ---
 
@@ -133,6 +154,7 @@
 | Frontend Vue3 | [architecture/frontend.md](./architecture/frontend.md) | 1 前端架构 |
 | 五阶段流水线 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 四层架构 | [architecture/overview.md](./architecture/overview.md) | 1 四层架构 |
+| FloatingPlayer 浮窗播放 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 FloatingPlayer |
 
 ---
 
@@ -141,10 +163,12 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | Glide 图片加载 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 2 Glide图片加载 |
+| Git 仓库管理 | [git-repo-management.md](./git-repo-management.md) | 仓库规范 |
 | GlideImageGetter HTML图片 | [modules/help-layer.md](./modules/help-layer.md) | 4.2 GlideImageGetter |
 | GSY Video 视频播放 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 3 GSY Video |
 | getContent 正文获取 | [modules/webbook-search.md](./modules/webbook-search.md) | 6.4 正文获取 |
 | getContent 七步管线 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 2 七步管线 |
+| Glide图片加载+视频+WebView | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 架构总览 |
 
 ---
 
@@ -156,6 +180,7 @@
 | HttpServer 路由 | [modules/web-service.md](./modules/web-service.md) | 2 HttpServer路由 |
 | HTTP 拦截器 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 2 拦截器链 |
 | Help 辅助层 | [modules/help-layer.md](./modules/help-layer.md) | 全文 |
+| HTTP辅助层 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 架构总览 |
 
 ---
 
@@ -165,6 +190,9 @@
 |--------|------|------|
 | IntentData 大对象传递 | [modules/help-layer.md](./modules/help-layer.md) | 2.1 IntentData |
 | IntentHelp 系统Intent | [modules/help-layer.md](./modules/help-layer.md) | 2.3 IntentHelp |
+| ImageLoader 统一入口 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 4 ImageLoader |
+| IntentAction Intent动作 | [modules/constant-system.md](./modules/constant-system.md) | 10 IntentAction |
+| InvalidBooksDirException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
 
 ---
 
@@ -202,6 +230,7 @@
 | LayoutManager 布局工厂 | [modules/help-layer.md](./modules/help-layer.md) | 3.2 LayoutManager |
 | Lifecycle | [architecture/android-ui.md](./architecture/android-ui.md) | 4 生命周期 |
 | LifecycleHelp 生命周期 | [modules/help-layer.md](./modules/help-layer.md) | 3.1 LifecycleHelp |
+| LegadoGlideModule 注册中心 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 LegadoGlideModule |
 
 ---
 
@@ -228,6 +257,9 @@
 | NanoHTTPD | [modules/web-service.md](./modules/web-service.md) | 1 服务概览 |
 | NetworkModule | [architecture/app-init.md](./architecture/app-init.md) | 2 模块初始化 |
 | NativeBaseSource Rhino绑定 | [modules/js-extensions.md](./modules/js-extensions.md) | 9 NativeBaseSource |
+| NoBooksDirException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| NoStackTraceException | [modules/exception-system.md](./modules/exception-system.md) | 2 NoStackTraceException |
+| NotificationId 通知ID | [modules/constant-system.md](./modules/constant-system.md) | 9 NotificationId |
 
 ---
 
@@ -237,6 +269,9 @@
 |--------|------|------|
 | OkHttpClient 构建 | [architecture/network-layer.md](./architecture/network-layer.md) | 1 OkHttpClient |
 | ObjectPool 对象池 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 1.5 ObjectPool |
+| ObsoleteUrlFactory 兼容桥 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 8 ObsoleteUrlFactory |
+| OkHttpStreamFetcher 图片加载 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 OkHttpStreamFetcher |
+| OkHttpUtils 请求工具 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 7 OkHttpUtils |
 | 18+ 内容过滤 | [modules/source-management.md](./modules/source-management.md) | 10 18+内容过滤 |
 
 ---
@@ -256,6 +291,9 @@
 | preDownload 预下载 | [modules/reading-engine.md](./modules/reading-engine.md) | 7 预下载策略 |
 | putMap 变量系统 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 2.5 变量系统 |
 | Python 客户端 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 5 Python客户端 |
+| PageAnim 翻页动画类型 | [modules/constant-system.md](./modules/constant-system.md) | 8 PageAnim |
+| PooledWebView 动态Context | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 PooledWebView |
+| ProgressManager 下载进度 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 7 ProgressManager |
 
 ---
 
@@ -263,6 +301,7 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
+| Quick Reference 快速参考 | [quick-reference.md](./quick-reference.md) | 命令速查 |
 | 前缀检测 | [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 1 SourceRule初始化 |
 
 ---
@@ -273,6 +312,9 @@
 |--------|------|------|
 | ReadAloud 朗读调度 | [modules/model-layer.md](./modules/model-layer.md) | 2 ReadAloud |
 | ReadBook 状态 | [modules/reading-engine.md](./modules/reading-engine.md) | 2 核心状态 |
+| Rhino 脚本引擎 | [modules/rhino-module.md](./modules/rhino-module.md) | 2-10 架构到陷阱 |
+| RhinoClassShutter 沙箱 | [modules/rhino-module.md](./modules/rhino-module.md) | 4 安全沙箱 |
+| RhinoExtensions 协程桥接 | [modules/rhino-module.md](./modules/rhino-module.md) | 7 协程桥接 |
 | ReadBookConfig 排版配置 | [modules/config-system.md](./modules/config-system.md) | 2 ReadBookConfig |
 | ReadManga | [modules/reading-engine.md](./modules/reading-engine.md) | 9 漫画阅读 |
 | ReadManga 漫画引擎 | [modules/reading-engine-media.md](./modules/reading-engine-media.md) | 2 ReadManga |
@@ -282,6 +324,8 @@
 | RemoteBook 远程书籍 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 1 远程书籍 |
 | ReplaceAnalyzer | [modules/content-pipeline.md](./modules/content-pipeline.md) | 4 替换规则引擎 |
 | Restore 恢复 | [modules/backup-restore.md](./modules/backup-restore.md) | 3 Restore恢复模块 |
+| RegexTimeoutException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| RssSourceExtensions RSS扩展 | [modules/source-extensions.md](./modules/source-extensions.md) | 3 RssSourceExtensions对比 |
 | ReturnData 响应 | [modules/web-service.md](./modules/web-service.md) | 3 统一响应格式 |
 | rhino 版本 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 8 版本锁定 |
 | Rhino 编译缓存 | [architecture/rule-engine-js-env.md](./architecture/rule-engine-js-env.md) | 3 Rhino编译缓存 |
@@ -317,6 +361,10 @@
 | SSL 全信任 | [architecture/network-layer.md](./architecture/network-layer.md) | 3 SSL策略 |
 | splitRule 分割 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 4.1 三种连接符 |
 | SymmetricCryptoAndroid | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 3.1 SymmetricCryptoAndroid |
+| SourceType 源类型 | [modules/constant-system.md](./modules/constant-system.md) | 6 SourceType |
+| Status 播放状态 | [modules/constant-system.md](./modules/constant-system.md) | 11 Status |
+| StrResponse 字符串响应 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 9 StrResponse |
+| sortUrls 排序地址 | [modules/source-extensions.md](./modules/source-extensions.md) | 3 RssSourceExtensions对比 |
 | 书源校验 | [modules/source-management.md](./modules/source-management.md) | 3.5 CheckSource |
 | 书源排序 | [modules/source-management.md](./modules/source-management.md) | 9 书源排序体系 |
 | 设计模式总结 | [architecture/overview.md](./architecture/overview.md) | 3 设计模式 |
@@ -335,10 +383,13 @@
 | TintHelper 视图着色 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 3.4 TintHelper |
 | TimeBatteryReceiver | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 4.2 TimeBatteryReceiver |
 | TTS 朗读 | [modules/service-layer.md](./modules/service-layer.md) | 5 TTS朗读 |
+| Task Navigation 任务导航 | [task-navigation.md](./task-navigation.md) | 14模块代码锚点 |
 | TTS 封装 | [modules/help-layer.md](./modules/help-layer.md) | 6.1 TTS |
 | TextViewTagHandler HTML标签 | [modules/help-layer.md](./modules/help-layer.md) | 4.3 TextViewTagHandler |
 | TTSReadAloudService | [modules/android-services.md](./modules/android-services.md) | 3 TTSReadAloudService |
 | TypeConverter | [modules/data-layer.md](./modules/data-layer.md) | 7 TypeConverter |
+| TocEmptyException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
+| Theme 主题枚举 | [modules/constant-system.md](./modules/constant-system.md) | 14 Theme |
 | 三章缓存 | [modules/reading-engine.md](./modules/reading-engine.md) | 4 三章缓存 |
 | 四分类去重 | [modules/webbook-search.md](./modules/webbook-search.md) | 5 四分类聚合 |
 | 陷阱检查 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 3 陷阱体系 |
@@ -369,6 +420,7 @@
 | ViewModel 体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 5 ViewModel |
 | VideoPlay 视频播放 | [modules/model-layer.md](./modules/model-layer.md) | 3 VideoPlay |
 | VideoPlayService | [modules/android-services.md](./modules/android-services.md) | 6 VideoPlayService |
+| VideoPlayer 视频播放器 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 VideoPlayer |
 | VMBaseActivity | [architecture/base-layer.md](./architecture/base-layer.md) | 1 BaseActivity |
 
 ---
@@ -387,6 +439,10 @@
 | WebService 前台服务 | [modules/android-services.md](./modules/android-services.md) | 7 WebService |
 | WeakReference 缓存 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 1.1 单例工厂 |
 | webView 渲染 | [modules/js-extensions.md](./modules/js-extensions.md) | 2 网络访问系列 |
+| WebViewPool 对象池 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 1 WebViewPool |
+| WebJsExtensions JS桥接 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 WebJsExtensions |
+| Widget 控件体系 | [modules/widget-system.md](./modules/widget-system.md) | 1 控件继承体系 |
+| Widget 主题感知 | [modules/widget-system.md](./modules/widget-system.md) | 2 主题感知机制 |
 
 ---
 
@@ -404,6 +460,9 @@
 |--------|------|------|
 | 音频焦点管理 | [modules/android-services.md](./modules/android-services.md) | 2 BaseReadAloudService |
 | 代理支持 | [architecture/network-layer.md](./architecture/network-layer.md) | 5 代理支持 |
+| 异常体系 | [modules/exception-system.md](./modules/exception-system.md) | 全文 |
+| 应用更新系统 | [modules/update-system.md](./modules/update-system.md) | 全文 |
+| 源辅助与扩展 | [modules/source-extensions.md](./modules/source-extensions.md) | 全文 |
 
 ---
 
@@ -411,7 +470,7 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| 站点特征映射 | [.trae/skills/legado-source-creator/references/site-features/_INDEX.md](./.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 站点特征 |
+| 站点特征映射 | [.trae/skills/legado-source-creator/references/site-features/_INDEX.md](../.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 站点特征 |
 | 交叉验证 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 子代理文件限制 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 自定义DNS | [modules/config-system.md](./modules/config-system.md) | 1 AppConfig |

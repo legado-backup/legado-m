@@ -1602,3 +1602,418 @@ class LocalBookRouter:
         parser = cls.get_parser(book_path)
         return parser.get_content(chapter)
 ```
+
+---
+
+## 附录A: epublib 模块参考
+
+> 源码路径: `modules/book/src/main/java/me/ag2s/epublib/`
+
+### domain/ 类列表（29 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `EpubBook` | EPUB 书籍顶层容器，持有 Metadata/Resources/Spine/TOC/Guide |
+| `Metadata` | 书籍元数据（标题/作者/日期/标识符/发布者等） |
+| `Author` | 作者信息（firstname/lastname） |
+| `Identifier` | 书籍唯一标识符（ISBN/UUID 等） |
+| `Date` | 出版/修改日期 |
+| `Resource` | EPUB 内资源（HTML/CSS/图片/字体），含 href/mediatype/data |
+| `LazyResource` | 延迟加载资源，仅在读时从 ZIP 提取数据 |
+| `LazyResourceProvider` | LazyResource 的数据提供接口 |
+| `Resources` | 资源集合管理器，支持 DataURI 内联解码（Base64） |
+| `ResourceReference` | 对 Resource 的弱引用封装 |
+| `TitledResourceReference` | 带标题的资源引用 |
+| `Spine` | 阅读顺序列表（线性 spine 引用集合） |
+| `SpineReference` | Spine 中单条引用 |
+| `TableOfContents` | 目录树结构 |
+| `TOCReference` | 目录条目（标题+href+子条目） |
+| `Guide` | 指南引用集合（封面/目录/序言等语义引用） |
+| `GuideReference` | 单条指南引用 |
+| `MediaType` | MIME 类型封装（如 application/xhtml+xml） |
+| `MediaTypes` | 预定义常用 MediaType 常量集合 |
+| `Relator` | MARC21 角色代码映射（作者/编者/插图等） |
+| `ManifestProperties` | EPUB3 manifest item properties 基类 |
+| `ManifestItemProperties` | EPUB3 manifest item 属性枚举 |
+| `ManifestItemRefProperties` | EPUB3 manifest itemref 属性枚举 |
+| `ResourceInputStream` | 资源输入流封装 |
+| `EpubResourceProvider` | EPUB ZIP 资源提供器 |
+| `FileResourceProvider` | 文件系统资源提供器 |
+
+### epub/ 类列表（17 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `EpubReader` | EPUB 读取入口，从 ZIP 解析 EpubBook |
+| `EpubWriter` | EPUB 写入入口，将 EpubBook 序列化为 ZIP |
+| `EpubWriterProcessor` | 写入处理器（清理/修复 HTML 等） |
+| `EpubProcessorSupport` | 读写处理公共基类 |
+| `BookProcessor` | 书籍处理器接口 |
+| `BookProcessorPipeline` | 多 BookProcessor 串联管道 |
+| `ResourcesLoader` | 资源加载器（ZIP→Resources） |
+| `PackageDocumentReader` | OPF package document 解析器 |
+| `PackageDocumentWriter` | OPF package document 生成器 |
+| `PackageDocumentMetadataReader` | OPF 元数据读取 |
+| `PackageDocumentMetadataWriter` | OPF 元数据写入 |
+| `PackageDocumentBase` | OPF 读写公共常量/工具 |
+| `NCXDocumentV2` | EPUB2 NCX 导航文档处理 |
+| `NCXDocumentV3` | EPUB3 导航文档处理 |
+| `HtmlProcessor` | HTML 清理/规范化处理 |
+| `DOMUtil` | DOM 文档工具方法 |
+
+### browsersupport/ 类列表（5 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `Navigator` | 浏览器导航接口 |
+| `NavigationHistory` | 导航历史记录栈 |
+| `NavigationEventListener` | 导航事件监听接口 |
+| `NavigationEvent` | 导航事件对象 |
+| `package-info.java` | 包文档 |
+
+### util/ 类列表（11 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `IOUtil` | IO 流读写工具 |
+| `ResourceUtil` | 资源路径/类型推断工具 |
+| `StringUtil` | 字符串工具（截取/匹配/编解码） |
+| `URLEncodeUtil` | URL 编解码工具 |
+| `CollectionUtil` | 集合操作工具 |
+| `NoCloseWriter` | 防关闭 Writer 包装 |
+| `NoCloseOutputStream` | 防关闭 OutputStream 包装 |
+| `commons/io/BOMInputStream` | BOM 自动检测输入流 |
+| `commons/io/ByteOrderMark` | BOM 标记常量 |
+| `commons/io/XmlStreamReader` | XML 编码自动检测读取器 |
+| `commons/io/XmlStreamReaderException` | XML 编码检测异常 |
+
+### util/zip/ 类列表（6 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `AndroidZipFile` | Android 兼容 ZIP 文件读取（支持 ENOTTY 回退） |
+| `AndroidZipEntry` | Android 兼容 ZIP 条目 |
+| `ZipFileWrapper` | ZIP 文件统一包装器（自动选择实现） |
+| `ZipEntryWrapper` | ZIP 条目统一包装器 |
+| `ZipConstants` | ZIP 格式常量 |
+| `ZipException` | ZIP 操作异常 |
+
+### 核心类关系图
+
+```mermaid
+classDiagram
+    class EpubBook {
+        +Metadata metadata
+        +Resources resources
+        +Spine spine
+        +TableOfContents tableOfContents
+        +Guide guide
+    }
+
+    class Metadata {
+        +List~Author~ authors
+        +List~Identifier~ identifiers
+        +List~Date~ dates
+        +String title
+    }
+
+    class Resources {
+        +Map~String_Resource~ resources
+        +Resource getByHref(href)
+        +Resource getDataUri(href)
+    }
+
+    class Resource {
+        +String href
+        +MediaType mediaType
+        +byte[] data
+    }
+
+    class LazyResource {
+        +LazyResourceProvider provider
+        +byte[] getData()
+    }
+
+    class Spine {
+        +List~SpineReference~ spineReferences
+    }
+
+    class TableOfContents {
+        +List~TOCReference~ tocReferences
+    }
+
+    class Guide {
+        +List~GuideReference~ references
+    }
+
+    class EpubReader {
+        +EpubBook readEpub(inputStream)
+    }
+
+    class EpubWriter {
+        +void write(EpubBook, outputStream)
+    }
+
+    EpubBook --> Metadata
+    EpubBook --> Resources
+    EpubBook --> Spine
+    EpubBook --> TableOfContents
+    EpubBook --> Guide
+    Resources --> Resource
+    Resources --> LazyResource
+    Spine --> SpineReference
+    TableOfContents --> TOCReference
+    Guide --> GuideReference
+    EpubReader ..> EpubBook : creates
+    EpubWriter ..> EpubBook : consumes
+```
+
+---
+
+## 附录B: umdlib 模块参考
+
+> 源码路径: `modules/book/src/main/java/me/ag2s/umdlib/`
+
+### domain/ 类列表（5 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `UmdBook` | UMD 书籍顶层容器，持有 Header/Chapters/Cover/End |
+| `UmdHeader` | 头部信息（类型/标题/作者/日期/出版商等） |
+| `UmdChapters` | 章节内容与标题列表（含 zlib 解压后的正文） |
+| `UmdCover` | 封面图片（JPEG 字节数组） |
+| `UmdEnd` | 文件结尾标记 |
+
+### tool/ 类列表（3 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `UmdUtils` | Unicode 字节→字符串转换 + zlib 解压缩 |
+| `StreamReader` | Little-Endian 流读取器（readByte/readShortLe/readIntLe/readHex 等） |
+| `WrapOutputStream` | UMD 构建用输出流包装器 |
+
+### umd/ 类列表（1 文件）
+
+| 类名 | 职责 |
+|------|------|
+| `UmdReader` | UMD 格式解析入口，从 InputStream 读取并构建 UmdBook |
+
+### 段类型码对照表
+
+| 段类型码 (十进制) | 十六进制 | 含义 | 数据说明 |
+|:---:|:---:|------|------|
+| 1 | 0x01 | 文件头版本 (DCTS_CMD_ID_VERSION) | UMD 类型 + 2 字节随机数 |
+| 2 | 0x02 | 文件标题 | Unicode 编码标题 |
+| 3 | 0x03 | 作者 | Unicode 编码作者名 |
+| 4 | 0x04 | 年 | 出版年份 |
+| 5 | 0x05 | 月 | 出版月份 |
+| 6 | 0x06 | 日 | 出版日期 |
+| 7 | 0x07 | 小说类型 | 如玄幻/都市等分类 |
+| 8 | 0x08 | 出版商 | Unicode 编码 |
+| 9 | 0x09 | 零售商 | Unicode 编码 |
+| 10 | 0x0A | 内容 ID (CONTENT ID) | HEX 编码标识符 |
+| 11 | 0x0B | 内容长度 (DCTS_CMD_ID_FILE_LENGTH) | 4 字节 LE 整数 |
+| 12 | 0x0C | 文件结束标记 | 整个文件长度 |
+| 13 | 0x0D | 保留段 | — |
+| 14 | 0x0E | 图片数据（主段） | 1 字节序号 |
+| 15 | 0x0F | 图片数据（主段） | 原始字节 |
+| 129 | 0x81 | 正文数据（附加段） | zlib 压缩正文 |
+| 130 | 0x82 | 封面图片（附加段） | JPEG 字节数组 |
+| 131 | 0x83 | 章节偏移（附加段） | 每 4 字节 LE 为一章内容长度 |
+| 132 | 0x84 | 章节标题+正文（附加段） | 标题列表 或 zlib 压缩正文 |
+| 135 | 0x87 | 页面偏移 (Page Offset) | 字体大小+屏幕宽+4字节指针 |
+| 240 | 0xF0 | CDS KEY | 加密密钥 |
+| 241 | 0xF1 | 许可证 (LICENCE KEY) | 16 字节 HEX |
+
+### UMD 解析流程
+
+```mermaid
+flowchart TD
+    A[读取 InputStream] --> B{校验魔数<br/>0xDE9A9B89}
+    B -->|不匹配| C[抛出 IOException: Wrong header]
+    B -->|匹配| D[创建 UmdBook + UmdHeader]
+    D --> E{读取字节 == 0x23?}
+    E -->|否| F[解析完成, 返回 UmdBook]
+    E -->|是| G[读取段类型码 segType<br/>+ 段标志 segFlag<br/>+ 段长度 len]
+    G --> H[readSection: 按段类型码分发]
+    H --> I[0x01: 读UMD类型]
+    H --> J[0x02-0x09: 读元数据<br/>标题/作者/日期/类型/出版商]
+    H --> K[0x0B: 读内容长度]
+    H --> L[0x81-0x84: 读附加段编号<br/>_AdditionalCheckNumber]
+    H --> M[0xF1: 读许可证密钥]
+    I & J & K & L & M --> N{读取字节 == 0x24?}
+    N -->|是| O[readAdditionalSection:<br/>按段类型码处理附加数据]
+    O --> P[0x81: zlib解压正文]
+    O --> Q[0x82: 读封面JPEG]
+    O --> R[0x83: 读章节内容长度表]
+    O --> S[0x84: 读章节标题列表 或 zlib正文]
+    P & Q & R & S --> N
+    N -->|否| E
+```
+
+---
+
+## 附录C: Base64 解码参考
+
+### 使用场景
+
+项目中 Base64 解码出现在两个场景，均使用 `android.util.Base64`：
+
+| # | 场景 | 源码位置 | 触发条件 |
+|---|------|---------|---------|
+| 1 | EPUB 内联 DataURI 解码 | `epublib/domain/Resources.java` | EPUB 资源的 href 以 `data:` 开头时，提取内联 Base64 数据 |
+| 2 | 在线导入 DataURL 书籍 | `app/.../model/localBook/LocalBook.kt` | 导入 URL 为 `data:` 协议（如 `data:application/epub+zip;base64,...`）时 |
+
+### 技术要点
+
+| 要点 | 说明 |
+|------|------|
+| 依赖类 | `android.util.Base64`（Android SDK 内置，非 java.util.Base64） |
+| 解码标志 | `Base64.DEFAULT` — 标准 RFC 4648 编码，含换行填充 |
+| 编码格式 | RFC 4648 Table 1（标准 Base64 字母表 `A-Za-z0-9+/`，`=` 填充） |
+| DataURI 正则 | `data:([\w/\-\.]+);base64,(.*)` — 捕获组1为 MIME 类型，捕获组2为 Base64 数据 |
+| 截取方式 | `str.substringAfter("base64,")` — 直接截取 `base64,` 之后的内容 |
+| 返回类型 | `byte[]` 字节数组 |
+| 异常处理 | 输入非法时 `Base64.decode()` 返回空数组或抛出 `IllegalArgumentException` |
+
+### 场景1: EPUB DataURI 解码流程
+
+```
+EpubReader.readEpub()
+  → ResourcesLoader.loadResources()
+    → Resources.getByHref(href)
+      → href 以 "data:" 开头?
+        → Pattern 匹配 "data:{MIME};base64,{DATA}"
+        → Base64.decode(group(2), Base64.DEFAULT) → byte[]
+        → new Resource(byte[], MediaType)
+```
+
+### 场景2: 在线导入 DataURL 解码流程
+
+```
+LocalBook.saveBookFile(str, fileName)
+  → str.isDataUrl() == true?
+    → str.substringAfter("base64,") → 提取编码部分
+    → Base64.decode(extracted, Base64.DEFAULT) → byte[]
+    → ByteArrayInputStream(byte[]) → InputStream
+    → saveBookFile(inputStream, fileName)
+```
+
+---
+
+## 附录A: epublib 模块参考
+
+> 源码路径: `modules/book/src/main/java/me/ag2s/epublib/`
+
+基于 Android 平台的 EPUB 解析/写入库，支持 EPUB 2.0 与 3.0 规范。核心能力：从 ZIP 流/文件读取 EPUB，解析 OPF 元数据、Spine、NCX 目录，支持懒加载大文件。
+
+### domain/ -- 领域模型（28 文件）
+
+| 类 | 职责 |
+|---|------|
+| **EpubBook** | 顶层实体，聚合 Resources / Metadata / Spine / TableOfContents / Guide 五大子系统 |
+| **Metadata** | 书籍元数据：titles / authors / contributors / identifiers / dates / subjects / publishers / descriptions / rights / language / format |
+| **Author** | 作者/贡献者，含 firstname / lastname / Relator（角色枚举，MARC Code List 全集） |
+| **Identifier** | 书籍标识，默认 UUID，支持 ISBN / URL / URI scheme |
+| **Resource** | EPUB 内任意资源（XHTML / CSS / 图片 / 字体 / XML），核心字段：id / href / MediaType / data / inputEncoding |
+| **LazyResource** | Resource 子类，延迟加载：首次 getData() 时从 LazyResourceProvider 拉取，close() 释放 data 缓存 |
+| **Resources** | Resource 集合管理，双索引（byHref / byId），含 Data URI 解析（Base64 内联图片），自动修复 href/id |
+| **ResourceReference** | 资源引用基类，持有 Resource |
+| **TitledResourceReference** | 带标题+fragmentId 的引用，SpineReference / TOCReference / GuideReference 的父类 |
+| **Spine** | 阅读顺序索引，List&lt;SpineReference&gt;，含 tocResource 引用 |
+| **TableOfContents** | 目录树，List&lt;TOCReference&gt;，支持按路径添加节点、计算深度、提取唯一资源 |
+| **TOCReference** | 目录条目，树结构（children），继承 TitledResourceReference |
+| **MediaType** | MIME 类型封装，含 name / defaultExtension / extensions |
+| **MediaTypes** | 预定义常量（XHTML / CSS / JPG / PNG / GIF / SVG / TTF / WOFF / MP3 / NCX / SMIL / EPUB 等） |
+
+### epub/ -- 解析/写入引擎（17 文件）
+
+| 类 | 职责 |
+|---|------|
+| **EpubReader** | EPUB 读取入口，支持 InputStream / ZipInputStream / ZipFile / AndroidZipFile，含 readEpubLazy 懒加载模式 |
+| **EpubWriter** | EPUB 写入入口 |
+| **ResourcesLoader** | 从 ZIP 加载 Resources，决定立即加载 vs LazyResource |
+| **PackageDocumentReader** | 解析 OPF 文档：manifest / spine / guide / metadata，含命名空间修复 |
+| **PackageDocumentMetadataReader** | 读取 Dublin Core 元数据 |
+| **NCXDocumentV2** | EPUB 2.0 NCX 目录解析 |
+| **NCXDocumentV3** | EPUB 3.0 Nav 目录解析 |
+
+### util/ -- 工具类
+
+| 类 | 职责 |
+|---|------|
+| **IOUtil** | I/O 工具：toByteArray / 流复制 |
+| **ResourceUtil** | 资源工具：创建 Resource / DOM 解析 / 编码检测 |
+| **StringUtil** | 字符串工具：isBlank / isNotBlank / substringBefore / substringAfter |
+| **BOMInputStream** | BOM（字节顺序标记）输入流 |
+| **XmlStreamReader** | XML 编码自动检测读取器 |
+
+### util/zip/ -- ZIP 兼容层
+
+| 类 | 职责 |
+|---|------|
+| **ZipFileWrapper** | 统一 ZipFile / AndroidZipFile 的抽象层 |
+| **AndroidZipFile** | Android 兼容的 ZIP 文件读取（处理 APK 内 ZIP） |
+
+---
+
+## 附录B: umdlib 模块参考
+
+> 源码路径: `modules/book/src/main/java/me/ag2s/umdlib/`
+
+UMD（Unicode Mobile Document）格式电子书解析库。中国功能机时代流行的手机小说格式，采用二进制分段结构，正文 zlib 压缩。
+
+### domain/ -- 领域模型（5 文件）
+
+| 类 | 职责 |
+|---|------|
+| **UmdBook** | 顶层实体，聚合 UmdHeader / UmdChapters / UmdCover / UmdEnd |
+| **UmdHeader** | 文件头：umdType / title / author / year / month / day，字符串编码 UTF-16LE |
+| **UmdChapters** | 章节集合：titles / contentLengths / contents，正文 zlib 压缩 |
+| **UmdCover** | 封面图片（JPEG） |
+| **UmdEnd** | 文件尾标记 |
+
+### tool/ -- 工具类（3 文件）
+
+| 类 | 职责 |
+|---|------|
+| **UmdUtils** | UTF-16LE 编解码、zlib 解压、HEX 转换 |
+| **StreamReader** | 二进制小端序流读取器（readByte / readShortLe / readIntLe） |
+| **WrapOutputStream** | 小端序输出流包装，记录已写入字节数 |
+
+### umd/ -- 解析入口
+
+| 类 | 职责 |
+|---|------|
+| **UmdReader** | 按二进制段标识逐段解析：0x23 主段、0x24 附加段 |
+
+### 段类型码对照表
+
+| 类型码 | 含义 | 数据 |
+|--------|------|------|
+| 0x01 | 文件头 | umdType + 随机2字节 |
+| 0x02 | 标题 | UTF-16LE 字符串 |
+| 0x03 | 作者 | UTF-16LE 字符串 |
+| 0x0B | 正文长度 | Int32LE |
+| 0x81 | 正文块 | zlib 压缩正文 |
+| 0x82 | 封面偏移 | JPEG 封面数据 |
+| 0x83 | 章节偏移 | Int32LE 数组 |
+| 0x84 | 章节标题 | 长度+UTF-16LE |
+
+---
+
+## 附录C: Base64 解码参考
+
+### 使用场景
+
+1. **EPUB 内联 Data URI 解码**：Resources.getByHref() 中，当 href 以 `data:` 开头时，用 `android.util.Base64.decode()` 解码
+2. **在线导入 Data URL 书籍**：LocalBook.importOnlineFile() 中，截取 `base64,` 后内容解码
+
+### 技术要点
+
+| 项目 | 说明 |
+|------|------|
+| **Base64 实现** | Android 原生 `android.util.Base64`，非 JDK |
+| **解码标志** | 均使用 `Base64.DEFAULT` |
+| **Data URI 正则** | `data:([\\w/\\-\\.]+);base64,(.*)` |
+| **内存注意** | 解码产生完整 byte[]，大文件需注意内存占用 |

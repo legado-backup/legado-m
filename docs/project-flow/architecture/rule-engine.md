@@ -1,4 +1,4 @@
-# 规则引擎详解
+﻿# 规则引擎详解
 
 > Legado 核心竞争壁垒——五种解析方式统一入口，SourceRule 是规则预处理状态机，AnalyzeUrl 处理模板变量注入。
 
@@ -439,7 +439,167 @@ URL 模板中支持尖括号翻页参数，按页码索引选取对应值：
 
 ---
 
-## 6. 规则执行完整链路
+## 6. CustomUrl — URL 模板属性解析器
+
+[CustomUrl.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/analyzeRule/CustomUrl.kt#L7)
+
+CustomUrl 是 AnalyzeUrl 的轻量配套类，负责从 URL 字符串中分离纯 URL 部分与 JSON 属性映射。两者共享同一个 `paramPattern` 正则（定义于 AnalyzeUrl.companion），实现一致的 URL+属性语法。
+
+### 6.1 类结构
+
+```kotlin
+// CustomUrl.kt L7-L49
+class CustomUrl(url: String) {
+    private val mUrl: String                          // 分离后的纯 URL
+    private val attribute = hashMapOf<String, Any>()  // 属性映射表
+
+    init {
+        val urlMatcher = AnalyzeUrl.paramPattern.matcher(url)
+        mUrl = if (urlMatcher.find()) {
+            // 匹配到 ",{" -> 逗号之前是 URL，之后是 JSON 属性
+            val attr = url.substring(urlMatcher.end())  // L16: 跳过 ",{" 取 JSON 部分
+            GSON.fromJsonObject<Map<String, Any>>(attr).getOrNull()?.let {
+                attribute.putAll(it)
+            }
+            url.take(urlMatcher.start())  // L19: 取逗号之前的纯 URL
+        } else {
+            url  // 无属性部分，整串即为 URL
+        }
+    }
+
+    fun putAttribute(key: String, value: Any?): CustomUrl  // 链式添加/删除属性
+    fun getUrl(): String                                     // 获取纯 URL
+    fun getAttr(): Map<String, Any>                          // 获取属性映射
+    override fun toString(): String                          // 重构 URL + 属性 JSON
+}
+```
+
+### 6.2 URL 模板语法：`url,{"key":"value",...}`
+
+CustomUrl 与 AnalyzeUrl 共享同一套 URL 模板语法，核心分隔符为 `paramPattern`：
+
+```
+语法格式:
+  <纯URL>,{"key1":"value1","key2":"value2",...}
+
+分隔规则 (AnalyzeUrl.kt L768):
+  paramPattern = Pattern.compile("\\s*,\\s*(?=\\{)")
+  -> 匹配逗号 + 可选空白 + 后跟左花括号的位置
+
+解析逻辑:
+  1. 在 URL 字符串中查找 ",{" 模式（逗号后紧跟左花括号）
+  2. 匹配成功 -> 逗号之前为纯 URL，逗号+空白之后为 JSON 属性
+  3. 匹配失败 -> 整串视为纯 URL，无属性
+
+示例:
+  "https://example.com/api"                                    -> URL=整串, 属性={}
+  "https://example.com/api,{"method":"POST"}"                  -> URL=.../api, 属性={method:POST}
+  "https://example.com/api, {"method":"POST","retry":3}"       -> URL=.../api, 属性={method:POST,retry:3}
+  "https://example.com/list,0,20"                              -> URL=整串(第二个逗号后非{,不匹配)
+```
+
+### 6.3 解析流程
+
+```mermaid
+%%{init: {'themeVariables': {'fontFamily': 'Microsoft YaHei, SimHei, sans-serif'}}}%%
+flowchart TD
+    INPUT["输入 URL 字符串"]
+    MATCH["paramPattern.matcher(url)<br/>正则: 逗号+空白+(?={)"]
+    FOUND{"找到匹配?<br/>(逗号后跟左花括号)"}
+
+    INPUT --> MATCH --> FOUND
+
+    FOUND -->|"是"| SPLIT["分离 URL 与 JSON"]
+    FOUND -->|"否"| PLAIN["整串作为 mUrl<br/>attribute 保持空"]
+
+    SPLIT --> EXTRACT_URL["mUrl = url.take(matcher.start())<br/>取逗号之前的纯 URL"]
+    SPLIT --> EXTRACT_ATTR["attr = url.substring(matcher.end())<br/>取逗号+空白之后的 JSON"]
+    EXTRACT_ATTR --> PARSE_JSON["GSON.fromJsonObject(attr)<br/>解析为 Map"]
+    PARSE_JSON --> PUT_ATTR["attribute.putAll(parsedMap)"]
+
+    EXTRACT_URL --> RESULT
+    PUT_ATTR --> RESULT
+    PLAIN --> RESULT
+
+    RESULT["CustomUrl 对象就绪<br/>mUrl: 纯 URL<br/>attribute: 属性映射"]
+```
+
+### 6.4 与 AnalyzeUrl 的交互关系
+
+CustomUrl 与 AnalyzeUrl 共享 `paramPattern` 分隔语义，但定位不同：
+
+| 维度 | CustomUrl | AnalyzeUrl |
+|------|-----------|------------|
+| 定位 | 轻量 URL 解析器（仅分离 URL + 属性） | 完整 URL 模板引擎（变量注入 + 请求构造） |
+| 属性模型 | `Map<String, Any>` 通用键值对 | `UrlOption` data class（method/body/headers/js 等强类型字段） |
+| 属性用途 | 存储自定义元数据（如 serverID） | 驱动 HTTP 请求构造（method/charset/body/webView 等） |
+| 输出 | `getUrl()` + `getAttr()` | `url` + `headerMap` + `body` + OkHttp Request |
+| 调用场景 | WebDav 路径解析、URL 后缀提取、书源 origin 标记 | 书源所有 URL 模板解析（searchUrl/bookUrl/tocUrl/contentUrl） |
+
+```mermaid
+%%{init: {'themeVariables': {'fontFamily': 'Microsoft YaHei, SimHei, sans-serif'}}}%%
+sequenceDiagram
+    participant Caller as 调用方
+    participant CU as CustomUrl
+    participant AU as AnalyzeUrl
+    participant PP as paramPattern<br/>(AnalyzeUrl.companion)
+
+    Note over PP: 共享正则定义<br/>Pattern.compile("\\s*,\\s*(?=\\{)")
+
+    rect rgb(230, 245, 255)
+        Note over Caller,AU: 场景1: CustomUrl 独立使用（WebDav/UrlUtil）
+        Caller->>CU: CustomUrl(urlString)
+        CU->>PP: paramPattern.matcher(url)
+        PP-->>CU: 匹配结果
+        CU-->>Caller: getUrl() + getAttr()
+    end
+
+    rect rgb(255, 245, 230)
+        Note over Caller,AU: 场景2: AnalyzeUrl 完整请求构造
+        Caller->>AU: AnalyzeUrl(mUrl, key, page, ...)
+        AU->>PP: paramPattern.matcher(baseUrl)  [init]
+        PP-->>AU: 剥离 baseUrl 中的属性
+        AU->>PP: paramPattern.matcher(ruleUrl)  [analyzeUrl]
+        PP-->>AU: 分离 URL + UrlOption JSON
+        AU->>AU: 解析 UrlOption -> method/body/headers/js
+        AU-->>Caller: url + headerMap + body + Request
+    end
+```
+
+### 6.5 实际使用场景
+
+| 调用位置 | 用途 | 关键代码 |
+|----------|------|----------|
+| [WebDav.kt L84](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/lib/webdav/WebDav.kt#L84) | 从 WebDav 路径中提取纯 URL | `URL(CustomUrl(path).getUrl())` |
+| [RemoteBookWebDav.kt L79](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/remote/RemoteBookWebDav.kt#L79) | 构建 WebDav 书籍 origin 标识（含 serverID 属性） | `BookType.webDavTag + CustomUrl(putUrl).putAttribute("serverID", serverID).toString()` |
+| [UrlUtil.kt L155](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/UrlUtil.kt#L155) | 去除 URL 中的属性 JSON，提取纯路径以获取文件后缀 | `CustomUrl(str).getUrl()` |
+| [RemoteBookViewModel.kt L141](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/ui/book/import/remote/RemoteBookViewModel.kt#L141) | 从远程书籍路径中提取纯 URL 用于 origin | `BookType.webDavTag + CustomUrl(remoteBook.path)` |
+
+### 6.6 toString() 逆向重构
+
+CustomUrl 的 `toString()` 方法可将对象还原为 `url,{"key":"value"}` 格式字符串：
+
+```kotlin
+// CustomUrl.kt L42-L48
+override fun toString(): String {
+    if (attribute.isEmpty()) return mUrl
+    return mUrl + "," + GSON.toJson(attribute)
+}
+
+// 实际效果：
+// CustomUrl("https://example.com/api,{"method":"POST"}").toString()
+// -> "https://example.com/api,{"method":"POST"}"
+
+// 链式添加属性后：
+// CustomUrl("https://example.com/api").putAttribute("serverID", 123).toString()
+// -> "https://example.com/api,{"serverID":123}"
+```
+
+> **AnalyzeUrl 完整 UrlOption 字段与请求构造流程** -> [第5章 AnalyzeUrl - URL 模板引擎](#5-analyzeurl--url-模板引擎)
+
+---
+
+## 7. 规则执行完整链路
 
 ```
 用户定义的规则字符串
@@ -469,7 +629,7 @@ RuleAnalyzer.splitRule(ruleStr)  → 按 &&/||/%% 拆分为 List<SourceRule>
 
 ---
 
-## 7. JS 扩展函数概览
+## 8. JS 扩展函数概览
 
 [JS 扩展函数详见 modules/js-extensions.md](../modules/js-extensions.md) | [JsExtensions接口](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/help/JsExtensions.kt)
 
@@ -488,7 +648,7 @@ RuleAnalyzer.splitRule(ruleStr)  → 按 &&/||/%% 拆分为 List<SourceRule>
 
 ---
 
-## 8. 版本锁定与陷阱
+## 9. 版本锁定与陷阱
 
 | 项目 | 锁定版本 | 原因 |
 |------|----------|------|
@@ -499,7 +659,7 @@ RuleAnalyzer.splitRule(ruleStr)  → 按 &&/||/%% 拆分为 List<SourceRule>
 
 ---
 
-## 9. 相关代码锚点速查
+## 10. 相关代码锚点速查
 
 | 功能 | 文件 | 行号 |
 |------|------|------|
@@ -512,6 +672,8 @@ RuleAnalyzer.splitRule(ruleStr)  → 按 &&/||/%% 拆分为 List<SourceRule>
 | XPath解析 | [AnalyzeByXPath.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeByXPath.kt) | L52-133 |
 | JS引擎入口 | [RhinoScriptEngine.kt](file:///f:/myself/github/WeAgentChat/temp/legado/modules/rhino/src/main/java/io/legado/app/model/analyzeRule/RhinoScriptEngine.kt) | L88-125 |
 | URL模板解析 | [AnalyzeUrl.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) | L81 |
+| URL属性分离 | [CustomUrl.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/analyzeRule/CustomUrl.kt) | L7-L49 |
+| paramPattern 共享正则 | [AnalyzeUrl.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) | L768 |
 | 书源规则字段 | [BookSource.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookSource.kt) | L32-98 |
 | 搜索规则定义 | [SearchRule.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/rule/SearchRule.kt) | L12-25 |
 | 正文规则定义 | [ContentRule.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/rule/ContentRule.kt) | L12-24 |

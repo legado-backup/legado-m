@@ -37,6 +37,16 @@
 | 修改工具类/协程/加密 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) |
 | 了解 help/ 辅助工具层 | [modules/help-layer.md](./modules/help-layer.md) |
 | 开发MOBI/WebDAV/主题 | [modules/custom-libraries.md](./modules/custom-libraries.md) |
+| 了解安全模型/SSL/JS沙箱 | [architecture/security-model.md](./architecture/security-model.md) |
+| 查看CI/CD流程 | [architecture/ci-cd-pipeline.md](./architecture/ci-cd-pipeline.md) |
+| 理解Intent/Deep Link | [architecture/intent-deep-links.md](./architecture/intent-deep-links.md) |
+| 修改核心UI页面 | [modules/ui-core-pages.md](./modules/ui-core-pages.md) |
+| 修改次要UI页面 | [modules/ui-secondary-pages.md](./modules/ui-secondary-pages.md) |
+| 理解关联导入体系 | [modules/association-import.md](./modules/association-import.md) |
+| 了解广播接收器 | [modules/receiver-system.md](./modules/receiver-system.md) |
+| 查看工具/扩展函数 | [modules/utils-extensions.md](./modules/utils-extensions.md) |
+| 了解构建配置 | [architecture/build-configuration.md](./architecture/build-configuration.md) |
+| 理解多模块架构 | [architecture/multi-module-architecture.md](./architecture/multi-module-architecture.md) |
 
 ---
 
@@ -45,7 +55,7 @@
 ``` 
 docs/project-flow/
 ├── README.md                          ← 你在这里
-├── INDEX.md                           ← 全局关键词索引（170+条目）
+├── INDEX.md                           ← 全局关键词索引（210+条目）
 ├── quick-reference.md                 ← 命令/文件/版本锁定速查
 ├── architecture/
 │   ├── overview.md                    ← 四层架构+数据流+设计模式
@@ -61,6 +71,11 @@ docs/project-flow/
 │   ├── network-layer.md               ← 网络层（OkHttp拦截器链+SSL+Cookie+Cronet+代理）
 │   ├── app-init.md                    ← App初始化（50步启动+常量+EventBus+异常+监控）
 │   ├── base-layer.md                  ← ⭐ Base类与MVVM（BaseActivity/VM/Service+RecyclerAdapter+Diff）
+│   ├── security-model.md              ← ⭐ 安全模型（SSL全信任+Rhino沙箱4层防护+AES/ECB加密+权限模型+ProGuard）
+│   ├── ci-cd-pipeline.md              ← ⭐ CI/CD流程（5个GitHub Actions workflow+dependabot+发布渠道矩阵）
+│   ├── intent-deep-links.md           ← ⭐ Intent体系（Deep Link注册+URL Scheme+文件关联+分享接收+IntentData）
+│   ├── build-configuration.md         ← 构建配置（Gradle配置+版本目录+依赖清单+ProGuard+版本锁定）
+│   ├── multi-module-architecture.md   ← 多模块架构（3+1模块+依赖关系+rhino/book/web模块详解）
 │   └── skill-architecture.md          ← Skill体系架构（陷阱体系+JVM仿真器+Python客户端）
 ├── database/
 │   ├── overview.md                    ← 数据库概览（AppDatabase定义+版本+迁移清单）
@@ -86,7 +101,63 @@ docs/project-flow/
     ├── rss-subsystem.md               ← ⭐ RSS子系统（Rss调度+规则解析+标准解析+文章流UI）
     ├── tools-infrastructure.md         ← ⭐ 工具与辅助层（utils+协程+加密+广播接收器）
     ├── help-layer.md                   ← ⭐ Help辅助层（监控三件套+数据传递+渲染优化+规则辅助+缓存系统+默认数据）
-    └── custom-libraries.md             ← ⭐ 自定义库层（MOBI解析引擎+WebDAV+主题引擎+阿里云TTS+Cronet+权限+对话框+偏好控件）
+    ├── exception-system.md              ← 异常体系（NoStackTraceException+7种业务异常+使用场景）
+    ├── constant-system.md               ← 常量系统（13个常量模块+位标志+@IntDef+预编译正则+事件总线）
+    ├── glide-video-webview.md            ← Glide图片加载+视频播放+WebView池化（ModelLoader+弹幕+WebViewPool+WebJsExtensions）
+    ├── http-helper-layer.md              ← HTTP辅助层（okHttpClient拦截器链+Cookie分层+SSL+BackstageWebView+Cronet封装）
+    ├── update-system.md                  ← 应用更新系统（策略模式+GitHub/Gitee双源+AppVariant变体匹配）
+    ├── source-extensions.md              ← 源辅助与扩展（SourceHelp+exploreKinds三级缓存+验证码等待+BaseSourceExtensions）
+    ├── custom-libraries.md             ← ⭐ 自定义库层（MOBI解析引擎+WebDAV+主题引擎+阿里云TTS+Cronet+权限+对话框+偏好控件）
+    ├── rhino-module.md                   ← ⭐ Rhino模块（沙箱体系+协程桥接+递归保护+Continuation机制）
+    ├── widget-system.md                  ← ⭐ 自定义控件体系（70+控件8子包+主题感知+阅读界面控件组合）
+    ├── ui-core-pages.md                  ← ⭐ 核心UI页面（ReadBookActivity 1857行+MainActivity+搜索/书源/设置/欢迎页）
+    ├── ui-secondary-pages.md             ← ⭐ 次要UI页面（替换规则+字典+代码编辑+视频+浏览器+文件+登录+二维码+字体）
+    ├── association-import.md             ← ⭐ 关联导入体系（8种ImportDialog+FileAssociationActivity+Deep Link路由）
+    ├── receiver-system.md                ← ⭐ 广播接收器体系（MediaButtonReceiver+NetworkChangedListener+TimeBatteryReceiver）
+    └── utils-extensions.md               ← ⭐ 工具与扩展函数（81个文件：网络/编码/加密/图片/Android扩展/数据处理）
+```
+
+---
+
+## 文档覆盖的源码模块关系
+
+```mermaid
+flowchart TB
+    subgraph core_arch["architecture/"]
+        RE["rule-engine.md\n规则引擎"]
+        NL["network-layer.md\n网络层"]
+    end
+    subgraph data_layer["database/"]
+        ENT["entities.md\n实体字段"]
+    end
+    subgraph func_mods["modules/"]
+        ES["exception-system.md\n异常体系"]
+        CS["constant-system.md\n常量系统"]
+        GVW["glide-video-webview.md\n图片/视频/WebView"]
+        HHL["http-helper-layer.md\nHTTP辅助层"]
+        US["update-system.md\n应用更新"]
+        SX["source-extensions.md\n源辅助与扩展"]
+        WS["webbook-search.md\n搜索调度"]
+        CP["content-pipeline.md\n正文管线"]
+        SM["source-management.md\n书源管理"]
+        JSE["js-extensions.md\nJS扩展"]
+        AS["android-services.md\nService层"]
+        CFG["config-system.md\n配置系统"]
+    end
+    RE -->|"规则调用"| JSE
+    RE -->|"URL构建"| HHL
+    WS -->|"搜索请求"| HHL
+    WS -->|"规则解析"| RE
+    CP -->|"正文请求"| HHL
+    SM -->|"校验/扩展"| SX
+    SX -->|"分类发现"| RE
+    GVW -->|"图片URL"| HHL
+    ES -->|"异常处理"| WS
+    ES -->|"异常处理"| CP
+    CS -->|"常量定义"| CFG
+    AS -->|"更新检查"| US
+    HHL -->|"Cookie/SSL"| NL
+    ENT -->|"实体定义"| CS
 ```
 
 ---

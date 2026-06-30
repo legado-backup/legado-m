@@ -631,7 +631,305 @@ RSS/Atom 订阅源配置，40+ 字段，实现 BaseSource 接口。
 
 ---
 
-## 14. 相关代码锚点
+
+## 14. 补充实体字段详解
+
+> 以下实体在早期版本中仅被提及表名/类型名，此处补充完整字段说明。源码路径均为 `app/src/main/java/io/legado/app/data/entities/`。
+
+### ReadRecordShow — 阅读记录展示视图
+
+[ReadRecordShow.kt:3-7](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/ReadRecordShow.kt#L3-L7)
+
+> 非 `@Entity` / `@DatabaseView` 注解的普通 data class，通常由 DAO 查询通过 `@Query` 的 SQL 聚合结果映射而来，用于展示阅读统计。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `bookName` | String | 书名 |
+| `readTime` | Long | 累计阅读时长（毫秒） |
+| `lastRead` | Long | 最后阅读时间戳 |
+
+### KeyboardAssist — 键盘辅助实体
+
+[KeyboardAssist.kt:10-20](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/KeyboardAssist.kt#L10-L20)
+
+> 表名 `keyboardAssists`，复合主键 `(type, key)`，用于存储输入法辅助词条（如自动补全词组）。实现了 `Parcelable`。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `type` | Int | `@PrimaryKey`, `@ColumnInfo(defaultValue = "0")` | 辅助类型（复合主键之一） |
+| `key` | String | `@PrimaryKey`, `@ColumnInfo(defaultValue = "")` | 键值（复合主键之二） |
+| `value` | String | `@ColumnInfo(defaultValue = "")` | 辅助值 |
+| `serialNo` | Int | `@ColumnInfo(defaultValue = "0")` | 排序序号 |
+### ReplaceBook — 替换规则书籍关联
+
+[ReplaceBook.kt:5-18](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/ReplaceBook.kt#L5-L18)
+
+> 非 `@Entity` 注解的普通 data class，表示替换规则与书籍的关联关系。用于「换源」功能中展示某本书在不同书源下的搜索结果。`type` 默认值来自 `BookType.text`。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `bookUrl` | String | 书籍 URL |
+| `origin` | String | 书源 URL |
+| `originName` | String | 书源名称 |
+| `type` | Int | 书籍类型（默认 `BookType.text` = 0） |
+| `name` | String | 书名 |
+| `author` | String | 作者 |
+| `kind` | String? | 分类标签 |
+| `coverUrl` | String? | 封面 URL |
+| `intro` | String? | 简介 |
+| `wordCount` | String? | 字数 |
+| `latestChapterTitle` | String? | 最新章节标题 |
+| `tocUrl` | String | 目录页 URL |
+| `originOrder` | Int | 书源排序序号（默认 0） |
+
+### RssReadRecord — RSS 阅读记录
+
+[RssReadRecord.kt:8-27](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/RssReadRecord.kt#L8-L27)
+
+> 表名 `rssReadRecords`，单主键 `record`（文章链接），索引 `origin`。记录 RSS 文章的已读状态和阅读进度。提供 `toRssArticle()` 和 `toStar()` 转换方法。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `record` | String | `@PrimaryKey` | 文章链接（主键） |
+| `title` | String? | | 文章标题 |
+| `readTime` | Long? | | 阅读时间戳 |
+| `read` | Boolean | | 是否已读（默认 true） |
+| `origin` | String | `@ColumnInfo(defaultValue = "")`, 索引列 | 关联的 RSS 源 URL |
+| `sort` | String | `@ColumnInfo(defaultValue = "")` | 排序值 |
+| `image` | String? | | 封面图 URL |
+| `type` | Int | `@ColumnInfo(defaultValue = "0")` | 类型：0=网页, 1=图片, 2=视频 |
+| `durPos` | Int | `@ColumnInfo(defaultValue = "0")` | 阅读进度位置 |
+| `pubDate` | String? | | 发布日期 |
+
+### RssStar — RSS 收藏
+
+[RssStar.kt:11-34](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/RssStar.kt#L11-L34)
+
+> 表名 `rssStars`，复合主键 `(origin, link)`。实现了 `BaseRssArticle` 接口和 `variableMap` 懒加载。提供 `toRssArticle()` 和 `toRecord()` 转换方法。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `origin` | String | `@PrimaryKey`, `BaseRssArticle` | 关联的 RSS 源 URL |
+| `link` | String | `@PrimaryKey`, `BaseRssArticle` | 文章原文链接 |
+| `sort` | String | | 排序值 |
+| `title` | String | | 文章标题 |
+| `starTime` | Long | | 收藏时间戳 |
+| `pubDate` | String? | | 发布日期 |
+| `description` | String? | | 文章摘要 |
+| `content` | String? | | 文章内容 |
+| `image` | String? | | 封面图 URL |
+| `group` | String | `@ColumnInfo(defaultValue = "默认分组")` | 分组名称 |
+| `variable` | String? | `BaseRssArticle` | 自定义变量 JSON |
+| `type` | Int | `@ColumnInfo(defaultValue = "0")` | 类型：0=网页, 1=图片, 2=视频 |
+| `durPos` | Int | `@ColumnInfo(defaultValue = "0")` | 阅读进度位置 |
+
+> **非持久化字段**（`@Transient` + `@Ignore` + `@IgnoredOnParcel`）：`variableMap: HashMap<String, String>` -- 从 `variable` JSON 懒加载解析的键值映射。
+
+### BookSourcePart — 书源分段规则视图
+
+[BookSourcePart.kt:17-44](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookSourcePart.kt#L17-L44)
+
+> `@DatabaseView` 注解，视图名 `book_sources_part`。从 `book_sources` 表中选取书源的核心字段子集，用于书源列表展示、分组管理等轻量级查询场景，避免加载完整 BookSource 对象。
+
+**视图定义 SQL**（[BookSourcePart.kt:11-15](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookSourcePart.kt#L11-L15)）：
+
+```sql
+SELECT bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore,
+       (loginUrl IS NOT NULL AND TRIM(loginUrl) <> '') AS hasLoginUrl,
+       lastUpdateTime, respondTime, weight,
+       (exploreUrl IS NOT NULL AND TRIM(exploreUrl) <> '') AS hasExploreUrl,
+       eventListener, bookSourceType
+FROM book_sources
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `bookSourceUrl` | String | 书源首页 URL |
+| `bookSourceName` | String | 书源名称 |
+| `bookSourceGroup` | String? | 分组 |
+| `customOrder` | Int | 手动排序编号 |
+| `enabled` | Boolean | 是否启用 |
+| `enabledExplore` | Boolean | 启用发现 |
+| `hasLoginUrl` | Boolean | 是否有登录地址（SQL 计算） |
+| `lastUpdateTime` | Long | 最后更新时间 |
+| `respondTime` | Long | 响应时间（默认 180000ms） |
+| `weight` | Int | 智能排序权重 |
+| `hasExploreUrl` | Boolean | 是否有发现 URL（SQL 计算） |
+| `eventListener` | Boolean | 是否启用事件监听 |
+| `bookSourceType` | Int | 书源类型 |
+
+### Cache — 缓存实体
+
+[Cache.kt:7-13](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Cache.kt#L7-L13)
+
+> 表名 `caches`，主键 `key`，唯一索引 `key`。通用键值缓存，支持过期时间。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `key` | String | `@PrimaryKey`, 唯一索引 | 缓存键 |
+| `value` | String? | | 缓存值 |
+| `deadline` | Long | | 过期截止时间戳（0=永不过期） |
+
+### Cookie — Cookie 实体
+
+[Cookie.kt:7-12](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Cookie.kt#L7-L12)
+
+> 表名 `cookies`，主键 `url`，唯一索引 `url`。存储每个 URL 对应的 Cookie 字符串，供书源/RSS 源的 HTTP 请求携带。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `url` | String | `@PrimaryKey`, 唯一索引 | URL 标识 |
+| `cookie` | String | | Cookie 字符串 |
+
+### SearchKeyword — 搜索关键词
+
+[SearchKeyword.kt:11-20](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/SearchKeyword.kt#L11-L20)
+
+> 表名 `search_keywords`，主键 `word`，唯一索引 `word`。实现了 `Parcelable`。记录搜索关键词的使用频次，用于搜索建议排序。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `word` | String | `@PrimaryKey`, 唯一索引 | 搜索关键词 |
+| `usage` | Int | | 使用次数（默认 1） |
+| `lastUseTime` | Long | | 最后使用时间戳（默认 `System.currentTimeMillis()`） |
+
+### Server — 服务器配置
+
+[Server.kt:15-23](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Server.kt#L15-L23)
+
+> 表名 `servers`，主键 `id`。实现了 `Parcelable`。存储 WebDAV 等远程服务器配置，`config` 字段以 JSON 存储结构化配置（如 WebDavConfig）。内嵌枚举 `TYPE` 和数据类 `WebDavConfig`。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `id` | Long | `@PrimaryKey` | 服务器 ID（默认 `System.currentTimeMillis()`） |
+| `name` | String | | 服务器名称 |
+| `type` | TYPE | | 服务器类型枚举（目前仅 `WEBDAV`） |
+| `config` | String? | | JSON 格式配置字符串 |
+| `sortNumber` | Int | | 排序序号 |
+
+**内嵌类型**：
+
+| 类型 | 定义位置 | 字段 |
+|------|----------|------|
+| `TYPE` 枚举 | [Server.kt:25-27](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Server.kt#L25-L27) | `WEBDAV` |
+| `WebDavConfig` 数据类 | [Server.kt:50-55](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Server.kt#L50-L55) | `url: String`, `username: String`, `password: String` |
+
+### Bookmark — 书签（增强）
+
+[Bookmark.kt:10-24](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/Bookmark.kt#L10-L24)
+
+> 表名 `bookmarks`，主键 `time`，非唯一索引 `(bookName, bookAuthor)`。实现了 `Parcelable`。上节已有基本字段表，此处补充注解与索引信息。
+
+**索引**：`Index(value = ["bookName", "bookAuthor"], unique = false)` -- 按书名+作者联合索引，用于快速查询某本书的所有书签。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `time` | Long | `@PrimaryKey` | 书签创建时间戳（默认 `System.currentTimeMillis()`） |
+| `bookName` | String | 索引列 | 书名 |
+| `bookAuthor` | String | 索引列 | 作者 |
+| `chapterIndex` | Int | | 章节索引 |
+| `chapterPos` | Int | | 章节内位置 |
+| `chapterName` | String | | 章节名称 |
+| `bookText` | String | | 原文内容 |
+| `content` | String | | 书签/笔记内容 |
+
+### BookChapterReview — 章节段评（增强）
+
+[BookChapterReview.kt:7-13](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookChapterReview.kt#L7-L13)
+
+> ⚠️ 此实体**未注册**在 AppDatabase 的 `@Database` 注解中，属于孤立实体。上节已有基本字段表，此处补充注解信息。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `bookId` | Long | `@ColumnInfo(defaultValue = "0")` | 书籍 ID |
+| `chapterId` | Long | | 章节 ID |
+| `summaryUrl` | String | | 段评摘要 URL |
+
+### 实体关系图
+
+```mermaid
+erDiagram
+    BookSource ||--o{ BookSourcePart : "视图投影"
+    BookSource ||--o{ ReplaceBook : "换源关联"
+    Book ||--o{ Bookmark : "书名+作者索引"
+    Book ||--o{ BookChapterReview : "孤立-未注册"
+    RssSource ||--o{ RssArticle : "origin关联"
+    RssSource ||--o{ RssStar : "origin关联"
+    RssSource ||--o{ RssReadRecord : "origin索引"
+    RssStar ||--o{ RssReadRecord : "互转"
+    RssArticle ||--o{ RssReadRecord : "互转"
+
+    BookSource {
+        string bookSourceUrl PK
+    }
+    BookSourcePart {
+        string bookSourceUrl
+    }
+    ReplaceBook {
+        string bookUrl
+        string origin
+    }
+    Bookmark {
+        long time PK
+        string bookName
+        string bookAuthor
+    }
+    BookChapterReview {
+        long bookId
+        long chapterId
+        string summaryUrl
+    }
+    RssSource {
+        string sourceUrl PK
+    }
+    RssArticle {
+        string origin
+        string link
+    }
+    RssStar {
+        string origin PK
+        string link PK
+    }
+    RssReadRecord {
+        string record PK
+        string origin
+    }
+    Cache {
+        string key PK
+        string value
+        long deadline
+    }
+    Cookie {
+        string url PK
+        string cookie
+    }
+    SearchKeyword {
+        string word PK
+        int usage
+        long lastUseTime
+    }
+    Server {
+        long id PK
+        string name
+        string type
+        string config
+    }
+    KeyboardAssist {
+        int type PK
+        string key PK
+        string value
+    }
+    ReadRecordShow {
+        string bookName
+        long readTime
+        long lastRead
+    }
+```
+
+---
+
+## 15. 相关代码锚点
+
 
 | 实体 | 文件 |
 |------|------|
