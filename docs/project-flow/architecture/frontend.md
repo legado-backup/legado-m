@@ -65,6 +65,23 @@ main.ts / pages/*/main.js (入口)
                      └── 右侧: SourceTabTools (4个 el-tabs 页签)
 ```
 
+```mermaid
+graph TD
+    A["pages/bookshelf/main.js<br/>pages/source/main.js"] --> B["createApp App.vue<br/>.use store .use router .mount"]
+    B --> C["App.vue &lt;router-view&gt;"]
+    C --> D["/ → BookShelf.vue<br/>书架页"]
+    C --> E["/chapter → BookChapter.vue<br/>阅读页"]
+    C --> F["/bookSource 或 /rssSource<br/>→ SourceEditor.vue"]
+    D --> D1["左侧导航栏 260px<br/>搜索框/最近阅读/连接状态"]
+    D --> D2["右侧书架区<br/>BookItems 卡片网格"]
+    E --> E1["tool-bar 左侧浮动<br/>目录/设置/书架/跳顶/跳底"]
+    E --> E2["read-bar 右侧浮动<br/>上一章/下一章"]
+    E --> E3["chapter 居中 670px<br/>ChapterContent 正文"]
+    F --> F1["SourceTabForm<br/>表单编辑"]
+    F --> F2["ToolBar<br/>操作按钮+快捷键"]
+    F --> F3["SourceTabTools<br/>4个 el-tabs 页签"]
+```
+
 ---
 
 ## 2. 路由体系
@@ -93,6 +110,29 @@ main.ts / pages/*/main.js (入口)
 | 书架 → 章节 | `sessionStorage` | `bookUrl`, `bookName`, `bookAuthor`, `chapterIndex`, `chapterPos`, `isSeachBook` |
 | 全局共享 | Pinia store | `isNight`, `shelf`, `config`, `readingBook`, `catalog` 等 |
 | 持久化 | `localStorage` | `readingRecent`（最近阅读）、`tabName`（源编辑器页签）、`remoteUrl`（后端地址） |
+
+```mermaid
+flowchart TD
+    subgraph sessionStorage机制
+        S1["BookShelf.vue<br/>点击书籍"] --> S2["sessionStorage 写入<br/>bookUrl/name/author<br/>chapterIndex/chapterPos/isSeachBook"]
+        S2 --> S3["router.push /chapter"]
+        S3 --> S4["BookChapter.vue<br/>从 sessionStorage 读取参数"]
+    end
+
+    subgraph Pinia共享机制
+        P1["bookStore<br/>isNight/shelf/config<br/>readingBook/catalog"] --> P2["任意组件<br/>useBookStore 访问"]
+        P3["sourceStore<br/>bookSources/rssSources<br/>currentSource/editTabSource"] --> P4["源编辑器组件<br/>useSourceStore 访问"]
+    end
+
+    subgraph localStorage持久化
+        L1["readingRecent<br/>最近阅读书籍"] --> L2["跨会话保留"]
+        L3["tabName<br/>源编辑器页签"] --> L4["刷新后恢复"]
+        L5["remoteUrl<br/>后端地址"] --> L6["跨页面共享"]
+    end
+
+    S1 -.-> P1
+    S4 -.-> P1
+```
 
 ---
 
@@ -281,6 +321,33 @@ App.vue (<router-view>)
         └── [Tab: 帮助] → SourceHelp.vue  (10个帮助链接)
 ```
 
+```mermaid
+graph TD
+    App["App.vue<br/>&lt;router-view&gt;"]
+
+    App --> BS["BookShelf.vue<br/>路由 /"]
+    App --> BC["BookChapter.vue<br/>路由 /chapter"]
+    App --> SE["SourceEditor.vue<br/>路由 /bookSource 或 /rssSource"]
+
+    BS --> BI["BookItems.vue × N<br/>CSS Grid 380px"]
+
+    BC --> CC["ChapterContent.vue × N<br/>v-for 多章渲染"]
+    CC --> CC1["IntersectionObserver<br/>段落追踪 + jump 平滑滚动"]
+    BC --> PC["PopCatalog.vue<br/>el-popover 弹窗"]
+    PC --> CI["CatalogItem.vue × N<br/>虚拟列表子项"]
+    BC --> RS["ReadSettings.vue<br/>el-popover 弹窗"]
+
+    SE --> STF["SourceTabForm.vue<br/>表单 接收config prop"]
+    SE --> TB["ToolBar.vue<br/>操作按钮+快捷键"]
+    SE --> STT["SourceTabTools.vue<br/>el-tabs 页签容器"]
+
+    STT --> SJ["SourceJson.vue<br/>el-input textarea"]
+    STT --> SD["SourceDebug.vue<br/>SSE 流式调试"]
+    STT --> SL["SourceList.vue<br/>虚拟列表"]
+    SL --> SI["SourceItem.vue × N<br/>虚拟列表子项"]
+    STT --> SH["SourceHelp.vue<br/>帮助链接"]
+```
+
 ### 4.2 组件 Store 依赖
 
 | 组件 | useSourceStore | useBookStore | inject('isBookSource') |
@@ -455,6 +522,38 @@ editHistory: { new: Source[], old: Source[] }  // 各限制最多 50 条
 | 响应拦截器 | 校验每个响应是否为 `LegadoApiResponse` 格式（含 `isSuccess`/`errorMsg`/`data`），校验失败弹出警告 |
 | 错误拦截器 | 弹出"后端连接失败"提示，设置 `connectionStore.connectType = 'danger'` |
 | WebSocket 消息回调 | 每次收到消息刷新连接状态为 `'已连接' + 入口地址` |
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant BS as BookShelf.vue
+    participant API as API层
+    participant BE as Legado后端
+    participant BC as BookChapter.vue
+
+    U->>BS: 点击书籍卡片
+    BS->>BS: 判断 SeachBook vs Book
+    alt 搜索书 SeachBook
+        BS->>API: API.saveBook(book)
+        API->>BE: POST /saveBook
+        BE-->>API: 保存成功
+        API-->>BS: 返回结果
+    end
+    BS->>BS: toDetail() 写入 sessionStorage
+    BS->>BC: router.push('/chapter')
+    BC->>API: API.getChapterList(bookUrl)
+    API->>BE: GET /getChapterList?url=...
+    BE-->>API: 返回章节目录
+    API-->>BC: catalog 数据
+    BC->>API: API.getBookContent(bookUrl, chapterIndex)
+    API->>BE: GET /getBookContent?url=...&index=...
+    BE-->>API: 返回章节正文
+    API-->>BC: 章节内容数据
+    BC->>BC: 渲染 ChapterContent
+    BC->>BC: IntersectionObserver 追踪阅读位置
+    BC->>API: saveBookProgressWithBeacon(进度)
+    API->>BE: sendBeacon /saveBookProgress
+```
 
 ---
 
