@@ -47,6 +47,7 @@
 | Skill 可用性优化 | P1 | SKILL.md精简+分级工作流+降级策略+触发词统一，71项0%完成率 | [skill-usability-optimization/](./skill-usability-optimization/) |
 | JVM 仿真服务端 WebView 支持+测试修复 | P0 | DebugResult数据结构+WebView委托+经验提取，解决测试假通过率问题 | [jvm-webview-and-test-fix/](./jvm-webview-and-test-fix/) |
 | 源修复闭环优化 | P0 | 仿真保真度+可观测性+经验闭环+文档治理（16方向），基于源码深度分析发现80+个真实痛点 | [source-repair-loop-optimization/](./source-repair-loop-optimization/) |
+| **Legado 核心质量优化** | P0 | 8方向深度审计：内存泄漏+线程安全+ANR+错误处理+测试+重构+废弃API+安全，3批次渐进式治理 | [legado-core-optimization/](./legado-core-optimization/) |
 
 ### 已完成
 

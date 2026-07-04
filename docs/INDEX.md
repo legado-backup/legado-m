@@ -105,6 +105,8 @@
 | [specs/skill-usability-optimization/](./specs/skill-usability-optimization/) | Skill 可用性优化 |
 | [specs/source-repair-loop-optimization/](./specs/source-repair-loop-optimization/) | 源修复循环优化 |
 | [specs/jvm-webview-and-test-fix/](./specs/jvm-webview-and-test-fix/) | JVM WebView 与测试修复 |
+| [specs/legado-core-optimization/](./specs/legado-core-optimization/) | Legado 核心质量优化（内存泄漏+线程安全+ANR+错误处理+测试） ✅ Batch1+2完成 |
+| [specs/dependency-upgrade-optimization/](./specs/dependency-upgrade-optimization/) | 依赖升级性能优化+minSdk迁移（Coroutines 9.8x Channel加速+7组AndroidX升级+WebView修复） 🔄 设计中 |
 | [specs/legado-skill-unified-redesign/](./specs/legado-skill-unified-redesign/) | Legado Skill 统一重设计 |
 
 ### 归档 Specs
