@@ -98,6 +98,7 @@
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
+| [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
 | [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
 | [specs/legado-skill-v2-rebuild/](./specs/legado-skill-v2-rebuild/) | Legado Skill V2 重建 |
 | [specs/skill-core-capability-rebuild/](./specs/skill-core-capability-rebuild/) | Skill 核心能力重建 |
