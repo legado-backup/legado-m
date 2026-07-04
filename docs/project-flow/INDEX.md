@@ -25,6 +25,41 @@
 | AudioPlayService | [modules/android-services.md](./modules/android-services.md) | 5 AudioPlayService |
 | AutoMigration | [modules/data-layer.md](./modules/data-layer.md) | 6 迁移策略 |
 | Activity 体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 2 Activity继承体系 |
+| AudioPlay 音频播放 | [architecture/android-ui.md](./architecture/android-ui.md) | 13 音频播放架构 |
+| 排版引擎 | [architecture/android-ui.md](./architecture/android-ui.md) | 11 排版引擎架构 |
+| 漫画阅读 | [architecture/android-ui.md](./architecture/android-ui.md) | 12 漫画阅读架构 |
+| Widget 自定义控件 | [architecture/android-ui.md](./architecture/android-ui.md) | 14 Widget控件体系详解 |
+| 主题系统 | [architecture/android-ui.md](./architecture/android-ui.md) | 15 主题系统深度架构 |
+| 布局资源体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 16 布局资源体系 |
+| 横屏适配 | [architecture/android-ui.md](./architecture/android-ui.md) | 17 横屏适配策略 |
+| 夜间模式 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.9 夜间模式颜色覆盖 |
+| Column 列实体 | [architecture/android-ui.md](./architecture/android-ui.md) | 11.6 Column实体体系 |
+| ZhLayout 中文排版 | [architecture/android-ui.md](./architecture/android-ui.md) | 11.5 中文排版 |
+| TextChapterLayout | [architecture/android-ui.md](./architecture/android-ui.md) | 11 排版引擎架构 |
+| ThemeStore 主题存储 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.3 ThemeStore |
+| TintHelper 控件着色 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.7 TintHelper |
+| PhotoView 图片查看 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.2 图片查看域 |
+| CoverImageView 封面图 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.2 图片查看域 |
+| DragSelectTouchHelper | [architecture/android-ui.md](./architecture/android-ui.md) | 14.3 列表交互域 |
+| FastScroller 快速滚动 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.3 列表交互域 |
+| BottomWebViewDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 14.4 对话框域 |
+| VerticalSeekBar | [architecture/android-ui.md](./architecture/android-ui.md) | 14.5 进度条域 |
+| WebtoonRecyclerView | [architecture/android-ui.md](./architecture/android-ui.md) | 12.3 缩放系统 |
+| 启动引导 | [architecture/android-ui.md](./architecture/android-ui.md) | 19 启动引导流程 |
+| WelcomeActivity | [architecture/android-ui.md](./architecture/android-ui.md) | 19 启动引导流程 |
+| 书源调试 | [architecture/android-ui.md](./architecture/android-ui.md) | 20 书源调试流程 |
+| 搜索范围 | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
+| SearchScopeDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
+| 发现页 | [architecture/android-ui.md](./architecture/android-ui.md) | 22 发现页架构 |
+| ExploreAdapter | [architecture/android-ui.md](./architecture/android-ui.md) | 22 发现页架构 |
+| 关联导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
+| URL Scheme 导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
+| 辅助工具页面 | [architecture/android-ui.md](./architecture/android-ui.md) | 24 辅助工具页面 |
+| 阅读记录 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.1 ReadRecordActivity |
+| 缓存导出 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.2 CacheActivity |
+| 页面组件统计 | [architecture/android-ui.md](./architecture/android-ui.md) | 18.1 页面布局组件统计 |
+| 分组编辑 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
+| groupId 位运算 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.4 groupId位运算核心 |
 | AppDatabase | [database/entities.md](./database/entities.md) | 1 数据库定义 |
 | API 数据流 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 1 HTTP链路 |
 | App 启动流程 | [architecture/app-init.md](./architecture/app-init.md) | 1 50步启动流程 |
@@ -79,6 +114,7 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | CacheBook | [modules/service-layer.md](./modules/service-layer.md) | 4 章节缓存 |
+| CacheActivity 缓存导出 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.2 CacheActivity |
 | CacheBookService | [modules/android-services.md](./modules/android-services.md) | 9 CacheBookService |
 | CheckSource 检验配置 | [modules/model-layer.md](./modules/model-layer.md) | 5 CheckSource |
 | CheckSourceService | [modules/android-services.md](./modules/android-services.md) | 11 CheckSourceService |
@@ -155,6 +191,7 @@
 | 五阶段流水线 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 四层架构 | [architecture/overview.md](./architecture/overview.md) | 1 四层架构 |
 | FloatingPlayer 浮窗播放 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 FloatingPlayer |
+| FileAssociationActivity 文件关联 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
 
 ---
 
@@ -169,6 +206,10 @@
 | getContent 正文获取 | [modules/webbook-search.md](./modules/webbook-search.md) | 6.4 正文获取 |
 | getContent 七步管线 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 2 七步管线 |
 | Glide图片加载+视频+WebView | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 架构总览 |
+| GroupEditDialog 分组编辑 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
+| GroupManageDialog 分组管理 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
+| GroupSelectDialog 分组选择 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
+| groupId 位运算 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.4 groupId位运算核心 |
 
 ---
 
@@ -273,6 +314,7 @@
 | OkHttpStreamFetcher 图片加载 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 OkHttpStreamFetcher |
 | OkHttpUtils 请求工具 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 7 OkHttpUtils |
 | 18+ 内容过滤 | [modules/source-management.md](./modules/source-management.md) | 10 18+内容过滤 |
+| OnLineImportActivity 在线导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
 
 ---
 
@@ -341,6 +383,8 @@
 | RuleComplete 规则补全 | [modules/help-layer.md](./modules/help-layer.md) | 5.1 RuleComplete |
 | RuleUpdate 规则订阅 | [modules/model-layer.md](./modules/model-layer.md) | 7 RuleUpdate |
 | Room 数据库 | [database/entities.md](./database/entities.md) | 1 数据库定义 |
+| ReadRecordActivity 阅读记录 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.1 ReadRecordActivity |
+| RSS 调试差异 | [architecture/android-ui.md](./architecture/android-ui.md) | 20.4 RSS调试差异 |
 
 ---
 
@@ -349,6 +393,8 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | SearchModel 并发 | [modules/webbook-search.md](./modules/webbook-search.md) | 4 并发调度 |
+| SearchScope 搜索范围 | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
+| SearchScopeDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
 | SearchRule | [architecture/rule-engine.md](./architecture/rule-engine.md) | 9 锚点速查 |
 | SharedJsScope 共享作用域 | [modules/model-layer.md](./modules/model-layer.md) | 8 SharedJsScope |
 | Skill 架构 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 1 Skill体系 |
