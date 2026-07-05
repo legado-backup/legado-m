@@ -190,9 +190,11 @@ UI 输入关键词
 
 | 依赖 | 版本 | 原因 |
 |------|------|------|
-| jsoup | 1.16.2 | 新版 select() 破坏性变更 |
-| rhino | 1.8.1 | Android 6 兼容性 |
+| jsoup | 1.16.2 | 新版 select() 破坏性变更（jsoup#2017） |
+| rhino | 1.8.1 | API 33 以下不可用的 VarHandle（desugaring 不覆盖） |
 | hutool | 5.8.22 | 书源加解密依赖 |
+| commons-text | 1.13.1 | API 24 以下不可用的 Arrays.setAll（desugaring 不覆盖） |
+| protobuf | 4.26.1 | 兼容性锁定 |
 | Kotlin | 2.3.x | 项目语言 |
 | Java | 17 | 编译目标 |
 

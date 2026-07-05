@@ -29,7 +29,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.13.2")
 
     // OkHttp（HTTP 请求，与 Legado 版本一致）
-    implementation("com.squareup.okhttp3:okhttp:5.3.2")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     // Hutool 加密（与 Legado 版本一致）
     implementation("cn.hutool:hutool-crypto:5.8.22")

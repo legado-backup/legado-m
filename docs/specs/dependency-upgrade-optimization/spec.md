@@ -90,7 +90,7 @@ Legado 项目当前使用 74+ 依赖项，部分依赖版本已有新版本发�
 | R1 | 将 minSdk 从 21 提升至 23 | P0 |
 | R2 | 清理 API 21-22 兼容代码（含遗漏项：WebViewPool/BottomWebViewDialog/SystemUtils） | P0 |
 | R3 | 识别所有可安全升级的依赖项并量化性能增益 | P0 |
-| R4 | 执行 P0 层升级（8 个依赖）并验证编译通过 | P0 |
+| R4 | 执行 P0 层升级（7 个依赖）并验证编译通过 | P0 |
 | R5 | 执行 WebView 性能修复（setLayerType + hardwareAccelerated） | P0 |
 | R6 | 执行 P1 层升级（OkHttp）并验证功能正确性 | P1 |
 | R7 | 更新 libs.versions.toml 中的版本号和注释 | P0 |
@@ -117,7 +117,7 @@ Legado 项目当前使用 74+ 依赖项，部分依赖版本已有新版本发�
 
 ### 场景 2：P0 层升级成功
 
-1. 修改 libs.versions.toml 中 8 个 P0 依赖版本号
+1. 修改 libs.versions.toml 中 7 个 P0 依赖版本号
 2. 执行 `gradlew assembleAppDebug` 编译通过
 3. 安装 APK，验证核心功能（书架、搜索、阅读、书源管理、音频播放）
 4. 合并变更
