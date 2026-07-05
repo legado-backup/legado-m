@@ -275,7 +275,7 @@ graph TD
 | 文件 | 变更类型 | 说明 |
 |------|----------|------|
 | `app/build.gradle` | 修改 | minSdk 21→23 |
-| `gradle/libs.versions.toml` | 修改 | 更新 8 个依赖版本号（coroutines/core/activity/material/media3/firebaseBom/lifecycle）+ 移除 #noinspection 注释 + 修正 rhino/commons-text 注释 |
+| `gradle/libs.versions.toml` | 修改 | 更新 7 个依赖版本号（coroutines/core/activity/material/media3/firebaseBom/lifecycle）+ 移除 #noinspection 注释 + 修正 rhino/commons-text 注释 |
 | `app/src/main/java/io/legado/app/utils/NetworkUtils.kt` | 修改 | 移除 API<23 兼容分支 |
 | `app/src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt` | 修改 | 移除 API<M 调速按钮隐藏 |
 | `app/src/main/java/io/legado/app/data/AppDatabase.kt` | 修改 | 移除 setLocale 版本保护 |

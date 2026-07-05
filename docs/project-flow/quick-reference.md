@@ -26,15 +26,17 @@
 | 书源实体 | `app/src/main/java/io/legado/app/data/entities/BookSource.kt` |
 | 数据库定义 | `app/src/main/java/io/legado/app/data/AppDatabase.kt` |
 | ProGuard | `app/proguard-rules.pro` |
-| 依赖版本 | `buildSrc/src/main/kotlin/Dependencies.kt` / `build.gradle.kts` |
+| 依赖版本 | `gradle/libs.versions.toml` |
 
 ## 版本锁定依赖
 
 | 依赖 | 版本 | 原因 |
 |------|------|------|
 | jsoup | 1.16.2 | 新版有破坏性变更（jsoup#2017） |
-| rhino | 1.8.1 | 新版使用 Android 6 以下缺少的 Arrays.setAll 方法 |
+| rhino | 1.8.1 | API 33 以下不可用的 VarHandle（desugaring 不覆盖） |
 | hutool | 5.8.22 | 书源加解密依赖，不可升级 |
+| commons-text | 1.13.1 | API 24 以下不可用的 Arrays.setAll（desugaring 不覆盖） |
+| protobuf | 4.26.1 | 兼容性锁定 |
 
 ## 数据库
 

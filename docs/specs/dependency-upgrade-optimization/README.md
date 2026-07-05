@@ -1,6 +1,6 @@
 # 依赖升级性能优化
 
-> 🔄 设计中 — 二次深度审查完成，等待用户最终审核
+> ✅ 实施完成 — Phase 0~3 代码修改+文档同步已全部完成
 
 ## 功能概述
 
@@ -20,9 +20,10 @@
 
 | 决策 | 结论 | 说明 |
 |------|------|------|
-| minSdk 21→23 | ✅ 确认 | 释放 activity/material/media3/core/lifecycle 升级路径；影响 <1% 用户 |
-| lifecycle | ✅ 升级到 2.11.0 | 二次审查确认 2.11.0 已是稳定版（非 beta），获得内存优化+LifecycleEffect |
-| core-ktx | ✅ 升级到 1.19.0 | 二次审查确认 1.19.0 已是稳定版（非 alpha）；注意 KTX 变空壳，扩展函数已移入 core 主模块 |
+| minSdk 21→23 | ✅ 确认 | 释放 activity/material/media3 升级路径；影响 <1% 用户 |
+| core | ⏸️ 回退到 1.18.0 | 1.19.0 要求 compileSdk 37 + AGP 9.1+，当前环境不支持 |
+| lifecycle | ⏸️ 保持 2.9.4 | 2.11.0 要求 compileSdk 37 + AGP 9.1+，当前环境不支持 |
+| OkHttp | ✅ 升级到 5.4.0 | 迁移 4 处 internal API 为公共实现，1 处保留并标注风险 |
 | fragment | ⏸️ 保持 1.8.9 | 1.9.0 仅有 alpha 版，当前为最新稳定版 |
 | webkit 1.14→1.16 | 🔴 阻断 | webkit 1.16.0 要求 minSdk≥24 |
 | commons-text 1.13.1 | 🔴 硬锁定 | Arrays.setAll 需 API 24+，desugaring 不覆盖 |
