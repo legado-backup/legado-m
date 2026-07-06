@@ -188,14 +188,15 @@ gradlew --version     # 应显示 Gradle 8.x
 | 配置项 | 值 | 来源文件 |
 |--------|-----|---------|
 | compileSdk | 36 | `build.gradle` (root) |
-| minSdk | 21 | `app/build.gradle` |
+| minSdk | 23 | `app/build.gradle` |
 | targetSdk | 36 | `app/build.gradle` |
 | applicationId | `io.legado.app` | `app/build.gradle` |
 | namespace | `io.legado.app` | `app/build.gradle` |
 | JDK | 17 | `app/build.gradle` (jvmToolchain) |
 | Kotlin | 2.3.10 | `gradle/libs.versions.toml` |
 | AGP | 8.13.2 | `gradle/libs.versions.toml` |
-| OkHttp | 5.3.2 | `gradle/libs.versions.toml` |
+| OkHttp | 5.4.0 | `gradle/libs.versions.toml` |
+| abiFilters | arm64-v8a, armeabi-v7a | `app/build.gradle` (ndk) |
 | 版本名格式 | `3.yy.MMddHH` | `app/build.gradle` (releaseTime) |
 | 版本号 | `10000 + gitCommitCount` | `app/build.gradle` |
 

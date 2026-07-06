@@ -30,7 +30,7 @@ DI 方式为手动管理：
 ## 数据库层
 
 - Room 数据库：`legado.db`，版本 89
-- **允许主线程查询**：`allowMainThreadQueries()` — 历史设计，新增代码应避免依赖此特性
+- **允许主线程查询**：`allowMainThreadQueries()` — Glide 图片加载等上下文中必需，保持启用
 - `room.generateKotlin=false`：生成 Java 而非 Kotlin
 - Schema 导出：`app/schemas/`
 - AutoMigration：v43+ 使用 AutoMigration，v1-v9 使用 `fallbackToDestructiveMigrationFrom`
@@ -71,7 +71,7 @@ modules/web 是独立 Vue3 前端项目，非 Gradle 模块
 |------|-----|------|
 | `configuration-cache` | false | 启用会导致无法升级 app 版本 |
 | `room.generateKotlin` | false | 生成 Java 而非 Kotlin |
-| `allowMainThreadQueries` | true | 历史设计，新增代码应避免 |
+| `allowMainThreadQueries` | true | Glide 图片加载等上下文中必需，保持启用 |
 | Vue3 sync.js | 仅 GitHub Actions | 本地开发需手动复制构建产物 |
 | `nonTransitiveRClass` | true | 非传递 R 类 |
 | `coreLibraryDesugaring` | 启用 | 支持低 API 设备使用新 Java API |
