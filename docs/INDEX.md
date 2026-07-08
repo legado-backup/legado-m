@@ -108,7 +108,8 @@
 | [specs/legado-core-optimization/](./specs/legado-core-optimization/) | Legado 核心质量优化（内存泄漏+线程安全+ANR+错误处理+测试） ✅ Batch1+2完成 |
 | [specs/dependency-upgrade-optimization/](./specs/dependency-upgrade-optimization/) | 依赖升级性能优化+minSdk迁移（Coroutines 9.8x+Lifecycle 2.11+Core 1.19+7组AndroidX升级+OkHttp 5.4+WebView修复） ✅ 实施完成 |
 | [specs/legado-skill-unified-redesign/](./specs/legado-skill-unified-redesign/) | Legado Skill 统一重设计 |
-| [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构） 🔄 设计中 |
+| [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构） ✅ 实施完成（P0+P1），待真机验证 |
+| [specs/e2e-automated-testing/](./specs/e2e-automated-testing/) | APK 端到端自动化测试验证系统（MEmu+uiautomator2+AI 日志分析，一键打包→装包→跑用例→出报告） 🔄 设计中 |
 
 ### 归档 Specs
 

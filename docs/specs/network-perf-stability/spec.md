@@ -60,13 +60,14 @@ Legado 作为开源电子书阅读器，**网络层是其一切业务的基础**
 | C2 | 307/308 重定向保持 method+body（借鉴蛋蛋Max） | `OkHttpUtils.kt:29-43` | 借鉴成熟实现 | RFC 7538 标准，蛋蛋Max 已验证 |
 | P0-6 | SSLContext "SSL" → "TLS" | `SSLHelper.kt:57` | 明确 Bug | TLS 是 SSL 的安全替代，行为兼容 |
 
-##### P0 功能借鉴（3 项短平快，用户可感知）
+##### P0 功能借鉴（4 项短平快，用户可感知）
 
 | 编号 | 功能 | 来源版本 | 文件数 | 借鉴依据 |
 |------|------|---------|--------|---------|
 | F-P0-1 | 调试工具集（编码/HTTP/curl/ping/正则/时间戳） | 蛋蛋Max | 14 | 用户可感知，难度低 |
 | F-P0-2 | 备份选择器（分类预览+一键备份） | 蛋蛋Max | 前端+后端 | 用户可感知，难度低 |
 | F-P0-3 | Web 端备份管理（BackupManager 完整移植） | 蛋蛋Max | 4 | 用户可感知，难度低 |
+| F-P0-4 | 订阅源页面选择器（搜索框和更多之间的"第X页"菜单） | 蛋蛋Max | 4 | 用户主动提及"相当实用"，基础设施已就绪，约50行代码 |
 
 #### P1 谨慎实施（8 项中风险优化 + 5 项中等难度功能借鉴）
 
@@ -92,6 +93,119 @@ Legado 作为开源电子书阅读器，**网络层是其一切业务的基础**
 | F-P1-3 | 调试日志面板 + 浮球（Overlay 窗口） | 蛋蛋Max | 13 | ⭐⭐⭐⭐ |
 | F-P1-4 | 阅读热力图 | 蛋蛋Max | - | ⭐⭐⭐ |
 | F-P1-5 | 书籍想法/笔记系统（含 Obsidian 导出） | Jingshiro | 8 | ⭐⭐⭐⭐ |
+
+##### P1 组件升级与体验优化（用户主动提供报告/需求，独立任务）
+
+| ID | 名称 | 来源 | 文件量 | 优先级 |
+|------|------|---------|--------|---------|
+| F-P1-6 | Cronet 网络引擎升级（128.0.6613.40 → 149.0.7827.201） | 用户报告 + 项目内置升级基础设施 | 2 | ⭐⭐⭐⭐ |
+| F-P1-7 | 打包压缩优化（降低 APK 体积） | 用户痛点 + 项目源码核实 | 1 | ⭐⭐⭐ |
+| F-P1-8 | 书源/订阅源分组文件夹布局（借鉴书架） | 用户需求 + 借鉴书架分组实现 | 8 | ⭐⭐⭐⭐ |
+
+> **F-P1-7 打包压缩优化可行性分析结论**（基于 `app/build.gradle` 源码核实）：
+>
+> **① 当前打包配置现状**（已启用项）：
+> - `release` buildType：`minifyEnabled true` + `shrinkResources true`（R8 代码压缩 + 资源压缩）
+> - `abiFilters 'arm64-v8a', 'armeabi-v7a'`（仅打包主流架构，x86/x86_64 仅模拟器使用）
+> - `packaging.resources.excludes.add('META-INF/*')`（排除 META-INF 冗余资源）
+> - 签名 V1/V2/V3/V4 全启用
+> - Cronet so 运行时下载不打包进 APK（`CronetLoader.kt` 从 `storage.googleapis.com` 下载到 `appDir/cronet/`）
+>
+> **② 可优化点评估**：
+>
+> | 优化项 | 收益 | 风险 | 决策 |
+> |--------|------|------|------|
+> | `resConfigs` 限定语言资源 | ~50-100KB（移除第三方库自带的未使用语言资源） | 极低（保留项目所有已翻译语言：zh/zh-rHK/zh-rTW/en/es/es-rES/ja/ja-rJP/pt/pt-rBR/vi） | ✅ **实施** |
+> | R8 full mode（`android.enableR8.fullMode=true`） | ~5%~10% 代码体积 | **高**：Legado 大量使用反射（Rhino JS 引擎 `RhinoWrapFactory`/`NativeBaseSource`/Gson `@Keep` + `TypeAdapter`/Hutool 加解密），full mode 会破坏运行时反射调用 | ❌ **不实施** |
+> | APP Bundle（`.aab` 格式） | 设备级资源裁剪 | 不适用：项目主要面向国内用户，分发渠道用 APK；国内应用市场不支持 AAB 分发 | ❌ **不适用** |
+> | `useLegacyPackaging`/`crunchPngs` | 已默认启用 | - | ℹ️ 已优化 |
+> | `splits.abi` 多 APK 分发 | 每架构 APK 减小 ~5MB | 国内分发渠道普遍只接受单 APK；多 APK 维护成本高 | ❌ **不实施** |
+>
+> **③ 决策结论**：仅实施 `resConfigs` 一项，保留项目所有已翻译语言（中/英/西/日/葡/越），移除第三方库自带的其他语言资源（法/德/俄等），预期 APK 减小 ~50-100KB，零风险。
+>
+> **④ 实施步骤**：
+> 1. `app/build.gradle` 的 `defaultConfig` 内新增 `resConfigs 'zh', 'zh-rHK', 'zh-rTW', 'en', 'es', 'es-rES', 'ja', 'ja-rJP', 'pt', 'pt-rBR', 'vi'`
+> 2. 编译验证（debug 验证语法 + release 验证体积变化）
+> 3. 真机回归测试：中/英/西/日/葡/越语言切换 + 资源引用无异常
+
+> **F-P1-8 书源/订阅源分组文件夹布局可行性分析结论**（基于源码核实 + 借鉴书架实现）：
+>
+> **① 书架分组实现参考**：
+> - `BookGroup.kt`：独立实体（`groupId`/`groupName`/`cover`/`order`/`show`/`bookSort`/`enableRefresh`/`onlyUpdateRead`），含特殊分组常量（IdRoot/IdAll/IdLocal/IdAudio/IdNetNone/IdLocalNone/IdVideo/IdError）
+> - `Book.kt:L77-L80`：`Book.group: Long` 字段保存分组索引号
+> - `BookGroupDao.kt:L23-L59`：`show` 查询 SQL 关联 `book_groups` 与 `books.group`，按 `order` 排序
+> - `BookshelfFragment2.kt:L143-L221`：根据 `groupId` 查询 `bookDao.flowByGroup(groupId)`，`groupId == BookGroup.IdRoot` 时显示全部
+> - `BaseBookshelfFragment.kt:L126-L135`：`initBookGroupData()` 读取分组数据，分组进入 UI 的公共入口
+>
+> **② 书源/订阅源当前实现**：
+> - `BookSource.bookSourceGroup: String? = null`（逗号分隔字符串，非独立分组表）
+> - `RssSource.sourceGroup: String? = null`（同上）
+> - `BookSourceActivity.kt:L159-L268`：菜单维护 `groupMenu`，支持 `menu_group_manage`/排序子菜单/enabled/disabled/no_group/group 筛选
+> - `BookSourceActivity.kt:L293-L390`：根据搜索关键字走 `flowAll/flowEnabled/flowDisabled/flowLogin/flowNoGroup/flowGroupSearch`，按 `BookSourceSort` 排序
+> - `BookSourceAdapter.kt:L93-L124`：列表项渲染 `cbBookSource.text = item.getDisPlayNameGroup()`
+> - `RssSourceActivity.kt:L118-L149`：类似书源，支持分组/筛选入口
+> - `RssSourceDao.kt:L46-L54`：`flowGroupSearch` 使用 `sourceGroup = :key` 匹配
+>
+> **③ 方案对比**：
+>
+> | 方案 | 描述 | 改动量 | 风险 | 决策 |
+> |------|------|--------|------|------|
+> | **A 轻量改造** | 复用现有字符串 group 字段 + 新增"分组文件夹视图"模式 + 视图切换（列表/文件夹）+ 点进文件夹按 group 筛选 + 排序复用现有 BookSourceSort | 8 文件 | 低（不改变数据模型） | ✅ **选定** |
+> | B 独立分组表 | 新增 `source_group` 实体（参考 BookGroup）+ DAO + 关联字段 | 15+ 文件 | 中（需数据库迁移） | ❌ 否决（改动过大） |
+> | C 完全复用 BookGroup | 书源/订阅源直接使用 BookGroup 表 | 12+ 文件 | 高（破坏书架分组语义） | ❌ 否决（语义混乱） |
+>
+> **④ 选定方案A 核心设计**：
+> - 入口：`BookSourceActivity`/`RssSourceActivity` 顶部新增"视图切换"按钮（列表视图/文件夹视图）
+> - 文件夹视图首屏：按 `bookSourceGroup`/`sourceGroup` 字段聚合，每个分组一个"文件夹"卡片（显示分组名+源数量+封面图标）
+> - 点进文件夹：按 `group = :key` 筛选源列表，复用现有列表视图 + 排序菜单
+> - 未分组源：单独一个"未分组"文件夹
+> - 排序：复用现有 `BookSourceSort`（手动/名称/URL/响应时间/启用状态等）
+> - 视图记忆：`AppConfig` 新增 `sourceViewMode`/`rssViewMode` 字段（list/folder）
+>
+> **⑤ 实施步骤**：
+> 1. 新增 `SourceFolderAdapter.kt`/`RssFolderAdapter.kt`（文件夹视图 Adapter）
+> 2. 新增 `item_source_folder.xml`/`item_rss_folder.xml`（文件夹卡片布局）
+> 3. 修改 `BookSourceActivity.kt`/`RssSourceActivity.kt`：新增视图切换按钮 + 文件夹视图 RecyclerView
+> 4. 修改 `BookSourceViewModel.kt`/`RssSourceViewModel.kt`：新增 `flowFolderGroups()` 方法（聚合查询分组列表）
+> 5. 修改 `BookSourceDao.kt`/`RssSourceDao.kt`：新增 `flowGroups()` 方法（DISTINCT group 字段查询）
+> 6. 修改 `AppConfig.kt`：新增 `sourceViewMode`/`rssViewMode` 配置项
+> 7. 修改 `strings.xml`：新增"文件夹视图"/"列表视图"等字符串
+> 8. 编译验证 + 真机回归测试
+
+> **Cronet 升级可行性分析结论**（基于用户提供的《开源阅读Cronet网络引擎版本现状与升级价值总结报告》+ 项目源码核实）：
+>
+> **① 架构现状**：项目采用"本地 jar API + 运行时动态下载 so"混合架构
+> - Java API 层：`app/cronetlib/` 下 5 个 jar（cronet_api/cronet_impl_common_java/cronet_impl_native_java/cronet_impl_platform_java/cronet_shared_java）
+> - Native so 层：**不打包进 APK**，运行时从 `storage.googleapis.com/chromium-cronet/android/{version}/Release/cronet/libs/{abi}/libcronet.{version}.so` 下载到 `appDir/cronet/` 目录
+> - 版本控制：`gradle.properties` 的 `CronetVersion`/`CronetMainVersion` + `assets/cronet.json`（各架构 so 的 MD5）
+>
+> **② 升级基础设施已就绪**（项目已内置完整自动化升级链）：
+> - `app/download.gradle`：Gradle 任务 `downloadCronet`，自动下载 5 个 jar + 4 架构 so + 生成 cronet.json
+> - `.github/scripts/cronet.sh`：GitHub Actions 自动化升级脚本，自动检测最新稳定版 + 更新 gradle.properties + 同步 proguard 规则 + 更新 updateLog.md + 生成 PR
+> - `docs/project-flow/build-apk-guide.md`：已有升级文档说明
+>
+> **③ 收益评估**：
+> - **兼容性（核心价值）**：新版 TLS 指纹同步最新 Chrome，可有效规避多数站点的旧版本指纹拦截，减少 403 报错；更新根证书库、TLS 1.3 加密套件与 HTTP/3 标准实现
+> - **性能**：弱网/高延迟场景 QUIC 拥塞控制优化，95 分位请求耗时下降 15%~20%；普通宽带环境提升有限（书源请求多为小文本，瓶颈在服务端）
+> - **APK 体积**：so 不打包进 APK，**APK 实际不增重**（仅 jar 层增量约几百 KB）；用户报告"增重 5~8MB"针对打包 so 的方案，本项目不适用
+>
+> **④ 风险评估**：
+> - **API 废弃风险（低）**：跨 21 个大版本，但项目使用的 `org.chromium.net.*` 是 Cronet 稳定 API，向后兼容性好；`CronetHelper.kt`/`CronetInterceptor.kt` 使用的 `ExperimentalCronetEngine`/`UrlRequest.Builder`/`UploadDataProvider` 等均为长期稳定 API
+> - **proguard 规则同步（已自动化）**：`cronet.sh` 会从 chromium 仓库同步 `cronet_combined_impl_native_proguard_golden.cfg`
+> - **网络环境要求**：升级时需访问 `storage.googleapis.com`（中国大陆可能需科学上网）；**用户运行时同样需访问该域名下载 so**，这是现有架构的既有约束，非升级引入
+> - **极少数老旧站点兼容异常**：理论存在，需真机回归测试
+>
+> **⑤ 实施步骤**（如决定升级）：
+> 1. 修改 `gradle.properties`：`CronetVersion=149.0.7827.201` + `CronetMainVersion=149.0.0.0`
+> 2. 执行 `gradlew app:downloadCronet`（需能访问 Google Storage）
+> 3. 检查 `CronetHelper.kt`/`CronetInterceptor.kt`/`CronetCoroutineInterceptor.kt` 使用的 API 是否有废弃
+> 4. 编译验证 + 真机回归测试（重点测试书源搜索/章节抓取/图片加载）
+> 5. 更新 `updateLog.md` 的 cronet 版本号
+>
+> **⑥ 决策建议**：**建议在 P1 主线优化完成后单独实施**，不并入当前内存泄漏治理/协程优化主线。理由：
+> - Cronet 升级属于"兼容性优化"维度，与当前 P1 的"稳定性/内存"维度独立
+> - 升级需真机回归测试覆盖面广（所有书源网络请求），不宜与主线优化混在一起
+> - 项目已有自动化升级脚本，实施成本低，可随时单独执行
 
 #### P2 评估实施（高风险项评估 + 长期功能借鉴）
 
@@ -285,6 +399,15 @@ Legado 作为开源电子书阅读器，**网络层是其一切业务的基础**
 - **FR-F-P0-3.4**：修改 `api/api.ts` 新增 `BackupItemInfo`/`BackupOverview` 类型 + `getBackupPreview()`/`getBackupUrl()` 方法
 - **FR-F-P0-3.5**：**后端配合**：确认 `WebServer.kt` 已实现 `/backup` 和 `/backupPreview` 接口
 
+#### FR-F-P0-4：订阅源页面选择器（借鉴蛋蛋Max，用户主动提及）
+
+- **FR-F-P0-4.1**：`menu/rss_articles.xml` 在 `menu_search` 之后、`menu_login` 之前插入 `menu_page` 项（`showAsAction="always"`）
+- **FR-F-P0-4.2**：`RssArticlesViewModel` 新增 `pageLiveData`、`initialSortUrl` 字段、`skipPage(targetPage)` 方法、`loadArticles(rssSource, targetPage)` 重载
+- **FR-F-P0-4.3**：`RssArticlesFragment` 新增 `getCurrentPage()`、`showPageMenu()`、`showPagePicker()`、`loadArticles(targetPage)` 重载
+- **FR-F-P0-4.4**：`RssSortActivity` 新增 `menuPage` 字段、`updatePageMenu(page, visible)`、`currentArticlesFragment()` 方法
+- **FR-F-P0-4.5**：仅当 `RssSource.ruleNextPage` 不为空时显示页面选择器（无此规则的源不显示菜单项）
+- **FR-F-P0-4.6**：**注意**：`strings.xml` 中 `menu_page`/`change_page` 已存在，不要重复添加
+
 ### 4.3 功能需求 - P1 优化点（8 项中风险）
 
 #### FR-A3：CookieStore LRU 淘汰
@@ -361,6 +484,39 @@ Legado 作为开源电子书阅读器，**网络层是其一切业务的基础**
 - **FR-F-P1-5.1**：读书笔记功能
 - **FR-F-P1-5.2**：Markdown 生成
 - **FR-F-P1-5.3**：Obsidian 集成导出
+
+#### FR-F-P1-6：Cronet 网络引擎升级（用户主动提供报告，独立任务）
+
+- **FR-F-P1-6.1**：Cronet 版本从 128.0.6613.40 升级到最新稳定版（截至 2026-07 为 149.0.7827.201）
+- **FR-F-P1-6.2**：复用项目内置升级基础设施（`gradlew app:downloadCronet` + `.github/scripts/cronet.sh`）
+- **FR-F-P1-6.3**：升级后 `CronetHelper.kt`/`CronetInterceptor.kt`/`CronetCoroutineInterceptor.kt` 使用的 API 无废弃报错
+- **FR-F-P1-6.4**：升级后真机回归测试：书源搜索/章节抓取/图片加载/订阅源更新全流程正常
+- **FR-F-P1-6.5**：升级后 `assets/cronet.json` 自动重新生成（含新版本各架构 so 的 MD5）
+- **FR-F-P1-6.6**：升级后 `updateLog.md` 的 `## cronet版本:` 行同步更新
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，不并入主线
+
+#### FR-F-P1-7：打包压缩优化（用户痛点，独立任务）
+
+- **FR-F-P1-7.1**：`app/build.gradle` 的 `defaultConfig` 内新增 `resConfigs 'zh', 'zh-rHK', 'zh-rTW', 'en', 'es', 'es-rES', 'ja', 'ja-rJP', 'pt', 'pt-rBR', 'vi'`，保留项目所有已翻译语言（中/英/西/日/葡/越），移除第三方库自带的其他语言资源（法/德/俄等）
+- **FR-F-P1-7.2**：编译 release APK 验证体积变化（预期减小 ~50-100KB）
+- **FR-F-P1-7.3**：真机回归测试：中/英/西/日/葡/越语言切换 + 资源引用无异常 + 字符串显示完整
+- **FR-F-P1-7.4**：**不实施** R8 full mode（`android.enableR8.fullMode=true`），因 Legado 大量使用反射（Rhino JS 引擎/Gson/Hutool），full mode 会破坏运行时反射调用
+- **FR-F-P1-7.5**：**不实施** APP Bundle，因项目主要面向国内用户，分发渠道用 APK
+- **FR-F-P1-7.6**：**不实施** `splits.abi` 多 APK 分发，因国内分发渠道普遍只接受单 APK
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，可与 F-P1-6 并行
+
+#### FR-F-P1-8：书源/订阅源分组文件夹布局（用户需求，独立任务）
+
+- **FR-F-P1-8.1**：`BookSourceActivity`/`RssSourceActivity` 顶部新增"视图切换"按钮（列表视图/文件夹视图），切换状态通过 `AppConfig.sourceViewMode`/`AppConfig.rssViewMode` 持久化
+- **FR-F-P1-8.2**：文件夹视图首屏按 `bookSourceGroup`/`sourceGroup` 字段聚合显示分组文件夹卡片（显示分组名+源数量+封面图标）
+- **FR-F-P1-8.3**：点进文件夹按 `group = :key` 筛选源列表，复用现有列表视图 + 排序菜单（`BookSourceSort`）
+- **FR-F-P1-8.4**：未分组源单独显示一个"未分组"文件夹
+- **FR-F-P1-8.5**：新增 `SourceFolderAdapter.kt`/`RssFolderAdapter.kt`（文件夹视图 Adapter）+ `item_source_folder.xml`/`item_rss_folder.xml`（文件夹卡片布局）
+- **FR-F-P1-8.6**：新增 `BookSourceDao.flowGroups()`/`RssSourceDao.flowGroups()` 方法（DISTINCT group 字段聚合查询）
+- **FR-F-P1-8.7**：文件夹视图支持排序方式（按源数量/分组名）
+- **FR-F-P1-8.8**：列表视图与文件夹视图切换不丢失当前选中状态和搜索关键字
+- **FR-F-P1-8.9**：真机回归测试：视图切换/进入文件夹/排序/搜索/选中操作全流程正常
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，可与 F-P1-6/F-P1-7 并行
 
 ### 4.5 非功能需求
 

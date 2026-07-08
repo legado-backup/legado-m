@@ -1,0 +1,20 @@
+# ai_tests/requirements.txt
+# Legado AI 自动化测试基础设施依赖（V3）
+# 🔒 固化层：版本锁定，不随意升级
+
+# === UI 自动化（M4） ===
+uiautomator2>=3.2.0
+adbutils>=2.0.0
+
+# === 模板渲染（M7/M9） ===
+Jinja2>=3.1.0
+
+# === 日志 ===
+loguru>=0.7.0
+
+# === 数据模型 ===
+pydantic>=2.0.0
+
+# === V3 可选：源码解析（M9，正则兜底时无需） ===
+# tree-sitter>=0.20
+# tree-sitter-java>=0.20

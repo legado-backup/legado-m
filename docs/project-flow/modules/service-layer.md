@@ -1619,3 +1619,103 @@ class ExportBookService:
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 10. 网络性能与稳定性优化 + 延伸版本功能借鉴（2026-07）
+
+> 本节汇总 2026-07 服务层相关的缓存优化 + 延伸版本功能借鉴。Spec：[specs/network-perf-stability/](../../specs/network-perf-stability/)。
+
+### 10.1 缓存定期清理（LRU 化）
+
+网络层与服务层多处无界 Map 缓存改为 LRU，避免内存泄漏：
+
+| 缓存 | 文件 | 上限 | 说明 |
+|------|------|------|------|
+| BookSource 内存缓存 | `SourceHelp.kt` | — | 新增内存缓存，减少数据库查询（热路径优化） |
+| failUrl 缓存 | `OkHttpStreamFetcher.kt` | 200 | 图片加载失败 URL 缓存 |
+| stringRuleCache | `AnalyzeRule.kt` | 64 | 规则解析缓存 |
+| 代理客户端缓存 | `HttpHelper.kt` | 20 | 代理 OkHttpClient 复用 |
+| DNS IP 缓存 | `HttpHelper.kt` | 100 | 自定义 DNS 解析缓存 |
+| ConcurrentRateLimiter | `ConcurrentRateLimiter.kt` | — | 新增 `clearRecord` 方法，删源时清理限流记录 |
+
+> 网络层细节详见 [network-layer.md](../architecture/network-layer.md) 第 13 节。
+
+### 10.2 调试工具集（F-P0-1）
+
+借鉴来源：阅读Sigma / 喵公子阅读。新增 7 个调试 Activity，全部采用 Jetpack Compose 构建：
+
+| Activity | 功能 |
+|----------|------|
+| 编码转换 | Base64 / URL / Unicode / Hex 互转 |
+| HTTP 请求 | 自定义 URL / Header / Body 发起请求 |
+| curl 转换 | curl 命令解析与转换 |
+| ping 工具 | 网络连通性检测 |
+| 正则测试 | 正则表达式匹配测试 |
+| 时间戳转换 | Unix 时间戳与日期互转 |
+| 辅助工具 | 其他调试辅助功能 |
+
+### 10.3 备份选择器（F-P0-2）
+
+借鉴来源：蛋蛋Max。支持选择性备份指定数据类型，避免全量备份：
+
+- **BackupSelectorConfig**：备份选择器配置，控制各数据类型的勾选状态
+- **新增 3 个实体**：
+  - `CoverGalleryGroup`：书封画廊分组
+  - `Image`：图片资源
+  - `ReadRecordDetail`：阅读记录明细
+- **BackupController**：备份控制器，按选择配置导出对应数据
+- **HttpServer 路由**：Web 端备份选择 API（与 10.4 联动）
+
+### 10.4 Web 端备份管理（F-P0-3）
+
+借鉴来源：蛋蛋Max。Vue3 Web 端新增备份管理页面：
+
+- 新增 Vue 组件：备份选择、导出、导入
+- 新增路由：`/backup`
+- 新增 API：与 `BackupController` 对接，支持选择性备份的 Web 操作
+
+### 10.5 订阅源页面选择器（F-P0-4）
+
+借鉴来源：阅读Sigma。订阅源列表菜单中新增页码选择器，可直接跳转到指定页码，无需逐页翻页。
+
+### 10.6 自动任务系统（F-P1-1）
+
+借鉴来源：阅读Sigma。支持 cron 表达式定时执行 JS 脚本：
+
+- cron 表达式调度（分 / 时 / 日 / 月 / 周）
+- JS 脚本通过 `JsExtensions` 执行，可调用 ajax / 文件 / 缓存等扩展
+- 任务管理：增删改查、启用 / 禁用
+- 后台执行 + 通知提醒
+
+### 10.7 高亮规则系统（F-P1-2）
+
+借鉴来源：阅读Sigma。正文内容高亮规则系统：
+
+- **9 通道样式**：支持 9 种独立的高亮样式配置（颜色 / 背景 / 粗体 / 斜体 / 下划线）
+- **手动高亮**：阅读时手动选中文本添加高亮
+- **分组管理**：规则分组，支持启用 / 禁用整组
+- **预设规则**：内置常用高亮预设
+- **导入导出**：规则 JSON 导入导出，支持分享
+
+### 10.8 调试日志悬浮球（F-P1-3）
+
+借鉴来源：阅读NG。调试日志悬浮球，方便实时查看日志：
+
+- **DebugFloatBallManager**：悬浮球管理器，支持拖拽 / 显示 / 隐藏
+- **AppLog 日志级别**：新增日志级别分类（VERBOSE / DEBUG / INFO / WARN / ERROR）
+- **AppLogDialog**：日志查看对话框，支持分类过滤、关键字搜索
+
+### 10.9 其他优化
+
+| 优化项 | 说明 |
+|--------|------|
+| 资源配置优化 | `resourceConfigurations` 仅保留已翻译语言，减小 APK 体积 |
+| 文件夹视图 | 书源 / 订阅源 / ExploreFragment / RssFragment 支持文件夹 / 列表视图切换 |
+| Cronet 149 升级 | 补全 `httpengine_native_provider_java.jar`，修复 Cronet 加载问题 |
+
+### 10.10 验证状态
+
+- ✅ P0 功能（F-P0-1 ~ F-P0-4）：4 项全部实施完成
+- ✅ P1 功能（F-P1-1 ~ F-P1-3）：3 项全部实施完成
+- ⚠️ 待真机验证：上述功能需在真机上验证可用性与稳定性

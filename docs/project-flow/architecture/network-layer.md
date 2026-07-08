@@ -91,7 +91,7 @@ if (AppConfig.addressCache.isNotEmpty()) {
 
 ```kotlin
 val unsafeTrustManager: X509TrustManager   // checkServerTrusted() 空实现
-val unsafeSSLSocketFactory: SSLSocketFactory  // SSLContext("SSL")
+val unsafeSSLSocketFactory: SSLSocketFactory  // SSLContext("TLS")（2026-07 修正，原为 "SSL"，存在协议版本过旧/握手兼容性问题）
 val unsafeHostnameVerifier                    // 始终返回 true
 ```
 
@@ -226,6 +226,7 @@ fun getProxyClient(proxy: String?): OkHttpClient {
 - 支持 HTTP / SOCKS4 / SOCKS5 代理
 - 支持代理认证 (`Proxy-Authorization` header)
 - 代理客户端缓存到 `ConcurrentHashMap` 复用
+- **2026-07 优化**：代理客户端缓存改为 LRU（上限 20），避免代理配置频繁切换时无界增长导致内存泄漏
 
 ---
 
@@ -675,6 +676,17 @@ loginCheckJs 存在时：
 - `ConcurrentHashMap<sourceKey, RateRecord>` 保证线程安全
 - `RateRecord` 包含：time（上次重置时间戳）、interval（时间窗口 ms）、accessLimit（窗口内最大次数）、frequency（当前已用次数）
 
+### clearRecord 方法（2026-07 新增）
+
+```kotlin
+fun clearRecord(sourceKey: String) {
+    recordMap.remove(sourceKey)
+}
+```
+
+- **用途**：删源/改源时清理对应的限流记录，避免已删除源残留 RateRecord 造成内存占用与误限流
+- **调用点**：书源/订阅源删除流程中调用，确保限流表与源列表保持一致
+
 ---
 
 ## 12. 关键设计要点
@@ -711,6 +723,56 @@ cookies 表持久 Cookie               → 基础优先级（长期存储）
    else:
        返回 (nextTime - nowTime) (需等待的毫秒数)
 ```
+
+---
+
+## 13. 网络性能与稳定性优化（2026-07）
+
+> 本节汇总 2026-07 网络层 P0 稳定性修复 + P0 性能优化 + 延伸版本功能借鉴的全部变更。Spec：[specs/network-perf-stability/](../../specs/network-perf-stability/)。
+
+### 13.1 P0 稳定性修复
+
+| # | 修复项 | 文件 | 说明 |
+|---|--------|------|------|
+| 1 | CancellationException 透传 | `Coroutine.kt` / `WebBook.kt` / `FlowExtensions.kt` / `OkHttpExceptionInterceptor.kt` | 所有 catch 块添加 CancellationException 守卫，捕获后重新抛出，避免破坏协程取消语义（蛋蛋Max 反模式修复） |
+| 2 | mutexMap 线程安全 | `BookSourceExtensions.kt` | `mutexMap` 从 `hashMapOf` 改为 `ConcurrentHashMap` + `computeIfAbsent`，消除并发场景下的 HashMap 结构损坏 |
+| 3 | MainViewModel poll() 线程安全 | `MainViewModel.kt` | `waitUpTocBooks` 从 `LinkedList` 改为 `ConcurrentLinkedQueue`，消除多线程访问 `LinkedList` 的并发修改风险 |
+| 4 | CacheBook.close() 同步 | `CacheBook.kt` | `close()` 方法添加 `@Synchronized`，防止并发关闭导致的 NPE |
+| 5 | BookHelp 互斥失效 | `BookHelp.kt` | `finally` 块顺序调整：先 `unlock` 后 `remove`，确保锁释放早于映射项移除，避免并发请求拿到已移除的 Mutex |
+| 6 | WebViewPool 池化修复 | `BackstageWebView.kt` | 新增 `closed` 标志位 + `isActiveWebView()` 引用相等检查（`===`），防止已关闭/已回收的 WebView 被复用导致 NPE（阅读Archive 范式借鉴） |
+| 7 | 307/308 重定向处理 | `OkHttpUtils.kt` | 新增 307/308 状态码手动跟随逻辑，保持原始 `method` + `body`（OkHttp 默认 followRedirects 在 307/308 上会丢 body），修复 POST 请求遇 307/308 后变 GET 的回归（蛋蛋Max 借鉴） |
+| 8 | SSLContext 协议修正 | `SSLHelper.kt` | `SSLContext.getInstance("SSL")` → `getInstance("TLS")`，避免 SSLv3 协议过旧导致的握手失败与安全风险 |
+
+### 13.2 P0 性能优化
+
+| # | 优化项 | 文件 | 说明 |
+|---|--------|------|------|
+| 9 | SourceHelp 内存缓存 | `SourceHelp.kt` | 新增 BookSource 内存缓存，减少数据库查询频次（热路径优化） |
+| 10 | BackstageWebView runBlocking 消除 | `BackstageWebView.kt` | 消除主线程 `runBlocking` 调用，避免主线程阻塞导致的 ANR |
+| 11 | BottomWebViewDialog runBlocking 优化 | `BottomWebViewDialog.kt` | `getModifiedContentWithJs` 内部逻辑优化，避免主线程阻塞 |
+| 12 | failUrl LruCache | `OkHttpStreamFetcher.kt` | 图片加载失败 URL 缓存从无界 Map 改为 LRU（上限 200），避免内存泄漏 |
+| 13 | ConcurrentRateLimiter clearRecord | `ConcurrentRateLimiter.kt` | 新增 `clearRecord(sourceKey)` 方法，删源时清理限流记录（见第 11 节） |
+| 14 | stringRuleCache LruCache | `AnalyzeRule.kt` | 规则解析缓存从无界 Map 改为 LRU（上限 64），避免规则解析缓存无界增长 |
+| 15 | 代理客户端 LRU 缓存 | `HttpHelper.kt` | 代理客户端缓存改为 LRU（上限 20），见第 5 节 |
+| 16 | OkHttp 连接池扩容 | `HttpHelper.kt` | 连接池空闲连接数 5 → 50，提升高并发场景下的连接复用率，减少 TCP 握手开销 |
+| 17 | DNS IP 缓存 LRU | `HttpHelper.kt` | DNS 自定义解析的 IP 缓存改为 LRU（上限 100），避免 `addressCache` 无界增长导致内存泄漏 |
+
+### 13.3 延伸版本功能借鉴
+
+> 完整功能借鉴清单见 [service-layer.md](../modules/service-layer.md) 第 10 节，此处仅列网络层相关项。
+
+| # | 功能 | 借鉴来源 | 说明 |
+|---|------|----------|------|
+| - | 307/308 重定向 | 蛋蛋Max | 见 13.1 #7 |
+| - | CancellationException 守卫 | 蛋蛋Max | 见 13.1 #1 |
+| - | WebView 池化 closed 标志 | 阅读Archive | 见 13.1 #6 |
+| - | Cronet 149 升级 | — | 补全 `httpengine_native_provider_java.jar`，修复 Cronet 加载问题（见第 4 节） |
+
+### 13.4 验证状态
+
+- ✅ P0 稳定性修复：8 项全部实施完成
+- ✅ P0 性能优化：9 项全部实施完成
+- ⚠️ 待真机验证：上述变更需在真机上验证稳定性与性能收益
 
 ---
 
