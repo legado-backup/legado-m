@@ -21,6 +21,9 @@
 | [F-P1-6-cronet-upgrade.md](./F-P1-6-cronet-upgrade.md) | F-P1-6 Cronet 网络引擎升级（128→149） | ✅ 完成 | 2026-07-07 |
 | [F-P1-8-source-folder-view.md](./F-P1-8-source-folder-view.md) | F-P1-8 书源/订阅源分组文件夹视图 | ✅ 完成 | 2026-07-07 |
 | [P1-C4-memory-leak-fix.md](./P1-C4-memory-leak-fix.md) | P1-C4 内存泄漏治理（4 处无界缓存改 LRU + 删源清理） | ✅ 完成 | 2026-07-07 |
+| [F-P1-1-auto-task-system.md](./F-P1-1-auto-task-system.md) | F-P1-1 自动任务系统（cron 定时 JS 脚本） | ✅ 完成 | 2026-07-08 |
+| [F-P1-2-highlight-rule-system.md](./F-P1-2-highlight-rule-system.md) | F-P1-2 高亮规则系统（9 通道样式 + 手动高亮 + 分组 + 预设） | ✅ 完成 | 2026-07-08 |
+| [F-P1-3-debug-log-floating-ball.md](./F-P1-3-debug-log-floating-ball.md) | F-P1-3 调试日志悬浮球（级别过滤 + 生命周期跟随） | ✅ 完成 | 2026-07-08 |
 
 ## 测试级别说明
 
