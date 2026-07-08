@@ -62,3 +62,72 @@
 | POST | /deleteBookSources | 删除书源 |
 | POST | /saveBook | 保存书籍 |
 | POST | /saveRssSource | 保存 RSS 源 |
+
+## 新增配置参数（2026-07）
+
+> 本轮网络性能与稳定性优化 + 延伸版本功能借鉴新增的配置参数。Spec：[specs/network-perf-stability/](../specs/network-perf-stability/)。
+
+### 网络层配置（LRU 缓存上限）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| OkHttp 连接池空闲连接数 | Int | 50 | 原 5，扩容提升高并发连接复用率 |
+| 代理客户端 LRU 上限 | Int | 20 | 代理 OkHttpClient 缓存上限 |
+| DNS IP 缓存 LRU 上限 | Int | 100 | 自定义 DNS 解析缓存上限 |
+| failUrl LruCache 上限 | Int | 200 | 图片加载失败 URL 缓存上限 |
+| stringRuleCache LruCache 上限 | Int | 64 | 规则解析缓存上限 |
+
+### 调试日志悬浮球（F-P1-3）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| debugLogFloatingBall | Boolean | false | 是否显示调试日志悬浮球 |
+| AppLog 日志级别 | Enum | VERBOSE | 日志级别过滤（VERBOSE/DEBUG/INFO/WARN/ERROR） |
+
+### 自动任务系统（F-P1-1）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| 自动任务列表 | List | [] | cron 表达式 + JS 脚本的任务列表 |
+| 单任务启用状态 | Boolean | false | 单个任务的启用 / 禁用 |
+
+### 文件夹视图
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| 书源文件夹视图 | Boolean | false | 书源列表是否显示为文件夹视图 |
+| 订阅源文件夹视图 | Boolean | false | 订阅源列表是否显示为文件夹视图 |
+| Explore 文件夹视图 | Boolean | false | 发现页是否显示为文件夹视图 |
+| Rss 文件夹视图 | Boolean | false | RSS 页是否显示为文件夹视图 |
+
+### 高亮规则系统（F-P1-2）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| 高亮规则列表 | List | [] | 9 通道高亮规则配置 |
+| 高亮规则分组 | List | [] | 规则分组管理（启用 / 禁用整组） |
+
+### 备份选择器（F-P0-2）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| BackupSelectorConfig | Object | 全选 | 备份时各数据类型的勾选状态 |
+
+## 新增 Web API 端点（2026-07）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET / POST | /backup/select | 获取 / 设置备份选择器配置 |
+| POST | /backup/export | 按选择配置导出备份 |
+| POST | /backup/import | 导入备份 |
+
+## 新增调试 Activity（F-P0-1）
+
+| Activity | 功能 |
+|----------|------|
+| 编码转换 | Base64 / URL / Unicode / Hex 互转 |
+| HTTP 请求 | 自定义 URL / Header / Body 发起请求 |
+| curl 转换 | curl 命令解析与转换 |
+| ping 工具 | 网络连通性检测 |
+| 正则测试 | 正则表达式匹配测试 |
+| 时间戳转换 | Unix 时间戳与日期互转 |

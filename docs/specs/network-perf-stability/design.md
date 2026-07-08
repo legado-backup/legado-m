@@ -280,6 +280,15 @@ val sslContext = SSLContext.getInstance("TLS")  // 使用 "TLS" 协议
 - `src/pages/backup/{index.html,main.js}`
 - 修改 `router/index.ts` + `views/BookShelf.vue` + `api/api.ts`
 
+**F-P0-4 订阅源页面选择器**（借鉴蛋蛋Max，用户主动提及，约 50 行代码）：
+- 基础设施已全部就绪（strings.xml 残留字符串 + Rss.getArticles 已支持 page + NumberPickerDialog 已存在 + RssSource.ruleNextPage 已存在）
+- 仅需 UI 入口接入：修改 4 个文件
+  - `app/src/main/res/menu/rss_articles.xml`：新增 `menu_page` 项（`showAsAction="always"`）
+  - `RssArticlesViewModel.kt`：新增 `pageLiveData`/`initialSortUrl`/`skipPage()`/`loadArticles(rssSource, targetPage)` 重载
+  - `RssArticlesFragment.kt`：新增 `getCurrentPage()`/`showPageMenu()`/`showPagePicker()`/`loadArticles(targetPage)` 重载
+  - `RssSortActivity.kt`：新增 `menuPage`/`updatePageMenu()`/`currentArticlesFragment()` + 菜单回调接入
+- 仅当 `RssSource.ruleNextPage` 不为空时显示菜单项（无此规则的源不受影响）
+
 ### 1.3 P1 阶段技术方案（8 项中风险优化 + 5 项中等难度功能借鉴）
 
 #### 1.3.1 CookieStore LRU 淘汰（A3）
@@ -422,10 +431,383 @@ private val stringRuleCache = LruCache<String, String>(64)
 - 新增 `ui/autoTask/AutoTaskActivity.kt` 等 UI 文件
 - 支持 Cron 表达式 + 书源更新/订阅源更新/书架备份等任务类型
 
-**F-P1-2 高亮规则系统**（借鉴蛋蛋Max/阅读T，10 文件）：
-- 新增 `data/entities/HighlightRule.kt`
-- 新增 `ui/book/read/HighlightRule*.kt`（编辑/配置/预览/分组管理）
-- 关键词/正则匹配 + 多 Span 样式（背景色/下划线/波浪线等）
+**F-P1-2 高亮规则系统**（以阅读T 为主体 + 蛋蛋Max 补齐分组/预设/导入导出）：
+
+> **设计决策**（基于三份子代理深度分析报告）：
+> 1. **UI 来源**：以阅读T UI 为主体（StyleHost 接口解耦 + 数据驱动通道 + Activity 列表式管理 + 9 通道全暴露 + 批量转化闭环），补齐蛋蛋Max 的分组管理/预设规则/导入导出三项功能
+> 2. **数据模型**：方案 A+ —— 保留现有 HighlightRule 字段不变（向后兼容），新增 `styleJson: String` 字段存储完整 HighlightStyle JSON。`toHighlightStyle()` 优先读 styleJson，没有则从旧字段映射
+> 3. **实施顺序**：先底层后 UI（Phase 1-2 纯函数零风险 → Phase 3-6 渲染层集成 → Phase 7-8 UI 移植）
+> 4. **不采用蛋蛋Max Span 方案**：HighlightStyleSpan 是空壳（updateDrawState 空实现），与当前项目 TextLine.draw 渲染流程不兼容，需额外 Span 解析层，收益为负
+
+**架构总览（5 层）**：
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  UI 层（阅读T 为主 + 蛋蛋Max 补齐）                                       │
+│  ├── HighlightRuleActivity（主入口，VMBaseActivity + RecyclerView）       │
+│  │   └── HighlightRuleAdapter（列表，拖拽排序 + DiffUtil payload）        │
+│  ├── HighlightRuleEditDialog（规则编辑全屏 Dialog，实现 StyleHost）        │
+│  ├── HighlightStyleDialog（样式 BottomSheet，9 通道数据驱动 + 6 预设）     │
+│  ├── HighlightActionMenu（手动高亮 Popup：样式/笔记/规则/复制/删除）      │
+│  ├── HighlightRulePopup（规则高亮 Popup：编辑/停用）                      │
+│  ├── HighlightNoteDialog（高亮备注编辑全屏 Dialog）                       │
+│  ├── HighlightFragment（目录"标注"Tab）                                   │
+│  ├── GroupManageDialog（蛋蛋Max 补齐：分组管理）                          │
+│  ├── PresetRuleDialog（蛋蛋Max 补齐：预设规则管理）                       │
+│  └── 导入导出 menu（蛋蛋Max 补齐：规则集备份迁移）                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│  渲染层集成（修改现有文件，默认关闭策略）                                  │
+│  ├── TextColumn.kt（加 highlightStyle 字段 + draw 插入 fill/style/emphasis）│
+│  ├── TextLine.kt（加 drawHighlightRuns + styledColumnCount + checkFastDraw）│
+│  ├── ContentTextView.kt（加 upHighlight + highlightPaint + click 分支）   │
+│  └── ReadBookActivity.kt（加菜单项 + 高亮回调）                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│  绘制层（新增，Android 依赖）                                             │
+│  └── HighlightDraw.kt（Canvas 直绘：5 种下划线 + 删除线 + 方框 + 着重号） │
+├─────────────────────────────────────────────────────────────────────────┤
+│  匹配引擎（新增，纯函数零风险）                                           │
+│  ├── HighlightRuleMatcher.kt（正则/字面量匹配 + 超时保护 3000ms）         │
+│  ├── HighlightMatcher.kt（章内 pos → 每行每列样式映射）                   │
+│  ├── HighlightTextBuilder.kt（文本重建，偏移对齐章内 pos）                │
+│  └── HighlightGeometry.kt（波浪采样点 + 着重号圆点几何）                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│  数据层（保留现有 + 新增样式系统）                                        │
+│  ├── HighlightRule.kt（现有，保留字段 + 新增 styleJson 字段）             │
+│  ├── HighlightRuleStore.kt（现有，SharedPreferences 存储）                │
+│  ├── HighlightRuleGroupStore.kt（现有，分组存储）                         │
+│  ├── HighlightStyle.kt（新增，9 通道样式数据类 + merge 语义）             │
+│  ├── HighlightStyles.kt（新增，6 个预设样式）                             │
+│  ├── HighlightColors.kt（新增，调色板 10 色）                             │
+│  └── BookHighlight.kt（新增，手动高亮 Room 实体 + DAO）                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**数据模型设计（方案 A+）**：
+
+```kotlin
+// 现有 HighlightRule.kt 保留所有字段不变（向后兼容），新增 styleJson 字段
+data class HighlightRule(
+    // 现有字段（保留，向后兼容旧数据）
+    var id: String = ...,
+    var name: String = "",
+    var pattern: String = "",
+    var sampleText: String = "",
+    var group: String = HighlightRuleGroupStore.DEFAULT_GROUP,
+    var targetScope: Int = TARGET_ALL,
+    var enabled: Boolean = true,
+    var textColor: Int? = null,
+    var underlineMode: Int = 0,        // 0=无, 1=实线, 2=虚线, 3=波浪, 4=双线, 5=SVG
+    var underlineColor: Int? = null,
+    var underlineWidth: Float = 1f,
+    var underlineOffset: Float = 2f,
+    var underlineSvgPath: String? = null,
+    var bgImage: String? = null,
+    var bgImageFit: Int = 0,
+    var bgImageScale: Float = 1f,
+    // 新增字段（存储完整 HighlightStyle JSON，9 通道）
+    var styleJson: String? = null,
+) {
+    // 映射函数：优先读 styleJson，没有则从旧字段映射
+    fun toHighlightStyle(): HighlightStyle {
+        styleJson?.let { json ->
+            runCatching {
+                GSON.fromJsonObject<HighlightStyle>(json).getOrNull()
+            }?.let { return it }
+        }
+        // 旧数据降级映射：textColor + underline 两个通道
+        return HighlightStyle(
+            textColor = textColor ?: 0,
+            underline = underlineMode.takeIf { it != 0 }?.let { mode ->
+                HighlightStyle.Underline(
+                    kind = when (mode) {
+                        1 -> HighlightStyle.Kind.SOLID
+                        2 -> HighlightStyle.Kind.DASHED
+                        3 -> HighlightStyle.Kind.WAVY
+                        4 -> HighlightStyle.Kind.DOUBLE
+                        5 -> HighlightStyle.Kind.SOLID  // SVG 降级为实线
+                        else -> HighlightStyle.Kind.SOLID
+                    },
+                    color = underlineColor ?: 0
+                )
+            }
+        )
+    }
+}
+
+// 新增 HighlightStyle.kt（9 通道，借鉴阅读T）
+data class HighlightStyle(
+    val fill: Int = 0,                 // 背景填充（含 alpha；0=不填充）
+    val textColor: Int = 0,            // 字体色（0=保持默认字色）
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+    val underline: Underline? = null,  // 下划线（5 种 kind）
+    val strike: Deco? = null,          // 删除线
+    val box: Deco? = null,             // 方框
+    val emphasis: Deco? = null,        // 着重号（字下圆点）
+    val fontPath: String = ""          // 自定义字体路径
+) {
+    data class Underline(val kind: Kind = Kind.SOLID, val color: Int = 0)
+    data class Deco(val color: Int = 0)  // color==0 跟随字色
+    enum class Kind { SOLID, WAVY, DASHED, DOTTED, DOUBLE }
+
+    val isEmpty: Boolean get() = fill == 0 && textColor == 0 && !bold && !italic &&
+        underline == null && strike == null && box == null && emphasis == null && fontPath.isEmpty()
+    val needsPerColumnDraw: Boolean get() = bold || italic || underline != null ||
+        strike != null || box != null || emphasis != null || fontPath.isNotEmpty()
+
+    companion object {
+        fun merge(base: HighlightStyle, other: HighlightStyle): HighlightStyle {
+            // 按通道 last-wins 叠加，布尔通道取或，字符串通道 other 优先
+            return HighlightStyle(
+                fill = if (other.fill != 0) other.fill else base.fill,
+                textColor = if (other.textColor != 0) other.textColor else base.textColor,
+                bold = base.bold || other.bold,
+                italic = base.italic || other.italic,
+                underline = other.underline ?: base.underline,
+                strike = other.strike ?: base.strike,
+                box = other.box ?: base.box,
+                emphasis = other.emphasis ?: base.emphasis,
+                fontPath = other.fontPath.ifEmpty { base.fontPath }
+            )
+        }
+    }
+}
+```
+
+**匹配引擎设计（4 个纯函数文件，零 Android 依赖，JVM 可测）**：
+
+```kotlin
+// help/HighlightRuleMatcher.kt —— 正则/字面量匹配 + 超时保护
+object HighlightRuleMatcher {
+    data class Rule(val id: Long, val pattern: String, val isRegex: Boolean, val style: HighlightStyle, val timeoutMs: Long = 3000L)
+    data class RuleMatch(val start: Int, val end: Int, val ruleId: Long, val style: HighlightStyle)
+
+    fun match(text: String, rules: List<Rule>): List<RuleMatch> {
+        if (text.isEmpty() || rules.isEmpty()) return emptyList()
+        val results = mutableListOf<RuleMatch>()
+        rules.forEach { rule ->
+            if (rule.isRegex) matchRegex(text, rule, results) else matchLiteral(text, rule, results)
+        }
+        return results
+    }
+    // 字面量：indexOf 循环，不重叠
+    // 正则：Regex.find 循环，零宽步进，超时 break，非法正则静默跳过
+}
+
+// help/HighlightMatcher.kt —— 章内 pos → 每行每列样式映射
+object HighlightMatcher {
+    data class Range(val start: Int, val end: Int, val style: HighlightStyle)
+    data class LineSpec(val charSize: Int, val columnCharLengths: List<Int>, val isParagraphEnd: Boolean)
+
+    fun resolve(pageBase: Int, lines: List<LineSpec>, ranges: List<Range>): List<List<HighlightStyle?>> {
+        // 逐行逐列计算半开区间交集，多规则按列表序 merge
+        // 位置口径：行内按 charData 长度累加，跨行按 charSize 推进，段末 +1（与 createBookmark 一致）
+    }
+}
+
+// help/HighlightTextBuilder.kt —— 文本重建，偏移对齐章内 pos
+object HighlightTextBuilder {
+    data class LineInput(val columnTexts: String, val charSize: Int, val isParagraphEnd: Boolean)
+    fun build(lines: List<LineInput>): String {
+        // 逐行 append columnTexts，补齐到 charSize（用空格），段末 append '\n'
+        // 保证字符串偏移 == 章内 pos，无需偏移映射表
+    }
+}
+
+// help/HighlightGeometry.kt —— 波浪采样点 + 着重号圆点几何
+object HighlightGeometry {
+    fun wavePoints(x0: Float, x1: Float, baseY: Float, amplitude: Float, wavelength: Float, step: Float): FloatArray
+    fun emphasisDots(starts: List<Float>, ends: List<Float>, cy: Float, r: Float): List<Pair<Float, Float>>
+}
+```
+
+**绘制层设计（新增 HighlightDraw.kt，Android 依赖）**：
+
+```kotlin
+// ui/book/read/page/HighlightDraw.kt —— Canvas 直绘
+object HighlightDraw {
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val dash = DashPathEffect(6.dp, 4.dp)
+    private val dot = DashPathEffect(2.dp, 3.dp)
+    private val wavePath = Path()
+
+    // 保存/恢复 TextPaint 状态（bold/italic/fontPath）
+    data class SavedTextStyle(val isFakeBoldText: Boolean, val textSkewX: Float, val typeface: Typeface?)
+    fun applyTextStyle(paint: TextPaint, style: HighlightStyle): SavedTextStyle { ... }
+    fun restoreTextStyle(paint: TextPaint, saved: SavedTextStyle) { ... }
+
+    // 着重号：字下圆点
+    fun drawEmphasis(canvas: Canvas, start: Float, end: Float, height: Float, color: Int) { ... }
+
+    // 线类/方框装饰（5 种下划线 + 删除线 + 方框）
+    fun drawRun(canvas: Canvas, x0: Float, x1: Float, baseline: Float, height: Float,
+                underline: HighlightStyle.Underline?, strike: HighlightStyle.Deco?,
+                box: HighlightStyle.Deco?, fallbackColor: Int) { ... }
+}
+```
+
+**渲染层集成设计（修改 3 个现有文件，默认关闭策略）**：
+
+```kotlin
+// TextColumn.kt —— 加 highlightStyle 字段 + draw 插入
+var highlightStyle: HighlightStyle? = null
+    set(value) {
+        if (field != value) {
+            textLine.invalidate()
+            textLine.styledColumnCount += if (value != null) 1 else -1  // 影响 checkFastDraw
+        }
+        field = value
+    }
+
+override fun draw(view, canvas) {
+    val hs = highlightStyle
+    // 1. 文字色：hs?.textColor != 0 优先
+    // 2. 背景填充：hs?.fill != 0 → canvas.drawRect
+    // 3. 文字样式：hs != null → HighlightDraw.applyTextStyle → drawText → restoreTextStyle
+    // 4. 着重号：hs?.emphasis?.let { HighlightDraw.drawEmphasis(...) }
+    // 5. 选中：canvas.drawRect(selectedPaint)  // 现有逻辑不变
+}
+
+// TextLine.kt —— 加 drawHighlightRuns + styledColumnCount + checkFastDraw
+var styledColumnCount: Int = 0
+
+fun drawTextLine(view, canvas) {
+    if (checkFastDraw()) {
+        fastDrawTextLine(view, canvas)  // 快速路径：只画 fill 背景，不画装饰
+    } else {
+        // 非快速路径：逐列 draw + drawHighlightRuns
+        columns.forEach { it.draw(view, canvas) }
+        drawHighlightRuns(view, canvas)
+    }
+}
+
+private fun checkFastDraw(): Boolean {
+    return styledColumnCount == 0  // 有装饰列时禁用快速路径
+}
+
+private fun drawHighlightRuns(view, canvas) {
+    // 合并连续 underline/strike/box 相同的列，调 HighlightDraw.drawRun 一次性绘制
+}
+
+// ContentTextView.kt —— 加 upHighlight + highlightPaint + click 分支
+private val highlightFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+private var hasHighlightDrawn: Boolean = false
+
+fun setContent(textPage: TextPage) {
+    // 现有逻辑不变
+    upHighlight()  // 追加调用
+}
+
+private fun upHighlight() {
+    val rules = HighlightRuleStore.loadEnabled(context)
+    if (rules.isEmpty() && ReadBook.highlightsOfChapter().isEmpty()) {
+        // 无规则无手动高亮 → 清空所有 highlightStyle，走原路径
+        textPage.lines.forEach { line ->
+            line.columns.forEach { col -> (col as? TextColumn)?.highlightStyle = null }
+        }
+        hasHighlightDrawn = false
+        return
+    }
+    // 有规则 → 构造 lineSpecs + ranges → HighlightMatcher.resolve → 写入 TextColumn.highlightStyle
+    hasHighlightDrawn = true
+}
+
+// click 分支：highlightStyle != null → onHighlightClick / onHighlightRuleClick
+```
+
+**UI 层设计（阅读T 为主 + 蛋蛋Max 补齐，11+3 个 Kotlin 文件）**：
+
+```kotlin
+// 阅读T 主体（11 文件）
+ui/highlight/HighlightRuleActivity.kt          // 主入口 Activity
+ui/highlight/HighlightRuleAdapter.kt           // 列表 Adapter（拖拽排序 + DiffUtil）
+ui/highlight/HighlightRuleViewModel.kt         // CRUD ViewModel
+ui/highlight/edit/HighlightRuleEditDialog.kt   // 规则编辑全屏 Dialog（实现 StyleHost）
+ui/book/read/HighlightStyleDialog.kt           // 样式 BottomSheet（9 通道数据驱动 + 6 预设）
+ui/book/read/HighlightActionMenu.kt            // 手动高亮 Popup
+ui/book/read/HighlightRulePopup.kt             // 规则高亮 Popup
+ui/book/read/HighlightNoteDialog.kt            // 高亮备注编辑 Dialog
+ui/book/toc/HighlightFragment.kt               // 目录"标注"Tab
+ui/book/toc/HighlightAdapter.kt                // 标注列表 Adapter
+ui/book/read/page/HighlightDraw.kt             // 绘制层（前述）
+
+// 蛋蛋Max 补齐（3 文件）
+ui/highlight/GroupManageDialog.kt              // 分组管理 Dialog
+ui/highlight/PresetRuleDialog.kt               // 预设规则管理 Dialog
+// 导入导出复用项目已有工具类，仅 menu 项
+
+// 关键接口：StyleHost 双宿主复用（规则编辑 + 手动高亮编辑共用一套样式面板）
+interface StyleHost {
+    fun currentHighlightStyle(): HighlightStyle
+    fun onHighlightStyleChanged(style: HighlightStyle)
+    fun pickHighlightColor(dialogId: Int, initial: Int, withAlpha: Boolean)
+    fun pickHighlightFont(current: String)
+}
+// 实现方一：HighlightRuleEditDialog
+// 实现方二：ReadBookActivity（手动高亮编辑）
+```
+
+**文件清单（新增 22 文件 + 修改 5 文件）**：
+
+| 类型 | 文件路径 | 来源 | 行数估算 |
+|------|---------|------|---------|
+| 新增 | `help/HighlightStyle.kt` | 阅读T | 52 |
+| 新增 | `help/HighlightStyles.kt` | 阅读T | 17 |
+| 新增 | `help/HighlightColors.kt` | 阅读T | 27 |
+| 新增 | `help/HighlightRuleMatcher.kt` | 阅读T | 80 |
+| 新增 | `help/HighlightMatcher.kt` | 阅读T | 70 |
+| 新增 | `help/HighlightTextBuilder.kt` | 阅读T | 40 |
+| 新增 | `help/HighlightGeometry.kt` | 阅读T | 35 |
+| 新增 | `ui/book/read/page/HighlightDraw.kt` | 阅读T | 120 |
+| 新增 | `data/entities/BookHighlight.kt` | 阅读T | 55 |
+| 新增 | `data/dao/BookHighlightDao.kt` | 阅读T | 30 |
+| 新增 | `ui/highlight/HighlightRuleActivity.kt` | 阅读T | 100 |
+| 新增 | `ui/highlight/HighlightRuleAdapter.kt` | 阅读T | 144 |
+| 新增 | `ui/highlight/HighlightRuleViewModel.kt` | 阅读T | 41 |
+| 新增 | `ui/highlight/edit/HighlightRuleEditDialog.kt` | 阅读T | 251 |
+| 新增 | `ui/book/read/HighlightStyleDialog.kt` | 阅读T | 234 |
+| 新增 | `ui/book/read/HighlightActionMenu.kt` | 阅读T | 54 |
+| 新增 | `ui/book/read/HighlightRulePopup.kt` | 阅读T | 37 |
+| 新增 | `ui/book/read/HighlightNoteDialog.kt` | 阅读T | 55 |
+| 新增 | `ui/book/toc/HighlightFragment.kt` | 阅读T | 103 |
+| 新增 | `ui/book/toc/HighlightAdapter.kt` | 阅读T | 54 |
+| 新增 | `ui/highlight/GroupManageDialog.kt` | 蛋蛋Max 补齐 | 200 |
+| 新增 | `ui/highlight/PresetRuleDialog.kt` | 蛋蛋Max 补齐 | 150 |
+| 新增 | 8 个布局文件 | 阅读T | 594 |
+| 新增 | 1 个 menu + 26 行 strings | 阅读T | 35 |
+| 修改 | `ui/book/read/config/HighlightRule.kt` | 现有+styleJson | +15 |
+| 修改 | `ui/book/read/page/entities/column/TextColumn.kt` | 加字段+draw | +30 |
+| 修改 | `ui/book/read/page/entities/TextLine.kt` | 加 drawHighlightRuns | +50 |
+| 修改 | `ui/book/read/page/ContentTextView.kt` | 加 upHighlight | +80 |
+| 修改 | `ui/book/read/ReadBookActivity.kt` | 加菜单+回调 | +40 |
+| 修改 | `data/appdb/AppDatabase.kt` | v91→v92 Migration | +15 |
+| **总计** | **22 新增 + 5 修改 + 8 布局 + 1 menu + 26 strings** | - | **~2700 行** |
+
+**实施顺序（8 Phase，先底层后 UI）**：
+
+| Phase | 内容 | 风险 | 验证 |
+|-------|------|------|------|
+| **1** | 复制 6 个纯函数文件（HighlightStyle/Styles/Colors/RuleMatcher/Matcher/TextBuilder/Geometry） | 🟢 零风险 | 编译通过 + JVM 单测 |
+| **2** | 复制 HighlightDraw.kt + ChapterProvider 字体缓存 | 🟢 零风险 | 编译通过 |
+| **3** | 修改 TextColumn（加 highlightStyle 字段 + draw 插入） | 🟡 低风险 | 编译通过 + 默认 null 不改变行为 |
+| **4** | 修改 TextLine（加 drawHighlightRuns + styledColumnCount） | 🟡 低风险 | 编译通过 + styledColumnCount==0 走原路径 |
+| **5** | 修改 ContentTextView（加 upHighlight + click 分支） | 🟡 低风险 | 编译通过 + 规则空时 upHighlight return |
+| **6** | 新增 BookHighlight 实体 + DAO + AppDatabase v91→v92 Migration | 🟠 中风险 | 编译通过 + Migration 测试 |
+| **7** | 移植 UI 11 文件（阅读T 主体） | 🟢 零风险 | 编译通过 + UI 可操作 |
+| **8** | 补齐蛋蛋Max 3 文件（GroupManage/PresetRule/导入导出）+ ReadBookActivity 菜单接入 | 🟡 低风险 | 编译通过 + 端到端测试 |
+
+**风险控制措施**：
+1. 所有渲染层修改采用"默认关闭"策略（highlightStyle == null 时走原路径）
+2. AppDatabase v91→v92 写 proper Migration（不用 fallbackToDestructiveMigration）
+3. 位置口径必须与 createBookmark 一致（行内按 charData 长度累加，跨行按 charSize 推进，段末 +1）
+4. 非法正则静默跳过（不抛异常），超时保护 3000ms 不可移除
+5. 手动高亮压过规则高亮（ranges = ruleRanges + manualRanges，顺序不能反）
+6. 标题行不画高亮（col.highlightStyle = if (line.isTitle) null else colors[li][ci]）
+7. 快速路径兼容（styledColumnCount > 0 时禁用 fastDrawTextLine）
+8. 自定义字体缓存命中与未命中两种情况都缓存
+9. 每个 Phase 编译验证，确保不破坏现有功能
+10. **完全不修改书源/订阅源/网络层相关代码**（零影响核心功能）
 
 **F-P1-3 调试日志面板 + 浮球**（借鉴蛋蛋Max，13 文件）：
 - 新增 `ui/debug/DebugFloatBall.kt`（Overlay 窗口）
@@ -440,6 +822,80 @@ private val stringRuleCache = LruCache<String, String>(64)
 - 新增 `data/entities/BookThought.kt`
 - 新增 `ui/thought/Thought*.kt`
 - Markdown 生成 + Obsidian 集成导出
+
+**F-P1-6 Cronet 网络引擎升级**（用户主动提供报告，独立任务，2 文件变更）：
+- **架构现状**：项目采用"本地 jar API + 运行时动态下载 so"混合架构
+  - Java API 层：`app/cronetlib/` 下 5 个 jar（由 `download.gradle` 下载）
+  - Native so 层：**不打包进 APK**，运行时从 `storage.googleapis.com` 下载到 `appDir/cronet/`
+  - 版本控制：`gradle.properties` 的 `CronetVersion`/`CronetMainVersion` + `assets/cronet.json`（各架构 so MD5）
+- **升级方案**：复用项目内置自动化升级链，不引入新代码
+  1. 修改 `gradle.properties`：`CronetVersion=149.0.7827.201` + `CronetMainVersion=149.0.0.0`
+  2. 执行 `gradlew app:downloadCronet`（自动下载 5 个 jar + 4 架构 so + 重新生成 cronet.json）
+  3. 检查 `CronetHelper.kt`/`CronetInterceptor.kt`/`CronetCoroutineInterceptor.kt` 使用的 API 是否有废弃（`ExperimentalCronetEngine`/`UrlRequest.Builder`/`UploadDataProvider` 等均为长期稳定 API，预期无废弃）
+  4. 编译验证 + 真机回归测试（书源搜索/章节抓取/图片加载）
+  5. 更新 `updateLog.md` 的 `## cronet版本:` 行
+- **文件变更**：
+  - `gradle.properties`：2 行版本号修改
+  - `app/src/main/assets/cronet.json`：由 `downloadCronet` 任务自动重新生成
+  - `app/cronetlib/*.jar`：由 `downloadCronet` 任务自动替换
+  - `app/src/main/assets/updateLog.md`：cronet 版本号行同步
+- **风险缓解**：
+  - API 废弃风险低（`org.chromium.net.*` 稳定 API 向后兼容）
+  - proguard 规则由 `cronet.sh` 自动同步
+  - 真机回归测试覆盖书源/RSS 源/图片加载全流程
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，Task 27 集成验证不含 Cronet 升级
+
+**F-P1-7 打包压缩优化**（用户痛点，独立任务，1 文件变更）：
+- **当前配置现状**（已启用项，无需改动）：
+  - `release` buildType：`minifyEnabled true` + `shrinkResources true`（R8 代码压缩 + 资源压缩）
+  - `abiFilters 'arm64-v8a', 'armeabi-v7a'`（仅打包主流架构，已减小 ~5MB）
+  - `packaging.resources.excludes.add('META-INF/*')`（排除 META-INF 冗余）
+  - Cronet so 运行时下载不打包进 APK
+- **升级方案**：仅新增 `resConfigs` 一项配置
+  1. `app/build.gradle` 的 `defaultConfig` 内新增 `resConfigs 'zh', 'zh-rHK', 'zh-rTW', 'en', 'es', 'es-rES', 'ja', 'ja-rJP', 'pt', 'pt-rBR', 'vi'`
+  2. 编译 release APK 对比体积变化（预期减小 ~50-100KB）
+  3. 真机回归测试：中/英/西/日/葡/越语言切换 + 资源引用无异常
+- **文件变更**：
+  - `app/build.gradle`：`defaultConfig` 内新增 1 行 `resConfigs` 配置（位于 `ndk.abiFilters` 之后）
+- **风险缓解**：
+  - 保留项目所有已翻译语言（项目 `values/`/`values-zh/`/`values-zh-rHK/`/`values-zh-rTW/`/`values-es-rES/`/`values-ja-rJP/`/`values-pt-rBR/`/`values-vi` 共 8 类），不移除任何项目翻译
+  - 仅移除第三方库（Material Components/AppCompat 等）自带的其他语言资源（法/德/俄等）
+  - 不影响 RTL 布局（布局资源与语言资源解耦）
+- **不实施项及理由**：
+  - R8 full mode：`android.enableR8.fullMode=true` 会破坏 Rhino JS 引擎 `RhinoWrapFactory`/`NativeBaseSource` 反射 + Gson `@Keep` 反序列化 + Hutool 加解密反射，风险高于收益
+  - APP Bundle：项目主要面向国内用户，国内应用市场普遍不支持 AAB 分发
+  - `splits.abi` 多 APK 分发：国内分发渠道普遍只接受单 APK
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，可与 F-P1-6 并行
+
+**F-P1-8 书源/订阅源分组文件夹布局**（用户需求，独立任务，8 文件变更）：
+- **架构现状**：
+  - 书源分组：`BookSource.bookSourceGroup: String?`（逗号分隔字符串，非独立分组表）
+  - 订阅源分组：`RssSource.sourceGroup: String?`（同上）
+  - 当前 UI：`BookSourceActivity`/`RssSourceActivity` 列表展示 + 菜单筛选 `group:<name>`
+- **选定方案A（轻量改造）核心设计**：
+  - **数据层**：复用现有 `bookSourceGroup`/`sourceGroup` 字符串字段，不新增分组表
+  - **DAO 层**：新增 `flowGroups()` 方法，使用 `SELECT DISTINCT` 聚合查询分组列表
+  - **UI 层**：新增"视图切换"按钮（列表视图/文件夹视图）+ 文件夹视图 Adapter + 文件夹卡片布局
+  - **配置层**：`AppConfig` 新增 `sourceViewMode`/`rssViewMode` 字段持久化视图状态
+- **文件变更**：
+  - 新增 `app/src/main/java/io/legado/app/ui/book/source/SourceFolderAdapter.kt`：文件夹视图 Adapter
+  - 新增 `app/src/main/java/io/legado/app/ui/rss/source/RssFolderAdapter.kt`：RSS 文件夹视图 Adapter
+  - 新增 `app/src/main/res/layout/item_source_folder.xml`：书源文件夹卡片布局
+  - 新增 `app/src/main/res/layout/item_rss_folder.xml`：RSS 文件夹卡片布局
+  - 修改 `app/src/main/java/io/legado/app/data/dao/BookSourceDao.kt`：新增 `flowGroups()` 方法
+  - 修改 `app/src/main/java/io/legado/app/data/dao/RssSourceDao.kt`：新增 `flowGroups()` 方法
+  - 修改 `app/src/main/java/io/legado/app/ui/book/source/BookSourceActivity.kt`：新增视图切换按钮 + 文件夹视图 RecyclerView + 视图切换逻辑
+  - 修改 `app/src/main/java/io/legado/app/ui/rss/source/RssSourceActivity.kt`：同上
+  - 修改 `app/src/main/java/io/legado/app/ui/book/source/BookSourceViewModel.kt`：新增 `flowFolderGroups()` 方法
+  - 修改 `app/src/main/java/io/legado/app/ui/rss/source/RssSourceViewModel.kt`：同上
+  - 修改 `app/src/main/java/io/legado/app/help/config/AppConfig.kt`：新增 `sourceViewMode`/`rssViewMode` 配置项
+  - 修改 `app/src/main/res/values/strings.xml`：新增"文件夹视图"/"列表视图"/"未分组"等字符串
+- **风险缓解**：
+  - 不改变数据模型，无数据库迁移风险
+  - 视图切换不丢失选中状态和搜索关键字（共享 ViewModel 状态）
+  - 文件夹视图与列表视图共用排序菜单（复用 `BookSourceSort`）
+  - 未分组源单独显示"未分组"文件夹，避免视觉遗漏
+- **实施时机**：P1 主线优化（Task 19~27）完成后单独执行，可与 F-P1-6/F-P1-7 并行
 
 ### 1.4 P2 阶段技术方案（评估后决定是否实施）
 
@@ -791,6 +1247,10 @@ BookHelp.saveImage(src)
 | `modules/web/src/router/index.ts` | 修改 | 集成 backupRoutes（F-P0-3） | +5 |
 | `modules/web/src/views/BookShelf.vue` | 修改 | 增加"数据备份"入口按钮（F-P0-3） | +10 |
 | `modules/web/src/api/api.ts` | 修改 | 新增 BackupItemInfo/BackupOverview 类型 + API（F-P0-3） | +30 |
+| `app/src/main/res/menu/rss_articles.xml` | 修改 | 新增 menu_page 项（F-P0-4，借鉴蛋蛋Max） | +4 |
+| `app/src/main/java/io/legado/app/ui/rss/article/RssArticlesViewModel.kt` | 修改 | 新增 pageLiveData/initialSortUrl/skipPage/loadArticles 重载（F-P0-4） | +20 |
+| `app/src/main/java/io/legado/app/ui/rss/article/RssArticlesFragment.kt` | 修改 | 新增 getCurrentPage/showPageMenu/showPagePicker/loadArticles 重载（F-P0-4） | +20 |
+| `app/src/main/java/io/legado/app/ui/rss/article/RssSortActivity.kt` | 修改 | 新增 menuPage/updatePageMenu/currentArticlesFragment + 菜单回调（F-P0-4） | +15 |
 
 ### 4.2 P1 阶段文件变更（8 项优化 + 5 项功能借鉴）
 

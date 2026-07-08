@@ -1,0 +1,2 @@
+# 占位文件：cases/ 目录存放测试用例（持续迭代层）
+# 子目录按模块分组：cases/{module}/case.md + auto_*.py + preconditions/

@@ -1,0 +1,2 @@
+# 占位文件：templates/ 目录存放 Jinja2 模板
+# 实施时创建：report.md.j2、ai_prompt_template.j2、auto_test_template.j2
