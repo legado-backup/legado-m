@@ -18,6 +18,9 @@
 
 ## TC-F-P0-4-01：菜单显示页码选项（正常用例）
 
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
+
 **测试步骤**：
 1. 打开一个订阅源
 2. 点击菜单按钮
@@ -28,6 +31,9 @@
 - ✅ showAsAction 为 "never"（在溢出菜单中）
 
 ## TC-F-P0-4-02：页码跳转（正常用例）
+
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
 
 **前置条件**：订阅源有多页文章
 
@@ -44,6 +50,9 @@
 
 ## TC-F-P0-4-03：第 1 页加载（正常用例）
 
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
+
 **测试步骤**：
 1. 打开订阅源
 2. 不操作页码，直接观察
@@ -54,6 +63,9 @@
 
 ## TC-F-P0-4-04：页码跳转后加载更多（正常用例）
 
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
+
 **测试步骤**：
 1. 跳转到第 3 页
 2. 滚动到底部，触发"加载更多"
@@ -63,6 +75,9 @@
 - ✅ 菜单标题保持"第3页"（loadMore 不更新菜单标题）
 
 ## TC-F-P0-4-05：Fragment 切换页码标题保持（正常用例）
+
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
 
 **前置条件**：订阅源有多个分类（如"推荐""最新"）
 
@@ -78,6 +93,9 @@
 
 ## TC-F-P0-4-06：跳转到不存在的页码（边界用例）
 
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
+
 **测试步骤**：
 1. 打开订阅源（只有 3 页）
 2. 跳转到第 10 页
@@ -88,6 +106,9 @@
 - ✅ 菜单标题更新为"第10页"
 
 ## TC-F-P0-4-07：单页订阅源（边界用例）
+
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
 
 **前置条件**：订阅源只有 1 页内容
 
@@ -101,6 +122,9 @@
 - ✅ 不崩溃
 
 ## TC-F-P0-4-08：网络错误后重试（异常用例）
+
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
 
 **测试步骤**：
 1. 跳转到某页时网络断开
@@ -119,6 +143,9 @@
 
 ### TC-F-P0-4-09：编译验证（Level 2）
 
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
+
 **测试步骤**：
 ```bash
 ./gradlew.bat :app:assembleAppDebug
@@ -128,6 +155,9 @@
 - ✅ BUILD SUCCESSFUL
 
 ### TC-F-P0-4-10：真机端到端验证（Level 3）
+
+**关联源码**：RssArticlesFragment.kt, RssSortActivity.kt
+**关联 Activity**：RssSortActivity
 
 **测试步骤**：
 1. 安装 APK

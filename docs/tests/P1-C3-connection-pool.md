@@ -28,6 +28,9 @@
 
 ### TC-P1-C3-01：连接池配置正确性（代码审查）✅ Level 1 已通过
 
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 读取 `HttpHelper.kt` okHttpClient builder 链
 2. 检查 `.connectionPool(...)` 配置
@@ -41,6 +44,9 @@
 **实际结果**：通过（L88 `.connectionPool(okhttp3.ConnectionPool(50, 5, TimeUnit.MINUTES))`）
 
 ### TC-P1-C3-02：派生客户端继承连接池（代码审查）✅ Level 1 已通过
+
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 读取 `okHttpClientManga` 定义（L129）
@@ -57,6 +63,9 @@
 
 ### TC-P1-C3-03：编译验证 ✅ Level 1 已通过
 
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 运行 `:app:assembleAppDebug`
 
@@ -70,6 +79,9 @@
 ## 二、端到端集成（待真机验证）
 
 ### TC-P1-C3-04：多书源访问连接复用率提升（Level 2 真机验证）⏳ 待验证
+
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 准备 10+ 个不同域名的书源
@@ -88,6 +100,9 @@
 
 ### TC-P1-C3-05：内存占用可接受（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 启动 app，记录初始内存
 2. 访问 50+ 个不同书源（填满连接池）
@@ -100,6 +115,9 @@
 
 ### TC-P1-C3-06：网络切换后连接池正确清理（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. WiFi 网络下访问多个书源
 2. 切换到移动数据
@@ -111,6 +129,9 @@
 - ✅ 无 "Connection refused" 或 "Socket closed" 错误
 
 ### TC-P1-C3-07：代理客户端继承连接池（Level 2 真机验证）⏳ 待验证
+
+**关联源码**：OkHttp.kt, ConnectionPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 配置代理访问书源

@@ -1,0 +1,86 @@
+{# ai_tests/templates/report.md.j2 — M7 Markdown 报告模板 #}
+# Legado E2E 测试报告
+
+## 执行环境
+
+| 项目 | 值 |
+|------|-----|
+| 设备 | {{ env.device or "N/A" }} |
+| APK | {{ apk_info.name or "N/A" }} |
+| APK 大小 | {{ apk_info.size or "N/A" }} |
+| 执行时间 | {{ env.timestamp or "N/A" }} |
+| 模拟器实例 | {{ env.instance_id if env.instance_id is not none else "N/A" }} |
+
+## 汇总统计
+
+| 指标 | 值 |
+|------|-----|
+| 总用例数 | {{ summary.total }} |
+| pass | {{ summary.pass }} |
+| fail | {{ summary.fail }} |
+| warning | {{ summary.warning }} |
+| manual | {{ summary.manual }} |
+| pass 率 | {{ summary.pass_rate }}% |
+
+{% if fail_cases %}
+## ❌ 失败用例（置顶）
+
+{% for case in fail_cases %}
+### {{ case.tc_id }}: {{ case.title }}
+- 模块: {{ case.module or "N/A" }}
+- verdict: **fail** (confidence={{ case.confidence }})
+- 原因: {{ case.reason }}
+- 轨道: {{ case.track_source }}
+
+{% endfor %}
+{% endif %}
+
+{% if manual_cases %}
+## 🤖 Manual 用例（置顶）
+
+{% for case in manual_cases %}
+### {{ case.tc_id }}: {{ case.title }}
+- 模块: {{ case.module or "N/A" }}
+- verdict: **manual** (confidence={{ case.confidence }})
+- 原因: {{ case.reason }}
+- ai-prompt 路径: `{{ case.ai_prompt_path or "N/A" }}`
+
+{% endfor %}
+{% endif %}
+
+## 📋 全部用例
+
+| TC-ID | 标题 | 模块 | verdict | confidence | 轨道 |
+|-------|------|------|---------|------------|------|
+{% for case in cases %}
+| {{ case.tc_id }} | {{ case.title }} | {{ case.module or "N/A" }} | {{ case.verdict }} | {{ case.confidence }} | {{ case.track_source }} |
+{% endfor %}
+
+{% if affected_modules %}
+## 🔍 V3 受影响模块
+
+- 改动文件数: {{ affected_modules.changed_files | length }}
+- 受影响 Activity: {{ affected_modules.affected_activities | length }}
+- 关联 TC-ID: {{ affected_modules.related_tc_ids | length }}
+- 建议复测: {{ affected_modules.recommended_rerun | length }}
+
+### 受影响 Activity 列表
+{% for act in affected_modules.affected_activities %}
+- {{ act }}
+{% endfor %}
+{% endif %}
+
+{% if feedback_signals %}
+## 💡 V3 反馈建议
+
+{% for fs in feedback_signals %}
+### {{ fs.tc_id }} ({{ fs.verdict }})
+- 失败模式: `{{ fs.failure_pattern }}`
+- 规则建议: {{ fs.suggested_rule }}
+- 提示词建议: {{ fs.suggested_prompt }}
+
+{% endfor %}
+{% endif %}
+
+---
+*报告由 Legado AI 自动化测试系统生成*

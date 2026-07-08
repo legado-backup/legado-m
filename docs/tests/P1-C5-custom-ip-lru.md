@@ -30,6 +30,9 @@
 
 ### TC-P1-C5-01：put + remove 一次性使用模式（正常用例）✅ Level 1 已通过
 
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：空 LRU cache（上限 100）
 
 **测试步骤**：
@@ -44,6 +47,9 @@
 
 ### TC-P1-C5-02：上限内不淘汰（边界用例）✅ Level 1 已通过
 
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 依次 put url1~url100 共 100 个 entry
 2. 检查 cache.size
@@ -54,6 +60,9 @@
 **实际结果**：通过（`customIp_withinMaxSize_doesNotEvict`）
 
 ### TC-P1-C5-03：超限淘汰最老（正常用例）✅ Level 1 已通过
+
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 依次 put url1~url101 共 101 个 entry
@@ -68,6 +77,9 @@
 
 ### TC-P1-C5-04：空 cache remove 返回 null（边界用例）✅ Level 1 已通过
 
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 不 put 任何 entry
 2. `cache.remove("nonexistent")`
@@ -78,6 +90,9 @@
 **实际结果**：通过（`customIp_emptyCacheRemoveReturnsNull`）
 
 ### TC-P1-C5-05：连续淘汰保留最近 100（综合用例）✅ Level 1 已通过
+
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 依次 put url1~url250 共 250 个 entry
@@ -98,6 +113,9 @@
 
 ### TC-P1-C5-06：DNS 缓存场景正常（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 启用 Cronet
 - 配置一个带 dnsIp 的书源
@@ -113,6 +131,9 @@
 
 ### TC-P1-C5-07：长跑后 customIp 不超过 100 个条目（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 准备 150+ 个带不同 dnsIp 的书源
 
@@ -127,6 +148,9 @@
 - ✅ 内存占用稳定，不持续增长
 
 ### TC-P1-C5-08：Cronet 未启用时 customIp 不累积（Level 2 真机验证）⏳ 待验证
+
+**关联源码**：CustomIpCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：禁用 Cronet
 

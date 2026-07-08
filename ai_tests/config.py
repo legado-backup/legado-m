@@ -55,7 +55,11 @@ TIMEOUT_UI_IMPLICIT_WAIT = 10
 # === 操作延迟（秒）===
 OPERATION_DELAY_BEFORE = 0.5
 OPERATION_DELAY_AFTER = 0.5
-
+# === click 滚动查找（OpenSpec e2e-ui-executor-hardening R1）===
+# click 找不到元素时自动滚动 N 次找，解决 PreferenceScreen 长列表元素在屏幕外不可见问题
+# 简化说明：固定向下滚动 | 已知上限：仅向下滚动，元素在上方时找不到 | 升级路径：双向滚动查找（V4）
+SCROLL_SEARCH_MAX = 5  # 最大滚动次数（实测"其它设置"页面"调试工具"需滚动 4 次可见）
+SCROLL_SEARCH_INTERVAL = 0.3  # 每次滚动后等待界面刷新秒数
 # === 崩溃模式（持续迭代层：基于失败案例扩展）===
 # 简化说明：正则匹配 logcat 关键字 | 已知上限：仅覆盖文本日志 | 升级路径：接入 LLM 语义分析（V4）
 CRASH_PATTERNS = {

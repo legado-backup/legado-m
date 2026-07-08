@@ -33,18 +33,30 @@
 ### Level 2：集成测试（编译通过 + 模块交互）
 
 #### TC-01 编译验证
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：项目代码已应用 F-P1-8 全部变更
 - **测试步骤**：执行 `./gradlew :app:compileAppDebugKotlin --rerun-tasks`
 - **预期结果**：BUILD SUCCESSFUL，无编译错误
 - **实际结果**：✅ BUILD SUCCESSFUL（4m 55s），仅有项目已有的 `bundleOf` deprecation 警告
 
 #### TC-02 菜单资源验证
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：APK 编译成功
 - **测试步骤**：检查 `book_source.xml` 和 `rss_source.xml` 均包含 `menu_view_mode` 项
 - **预期结果**：两个菜单文件均包含 `@+id/menu_view_mode`，图标为 `@drawable/ic_folder_outline`，`showAsAction="always"`
 - **实际结果**：✅ 已验证
 
 #### TC-03 字符串资源验证
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：strings.xml 已更新（4 语言）
 - **测试步骤**：检查 `values`/`values-zh`/`values-zh-rTW`/`values-zh-rHK` 均包含 `view_mode`/`list_view`/`folder_view`/`all_groups`
 - **预期结果**：4 个 strings.xml 文件均包含 4 个新字符串
@@ -53,12 +65,20 @@
 ### Level 3：端到端验证（真机操作）
 
 #### TC-04 书源 - 默认列表视图
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：首次安装或清除数据后
 - **测试步骤**：打开书源管理界面
 - **预期结果**：默认显示列表视图（LinearLayoutManager），与原有行为一致
 - **验证要点**：菜单按钮显示文件夹图标
 
 #### TC-05 书源 - 切换到文件夹视图
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：书源管理界面已打开，当前为列表视图
 - **测试步骤**：点击顶部菜单的文件夹图标按钮
 - **预期结果**：
@@ -69,6 +89,10 @@
 - **验证要点**：重新打开书源管理界面，应直接显示文件夹视图
 
 #### TC-06 书源 - 点击"全部"文件夹
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：当前为文件夹视图
 - **测试步骤**：点击"全部"文件夹
 - **预期结果**：
@@ -77,6 +101,10 @@
   3. `AppConfig.sourceViewMode` 持久化为 0
 
 #### TC-07 书源 - 点击"未分组"文件夹
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：当前为文件夹视图
 - **测试步骤**：点击"未分组"文件夹
 - **预期结果**：
@@ -85,6 +113,10 @@
   3. 列表显示未分组的书源
 
 #### TC-08 书源 - 点击分组文件夹
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：当前为文件夹视图，存在至少一个分组
 - **测试步骤**：点击某个分组文件夹（如"失效"）
 - **预期结果**：
@@ -93,16 +125,28 @@
   3. 列表显示该分组下的书源
 
 #### TC-09 书源 - 文件夹视图分组数据实时更新
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：当前为文件夹视图
 - **测试步骤**：在另一个界面（如书源编辑）修改某书源的分组
 - **预期结果**：返回书源管理界面，文件夹视图自动更新分组列表
 
 #### TC-10 订阅源 - 文件夹视图全流程
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：订阅源管理界面已打开
 - **测试步骤**：重复 TC-04 ~ TC-09 的操作
 - **预期结果**：行为与书源一致，`AppConfig.rssViewMode` 独立持久化
 
 #### TC-11 视图切换不丢失搜索状态
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：列表视图下搜索了某关键词
 - **测试步骤**：
   1. 切换到文件夹视图
@@ -112,6 +156,10 @@
   2. 切换回列表视图时，搜索关键词保留，列表恢复筛选状态
 
 #### TC-12 文件夹视图下拖拽禁用
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：当前为文件夹视图
 - **测试步骤**：长按文件夹卡片尝试拖拽
 - **预期结果**：无法拖拽，`itemTouchCallback.isCanDrag = false` 生效，无崩溃
@@ -119,11 +167,19 @@
 ## 4. 边界值测试
 
 #### TC-13 无分组数据
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：所有书源都未设置分组
 - **测试步骤**：切换到文件夹视图
 - **预期结果**：只显示"全部"和"未分组"两个文件夹，无崩溃
 
 #### TC-14 空分组名
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：某书源的 `bookSourceGroup` 为空字符串或纯逗号
 - **测试步骤**：切换到文件夹视图
 - **预期结果**：`dealGroups()` 已处理空字符串（`splitNotBlank` 过滤），不显示空分组
@@ -131,11 +187,19 @@
 ## 5. 异常场景测试
 
 #### TC-15 文件夹视图下快速切换
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：书源管理界面已打开
 - **测试步骤**：快速连续点击视图切换按钮 5 次
 - **预期结果**：最终视图模式与点击次数奇偶一致，无崩溃
 
 #### TC-16 文件夹视图下进程被杀
+
+**关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
+**关联 Activity**：BookSourceActivity
+
 - **前置条件**：文件夹视图模式下按 Home 键切到后台
 - **测试步骤**：等待系统杀死进程后重新打开
 - **预期结果**：恢复到文件夹视图（`AppConfig.sourceViewMode` 已持久化）

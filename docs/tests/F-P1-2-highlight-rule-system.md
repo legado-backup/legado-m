@@ -18,6 +18,9 @@
 
 ## TC-F-P1-2-01：创建字面量高亮规则（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：正在阅读一本书
 
 **测试步骤**：
@@ -36,6 +39,9 @@
 
 ## TC-F-P1-2-02：创建正则高亮规则（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建规则
 2. 名称输入"章节标题"
@@ -50,6 +56,9 @@
 
 ## TC-F-P1-2-03：无效正则表达式（异常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建规则
 2. 开启"正则匹配"
@@ -62,6 +71,9 @@
 - ✅ 规则不保存或标记为无效
 
 ## TC-F-P1-2-04：9 通道样式组合（正常用例）
+
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 新建规则
@@ -83,6 +95,9 @@
 
 ## TC-F-P1-2-05：样式降级映射（兼容性用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：存在使用旧字段（textColor/underlineMode）的规则
 
 **测试步骤**：
@@ -96,6 +111,9 @@
 
 ## TC-F-P1-2-06：作用范围设置（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建规则，设置作用范围为"仅标题"
 2. 新建规则，设置作用范围为"仅正文"
@@ -107,6 +125,9 @@
 - ✅ "全部"规则高亮标题和正文
 
 ## TC-F-P1-2-07：手动划线高亮（正常用例）
+
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：正在阅读一本书
 
@@ -124,6 +145,9 @@
 
 ## TC-F-P1-2-08：分组管理 - 新建分组（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入高亮规则管理页
 2. 点击分组管理
@@ -138,6 +162,9 @@
 
 ## TC-F-P1-2-09：预设规则库（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入高亮规则管理页
 2. 点击"预设规则"
@@ -150,6 +177,9 @@
 - ✅ 预设规则参数正确
 
 ## TC-F-P1-2-10：规则导入导出（正常用例）
+
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 创建 2 条规则
@@ -165,6 +195,9 @@
 
 ## TC-F-P1-2-11：规则启用/禁用（正常用例）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 创建一条规则并启用
 2. 切换为禁用
@@ -175,6 +208,9 @@
 - ✅ 重新启用后恢复高亮
 
 ## TC-F-P1-2-12：超时保护（边界用例）
+
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 创建一条正则规则，使用灾难性回溯正则 `(a+)+$`
@@ -192,6 +228,9 @@
 
 ### TC-F-P1-2-13：高亮规则入口可达性（Level 3）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 打开一本书进入阅读界面
 2. 点击屏幕中央唤出菜单
@@ -203,6 +242,9 @@
 
 ### TC-F-P1-2-14：标注 Tab 可达性（Level 3）
 
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 打开一本书的目录页
 2. 查看 Tab 列表
@@ -212,6 +254,9 @@
 - ✅ 点击可查看该书所有手动高亮
 
 ### TC-F-P1-2-15：编译验证（Level 2）
+
+**关联源码**：HighLight.kt, ReadBook.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 ```bash

@@ -67,6 +67,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 
 ### TC-P0-9-01：单图片下载正常完成（正常用例）⏳ 待验证
 
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入一本含图片章节的书籍（漫画/插画小说）
@@ -83,6 +86,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 - ✅ 无图片损坏
 
 ### TC-P0-9-02：并发下载同 src 图片（核心场景）⏳ 待验证
+
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -102,6 +108,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 
 ### TC-P0-9-03：图片下载异常时互斥正确（异常用例）⏳ 待验证
 
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 配置一个图片 URL 不可达的书源
@@ -119,6 +128,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 - ✅ 无死锁、无 `IllegalMonitorStateException`
 
 ### TC-P0-9-04：快速切换章节时互斥不失效（边界用例）⏳ 待验证
+
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -139,6 +151,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 
 ### TC-P0-10-01：单次 JS 执行回调正常（正常用例）⏳ 待验证
 
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 配置一个使用 WebView 加载的书源（含 JS 规则）
@@ -155,6 +170,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 - ✅ 搜索结果正确返回
 
 ### TC-P0-10-02：destroy 后旧回调被拒绝（核心修复点）⏳ 待验证
+
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -174,6 +192,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 - ✅ 无"已销毁的 WebView 接收回调"日志
 
 ### TC-P0-10-03：WebView 复用后旧回调不串扰（核心修复点）⏳ 待验证
+
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -196,6 +217,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 
 ### TC-P0-10-04：closed 标志位优先级（边界用例）⏳ 待验证
 
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：同 TC-P0-10-02
 
 **测试步骤**：
@@ -215,6 +239,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 
 ### TC-P0-9-10-05：漫画书长跑阅读（端到端）⏳ 待验证
 
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入一本 50+ 章的漫画书
@@ -231,6 +258,9 @@ private fun isActiveWebView(webView: WebView? = null): Boolean {
 - ✅ 无 ANR、无崩溃
 
 ### TC-P0-9-10-06：多书源并发搜索（端到端）⏳ 待验证
+
+**关联源码**：WebViewPool.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK

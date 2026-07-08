@@ -85,9 +85,10 @@
 │  ├── report.md                 # 人读报告                             │
 │  ├── report.json               # 机器可读（AI agent 接入）             │
 │  ├── manual_cases.md           # manual 用例清单 + AI 分析提示词        │
-│  ├── summary.txt               # 一行摘要                              │
-│  ├── affected_modules.json     # V3: 源码影响分析结果                   │
-│  ├── feedback_suggestions.json # V3: 反馈闭环建议清单                   │
+│  ├── summary.txt               # 一行摘要（pass率/失败数/manual数）     │
+│  ├── affected_modules.json     # V3: 源码影响分析结果（机器读）          │
+│  ├── feedback_suggestions.md   # V3: 反馈闭环建议清单（人读，AI agent 审阅）│
+│  ├── feedback_suggestions.json # V3: 反馈闭环建议清单（机器读，M16 回填） │
 │  └── cases/{tc_id}/            # 每用例证据目录                        │
 │      ├── step-XX-*.png|xml     # 截图+UI XML                          │
 │      ├── log-slice.txt          # 日志切片                             │
@@ -314,22 +315,62 @@ class RuleAnalyzer:
 
 #### 1.3.7 M7 报告生成器（report_generator.py，V2 沿用 + V3 扩展）
 
-**职责**：Markdown + JSON + manual 三件套，**V3 新增 affected_modules.json 和 feedback_suggestions.json**。
+**职责**：Markdown + JSON + manual 三件套，**V3 新增 affected_modules.json 和 feedback_suggestions.md/.json 双版本**。
 
-**核心 API（V3 扩展）**：
+**设计决策（ADR-AD-13）**：
+- **feedback_suggestions 双版本**：`.md`（人读，供 AI agent 审阅）+ `.json`（机器读，供 M16 反馈闭环回填）。tasks.md 9.7 原只要求 `.md`，实现中补充 `.json` 以支持机器消费。
+- **generate_affected_modules 返回类型**：返回 JSON 字符串内容（与其他 generate_* 方法一致），不返回文件路径。保持 API 返回类型一致性。
+- **summary.txt 格式**：一行摘要 `pass:N/M fail:N manual:N pass_rate:X%`，供 CLI 退出码判定和快速概览。
+- **generate_json evidence_collected 容错**：evidence 中 value 非 dict 时视为未收集（collected=False），不抛 AttributeError。
+
+**核心 API（V3 扩展，完整签名）**：
 
 ```python
 class ReportGenerator:
-    def generate_all(self, results, env, apk_info, affected_modules=None, feedback_signals=None):
-        """生成完整报告套件"""
-        self.generate_markdown(results, env, apk_info)
-        self.generate_json(results, env, apk_info)
-        self.generate_manual_cases(results)
-        # V3 新增
-        if affected_modules:
-            self.generate_affected_modules(affected_modules)
-        if feedback_signals:
-            self.generate_feedback_suggestions(feedback_signals)
+    def __init__(self, report_dir: Optional[Path] = None):
+        """初始化，report_dir 默认 REPORTS_DIR/{timestamp}/"""
+
+    def generate_markdown(
+        self, results, env, apk_info,
+        affected_modules=None, feedback_signals=None
+    ) -> str:
+        """生成 report.md（失败用例置顶+manual 置顶+全部用例表+执行环境+V3 affected/feedback 节）
+        返回: Markdown 内容字符串"""
+
+    def generate_json(self, results, env, apk_info) -> dict:
+        """生成 report.json（含 evidence_collected/ai_prompt_path/track_source/feedback_signal 字段）
+        返回: report dict（可 json.dumps）
+        容错: evidence 中 value 非 dict 时 collected=False"""
+
+    def generate_manual_cases(self, results) -> str:
+        """生成 manual_cases.md（manual 用例清单+AI 提示词路径+AI agent 接入流程）
+        返回: Markdown 内容字符串"""
+
+    def generate_affected_modules(self, affected: dict) -> str:
+        """V3 新增：生成 affected_modules.json
+        返回: JSON 字符串内容（与其他方法一致，不返回文件路径）"""
+
+    def generate_feedback_suggestions(self, feedback_signals: list) -> str:
+        """V3 新增：生成 feedback_suggestions.md（规则建议/提示词建议/陷阱库建议）
+        返回: Markdown 内容字符串"""
+
+    def generate_feedback_suggestions_json(self, feedback_signals: list) -> str:
+        """V3 新增：生成 feedback_suggestions.json（机器读，供 M16 回填）
+        返回: JSON 字符串内容"""
+
+    def generate_summary(self, results) -> str:
+        """生成 summary.txt（一行摘要）+ 证据归档目录 cases/{tc_id}/
+        返回: 汇总统计文本（多行）"""
+
+    def generate_all(
+        self, results, env=None, apk_info=None,
+        affected_modules=None, feedback_signals=None
+    ) -> dict[str, str]:
+        """生成完整报告套件（七件套）
+        返回: {file_type: file_path} dict
+        套件: report.md + report.json + manual_cases.md + summary.txt +
+              affected_modules.json + feedback_suggestions.md + feedback_suggestions.json
+        可选件: affected_modules / feedback_signals 为 None 时跳过"""
 ```
 
 #### 1.3.8 M8 源码影响分析器（source_impact_analyzer.py）⭐ V3 新增
@@ -502,6 +543,16 @@ class SourceImpactAnalyzer:
 }
 ```
 
+**设计决策（ADR-AD-16，阶段 12 实施补充）**：
+
+- **输出字段命名调整**：实际实现用 `related_tc_ids`（设计文档原为 `suggested_retest_tc_ids`），更简洁且与 `_lookup_related_tc_ids` 方法名一致。run_e2e.py 步骤 5.5 已同步该字段引用。
+- **TC_HEADER_RE 复用陷阱**：从 `case_parser` 复用 `TC_HEADER_RE`（`r'^#{2,3}\s+(TC-...)'`），但该正则**无 `re.MULTILINE` flag**，`^` 只匹配整个字符串开头。必须**逐行 `match`** 而非 `finditer(content)` 全文扫描，否则 TC-ID 提取数为 0。此陷阱已修复并写入测试用例。
+- **source_map.json 结构扁平化**：实现版采用 `{activities: {name: {callers, ui_components, tc_ids, path}}}` 扁平结构（设计文档原为 `{mappings: {path: {...}}, unknown_bindings: []}`），以 Activity 名作 key 避免 path 重复，更易 JSONPath 查询。`unknown_bindings` 字段暂未实现（V4 再补，反射场景罕见）。
+- **MAX_REVERSE_TRACE_DEPTH=2**：向上追溯 2 层（Activity → 直接调用方 → 间接调用方），平衡覆盖度与误报率。超过 2 层会引入大量噪声（如 `MainActivity` 被几乎所有 Activity 引用）。
+- **build_source_map 自动持久化**：扫描后立即写入 `source_map.json`，避免每次启动重建（耗时约 5-10s，56 个 Activity × grep 全源码）。`--update-source-map` CLI 参数触发强制重建。
+- **实测规模**：56 个 Activity，23 个唯一调用方，39 个关联 TC-ID。`analyze_diff(HEAD~1)` 实测：54 改动文件 → 9 受影响 Activity → 15 建议复测 TC-ID。
+- **简化折中**：`--diff` 与 `--tc` 互斥时优先 `--diff`，未做冲突检测；`source_map.json` 可能过时（升级路径：V4 基于 git diff 自动检测源码变化触发重建）。
+
 #### 1.3.9 M9 源码→测试生成器（source_test_generator.py）⭐ V3 新增
 
 **职责**：基于 Activity 源码生成 Python 测试骨架（B 轨）。
@@ -639,6 +690,18 @@ class SourceTestGenerator:
         return '\n'.join(lines)
 ```
 
+**设计决策（ADR-AD-17，阶段 13 实施补充）**：
+
+- **文件名格式对齐 M3 规则 1**：输出文件名用 `auto_{tc_id.lower().replace('-', '_')}.py`（如 `auto_tc_f_p0_1_auto_001.py`），确保 M3 `_find_python_track` 能通过文件名规则识别。设计文档原为 `auto_TC-{activity_name}-01.py`，实际实现改为对齐 M3 命名约定。
+- **@tc_id 注释兜底**：模板生成 `# @tc_id: {tc_id}` 注释（在文件头 docstring 之后），作为 M3 规则 2 的兜底（文件名不规范时仍可通过扫描前 20 行注释识别）。
+- **full_activity_class 完整类名**：`am start` 命令用完整类名（`io.legado.app.ui.debug.DebugToolsActivity`），不是相对路径（`.ui.debug.DebugToolsActivity`）。原因：applicationIdSuffix 会改变 applicationId（debug → io.legado.app.debug），但不改变 Activity 类名，用完整类名避免歧义。
+- **module="auto" 降级策略**：source_map.json 中无关联 TC-ID 时，模块推断为 "auto"，输出到 `ai_tests/cases/auto/`。这类用例在 M3 中会被标记为 "python_only_skipped"（缺 MD 头部信息），需 AI 后续补充 case.md。
+- **Manifest 缓存**：`_parse_manifest` 首次解析后缓存结果（`_manifest_cache`），避免每次 generate 都读 XML（63 个 Activity 的解析有性能开销）。
+- **_allocate_tc_id 正则修复**：原正则用大写连字符格式（`TC-{module}-auto-`），但文件名是小写下划线格式（M3 规则 1），导致匹配不到。修复为 `f"TC-{module}-auto-".lower().replace('-', '_')` 后正确匹配。
+- **Jinja2 模板渲染**：用 `FileSystemLoader` + `select_autoescape([])`（不启用自动转义，因为生成 Python 代码），`keep_trailing_newline=True` 保持模板末尾换行。
+- **简化折中**：viewBinding 场景仅提取 `binding.xxx` 引用名，未关联到 R.id（升级路径：V4 解析布局 XML 反查 R.id）；Compose 场景输出降级说明，提示需手动定位元素。
+- **实测规模**：BookshelfManageActivity 实测提取 14 个 R.id 常量 + 1 个跳转目标，DebugToolsActivity（Compose）实测 view_ids=0（输出降级说明）。M3 `_find_python_track` 两种规则均验证通过。
+
 #### 1.3.10 双轨用例调度机制（V3 新增）
 
 **调度规则**：
@@ -736,6 +799,41 @@ class FeedbackLoop:
                 }
         return None
 ```
+
+#### 1.3.12 M10 编排层（run_e2e.py，V3 扩展命令）
+
+**职责**：Layer 3 编排器，串联 M1-M9 模块，端到端执行 E2E 测试。
+
+**核心 API**：
+
+```python
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """解析 CLI 参数（基础 7 + V3 新增 4）"""
+
+def filter_cases(cases: list, tc_filter: str) -> list:
+    """--tc 筛选：all/P0/P1/模块名/TC-ID"""
+
+def handle_v3_reserved_args(args: argparse.Namespace) -> Optional[int]:
+    """V3 预留参数降级处理（M8/M9/M16 未实现时）
+    Returns: None=继续执行, int=提前退出码"""
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """主流程：环境校验→V3 预留参数→模拟器→u2→APK→用例→日志→
+    逐用例双轨执行→证据收集→规则判定→报告生成→退出码
+    Returns: 0=全过, 1=部分失败, 2=致命错误"""
+```
+
+**设计决策（ADR-AD-14，深度自分析补充）**：
+
+- **V3 预留参数降级策略**：`--diff` 降级为 `--tc all`（继续执行），`--gen-test` 退出码 0（仅提示），`--update-source-map`/`--feedback` 仅警告（继续执行）。设计原则是"未实现不阻塞"，给出明确降级路径提示。
+- **双轨调度检查点**：逐用例执行前检查 `tc.track_source`，若为 `"python"` 且 `python_track_path` 存在则优先执行 B 轨。M9 未实现时降级为 MD 执行并 warn，**不阻塞主流程**。升级路径：M9 实现后调用 `_run_python_track()` 方法。
+- **feedback_signals 自动提取**：报告生成前从 `results` 中提取所有 `feedback_signal` 字段（fail/manual 时 RuleAnalyzer 输出），传给 `generate_all(feedback_signals=...)`。**修复了原实现中 feedback_suggestions.md/.json 未生成的问题**（深度自分析发现）。
+- **空用例场景报告完整性**：无可执行用例时，`generate_all([])` 仍生成完整 env（含 instance_id/adb_serial/timestamp）和 apk_info（含 path），避免空报告缺执行环境信息。
+- **退出码语义**：`0=全过, 1=部分失败（含 manual）, 2=致命错误`。manual 计入"部分失败"以提醒用户介入处理。
+- **UiExecutor 自愈依赖**（第二轮深度优化）：`UiExecutor(device=device, memu=memu)` 必须传入 memu 参数，否则 atx-agent 卡死时无法重启（自愈机制失效）。
+- **错误信息可诊断性**（第二轮深度优化）：致命错误（退出码 2）必须包含可能原因 + 预期地址/路径，降低用户排查成本。如"ADB 连接失败"附加"可能原因：端口冲突/启动慢/ADB 服务异常"+"预期 ADB 地址: 127.0.0.1:21503"。
+- **日志级别可配置**（第二轮深度优化）：`-v/--verbose` 参数启用 DEBUG 级别，默认 INFO。支持子模块详细输出调试，避免默认模式下日志噪音。
+- **进度百分比显示**（第二轮深度优化）：`[i/total percent%]` 格式，便于长时间测试（如 208 用例）预估剩余时间。
 
 ### 1.4 固化层 vs 持续迭代层分类（V3 新增）
 

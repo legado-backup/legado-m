@@ -24,6 +24,9 @@
 
 ### TC-01: Vite 构建成功
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：modules/web/ 依赖已安装（npm install）
 
 **测试步骤**：
@@ -45,6 +48,9 @@
 
 ### TC-02: 构建产物正确复制到 APK 资源目录
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：TC-01 通过
 
 **测试步骤**：
@@ -63,6 +69,9 @@
 ---
 
 ### TC-03: APK 构建成功
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-02 通过
 
@@ -83,6 +92,9 @@
 
 ### TC-04: 备份页面正常加载
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务启动，浏览器访问书架页面
 
 **测试步骤**：
@@ -100,6 +112,9 @@
 ---
 
 ### TC-05: 备份下载功能 - 正常场景
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-04 通过，后端 `/backup` 接口正常
 
@@ -119,6 +134,9 @@
 
 ### TC-06: 备份预览展示 - 正常场景
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：TC-05 通过，后端 `/backupPreview` 接口正常
 
 **测试步骤**：
@@ -137,6 +155,9 @@
 
 ### TC-07: 分类展开/折叠
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：TC-06 通过，备份预览已展示
 
 **测试步骤**：
@@ -153,6 +174,9 @@
 ---
 
 ### TC-08: 文件图标正确显示
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-06 通过
 
@@ -174,6 +198,9 @@
 
 ### TC-09: 文件大小格式化
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：TC-06 通过
 
 **测试步骤**：
@@ -187,6 +214,9 @@
 ---
 
 ### TC-10: 夜间模式适配
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：阅读 App 主题设置为夜间模式（theme == 6）
 
@@ -211,6 +241,9 @@
 
 ### TC-11: 入口按钮显示
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务启动，浏览器访问书架页面
 
 **测试步骤**：
@@ -225,6 +258,9 @@
 ---
 
 ### TC-12: 入口按钮点击跳转
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-11 通过
 
@@ -244,6 +280,9 @@
 
 ### TC-13: /backup 接口 - 正常请求
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务启动
 
 **测试步骤**：
@@ -262,6 +301,9 @@
 
 ### TC-14: /backupPreview 接口 - 正常请求
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务启动
 
 **测试步骤**：
@@ -279,6 +321,9 @@
 ---
 
 ### TC-15: /backup 接口 - 备份内容完整性
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-13 通过
 
@@ -303,6 +348,9 @@
 
 ### TC-16: 后端服务未启动
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务未启动（端口未监听）
 
 **测试步骤**：
@@ -320,6 +368,9 @@
 
 ### TC-17: /backup 接口返回错误
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：Web 服务启动，但后端备份逻辑异常
 
 **测试步骤**：
@@ -335,6 +386,9 @@
 ---
 
 ### TC-18: /backupPreview 返回空数据
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：TC-05 通过，但 /backupPreview 返回空 items
 
@@ -352,6 +406,9 @@
 
 ### TC-19: /backupPreview 返回错误格式
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：TC-05 通过
 
 **测试步骤**：
@@ -368,6 +425,9 @@
 ## 六、移动端适配（Level 3 真机验证）
 
 ### TC-20: 移动端窄屏适配
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：浏览器窗口宽度 < 520px
 
@@ -388,6 +448,9 @@
 
 ### TC-21: 路由配置正确
 
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
+
 **前置条件**：前端构建成功
 
 **测试步骤**：
@@ -404,6 +467,9 @@
 ---
 
 ### TC-22: API 类型定义正确
+
+**关联源码**：HttpServer.kt, WebBackups.kt
+**关联 Activity**：HttpServer
 
 **前置条件**：前端构建成功
 

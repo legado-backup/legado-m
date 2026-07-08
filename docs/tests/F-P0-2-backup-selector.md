@@ -27,6 +27,9 @@
 
 ### TC-F-P0-2-01：全选备份（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：app 内有书源、订阅源、规则、书籍等数据
 
 **测试步骤**：
@@ -42,6 +45,9 @@
 
 ### TC-F-P0-2-02：部分选择备份（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入备份页面
 2. 只勾选"书源"和"订阅源"
@@ -54,6 +60,9 @@
 
 ### TC-F-P0-2-03：空选择备份（边界用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入备份页面
 2. 取消所有勾选
@@ -64,6 +73,9 @@
 - ✅ 不生成空 ZIP
 
 ### TC-F-P0-2-04：备份选择持久化（正常用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 勾选部分备份项
@@ -79,6 +91,9 @@
 ## 二、书籍缓存备份
 
 ### TC-F-P0-2-05：选择书籍缓存备份（正常用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：有 3+ 本已缓存章节的书籍
 
@@ -96,6 +111,9 @@
 
 ### TC-F-P0-2-06：全选书籍缓存（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入书籍缓存选择
 2. 点击"全选"
@@ -106,6 +124,9 @@
 - ✅ BookCacheSelectorConfig 正确持久化
 
 ### TC-F-P0-2-07：无缓存书籍备份（边界用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：没有任何已缓存章节的书籍
 
@@ -122,6 +143,9 @@
 
 ### TC-F-P0-2-08：创建封面图集分组（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 进入封面图集管理
 2. 点击"新建分组"
@@ -135,6 +159,9 @@
 
 ### TC-F-P0-2-09：设为默认封面（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 选择一个包含图片的分组
 2. 点击"设为默认"
@@ -145,6 +172,9 @@
 - ✅ 不同书籍显示不同封面（基于书名 hash 稳定取图）
 
 ### TC-F-P0-2-10：导出分组 ZIP（正常用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 选择一个分组
@@ -157,6 +187,9 @@
 
 ### TC-F-P0-2-11：导入分组 ZIP（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 点击"导入"
 2. 选择一个封面图集 ZIP 文件
@@ -168,6 +201,9 @@
 
 ### TC-F-P0-2-12：删除分组级联删除图片（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 删除一个有图片的分组
 2. 查看数据库
@@ -177,6 +213,9 @@
 - ✅ 关联的图片记录级联删除（ForeignKey CASCADE）
 
 ### TC-F-P0-2-13：导出空分组（边界用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 创建一个空分组（无图片）
@@ -192,6 +231,9 @@
 
 ### TC-F-P0-2-14：默认高亮规则加载（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 首次进入高亮规则设置
 2. 查看规则列表
@@ -201,6 +243,9 @@
 - ✅ 对话/书名号/括号标注默认启用
 
 ### TC-F-P0-2-15：启用高亮规则后阅读效果（正常用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 启用"对话高亮"规则
@@ -213,6 +258,9 @@
 
 ### TC-F-P0-2-16：自定义高亮规则（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建高亮规则
 2. 输入正则表达式 `\d+元`
@@ -223,6 +271,9 @@
 - ✅ "100元"等金额文本被红色高亮
 
 ### TC-F-P0-2-17：无效正则不崩溃（异常用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 新建高亮规则
@@ -240,6 +291,9 @@
 
 ### TC-F-P0-2-18：获取备份预览（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：手机和电脑同一局域网，Web 服务已启动
 
 **测试步骤**：
@@ -253,6 +307,9 @@
 
 ### TC-F-P0-2-19：下载备份 ZIP（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 浏览器访问 `http://{手机IP}:{端口}/backup`
 2. 下载 ZIP 文件
@@ -264,6 +321,9 @@
 - ✅ Content-Type 正确
 
 ### TC-F-P0-2-20：Web 端备份无数据（边界用例）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：新安装 app，无任何书源/书籍数据
 
@@ -280,6 +340,9 @@
 
 ### TC-F-P0-2-21：恢复备份完整链（正常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：已有一个完整备份 ZIP
 
 **测试步骤**：
@@ -295,6 +358,9 @@
 
 ### TC-F-P0-2-22：恢复损坏的备份文件（异常用例）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 选择一个非 ZIP 文件或损坏的 ZIP
 2. 尝试恢复
@@ -308,6 +374,9 @@
 ## 七、数据库 Migration
 
 ### TC-F-P0-2-23：89→90 数据库升级（Level 2）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：数据库版本为 89
 
@@ -325,6 +394,9 @@
 
 ### TC-F-P0-2-24：全新安装数据库创建（Level 2）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 卸载 app
 2. 全新安装新版本
@@ -340,6 +412,9 @@
 
 ### TC-F-P0-2-25：KSP 编译验证（Level 1）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 ```bash
 ./gradlew.bat :app:kspAppDebugKotlin
@@ -351,6 +426,9 @@
 
 ### TC-F-P0-2-26：APK 打包验证（Level 2）
 
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 ```bash
 ./gradlew.bat :app:assembleAppDebug
@@ -360,6 +438,9 @@
 - ✅ BUILD SUCCESSFUL
 
 ### TC-F-P0-2-27：真机端到端验证（Level 3）
+
+**关联源码**：BackupSelectorConfig.kt, BackupController.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 安装 APK

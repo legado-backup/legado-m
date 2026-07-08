@@ -38,6 +38,9 @@
 
 ### TC-P1-B1-01：首次访问书源调试写入缓存（正常用例）⏳ 待验证
 
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入一个书源（如"笔趣阁"）
@@ -56,6 +59,9 @@
 
 ### TC-P1-B1-02：二次访问命中缓存（正常用例）⏳ 待验证
 
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：TC-P1-B1-01 已执行（缓存已写入）
 
 **测试步骤**：
@@ -69,6 +75,9 @@
 - ✅ WebView 正常加载规则
 
 ### TC-P1-B1-03：insertBookSource 后缓存刷新（正常用例）⏳ 待验证
+
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 书源 A 已在缓存中
@@ -84,6 +93,9 @@
 - ✅ WebView 使用新规则
 
 ### TC-P1-B1-04：deleteBookSource 后缓存清除（边界用例）⏳ 待验证
+
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：书源 A 已在缓存中
 
@@ -103,6 +115,9 @@
 
 ### TC-P1-B1-05：超 50 个书源自动淘汰（边界用例）⏳ 待验证
 
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 导入 60 个不同书源
 
@@ -121,6 +136,9 @@
 ## 三、端到端集成（Level 3 真机验证）
 
 ### TC-P1-B1-06：书源调试全流程（端到端用例）⏳ 待验证
+
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -142,6 +160,9 @@
 - ✅ 全程无 ANR，UI 流畅度较原实现改善
 
 ### TC-P1-B1-07：长跑下主线程阻塞减少（性能验证）⏳ 待验证
+
+**关联源码**：BackstageWebView.kt, SourceHelp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 导入 20+ 个书源

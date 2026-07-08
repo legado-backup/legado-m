@@ -25,6 +25,10 @@
 ## Level 1：编译验证
 
 ### TC-01 编译通过验证
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：4 个文件已按修改概述完成代码变更
 - **测试步骤**：
   1. 执行 `./gradlew :app:compileAppDebugKotlin --rerun-tasks`
@@ -33,6 +37,10 @@
 - **状态**：通过
 
 ### TC-02 failUrl API 适配验证
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：OkHttpStreamFetcher.kt 已修改
 - **测试步骤**：
   1. 代码审查 L57：`failUrl` 声明为 `LruCache<String, Boolean>(200)`
@@ -44,6 +52,10 @@
 - **状态**：通过
 
 ### TC-03 stringRuleCache API 适配验证
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：AnalyzeRule.kt 已修改
 - **测试步骤**：
   1. 代码审查 L80：`stringRuleCache` 声明为 `LruCache<String, List<SourceRule>>(64)`
@@ -54,6 +66,10 @@
 - **状态**：通过
 
 ### TC-04 ConcurrentRateLimiter.clearRecord 方法验证
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：ConcurrentRateLimiter.kt 已修改
 - **测试步骤**：
   1. 代码审查 L52-54：`clearRecord(key: String)` 方法存在于 companion object
@@ -63,6 +79,10 @@
 - **状态**：通过
 
 ### TC-05 SourceHelp 删源清理验证
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：SourceHelp.kt 已修改
 - **测试步骤**：
   1. 代码审查 L14：新增 `import io.legado.app.help.ConcurrentRateLimiter`
@@ -77,6 +97,10 @@
 ## Level 3：真机端到端验证
 
 ### TC-06 图片加载失败 URL 缓存 LRU 淘汰
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，存在大量图片加载失败的书源
 - **测试步骤**：
   1. 打开包含大量封面图片的书架
@@ -88,6 +112,10 @@
 - **状态**：待验证
 
 ### TC-07 规则解析缓存 LRU 淘汰
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，存在使用不同规则的书源
 - **测试步骤**：
   1. 阅读使用不同解析规则的书籍（触发 stringRuleCache 缓存）
@@ -98,6 +126,10 @@
 - **状态**：待验证
 
 ### TC-08 删源后并发限流记录清理
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，存在配置了 `concurrentRate` 的书源
 - **测试步骤**：
   1. 导入配置了并发率限制（如 `concurrentRate = "1/1000"`）的书源
@@ -109,6 +141,10 @@
 - **状态**：待验证
 
 ### TC-09 批量删源后并发限流记录清理
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，存在多个配置了 `concurrentRate` 的书源
 - **测试步骤**：
   1. 导入 10 个配置了并发率限制的书源
@@ -120,6 +156,10 @@
 - **状态**：待验证
 
 ### TC-10 RSS 源删源后并发限流记录清理
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，存在配置了 `concurrentRate` 的 RSS 源
 - **测试步骤**：
   1. 导入配置了并发率限制的 RSS 源
@@ -131,6 +171,10 @@
 - **状态**：待验证
 
 ### TC-11 24 小时长跑内存稳定性
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，书架有 100+ 本书
 - **测试步骤**：
   1. 使用 Android Studio Profiler 监控内存
@@ -146,6 +190,10 @@
 ## 边界值用例
 
 ### TC-12 LruCache 达到上限时的淘汰行为
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装
 - **测试步骤**：
   1. 触发 200 个不同 URL 的图片加载失败（填满 failUrl LruCache）
@@ -155,6 +203,10 @@
 - **状态**：待验证
 
 ### TC-13 空 key 调用 clearRecord
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装
 - **测试步骤**：
   1. 调用 `ConcurrentRateLimiter.clearRecord("")` 或 `clearRecord(key)` 其中 key 不存在于 map 中
@@ -163,6 +215,10 @@
 - **状态**：通过
 
 ### TC-14 删源时 key 为 null
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装
 - **测试步骤**：
   1. 删除 key 为空字符串的书源（理论上不应该出现，但防御性测试）
@@ -175,6 +231,10 @@
 ## 异常/非法输入用例
 
 ### TC-15 并发删源时清理限流记录
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装，多个线程同时删除不同书源
 - **测试步骤**：
   1. 在多线程环境下同时删除多个书源（每个线程删除不同 key）
@@ -184,6 +244,10 @@
 - **状态**：通过
 
 ### TC-16 LruCache.put 传入 null value
+
+**关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 - **前置条件**：APP 已安装
 - **测试步骤**：
   1. 代码审查 `failUrl.put(url.toStringUrl(), true)` 是否可能传入 null
