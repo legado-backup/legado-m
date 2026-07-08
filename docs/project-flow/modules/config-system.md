@@ -126,6 +126,7 @@ AppConfig object
 # showAddToShelfAlert(true), changeSourceCheckAuthor(false),
 # changeSourceLoadInfo(false), changeSourceLoadToc(false),
 # batchChangeSourceDelay(0)
+# customWelcome(true)  ← 默认值变更: false → true（新安装默认开启替换欢迎页）
 ```
 
 #### 界面与排版配置
@@ -139,6 +140,15 @@ AppConfig object
 | `defaultBookTreeUri` | String | 默认书籍目录URI |
 | `bookImportFileName` | String | 书籍导入文件名 |
 
+#### 书源/订阅源视图配置（folder-view-welcome-refactor 新增）
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `sourceFolderStyle` | Int | `0` | 文件夹分组样式：0=按分组, 1=按类型 |
+| `sourceFolderMargin` | Int | `8` | 文件夹视图间距（dp），范围 0-60 |
+| `sourceViewMode` | Int | `0` | 书源视图模式：0=列表, 1=文件夹（BookSourceActivity + ExploreFragment 共用） |
+| `rssViewMode` | Int | `0` | 订阅源视图模式：0=列表, 1=文件夹（RssSourceActivity + RssFragment 共用） |
+
 ### 自定义 DNS 解析
 
 [AppConfig.kt:L133-L160](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/help/config/AppConfig.kt#L133)
@@ -149,6 +159,51 @@ customHosts (JSON字符串)
         → addressCache (Map<String, List<InetAddress>>)  — 懒解析IP
             → OkHttpClient.Builder.dns { }  — 注入自定义DNS
 ```
+
+### 配置变更记录（folder-view-welcome-refactor）
+
+> 本次配置变更对应 spec：`docs/specs/folder-view-welcome-refactor/`（书源/订阅源文件夹视图重构 + 欢迎页增强 + 前端样式审计）。
+
+#### 新增配置项（PreferKey + AppConfig）
+
+| 配置项 | PreferKey | 类型 | 默认值 | 说明 |
+|--------|-----------|------|--------|------|
+| `sourceFolderStyle` | `sourceFolderStyle` | Int | `0` | 文件夹分组样式：0=按分组, 1=按类型 |
+| `sourceFolderMargin` | `sourceFolderMargin` | Int | `8` | 文件夹视图间距（dp），范围 0-60 |
+| `sourceViewMode` | `sourceViewMode` | Int | `0` | 书源视图模式：0=列表, 1=文件夹 |
+| `rssViewMode` | `rssViewMode` | Int | `0` | 订阅源视图模式：0=列表, 1=文件夹 |
+
+- `sourceViewMode` 由 `BookSourceActivity` 与 `ExploreFragment` 共用
+- `rssViewMode` 由 `RssSourceActivity` 与 `RssFragment` 共用
+
+#### 默认值变更
+
+| 配置项 | PreferKey | 旧默认值 | 新默认值 | 说明 |
+|--------|-----------|----------|----------|------|
+| `customWelcome` | `customWelcome` | `false` | `true` | 新安装默认开启"替换欢迎页"功能 |
+
+#### 菜单变更
+
+| 菜单文件 | 变更 |
+|----------|------|
+| `menu/book_source.xml` | `menu_view_mode` → `menu_folder_config`（三点菜单统一入口） |
+| `menu/rss_source.xml` | `menu_view_mode` → `menu_folder_config` |
+| `menu/main_explore.xml` | `menu_view_mode` → `menu_folder_config` |
+| `menu/main_rss.xml` | `menu_view_mode` → `menu_folder_config` |
+
+#### 偏好页面变更
+
+| 偏好文件 | 变更 |
+|----------|------|
+| `xml/pref_main.xml` | 移除 `debug_tools` Preference（从"我的"页面迁出） |
+| `xml/pref_config_other.xml` | 新增 `debug_tools` Preference（迁移到"其他设置"） |
+
+#### 自动任务变更
+
+- `AutoTaskEditActivity`：Cron 表达式输入框改为频率选择器
+  - 每天：`0 0 * * *`
+  - 每小时：`0 * * * *`
+  - 自定义：用户手动输入 Cron 表达式
 
 ---
 
@@ -569,6 +624,13 @@ class PreferKey:
     change_source_load_info = "changeSourceLoadInfo"
     change_source_load_toc = "changeSourceLoadToc"
     batch_change_source_delay = "batchChangeSourceDelay"
+
+    # === 书源/订阅源视图（folder-view-welcome-refactor 新增）===
+    source_folder_style = "sourceFolderStyle"        # 文件夹分组样式: 0=按分组 1=按类型
+    source_folder_margin = "sourceFolderMargin"      # 文件夹视图间距(dp), 0-60
+    source_view_mode = "sourceViewMode"              # 书源视图模式: 0=列表 1=文件夹
+    rss_view_mode = "rssViewMode"                    # 订阅源视图模式: 0=列表 1=文件夹
+    custom_welcome = "customWelcome"                 # 替换欢迎页, 默认值: false → true
 ```
 
 ---

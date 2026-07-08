@@ -593,6 +593,8 @@ FrameLayout
 
 **批量操作**：启用/禁用/发现/校验/置顶/置底/加分组/移分组/导出/分享
 
+**文件夹视图**（2026-07-08 重构）：除默认列表视图外，书源/订阅源列表支持切换为文件夹卡片视图，详见 [第 26 节](#26-书源订阅源文件夹视图重构2026-07-08)。卡片采用 3:4 比例 + 首字占位 + 主题色背景，参考书架封面风格；通过 `showFolderConfig()` 对话框配置分组样式、视图模式与间距。
+
 ### 9.6 书源编辑页面 (BookSourceEditActivity)
 
 **布局**：
@@ -1886,7 +1888,7 @@ groupId 为 2 的幂次，通过位运算实现多分组管理：
 
 ---
 
-*文档补全: wiki-generator + android-ui-design | 最后更新: 2026-07-04*
+*文档补全: wiki-generator + android-ui-design | 最后更新: 2026-07-08*
 
 ---
 
@@ -1941,3 +1943,46 @@ groupId 为 2 的幂次，通过位运算实现多分组管理：
 | 暗色模式视觉 | 🔄 需真机验证 |
 | 触控目标视觉 | 🔄 需真机验证 |
 | WCAG 对比度实测 | 🔄 需真机验证 |
+
+---
+
+## 26. 书源/订阅源文件夹视图重构（2026-07-08）
+
+> 本次重构统一书源/订阅源列表的文件夹视图卡片样式，参考书架封面风格，并抽取通用的 Grid 间距装饰器与配置对话框。
+
+### 26.1 新增布局文件
+
+| 布局文件 | 用途 |
+|---------|------|
+| `item_source_folder_grid.xml` | 书源/订阅源文件夹视图卡片：3:4 比例 + 首字占位 + 主题色背景 + MaterialCardView + selectableItemBackground |
+| `dialog_source_folder_config.xml` | 文件夹视图配置对话框：分组样式 Spinner + 视图 RadioGroup + 间距 DetailSeekBar |
+
+### 26.2 新增 Drawable
+
+- `bg_source_folder_cover.xml`：文件夹封面主题色背景 drawable，用于无封面时的占位渐变背景
+
+### 26.3 新增类
+
+| 类 | 路径 | 职责 |
+|----|------|------|
+| `GridSpacingItemDecoration` | `ui/widget/recycler/GridSpacingItemDecoration.kt` | Grid 布局等间距装饰器，统一管理网格项间距，支持配置对话框实时调整 |
+
+### 26.4 修改类
+
+| 类 | 变更内容 |
+|----|---------|
+| `SourceFolderAdapter.kt` | 改用新布局 `item_source_folder_grid.xml`；新增 `showConfigDialog()`、`calculateSpanCount()`、`spacingPx()` |
+| `BookSourceActivity` / `RssSourceActivity` / `ExploreFragment` / `RssFragment` | `switchViewMode()` → `showFolderConfig()`，`applyListView`/`applyFolderView` 重构 |
+| `BitmapUtils.kt` | 新增 `cropBitmapToAspectRatio(srcPath, ratioW, ratioH)`，按指定宽高比裁剪图片 |
+| `WelcomeConfigFragment.kt` | `setCoverFromUri()` 调用 `cropBitmapToAspectRatio` 进行封面裁剪 |
+| `AutoTaskEditActivity.kt` | Cron 频率选择器（每天 / 每小时 / 自定义） |
+| `OtherConfigFragment.kt` | 新增 `debug_tools` 入口 |
+| `MyFragment.kt` | 移除 `debug_tools` 入口（迁移至 OtherConfigFragment） |
+
+### 26.5 设计说明
+
+- **卡片样式**：3:4 宽高比与书架书籍封面保持一致，无封面时使用分组名首字 + 主题色背景占位
+- **主题色背景**：`bg_source_folder_cover.xml` 使用主题色，保证日/夜间模式视觉一致
+- **交互反馈**：MaterialCardView 提供统一阴影和圆角，selectableItemBackground 提供点击 ripple 反馈
+- **间距管理**：GridSpacingItemDecoration 统一管理网格间距，避免逐项设置 margin；间距可通过 `dialog_source_folder_config.xml` 配置对话框实时调整
+- **入口迁移**：`debug_tools` 入口从 `MyFragment` 迁移至 `OtherConfigFragment`，与其它调试/工具类入口归并

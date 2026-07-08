@@ -110,6 +110,13 @@
 | [specs/legado-skill-unified-redesign/](./specs/legado-skill-unified-redesign/) | Legado Skill 统一重设计 |
 | [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构） ✅ 实施完成（P0+P1），待真机验证 |
 | [specs/e2e-automated-testing/](./specs/e2e-automated-testing/) | APK 端到端自动化测试验证系统（MEmu+uiautomator2+AI 日志分析，一键打包→装包→跑用例→出报告） 🔄 设计中 |
+| [specs/e2e-ui-executor-hardening/](./specs/e2e-ui-executor-hardening/) | E2E UI 执行器加固（scroll_find 滚动查找/自愈重构/失败跳过/dismiss_dialogs 误判修复/规则分析器 uiautomator2 崩溃排除/证据收集路径修复/测试用例对齐 Compose UI） ✅ 实施完成，单用例 pass_rate=100% |
+| [specs/apk-size-optimization/](./specs/apk-size-optimization/) | APK 体积审核与精简优化（v3：debug APK解压分析+打包技术手段全量评估，已用所有稳定优化，零功能影响预估-2.5~3.5MB，附折中选项） 🔄 设计中 |
+| [specs/folder-view-welcome-refactor/](./specs/folder-view-welcome-refactor/) | 书源/订阅源文件夹视图重构 + 欢迎页增强 + 前端样式审计 ✅ 实施完成，待真机验证 |
+| [specs/video-m3u8-cache/](./specs/video-m3u8-cache/) | 视频播放器 m3u8 边下边播缓存（cachePlay 配置 + 设置开关，默认开启） ✅ 已实施，待真机验证 |
+| [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表页 DiffUtil 增量更新 + WebView cacheFirst 默认 true） ✅ 已实施，待真机验证 |
+| [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静音 + 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮） ✅ 已实施，待真机验证 |
+| [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
 
 ### 归档 Specs
 

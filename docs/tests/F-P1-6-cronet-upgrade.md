@@ -37,6 +37,9 @@
 
 ### TC-F-P1-6-01：gradle.properties 版本号修改正确 ✅ Level 2 已通过
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 读取 `gradle.properties` L44-45
 2. 确认 CronetVersion=149.0.7827.201 + CronetMainVersion=149.0.0.0
@@ -48,6 +51,9 @@
 **实际结果**：通过
 
 ### TC-F-P1-6-02：downloadCronet 下载完整 ✅ Level 2 已通过
+
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 执行 `gradlew app:downloadCronet`
@@ -66,6 +72,9 @@
 
 ### TC-F-P1-6-03：API 兼容性检查 ✅ Level 2 已通过
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 反编译新 `cronet_impl_native_java.jar` 中的 `org.chromium.base.ThreadUtils`
 2. 检查 `setThreadAssertsDisabledForTesting` 方法是否存在
@@ -80,6 +89,9 @@
 
 ### TC-F-P1-6-04：App.kt API 废弃修复 ✅ Level 2 已通过
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 读取 `App.kt` L75-79
 2. 确认使用新方法名
@@ -92,6 +104,9 @@
 
 ### TC-F-P1-6-05：编译验证 ✅ Level 2 已通过
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 执行 `gradlew app:assembleAppDebug`
 
@@ -103,6 +118,9 @@
 **实际结果**：通过（3m 20s）
 
 ### TC-F-P1-6-06：updateLog.md cronet 版本号同步 ✅ Level 2 已通过
+
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 读取 `updateLog.md` L5
@@ -117,6 +135,9 @@
 ## 二、真机回归测试（Level 3 待验证）
 
 ### TC-F-P1-6-07：Cronet so 下载与加载 ⏳ 待验证
+
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -135,6 +156,9 @@
 
 ### TC-F-P1-6-08：书源搜索功能 ⏳ 待验证
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - Cronet 已启用
 - 导入 3+ 个书源
@@ -152,6 +176,9 @@
 
 ### TC-F-P1-6-09：章节抓取功能 ⏳ 待验证
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 已添加一本书籍
 
@@ -167,6 +194,9 @@
 
 ### TC-F-P1-6-10：图片加载功能 ⏳ 待验证
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 书源配置了封面图片
 
@@ -180,6 +210,9 @@
 
 ### TC-F-P1-6-11：订阅源更新功能 ⏳ 待验证
 
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 导入订阅源
 
@@ -192,6 +225,9 @@
 - ✅ 无网络错误
 
 ### TC-F-P1-6-12：TLS 指纹改善验证（核心价值）⏳ 待验证
+
+**关联源码**：Cronet.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 准备一个原 128 版本会被 403 拦截的书源（如有）

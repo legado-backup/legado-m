@@ -18,6 +18,9 @@
 
 ## TC-F-P1-3-01：开启悬浮球显示（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **前置条件**：进入「其他设置」
 
 **测试步骤**：
@@ -32,6 +35,9 @@
 
 ## TC-F-P1-3-02：关闭悬浮球隐藏（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **前置条件**：悬浮球已显示
 
 **测试步骤**：
@@ -45,6 +51,9 @@
 
 ## TC-F-P1-3-03：点击悬浮球打开日志面板（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **前置条件**：悬浮球已显示
 
 **测试步骤**：
@@ -56,6 +65,9 @@
 - ✅ 日志面板显示应用日志列表
 
 ## TC-F-P1-3-04：日志级别过滤 - 全部（正常用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **前置条件**：日志面板已打开
 
@@ -69,6 +81,9 @@
 
 ## TC-F-P1-3-05：日志级别过滤 - 仅错误（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **测试步骤**：
 1. 点击菜单"过滤"
 2. 选择"错误"
@@ -78,6 +93,9 @@
 - ✅ 其他级别日志被过滤
 
 ## TC-F-P1-3-06：日志级别过滤 - 警告/信息/调试（正常用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **测试步骤**：
 1. 分别选择"警告""信息""调试"过滤
@@ -89,6 +107,9 @@
 
 ## TC-F-P1-3-07：清空日志（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **前置条件**：日志面板已打开
 
 **测试步骤**：
@@ -99,6 +120,9 @@
 - ✅ AppLog.logs 清空
 
 ## TC-F-P1-3-08：Activity 切换 - 悬浮球跟随（正常用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **前置条件**：悬浮球已显示
 
@@ -114,6 +138,9 @@
 
 ## TC-F-P1-3-09：Activity 销毁 - 悬浮球清理（正常用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **测试步骤**：
 1. 悬浮球显示状态下，按返回键退出当前 Activity
 2. 观察悬浮球
@@ -124,6 +151,9 @@
 - ✅ 不残留 View 在已销毁的 Activity 上
 
 ## TC-F-P1-3-10：竞态保护 - 快速开关（边界用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **测试步骤**：
 1. 快速连续切换悬浮球开关 5 次（开→关→开→关→开）
@@ -136,6 +166,9 @@
 - ✅ showToken 确保异步操作有效性
 
 ## TC-F-P1-3-11：日志级别向后兼容（兼容性用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **前置条件**：AppLog 中有通过旧 `put()` 方法写入的日志
 
@@ -151,6 +184,9 @@
 
 ## TC-F-P1-3-12：日志上限 100 条（边界用例）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **测试步骤**：
 1. 触发超过 100 条日志（如批量操作）
 2. 打开日志面板
@@ -161,6 +197,9 @@
 - ✅ 不 OOM
 
 ## TC-F-P1-3-13：非 AppCompatActivity 不显示（边界用例）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **前置条件**：存在非 AppCompatActivity 的 Activity（如某些第三方库 Activity）
 
@@ -178,6 +217,9 @@
 
 ### TC-F-P1-3-14：悬浮球开关即时反馈（Level 3）
 
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
+
 **测试步骤**：
 1. 在「其他设置」打开悬浮球开关
 2. 不离开设置页面，观察悬浮球是否显示
@@ -189,6 +231,9 @@
 - ✅ OtherConfigFragment.onSharedPreferenceChanged 正确处理
 
 ### TC-F-P1-3-15：AppLog 各级别写入（Level 3）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **测试步骤**：
 1. 触发不同级别的日志写入（putError/putWarn/putInfo/putDebug）
@@ -202,6 +247,9 @@
 - ✅ DEBUG 日志前缀 [D]（需开启 recordLog）
 
 ### TC-F-P1-3-16：编译验证（Level 2）
+
+**关联源码**：DebugLogFloatingBall.kt
+**关联 Activity**：DebugLogFloatingBall
 
 **测试步骤**：
 ```bash

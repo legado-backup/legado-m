@@ -30,6 +30,9 @@
 
 ### TC-P1-A6-01：上限内不淘汰（边界用例）✅ Level 1 已通过
 
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：空 LRU cache（上限 20）
 
 **测试步骤**：
@@ -46,6 +49,9 @@
 
 ### TC-P1-A6-02：超限淘汰最老（正常用例）✅ Level 1 已通过
 
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 依次 put proxy1~proxy21 共 21 个 entry
 2. 检查 size
@@ -60,6 +66,9 @@
 **实际结果**：通过（`lruCache_exceedMaxSize_evictsOldest`）
 
 ### TC-P1-A6-03：accessOrder 刷新顺序（对照用例）✅ Level 1 已通过
+
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 依次 put proxy1~proxy20 共 20 个 entry
@@ -77,6 +86,9 @@
 
 ### TC-P1-A6-04：空 cache 查询返回 null（边界用例）✅ Level 1 已通过
 
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 不 put 任何 entry
 2. 查询 "nonexistent"
@@ -87,6 +99,9 @@
 **实际结果**：通过（`lruCache_emptyCache_returnsNullForMissingKey`）
 
 ### TC-P1-A6-05：连续淘汰保留最近 20（综合用例）✅ Level 1 已通过
+
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 依次 put proxy1~proxy50 共 50 个 entry
@@ -107,6 +122,9 @@
 
 ### TC-P1-A6-06：代理书源访问正常（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 配置一个代理（http 或 socks5）
 - 准备一个使用该代理的书源
@@ -123,6 +141,9 @@
 
 ### TC-P1-A6-07：长跑后 cache 不超过 20 个条目（Level 2 真机验证）⏳ 待验证
 
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 准备 30+ 个不同的代理配置
 
@@ -137,6 +158,9 @@
 - ✅ 内存占用稳定，不持续增长
 
 ### TC-P1-A6-08：代理复用不重复构造（Level 2 真机验证）⏳ 待验证
+
+**关联源码**：ProxyClientCache.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 配置代理 A，访问书源

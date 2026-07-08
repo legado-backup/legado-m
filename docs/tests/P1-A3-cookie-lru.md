@@ -30,6 +30,9 @@
 
 ### TC-P1-A3-01：通用 tracking Cookie 识别（正常用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：无
 
 **测试步骤**：
@@ -45,6 +48,9 @@
 
 ### TC-P1-A3-02：前缀变体识别（正常用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 调用 `isTrackingCookieKey("_ga_XYZ")`
 2. 调用 `isTrackingCookieKey("_gat_UA-12345")`
@@ -57,6 +63,9 @@
 
 ### TC-P1-A3-03：百度统计 Hm_lvt_/Hm_lpvt_ 识别（正常用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 调用 `isTrackingCookieKey("Hm_lvt_123456")`
 2. 调用 `isTrackingCookieKey("Hm_lpvt_abc")`
@@ -67,6 +76,9 @@
 **实际结果**：通过（`isTrackingCookieKey_recognizesBaiduHmCookies`）
 
 ### TC-P1-A3-04：业务 Cookie 不误判（对照用例）✅ Level 1 已通过
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 调用 `isTrackingCookieKey("JSESSIONID")`
@@ -80,6 +92,9 @@
 **实际结果**：通过（`isTrackingCookieKey_rejectsBusinessCookies`）
 
 ### TC-P1-A3-05：空白 key trim 处理（边界用例）✅ Level 1 已通过
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 调用 `isTrackingCookieKey("  _ga  ")`
@@ -95,6 +110,9 @@
 
 ### TC-P1-A3-06：空 map 返回 null（边界用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 调用 `selectCookieKeyToRemove(emptyMap())`
 
@@ -105,6 +123,9 @@
 
 ### TC-P1-A3-07：单元素 map 返回该 key（边界用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 调用 `selectCookieKeyToRemove(mapOf("JSESSIONID" to "abc123"))`
 
@@ -114,6 +135,9 @@
 **实际结果**：通过（`selectCookieKeyToRemove_singleEntry_returnsThatKey`）
 
 ### TC-P1-A3-08：tracking Cookie 优先于业务 Cookie（正常用例）✅ Level 1 已通过
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：map 含业务 Cookie + tracking Cookie
 
@@ -128,6 +152,9 @@
 
 ### TC-P1-A3-09：多 tracking 取最长 key（正常用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 构造 `linkedMapOf("_ga" to "...", "_gid" to "...", "Hm_lvt_1234567890" to "...")`
 2. 调用 `selectCookieKeyToRemove(map)`
@@ -139,6 +166,9 @@
 
 ### TC-P1-A3-10：无 tracking 时按 key 长度降序（对照用例）✅ Level 1 已通过
 
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 构造 `linkedMapOf("sid" to "s1", "JSESSIONID" to "j1", "token" to "t1")`
 2. 调用 `selectCookieKeyToRemove(map)`
@@ -149,6 +179,9 @@
 **实际结果**：通过（`selectCookieKeyToRemove_noTrackingCookie_fallsBackToLongestKey`）
 
 ### TC-P1-A3-11：混合场景 tracking 优先（综合用例）✅ Level 1 已通过
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 构造 `linkedMapOf("PHPSESSID" to "p1", "_gat_UA-12345-1" to "g1", "a" to "x")`
@@ -164,6 +197,9 @@
 ## 三、端到端集成（待真机验证）
 
 ### TC-P1-A3-12：大 Cookie 站点登录态保持（Level 3 真机验证）⏳ 待验证
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 准备一个 Cookie 总长度 > 4096 的书源站点（含 _ga / JSESSIONID 等混合 Cookie）
@@ -182,6 +218,9 @@
 - ✅ 后续请求正常返回业务数据（非 401/403）
 
 ### TC-P1-A3-13：4096 截断链路端到端验证（Level 3 真机验证）⏳ 待验证
+
+**关联源码**：CookieStore.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：构造一个仅含业务 Cookie 但总长度 > 4096 的极端场景
 

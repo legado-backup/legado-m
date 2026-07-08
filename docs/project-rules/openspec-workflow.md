@@ -173,7 +173,17 @@ OpenSpec 是一套结构化的功能设计文档体系，确保每个开发任�
     │   └── 标记 tasks.md（⚠️ 或 ✅，注明完成级别和缺失项）
     └── 核心变更 → 必须验证可运行
     ↓
-步骤6: 🛑 强制检查点 2 — 用户审核实施结果
+步骤5.5: ⭐ AI 自动端到端测试（V3 强制，详见 S13 子规范 ai_e2e_testing_workflow.md）
+    ├── 5.5.1 源码影响分析（run_e2e.py --diff HEAD~1）→ affected_modules.json
+    ├── 5.5.2 APK 自动发现 + MEmu 启动
+    ├── 5.5.3 双轨用例调度（同 TC-ID Python 优先）
+    ├── 5.5.4 8 类证据收集
+    ├── 5.5.5 规则判定（pass/fail/manual/warning）
+    ├── 5.5.6 manual 用例 AI agent 介入（生成 ai-prompt.md + 回填 ai_verdict）
+    ├── 5.5.7 五件套报告生成（report.md/json + manual_cases + affected + feedback）
+    └── 5.5.8 反馈闭环触发（run_e2e.py --feedback）→ 沉淀规则/陷阱/提示词
+    ↓
+步骤6: 🛑 强制检查点 2 — 用户审核实施结果（含 5.5 测试报告）
     ├── 默认：阶段审查（每个阶段完成后审查）
     └── 可选：任务审查（每个任务完成后展示 Diff，用户可接受/拒绝）
     ↓
@@ -299,6 +309,11 @@ OpenSpec 是一套结构化的功能设计文档体系，确保每个开发任�
 - [ ] 任务完成后是否执行了文档同步？（步骤8 — 对照映射表更新 docs/project-flow/）
 - [ ] docs/project-flow/ 下所有文档是否与当前代码一致？
 - [ ] 是否已清理临时文件和调试代码？
+- [ ] **V3：是否执行了步骤 5.5 AI 自动端到端测试？**（详见 S13 子规范 ai_e2e_testing_workflow.md）
+- [ ] **V3：是否触发了源码影响分析？**（5.5.1 `run_e2e.py --diff HEAD~1`）
+- [ ] **V3：存在 fail/manual 用例时是否触发了反馈闭环？**（5.5.8 `run_e2e.py --feedback`）
+- [ ] **V3：manual 用例是否生成 ai-prompt.md 并回填 ai_verdict？**
+- [ ] **V3：测试用例是否含源码溯源字段？**（`**关联源码**` + `**关联 Activity**`，详见 S14 子规范 test-case-design-guide.md）
 
 ---
 

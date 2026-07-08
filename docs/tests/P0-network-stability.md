@@ -27,6 +27,9 @@
 
 ### TC-P0-1-01：协程正常取消不触发错误回调（正常用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：书架正在刷新书籍
 
 **测试步骤**：
@@ -41,6 +44,9 @@
 
 ### TC-P0-1-02：协程异常触发错误回调（异常用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：配置一个无效书源（URL 不可达）
 
 **测试步骤**：
@@ -53,6 +59,9 @@
 - ✅ 错误信息通过 onError 回调传递
 
 ### TC-P0-1-03：单元测试验证（Level 1）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 ```bash
@@ -69,6 +78,9 @@
 
 ### TC-P0-2-01：多线程并发访问书源（正常用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：书架有 10+ 本书，配多个书源
 
 **测试步骤**：
@@ -80,6 +92,9 @@
 - ✅ 书源互斥锁正常工作，无 ConcurrentModificationException
 
 ### TC-P0-2-02：快速重复触发刷新（边界用例）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 连续快速点击"刷新"按钮 5 次
@@ -95,6 +110,9 @@
 
 ### TC-P0-6-01：刷新队列并发访问（正常用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 书架刷新过程中，同时触发搜索操作
 2. 观察是否崩溃
@@ -108,6 +126,9 @@
 ## P0-7 CacheBook 同步锁
 
 ### TC-P0-7-01：缓存书籍关闭时数据一致性（正常用例）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：打开一本缓存书籍阅读
 
@@ -123,6 +144,9 @@
 
 ### TC-P0-7-02：快速切换书籍（边界用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 快速连续打开 3 本不同的缓存书籍
 2. 每本阅读几秒后立即切换
@@ -137,6 +161,9 @@
 
 ### TC-P0-8-01：HTTPS 网站正常访问（正常用例）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 使用 HTTPS 书源搜索书籍
 2. 观察是否能正常获取结果
@@ -146,6 +173,9 @@
 - ✅ TLS 协议生效
 
 ### TC-P0-8-02：307/308 重定向网站访问（正常用例）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：找一个支持 307/308 重定向的网站书源
 
@@ -158,6 +188,9 @@
 - ✅ 不出现"重定向过多"错误
 
 ### TC-P0-8-03：SSL 证书错误网站（异常用例）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 使用 SSL 证书过期或无效的书源
@@ -173,6 +206,9 @@
 
 ### TC-P0-13-01：全量单元测试（Level 1）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 ```bash
 ./gradlew.bat :app:testAppDebugUnitTest
@@ -184,6 +220,9 @@
 
 ### TC-P0-13-02：APK 编译通过（Level 2）
 
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 ```bash
 ./gradlew.bat :app:assembleAppDebug
@@ -194,6 +233,9 @@
 - ✅ 仅有 deprecation 警告（已有代码，非本次新增）
 
 ### TC-P0-13-03：真机功能回归（Level 3）
+
+**关联源码**：ConcurrentRateLimiter.kt, OkHttp.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 安装 APK 到真机

@@ -19,6 +19,9 @@
 
 ## TC-F-P1-1-01：创建自动任务（正常用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：已开启自动任务服务开关
 
 **测试步骤**：
@@ -35,6 +38,9 @@
 - ✅ 任务状态为已启用
 
 ## TC-F-P1-1-02：创建书籍更新任务（正常用例）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：书架有至少 1 本书
 
@@ -53,6 +59,9 @@
 
 ## TC-F-P1-1-03：无效 cron 表达式（异常用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建任务
 2. cron 输入 `invalid-cron`
@@ -65,6 +74,9 @@
 
 ## TC-F-P1-1-04：空脚本任务（边界用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建任务
 2. 脚本留空
@@ -76,6 +88,9 @@
 - ✅ 不崩溃
 
 ## TC-F-P1-1-05：refreshToc 动作 - 有新书章节（正常用例）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：配置一个有新书章节的书籍更新任务
 
@@ -91,6 +106,9 @@
 
 ## TC-F-P1-1-06：refreshToc 动作 - 无新书章节（边界用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 确保任务关联的书籍无新书章节
 2. 等待任务执行
@@ -100,6 +118,9 @@
 - ✅ 任务日志显示"《书名》无更新"
 
 ## TC-F-P1-1-07：notify 动作 - 自定义通知（正常用例）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 新建任务，脚本输入：
@@ -115,6 +136,9 @@
 
 ## TC-F-P1-1-08：未知动作类型（异常用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 新建任务，脚本输入：
    ```json
@@ -129,6 +153,9 @@
 
 ## TC-F-P1-1-09：任务启用/禁用切换（正常用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 在任务管理页面长按或点击任务开关
 2. 切换为禁用
@@ -141,6 +168,9 @@
 
 ## TC-F-P1-1-10：任务删除（正常用例）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 在任务管理页面选择一个任务
 2. 点击删除
@@ -152,6 +182,9 @@
 - ✅ 调度计划自动更新
 
 ## TC-F-P1-1-11：任务导入导出（正常用例）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 创建 2 个任务
@@ -166,6 +199,9 @@
 - ✅ 导入后自动刷新调度
 
 ## TC-F-P1-1-12：任务拖拽排序（正常用例）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 1. 创建 3 个任务
@@ -184,6 +220,9 @@
 
 ### TC-F-P1-1-13：自动任务服务开关（Level 3）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **测试步骤**：
 1. 在「我的」页面关闭自动任务服务开关
 2. 等待 30 分钟
@@ -198,6 +237,9 @@
 
 ### TC-F-P1-1-14：Android 14+ Alarm 模式（Level 3）
 
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：Android 14+ 设备（SDK >= VANILLA_ICE_CREAM）
 
 **测试步骤**：
@@ -211,6 +253,9 @@
 - ✅ 任务按时执行
 
 ### TC-F-P1-1-15：编译验证（Level 2）
+
+**关联源码**：AutoTask.kt, AutoTaskScheduler.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **测试步骤**：
 ```bash

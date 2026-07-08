@@ -1,0 +1,119 @@
+{# ai_tests/templates/auto_test_template.j2 — M9 自动生成 Python 测试骨架 Jinja2 模板
+
+渲染目标：ai_tests/cases/{module}/auto_{tc_id}.py（B 轨 Python 用例）
+设计原则：生成可读、可调试的骨架代码，AI 仅需补全 TODO 部分
+
+简化说明：仅生成基础骨架，不含复杂断言 | 已知上限：反射/动态加载场景需手动补充 | 升级路径：V4 基于 LLM 自动补全 TODO
+#}
+"""自动生成测试骨架 — {{ activity_name }}
+
+生成时间：{{ generated_at }}
+TC-ID：{{ tc_id }}
+模块：{{ module }}
+源码：{{ source_path }}
+关联 Activity：{{ activity_name }}
+关联源码：{{ source_path }}
+
+NOTE: 此为 M9 自动生成骨架，AI 需补全 TODO 部分
+      生成器：ai_tests/lib/source_test_generator.py
+"""
+# @tc_id: {{ tc_id }}
+# @module: {{ module }}
+# @activity: {{ activity_name }}
+# @track: python
+
+from ai_tests.lib.ui_executor import UiExecutor
+from ai_tests.lib.evidence_collector import EvidenceCollector
+from ai_tests.config import PACKAGE
+
+
+# === Resource-ID 常量（从源码 R.id.* 提取）===
+{% for view_id in view_ids %}
+{{ view_id | upper }}_ID = "{{ view_id }}"
+{% endfor %}
+
+{% if not view_ids %}
+# 简化说明：源码中未提取到 R.id.xxx（可能使用 viewBinding 或 Compose） | 已知上限：需手动补充 | 升级路径：V4 支持 viewBinding/Compose 解析
+{% endif %}
+
+# === 跳转目标 Activity（从源码 startActivity 提取）===
+{% for jump in activity_jumps %}
+# {{ jump }}  (from {{ activity_name }})
+{% endfor %}
+
+
+class Test{{ activity_name }}:
+    """{{ activity_name }} 自动测试（B 轨 Python）
+
+    源码 Activity：{{ activity_name }}
+    源码路径：{{ source_path }}
+    注册状态：{{ "已注册" if is_registered else "未在 AndroidManifest.xml 中找到（可能为Fragment或内部类）" }}
+    布局：{{ layout or "未识别（可能使用 Compose）" }}
+    """
+
+    PACKAGE = "{{ package_name }}"
+    TARGET_ACTIVITY = "{{ activity_name }}"
+
+    def setup_method(self, device):
+        """初始化：启动目标 Activity
+
+        TODO: AI 补全启动逻辑
+        提示：
+        - 可通过 `am start -n {{ package_name }}/{{ full_activity_class }}` 启动
+        - 或通过 UI 导航到目标页面（更贴近真实用户路径）
+        """
+        # TODO: 补全启动逻辑
+        pass
+
+    def test_basic_flow(self, device):
+        """基础流程测试（M9 自动生成）
+
+        基于源码静态分析生成，覆盖：
+        {% for view_id in view_ids[:5] %}
+        - {{ view_id }}
+        {% endfor %}
+        {% for jump in activity_jumps[:3] %}
+        - 跳转 → {{ jump }}
+        {% endfor %}
+        """
+        {% if view_ids %}
+        # === 元素操作（{% if view_ids|length > 5 %}前 5{% else %}全部 {{ view_ids|length }}{% endif %} 个）===
+        {% for view_id in view_ids[:5] %}
+        # 操作元素：{{ view_id }}
+        # device(resourceId="{{ package_name }}:id/{{ view_id }}").click()
+        # TODO: 补全 {{ view_id }} 的业务逻辑
+
+        {% endfor %}
+        {% else %}
+        # 简化说明：未提取到 R.id.xxx，可能使用 viewBinding 或 Compose | 已知上限：需手动定位元素 | 升级路径：V4 支持 viewBinding/Compose
+        pass
+        {% endif %}
+
+        {% if activity_jumps %}
+        # === 跳转断言（{% if activity_jumps|length > 3 %}前 3{% else %}全部 {{ activity_jumps|length }}{% endif %} 个）===
+        {% for jump in activity_jumps[:3] %}
+        # 跳转断言：{{ jump }}
+        # assert device.wait_activity("{{ jump }}", timeout=10), "应跳转到 {{ jump }}"
+        # TODO: 补全 {{ jump }} 跳转的业务逻辑
+
+        {% endfor %}
+        {% endif %}
+
+    def teardown_method(self, device):
+        """清理：返回首页或退出
+
+        TODO: AI 补全清理逻辑
+        提示：
+        - 可通过 device.press("back") 返回
+        - 或通过 am start 回到 MainActivity
+        """
+        # TODO: 补全清理逻辑
+        pass
+
+
+# === 自动生成结束，AI 在此处之上补全业务逻辑 ===
+# 生成元信息：
+#   生成器：ai_tests/lib/source_test_generator.py (M9)
+#   模板：ai_tests/templates/auto_test_template.j2
+#   源码 Activity 数：{{ activity_count_hint }}
+#   双轨调度：M3 CaseParser 检测到本文件后，将 track_source 标记为 "python"

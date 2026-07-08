@@ -37,6 +37,9 @@
 
 ### TC-P1-B2-01：RSS 阅读正常加载（正常用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入一个订阅源（含 RSS 文章页）
@@ -56,6 +59,9 @@
 
 ### TC-P1-B2-02：源编辑预览正常加载（正常用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入一个书源
@@ -74,6 +80,9 @@
 
 ### TC-P1-B2-03：POST 请求不拦截（边界用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 书源 URL 使用 POST 方法
@@ -88,6 +97,9 @@
 - ✅ WebView 走默认加载流程
 
 ### TC-P1-B2-04：data: URL 不拦截（边界用例）⏳ 待验证
+
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -107,6 +119,9 @@
 
 ### TC-P1-B2-05：307 重定向跟随（正常用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 找一个会返回 307 重定向的 URL（如某些 API 端点）
@@ -124,6 +139,9 @@
 
 ### TC-P1-B2-06：308 重定向跟随（正常用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：同 TC-P1-B2-05，但 URL 返回 308
 
 **测试步骤**：同 TC-P1-B2-05
@@ -140,6 +158,9 @@
 
 ### TC-P1-B2-07：Set-Cookie 正确保存（正常用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 订阅源 URL 响应包含 `Set-Cookie` 头
@@ -155,6 +176,9 @@
 - ✅ 后续 WebView 请求自动携带 Cookie
 
 ### TC-P1-B2-08：请求异常返回 null（异常用例）⏳ 待验证
+
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 安装新构建 APK
@@ -178,6 +202,9 @@
 
 ### TC-P1-B2-09：RSS 阅读 + 源编辑预览全流程（端到端用例）⏳ 待验证
 
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
+
 **前置条件**：
 - 安装新构建 APK
 - 导入 3+ 个订阅源 + 3+ 个书源
@@ -197,6 +224,9 @@
 - ✅ 无内存泄漏（多次打开/关闭 `BottomWebViewDialog`）
 
 ### TC-P1-B2-10：协程调度开销减少（性能验证）⏳ 待验证
+
+**关联源码**：BottomWebViewDialog.kt
+**关联 Activity**：无（纯 Service/工具类）
 
 **前置条件**：
 - 启用 Systrace 或 CPU Profiler
