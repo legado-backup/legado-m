@@ -119,6 +119,8 @@
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
 | [specs/yesterday-changes-deep-audit/](./specs/yesterday-changes-deep-audit/) | 昨日改动（2026-07-08）深度自我审查（书源订阅源布局+视频播放器，6 Agent 并行审查发现 29 项 bug + 7 阻塞点 + 1 需求偏差） ✅ 审查完成 |
 | [specs/context-compression-feedback-preservation/](./specs/context-compression-feedback-preservation/) | 上下文压缩用户反馈保全 + 主线任务完成质量三层审查 + 打包功能差距三层修复（Part A 反馈持久化+四件套 + Part B B0openspec偏差/B1代码/B2交付 + Part C C1偏差归属/C2 F1-F10核查/C3 E2E+L2） ✅ 已完成（D1偏差已修正，7类细节不符需新建spec） |
+| [specs/source-layout-detail-refinement/](./specs/source-layout-detail-refinement/) | 书源/订阅源布局细节精修（D1标签+分组两模式 / D2按类型分组修复+返回键 / D3订阅源二级页还原列表 / D4搜索框 / D5视频缓存下拉选择 / D6倍速15x保留） ✅ 实施完成待文档同步 |
+| [specs/rss-video-player-enhancement/](./specs/rss-video-player-enhancement/) | 订阅源视频播放器增强（R1多集选择播放 + R2 m3u8播放失败调试日志 + R3学习旧订阅源布局 + R4日志异常优化 + R5自动抓取视频链接+Header修复404） 🔄 实施完成待用户实测（7.1/7.2/7.5/7.6 + 3.17 Bug修复 L2通过；7.3/7.4/7.7/7.8 需真实视频站点验证） |
 ### 归档 Specs
 
 | 文档 | 说明 |
