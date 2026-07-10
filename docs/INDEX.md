@@ -117,7 +117,8 @@
 | [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表页 DiffUtil 增量更新 + WebView cacheFirst 默认 true） ✅ 已实施，待真机验证 |
 | [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静音 + 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮） ✅ 已实施，待真机验证 |
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
-
+| [specs/yesterday-changes-deep-audit/](./specs/yesterday-changes-deep-audit/) | 昨日改动（2026-07-08）深度自我审查（书源订阅源布局+视频播放器，6 Agent 并行审查发现 29 项 bug + 7 阻塞点 + 1 需求偏差） ✅ 审查完成 |
+| [specs/context-compression-feedback-preservation/](./specs/context-compression-feedback-preservation/) | 上下文压缩用户反馈保全 + 主线任务完成质量三层审查 + 打包功能差距三层修复（Part A 反馈持久化+四件套 + Part B B0openspec偏差/B1代码/B2交付 + Part C C1偏差归属/C2 F1-F10核查/C3 E2E+L2） ✅ 已完成（D1偏差已修正，7类细节不符需新建spec） |
 ### 归档 Specs
 
 | 文档 | 说明 |
