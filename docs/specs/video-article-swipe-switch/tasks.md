@@ -55,6 +55,54 @@
 - [ ] 7.4 basic-memory 写入关键决策
 - [ ] 7.5 project_memory.md 追加执行记录
 
+### 阶段8：分页加载 + 预缓冲 + 位置记忆（用户反馈 2026-07-11 22:30）
+
+#### 8.1 分页加载（F9）
+
+- [ ] 8.1.1 VideoPlay.kt 新增分页上下文字段：rssSortName/rssSortUrl/rssNextPageUrl/rssArticlePage/rssArticlesHasMore/isLoadingMoreArticles
+- [ ] 8.1.2 VideoPlay.kt 新增 loadMoreArticles() 方法（复用 Rss.getArticles 逻辑，追加到 rssArticles，postEvent 通知）
+- [ ] 8.1.3 EventBus.kt 新增 ARTICLES_LOADED 事件常量
+- [ ] 8.1.4 ReadRss.kt readRss 方法新增 sortName/sortUrl/nextPageUrl/page 参数，传递给 VideoPlay
+- [ ] 8.1.5 RssArticlesFragment.kt readRss 回调传递分页上下文（从 ViewModel 获取 sortName/nextPageUrl/page）
+- [ ] 8.1.6 VideoPlayerActivity.kt onPageSelected 检测到最后一个时触发 loadMoreArticles()
+- [ ] 8.1.7 VideoPlayerActivity.kt 新增 ARTICLES_LOADED 事件监听，调用 adapter.notifyItemRangeInserted
+- [ ] 8.1.8 VideoPlayerActivity.kt finish() 清理分页上下文字段
+
+#### 8.2 预缓冲（F10）
+
+- [ ] 8.2.1 VideoPlay.kt 新增 preloadedVideoUrls/preloadedArticles 字段
+- [ ] 8.2.2 VideoPlay.kt 新增 preloadNextArticleVideo(currentIndex) 方法（R5 抓取或 ruleContent 解析）
+- [ ] 8.2.3 VideoPlay.kt 新增 getCachedVideoUrl(articleLink) 方法
+- [ ] 8.2.4 VideoPlay.kt 新增 clearPreloadCache() 方法
+- [ ] 8.2.5 VideoPlay.kt switchToArticle 方法添加缓存检查（有缓存直接使用，无缓存走现有逻辑）
+- [ ] 8.2.6 VideoFragment.kt 新增进度监听 Coroutine（每5秒轮询，进度超80%触发预缓冲）
+- [ ] 8.2.7 VideoFragment.kt onPrepared 回调中启动进度监听
+- [ ] 8.2.8 VideoFragment.kt onDestroyView 中取消进度监听
+- [ ] 8.2.9 VideoPlayerActivity.kt finish() 调用 clearPreloadCache()
+
+#### 8.3 位置记忆（F11）
+
+- [ ] 8.3.1 VideoPlay.kt 新增 lastPlayedArticleLink 字段
+- [ ] 8.3.2 VideoPlayerActivity.kt finish() 保存当前文章 link 到 lastPlayedArticleLink
+- [ ] 8.3.3 RssArticlesFragment.kt onResume() 检查 lastPlayedArticleLink 并滚动到对应位置
+- [ ] 8.3.4 RssArticlesFragment.kt 滚动后清除 lastPlayedArticleLink（一次性标记）
+
+#### 8.4 编译验证 + 真机测试
+
+- [ ] 8.4.1 编译验证（`.gradlew.bat assembleDebug`）BUILD SUCCESSFUL
+- [ ] 8.4.2 APK 安装到 MEmu 模拟器
+- [ ] 8.4.3 L1 验证：App 正常启动无崩溃
+- [ ] 8.4.4 L2 验证：分页加载（滑到最后一个文章触发加载下一页，新文章可继续滑动）
+- [ ] 8.4.5 L2 验证：预缓冲（当前视频播放到80%时 logcat 确认预加载触发，切换文章后播放更快）
+- [ ] 8.4.6 L2 验证：位置记忆（滑到文章7后退出，返回列表自动滚动到文章7位置）
+- [ ] 8.4.7 L2 验证：向后兼容（无 rssArticles 时分页加载/预缓冲/位置记忆不触发）
+- [ ] 8.4.8 临时日志验证：关键路径添加 SwipeTest 日志，确认流程正确后移除
+
+#### 8.5 文档同步
+
+- [ ] 8.5.1 updateLog.md 追加分页加载/预缓冲/位置记忆变更说明
+- [ ] 8.5.2 tasks.md 阶段8任务清单全部勾选 + AOAdapt 日志
+
 ## AOAdapt 日志
 
 > 记录实施过程中的偏差、问题、决策调整。

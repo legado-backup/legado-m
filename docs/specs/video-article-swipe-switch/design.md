@@ -116,6 +116,110 @@ fun updateEpisodeSelector() {
 
 **关键**：ViewPager2 初始位置需要设置为点击的文章索引，而非默认的 0。
 
+### 1.6 分页加载机制（阶段8）
+
+**问题**：VideoPlay.rssArticles 是内存快照，不会自动更新。滑到最后一个时需要异步加载下一页。
+
+**方案**：VideoPlay 保存分页上下文，onPageSelected 触发加载，EventBus 通知 adapter 更新。
+
+```
+RssArticlesViewModel.loadMore 逻辑（现有）：
+  Rss.getArticles(scope, sortName, pageUrl, source, page, searchKey)
+    → (articles, nextPageUrl)
+    → appDb.rssArticleDao.append(...)
+
+VideoPlay.loadMoreArticles 逻辑（阶段8新增）：
+  Rss.getArticles(loadScope, sortName, pageUrl, source, page, null)
+    → (articles, newNextPageUrl)
+    → rssArticles 追加 articles（内存操作，不写数据库）
+    → postEvent(ARTICLES_LOADED, oldSize to newSize)
+```
+
+**关键区别**：
+- RssArticlesViewModel.loadMore：文章存入数据库，通过 Flow 通知 UI
+- VideoPlay.loadMoreArticles：文章追加到内存列表，通过 EventBus 通知 adapter
+
+**adapter 更新方式**：
+```kotlin
+// FragmentStateAdapter 支持 notifyItemRangeInserted
+videoPagerAdapter?.notifyItemRangeInserted(oldSize, newSize - oldSize)
+// ViewPager2 自动创建新位置的 Fragment
+```
+
+**防重复加载**：
+- `isLoadingMoreArticles` 标记：加载中时拒绝新请求
+- `rssArticlesHasMore` 标记：无更多时拒绝请求
+- `rssNextPageUrl` 为空时拒绝请求
+
+### 1.7 预缓冲机制（阶段8）
+
+**问题**：切换文章时需要异步加载视频 URL，有延迟。希望在当前视频快看完时预加载下一个。
+
+**方案**：VideoFragment 进度监听 + VideoPlay 预加载缓存。
+
+```
+VideoFragment（播放中）
+  │
+  │ onPrepared → startProgressMonitor()
+  ▼
+进度监听 Coroutine（每5秒轮询）
+  │
+  │ progress = currentTime / duration
+  ▼
+progress >= 0.8f ?
+  │
+  ├── 是 → VideoPlay.preloadNextArticleVideo(currentIndex)
+  │     │
+  │     ├── 获取 rssArticles[currentIndex + 1]
+  │     ├── 异步加载视频 URL（R5 VideoUrlExtractor.extract）
+  │     └── 缓存到 preloadedVideoUrls[article.link]
+  │
+  └── 否 → 继续轮询
+
+切换文章时：
+  switchToArticle(index) 
+    → 检查 preloadedVideoUrls[article.link]
+    → 有缓存：直接 player.setUp(cachedUrl) + startPlayLogic()
+    → 无缓存：正常异步加载（现有逻辑）
+```
+
+**预加载 URL 提取逻辑**：
+- ruleContent 为空：使用 R5 VideoUrlExtractor.extract（获取文章页面 HTML → 提取视频 URL）
+- ruleContent 不为空：使用 Rss.getContent（解析 ruleContent 获取视频 URL）
+
+**缓存管理**：
+- 预加载成功：preloadedVideoUrls[link] = url
+- 预加载失败：preloadedArticles.remove(link)（允许重试）
+- 切换文章后：清理非当前和非下一个的缓存（避免内存泄漏）
+
+### 1.8 位置记忆机制（阶段8）
+
+**问题**：用户在播放器中滑到文章 7 后退出，返回列表时列表仍在文章 3 的位置（点击进入时的位置）。
+
+**方案**：VideoPlay 保存退出时的文章 link，RssArticlesFragment.onResume 检查并滚动。
+
+```
+VideoPlayerActivity.finish()
+  │
+  └── VideoPlay.lastPlayedArticleLink = rssArticles?.getOrNull(rssArticleIndex)?.link
+
+用户返回 RssArticlesFragment
+  │
+  └── onResume()
+        │
+        ├── VideoPlay.lastPlayedArticleLink?.let { link ->
+        │     ├── 在 adapter.getItems() 中查找 link
+        │     ├── 找到：smoothScrollToPosition(index)
+        │     └── 未找到：不滚动（文章可能在下一页，用户可手动下拉）
+        │
+        └── VideoPlay.lastPlayedArticleLink = null  ← 清除标记
+```
+
+**设计考量**：
+- 一次性标记：滚动后清除 lastPlayedArticleLink，避免每次 onResume 都滚动
+- 文章不在列表中：index<0 时不滚动（可能分页加载后才有），仅清除标记
+- 使用 smoothScrollToPosition：平滑滚动，用户体验更好
+
 ## 2. Architecture Decisions（架构决策）
 
 ### ADR-1：VideoPlay 单例存储 rssArticles
@@ -166,11 +270,38 @@ fun updateEpisodeSelector() {
 ### ADR-6：退出播放器清理 rssArticles
 
 **Y-Statement**：
-- **Context**：VideoPlay.rssArticles 存储文章列表，退出播放器后不清理会导致内存泄漏
-- **Decision**：VideoPlayerActivity.finish() 中清理 `VideoPlay.rssArticles = null`
-- **Consequences**：
+- **Context**（上下文）：VideoPlay.rssArticles 存储文章列表，退出播放器后不清理会导致内存泄漏
+- **Decision**（决策）：VideoPlayerActivity.finish() 中清理 `VideoPlay.rssArticles = null`
+- **Consequences**（后果）：
   - 正面：防止内存泄漏
   - 负面：从悬浮窗恢复时 rssArticles 已清空，无法上下滑动切换文章（可接受，悬浮窗模式不涉及文章切换）
+
+### ADR-7：分页加载在 VideoPlay 中保存分页上下文（阶段8）
+
+**Y-Statement**：
+- **Context**（上下文）：视频播放器中滑到最后一个文章时需要加载下一页，但 VideoPlay.rssArticles 是内存快照，没有分页上下文
+- **Decision**（决策）：VideoPlay 新增分页上下文字段（rssSortName/rssSortUrl/rssNextPageUrl/rssArticlePage/rssArticlesHasMore），loadMoreArticles 方法复用 Rss.getArticles 逻辑
+- **Consequences**（后果）：
+  - 正面：分页加载逻辑自包含在 VideoPlay 中，不依赖 RssArticlesViewModel
+  - 负面：VideoPlay 单例状态增加（6个新字段）；分页上下文需要在 ReadRss.readRss 中从 ViewModel 传递
+
+### ADR-8：预缓冲仅预加载 URL（阶段8）
+
+**Y-Statement**：
+- **Context**（上下文）：切换文章时异步加载视频 URL 有延迟，希望在当前视频快看完时预加载下一个
+- **Decision**（决策）：仅预加载视频 URL（轻量级），不预缓冲完整视频流（避免多播放器实例管理复杂度）
+- **Consequences**（后果）：
+  - 正面：实现简单，不需要管理多个播放器实例；内存占用低（仅缓存 URL 字符串）
+  - 负面：切换文章时仍需要 player.setUp + prepareAsync，但跳过了 URL 抓取的异步等待（节省最大延迟部分）
+
+### ADR-9：位置记忆通过 VideoPlay 单例传递（阶段8）
+
+**Y-Statement**：
+- **Context**（上下文）：用户在播放器中滑到文章 7 后退出，返回列表时列表仍在点击时的位置（文章 3），需要滚动到文章 7
+- **Decision**（决策）：VideoPlay 新增 lastPlayedArticleLink 字段，finish() 时保存，RssArticlesFragment.onResume() 检查并滚动
+- **Consequences**（后果）：
+  - 正面：利用已有 VideoPlay 单例，无需 Intent extra 或 EventBus；一次性标记避免每次 onResume 滚动
+  - 负面：文章不在当前列表页时无法定位（index<0），需用户手动下拉加载更多（可接受，分页加载需求 F9 解决此问题）
 
 ## 3. Data Flow（数据流）
 
@@ -488,6 +619,133 @@ private fun switchToViewPagerMode() {
 override fun finish() {
     // ...（现有逻辑）...
     // 新需求：清理文章列表防止内存泄漏
+    if (VideoPlay.book == null && !VideoPlay.singleUrl) {
+        VideoPlay.rssArticles = null
+        VideoPlay.rssArticleIndex = 0
+    }
+    super.finish()
+}
+```
+
+### 4.5 阶段8新增文件变更（分页加载 + 预缓冲 + 位置记忆）
+
+| 文件 | 修改内容 | 需求 | 优先级 |
+|------|---------|------|--------|
+| `VideoPlay.kt` | 新增分页上下文字段(6个) + preloadedVideoUrls/preloadedArticles + lastPlayedArticleLink + loadMoreArticles() + preloadNextArticleVideo() + getCachedVideoUrl() | F9/F10/F11 | P0 |
+| `ReadRss.kt` | readRss 传递 sortName/sortUrl/nextPageUrl/page 给 VideoPlay | F9 | P0 |
+| `RssArticlesFragment.kt` | readRss 回调传递分页上下文 + onResume 位置记忆滚动 | F9/F11 | P0 |
+| `VideoPlayerActivity.kt` | onPageSelected 触发分页加载 + ARTICLES_LOADED 事件监听 + finish 保存 lastPlayedArticleLink | F9/F11 | P0 |
+| `VideoFragment.kt` | 进度监听 Coroutine + onPrepared 启动监听 + onDestroyView 取消监听 | F10 | P0 |
+| `EventBus.kt` | 新增 ARTICLES_LOADED 事件常量 | F9 | P0 |
+| `VideoPagerAdapter.kt` | （无需修改，notifyItemRangeInserted 由 Activity 调用） | - | - |
+
+**阶段8 VideoPlay.kt 详细变更**：
+
+```kotlin
+// ==================== 阶段8：分页加载 + 预缓冲 + 位置记忆 ====================
+
+// 分页加载上下文
+var rssSortName: String? = null
+var rssSortUrl: String? = null
+var rssNextPageUrl: String? = null
+var rssArticlePage: Int = 1
+var rssArticlesHasMore: Boolean = true
+var isLoadingMoreArticles: Boolean = false
+
+// 预缓冲缓存
+val preloadedVideoUrls: MutableMap<String, String> = mutableMapOf()
+val preloadedArticles: MutableSet<String> = mutableSetOf()
+
+// 位置记忆
+var lastPlayedArticleLink: String? = null
+
+// 分页加载方法
+fun loadMoreArticles(): Boolean {
+    if (isLoadingMoreArticles || !rssArticlesHasMore) return false
+    val source = source as? RssSource ?: return false
+    val pageUrl = rssNextPageUrl ?: return false
+    val sortName = rssSortName ?: return false
+    isLoadingMoreArticles = true
+    Coroutine.async(loadScope, IO) {
+        rssArticlePage++
+        Rss.getArticles(loadScope, sortName, pageUrl, source, rssArticlePage, null)
+            .onSuccess(IO) { (articles, newNextPageUrl) ->
+                val oldSize = rssArticles?.size ?: 0
+                val mutableList = rssArticles?.toMutableList() ?: mutableListOf()
+                mutableList.addAll(articles)
+                rssArticles = mutableList
+                rssNextPageUrl = newNextPageUrl
+                rssArticlesHasMore = articles.isNotEmpty() && !newNextPageUrl.isNullOrBlank()
+                isLoadingMoreArticles = false
+                val newSize = rssArticles?.size ?: 0
+                postEvent(EventBus.ARTICLES_LOADED, oldSize to newSize)
+            }.onError {
+                isLoadingMoreArticles = false
+                rssArticlePage--
+                AppLog.put("分页加载文章失败", it, true)
+            }
+    }
+    return true
+}
+
+// 预缓冲方法
+fun preloadNextArticleVideo(currentIndex: Int) {
+    val articles = rssArticles ?: return
+    val nextArticle = articles.getOrNull(currentIndex + 1) ?: return
+    if (nextArticle.link in preloadedArticles) return
+    val source = source as? RssSource ?: return
+    preloadedArticles.add(nextArticle.link)
+    Coroutine.async(loadScope, IO) {
+        try {
+            val ruleContent = source.ruleContent
+            val videoUrl = if (ruleContent.isNullOrBlank()) {
+                // R5 抓取
+                val pageAnalyzeUrl = AnalyzeUrl(nextArticle.link, source = source, ruleData = nextArticle)
+                val res = pageAnalyzeUrl.getStrResponseAwait()
+                val html = res.body ?: ""
+                VideoUrlExtractor.extract(html, nextArticle.link).firstOrNull()
+            } else {
+                // ruleContent 解析
+                Rss.getContent(loadScope, nextArticle, ruleContent, source)
+                    .await()?.let { parseRssRoutes(it, nextArticle.link)?.firstOrNull()?.episodes?.firstOrNull()?.url }
+            }
+            if (videoUrl != null) {
+                preloadedVideoUrls[nextArticle.link] = videoUrl
+            }
+        } catch (e: Exception) {
+            AppLog.put("预缓冲下一个视频失败", e)
+            preloadedArticles.remove(nextArticle.link)
+        }
+    }.onError {
+        preloadedArticles.remove(nextArticle.link)
+    }
+}
+
+fun getCachedVideoUrl(articleLink: String): String? = preloadedVideoUrls[articleLink]
+
+// 清理预缓冲缓存（退出播放器时调用）
+fun clearPreloadCache() {
+    preloadedVideoUrls.clear()
+    preloadedArticles.clear()
+}
+```
+
+**阶段8 finish() 修改**：
+```kotlin
+override fun finish() {
+    // 阶段8：保存位置记忆
+    VideoPlay.lastPlayedArticleLink = VideoPlay.rssArticles
+        ?.getOrNull(VideoPlay.rssArticleIndex)?.link
+    // 阶段8：清理预缓冲缓存
+    VideoPlay.clearPreloadCache()
+    // 阶段8：清理分页上下文
+    VideoPlay.rssSortName = null
+    VideoPlay.rssSortUrl = null
+    VideoPlay.rssNextPageUrl = null
+    VideoPlay.rssArticlePage = 1
+    VideoPlay.rssArticlesHasMore = true
+    VideoPlay.isLoadingMoreArticles = false
+    // 现有清理
     if (VideoPlay.book == null && !VideoPlay.singleUrl) {
         VideoPlay.rssArticles = null
         VideoPlay.rssArticleIndex = 0
