@@ -132,6 +132,7 @@
 | [specs/video-control-visibility-enhancement/](./specs/video-control-visibility-enhancement/) | 视频播放器控件显隐与缓冲条优化（F1缓冲进度条修复+secondaryProgress绑定 / F2控件3秒自动隐藏+单击切换+触摸事件根因修复OnTouchListener设到surface_container） ✅ 实施完成（L2真机验证通过） |
 | [specs/video-ui-dedup-layout-adjust/](./specs/video-ui-dedup-layout-adjust/) | 视频播放器 UI 去重与布局调整（移除右侧静音/倍速按钮避免与GSY底部控件重叠 + 左下角标题区和全屏按钮上移32dp避免遮挡GSY底部播放条 + VideoFragment.kt死代码清理） ✅ 实施完成（Phase 1-4全部完成+L2验证通过） |
 | [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（10类问题：ExoPlayer失败降级WebView用skill V2模板 + 播放器类型配置 + ViewPager2兼容性 + 加密解密容错 + ClassCastException容错 + SQLiteBlobTooBig容错 + WebView线程安全 + 网络重试 + JSON容错 + HlsPlaylistStuck + Cronet回退） ✅ 实施完成（L2真机验证通过，5.6 ViewPager2滑动切换核心修复 onInterceptTouchEvent 方案） |
+| [specs/video-back-fullscreen-fix/](./specs/video-back-fullscreen-fix/) | 视频播放器返回按钮修复+全屏按钮迁移+真全屏优化（B1: setNavigationOnClickListener绕过onSupportNavigateUp时序冲突 / U1: btn_fullscreen移入right_buttons随整体显隐 / F1: TitleBar gone()替代ActionBar hide()释放布局空间） 🔄 设计中 |
 | [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制） ✅ 已完成（检查点3最终验收通过 2026-07-13） |
 ### 归档 Specs
 
