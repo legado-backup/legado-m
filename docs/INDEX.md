@@ -17,6 +17,12 @@
 | 架构模式 | [project-rules/architecture_rules.md](./project-rules/architecture_rules.md) | 手动DI+ViewModel模式+Room配置+Web服务器+事件系统+模块依赖+构建配置 |
 | 测试规范 | [project-rules/testing_rules.md](./project-rules/testing_rules.md) | JUnit4+书源自测三阶段+测试运行命令 |
 | 工作流程 | [project-rules/openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec四文档+强制检查点+文档同步映射表 |
+| 延伸版本对比方法论 | [project-rules/forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 27+延伸版本清单+五阶段对比流程+优先级矩阵+踩坑案例 |
+| E2E测试流程 | [project-rules/ai_e2e_testing_workflow.md](./project-rules/ai_e2e_testing_workflow.md) | 5.5.1-5.5.8八步强制流程+固化层保护+V3.1快速验证脚本 |
+| 测试用例设计 | [project-rules/test-case-design-guide.md](./project-rules/test-case-design-guide.md) | 双轨制+源码溯源字段+步骤语义化 |
+| 改造过程日志 | [project-rules/logging-during-refactoring.md](./project-rules/logging-during-refactoring.md) | 10类必加日志场景+永久/临时双轨+Tag规范+验证检查清单 |
+| 版本交付同步 | [project-rules/version-delivery-sync.md](./project-rules/version-delivery-sync.md) | 同步清单+updateLog.md格式+编译前更新时机 |
+| 复杂任务流水线 | [project-rules/complex-task-pipeline.md](./project-rules/complex-task-pipeline.md) | 五阶段流水线+硬性约束（单子代理≤12文件）+反模式 |
 
 ---
 
@@ -125,7 +131,8 @@
 | [specs/video-article-swipe-switch/](./specs/video-article-swipe-switch/) | 视频播放器上下滑动切换文章（ViewPager2+Fragment+文章列表模式+分页加载+预缓冲+位置记忆） ✅ 实施完成（阶段1-8全部代码完成+L2验证通过） |
 | [specs/video-control-visibility-enhancement/](./specs/video-control-visibility-enhancement/) | 视频播放器控件显隐与缓冲条优化（F1缓冲进度条修复+secondaryProgress绑定 / F2控件3秒自动隐藏+单击切换+触摸事件根因修复OnTouchListener设到surface_container） ✅ 实施完成（L2真机验证通过） |
 | [specs/video-ui-dedup-layout-adjust/](./specs/video-ui-dedup-layout-adjust/) | 视频播放器 UI 去重与布局调整（移除右侧静音/倍速按钮避免与GSY底部控件重叠 + 左下角标题区和全屏按钮上移32dp避免遮挡GSY底部播放条 + VideoFragment.kt死代码清理） ✅ 实施完成（Phase 1-4全部完成+L2验证通过） |
-| [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（ExoPlayer HLS失败降级WebView + 播放器类型配置 + 加密解密失败容错 + ClassCastException类型容错 + 网络重试 + JSON格式容错） 🔄 设计中 |
+| [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（10类问题：ExoPlayer失败降级WebView用skill V2模板 + 播放器类型配置 + ViewPager2兼容性 + 加密解密容错 + ClassCastException容错 + SQLiteBlobTooBig容错 + WebView线程安全 + 网络重试 + JSON容错 + HlsPlaylistStuck + Cronet回退） ✅ 实施完成（L2真机验证通过，5.6 ViewPager2滑动切换核心修复 onInterceptTouchEvent 方案） |
+| [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制） ✅ 已完成（检查点3最终验收通过 2026-07-13） |
 ### 归档 Specs
 
 | 文档 | 说明 |

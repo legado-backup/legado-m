@@ -2,20 +2,21 @@
 
 ## Intent（意图）
 
-解决用户安装最新版客户端后，订阅源视频播放出现"网页 video 标签可播放但内置播放器不可播放"的回归问题，同时修复日志深度分析发现的其他 4 类问题，提升视频播放稳定性和用户体验。
+解决用户安装最新版客户端后，订阅源视频播放出现"网页 video 标签可播放但内置播放器不可播放"的回归问题，同时修复日志深度分析发现的**其他 9 类问题**（原 4 类 + 深度扫描新发现 5 类），提升视频播放稳定性和用户体验。
 
 ## Scope（范围）
 
 ### In Scope（纳入范围）
 
-#### P0: ExoPlayer HLS 播放失败降级机制
+#### P0: ExoPlayer 播放失败降级机制（覆盖两类根因）
 
-- **问题**: ExoPlayer 对 HLS TS 分片的 H264 SPS NAL unit 解析过严（`ParsableNalUnitBitArray.assertValidOffset` 抛出 `IllegalStateException`），导致错误码 2000 (ERROR_CODE_IO_UNSPECIFIED)，07-12 日志中出现 265 次播放失败
+- **问题1（HLS SPS 解析失败）**: ExoPlayer 对 HLS TS 分片的 H264 SPS NAL unit 解析过严（`ParsableNalUnitBitArray.assertValidOffset` 抛出 `IllegalStateException`），导致错误码 2000 (ERROR_CODE_IO_UNSPECIFIED)，07-12 日志中出现 265 次播放失败
+- **问题2（UnrecognizedInputFormatException，新发现）**: ExoPlayer **完全无法识别**流格式，所有 Extractor（FlvExtractor/TsExtractor/Mp4Extractor 等 20+ 种）都读不了流。07-10 日志中出现 20+ 次。根因：视频 URL 返回的是 HTML 页面（非视频流）或非标准格式
 - **根因**: ExoPlayer 的 `TsExtractor` 严格校验 H264 SPS 数据格式，而 WebView 的 Chromium 媒体引擎 + HLS.js 更宽容
 - **修复**:
-  - S0-1: ExoPlayer 失败后，**自动用 skill V2 hls-video-player.html 模板**包装视频 URL，WebView 加载播放（手动降级按钮触发）
+  - S0-1: ExoPlayer 失败后（含 2000 错误码 + UnrecognizedInputFormatException），**用 skill V2 hls-video-player.html 模板**包装视频 URL，WebView 加载播放（手动降级按钮触发）
   - S0-2: 设置中添加"播放器类型"选项（自动/内置/WebView），选 WebView 时直接用 V2 模板播放
-  - S0-3: Exo2MediaPlayer.onPlayerError 补充 ERROR_CODE_IO_UNSPECIFIED (2000) 的友好提示
+  - S0-3: Exo2MediaPlayer.onPlayerError 补充 ERROR_CODE_IO_UNSPECIFIED (2000) 和 UnrecognizedInputFormatException 的友好提示
 
 #### P1-1: 加密解密失败容错
 
@@ -36,6 +37,28 @@
 
 - **问题**: "链接参数 JSON 格式不规范，请改为规范格式"
 - **修复**: 增强 JSON 格式容错（对不规范的链接参数提供降级处理）
+
+#### P1-3: SQLiteBlobTooBigException 容错（新发现）
+
+- **问题**: `android.database.sqlite.SQLiteBlobTooBigException: Row too big to fit into CursorWindow requiredPos=0, totalRows=39`，Room 数据库某行内容过大（超过 2MB CursorWindow 限制），导致查询失败
+- **根因**: 某条记录（可能是书源/订阅源的 config 字段、或文章内容）序列化后超过 CursorWindow 限制
+- **修复**: 查询大字段时改用分页加载或流式读取；对超大记录提供容错（跳过而非崩溃）
+
+#### P1-4: WebView 线程违规修复（新发现）
+
+- **问题**: `A WebView method was called on thread 'DefaultDispatcher-worker-7 @coroutine#365'. All WebView methods must be called on the same thread.`，WebView 在后台协程线程被调用
+- **根因**: 某处代码在协程中直接调用 WebView 方法（应在主线程调用）
+- **修复**: 排查所有 WebView 调用点，确保在主线程（`runOnUiThread` 或 `Handler(Looper.getMainLooper()).post`）执行
+
+#### P2-3: HlsPlaylistTracker PlaylistStuckException 容错（新发现）
+
+- **问题**: `androidx.media3.exoplayer.hls.playlist.HlsPlaylistTracker$PlaylistStuckException`，HLS 播放列表卡住无法加载
+- **修复**: 捕获此异常并提示降级到 WebView
+
+#### P2-4: Cronet 系统错误容错（新发现）
+
+- **问题**: `org.chromium.net.impl.CronetExceptionImpl: System error` + `IOException: System error`，Cronet 网络层系统错误
+- **修复**: 捕获 CronetException 时回退到 OkHttp 重试
 
 ### Out of Scope（排除范围）
 
@@ -93,13 +116,32 @@
 4. App 读取 V2 模板，替换 `{{result}}` 为视频 URL，`{{videoTitle}}` 为标题
 5. WebView 加载替换后的 HTML，Chromium + HLS.js 播放
 
+### 降级后 ViewPager2 上下切换兼容性分析（用户反馈2解答）
+
+**结论：✅ 降级到 WebView 后，ViewPager2 上下滑动切换视频完全不受影响**
+
+**技术依据**：
+
+1. **ViewPager2 与播放器类型解耦**：ViewPager2 在 Activity 层管理 Fragment 切换（`onPageSelected` → `deactivatePlayer`/`activatePlayer`），与 Fragment 内部 playerView 的具体类型（GSY/WebView）无关
+2. **Fragment 内部 View 替换方案**：保持 ViewPager2 + VideoFragment 架构不变，降级时在 Fragment 内部隐藏 GSY VideoPlayer、显示 WebView，滑动机制不受影响
+3. **生命周期扩展**：`activatePlayer()`/`deactivatePlayer()` 扩展为同时管理 WebView（JS 暂停 `video.pause()` / 恢复 `video.play()`）
+
+**需处理的兼容性挑战**：
+
+| 挑战 | 方案 |
+|------|------|
+| 触摸事件冲突 | WebView 视频区域设固定高度，非视频区域允许触摸穿透到 ViewPager2 |
+| WebView 内存 | offscreenPageLimit=1 意味着最多 2 个 WebView；降级模式只在当前 Fragment 创建 WebView，相邻 Fragment 不预创建 |
+| WebView 销毁 | Fragment.onDestroyView 中 `loadUrl("about:blank")` + `destroy()` 防内存泄漏 |
+| 状态保存 | 降级状态记录到 Fragment arguments，切换回来时恢复 WebView 播放 |
+
 ### Alternatives Considered（备选方案）
 
 #### 方案A: 自动降级（ExoPlayer 失败后自动切换 WebView）
 
 - **优点**: 用户体验最好，无需干预
 - **缺点**: 实现复杂，需管理 ExoPlayer 和 WebView 两个播放器的生命周期；自动切换可能导致用户困惑
-- **不采用原因**: 实现复杂度高，先用手动降级快速解决问题，后续可考虑
+- **不采用原因**: 实现复杂度高，先用手动降级快速解决问题。**注：经 ViewPager2 兼容性分析，自动降级技术可行（Fragment 内部 View 替换不破坏滑动），后续优化可考虑**
 
 #### 方案B: 修复 ExoPlayer TS 解析（自定义 TsExtractor）
 
@@ -119,6 +161,8 @@
 2. **WebView 模式需要网络加载 HLS.js**: 首次加载需要从 CDN 下载 hls.js（约 200KB），后续有缓存
 3. **配置选项可能被忽略**: 用户可能不知道有"播放器类型"配置选项
 4. **P1/P2 修复为容错而非根治**: 加密解密失败/类型转换异常的根因在源本身，App 层面只能容错
+5. **WebView 内存开销**: 降级模式下 ViewPager2 最多有 2 个 WebView 同时存在（offscreenPageLimit=1），每个加载 HLS.js 约 200KB
+6. **SQLiteBlobTooBig 容错为跳过**: 超大记录被跳过可能导致部分数据丢失显示，但优于崩溃
 
 ## Requirements（需求）
 
@@ -147,6 +191,26 @@
 ### R4: 源格式容错
 
 - **R4.1**: 链接参数 JSON 格式不规范时提供降级处理（尝试解析非标准 JSON）
+
+### R5: ViewPager2 上下切换兼容性（用户反馈2）
+
+- **R5.1**: 降级到 WebView 后，ViewPager2 上下滑动切换视频功能正常
+- **R5.2**: WebView 播放时切换到其他 Fragment，WebView 正确暂停（JS `video.pause()`）
+- **R5.3**: 切换回来时 WebView 正确恢复播放（JS `video.play()`）
+- **R5.4**: WebView 在 Fragment.onDestroyView 中正确销毁，无内存泄漏
+- **R5.5**: WebView 视频区域触摸不阻塞 ViewPager2 滑动（非视频区域穿透）
+
+### R6: 新发现异常容错（深度日志分析）
+
+- **R6.1**: SQLiteBlobTooBigException 时跳过超大记录而非崩溃
+- **R6.2**: UnrecognizedInputFormatException 触发降级提示（与 2000 错误码同等处理）
+- **R6.3**: HlsPlaylistTracker$PlaylistStuckException 触发降级提示
+- **R6.4**: Cronet 系统错误时回退到 OkHttp 重试
+
+### R7: WebView 线程安全修复（新发现）
+
+- **R7.1**: 排查所有 WebView 调用点，确保在主线程执行
+- **R7.2**: 使用 `runOnUiThread` 或 `Handler(Looper.getMainLooper()).post` 包裹 WebView 调用
 
 ## Scenarios（场景）
 
