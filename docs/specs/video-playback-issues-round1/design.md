@@ -119,6 +119,74 @@ hls.config.xhrSetup = function(xhr, url) {
 - 检测 JSON 格式不规范时，尝试宽松解析（如允许尾随逗号、单引号）
 - 解析失败时记录警告日志，不阻塞播放
 
+### P1-3: SQLiteBlobTooBigException 容错（新发现）
+
+#### 实现要点
+
+修改 Room 数据库查询逻辑：
+- 检测 `SQLiteBlobTooBigException` 时，跳过超大记录而非崩溃
+- 记录警告日志（含表名+记录位置），便于定位问题源
+- 对大字段查询改用分页加载（limit/offset）
+
+### P1-4: WebView 线程违规修复（新发现）
+
+#### 实现要点
+
+排查所有 WebView 调用点（Grep `webView\.` / `loadUrl` / `loadDataWithBaseURL`）：
+- 确保所有 WebView 方法在主线程执行
+- 使用 `runOnUiThread { }` 或 `withContext(Dispatchers.Main)` 包裹
+- 重点检查协程中的 WebView 调用（`DefaultDispatcher-worker-*` 线程）
+
+### P2-3: HlsPlaylistStuckException 容错（新发现）
+
+#### 实现要点
+
+修改 `Exo2MediaPlayer.onPlayerError`：
+- 检测 `HlsPlaylistTracker$PlaylistStuckException` 时，提示"播放列表加载卡住，可尝试 WebView 播放"
+- 与 2000 错误码同等处理（触发降级提示）
+
+### P2-4: Cronet 系统错误容错（新发现）
+
+#### 实现要点
+
+修改网络请求逻辑：
+- 检测 `CronetException` 时，回退到 OkHttp 重试
+- 记录警告日志，便于统计 Cronet 失败率
+
+### WebView 降级与 ViewPager2 兼容性架构（用户反馈2）
+
+#### 架构设计
+
+```
+VideoPlayerActivity (Activity 层，不变)
+├── ViewPager2 (ORIENTATION_VERTICAL, offscreenPageLimit=1)
+│   └── onPageSelected(position)  ← 滑动机制不变
+│       ├── 旧 Fragment.deactivatePlayer()  ← 扩展：同时暂停 WebView
+│       └── 新 Fragment.activatePlayer()    ← 扩展：同时恢复 WebView
+└── VideoFragment (Fragment 层，扩展)
+    ├── GSY VideoPlayer (内置播放器，默认可见)
+    ├── WebView (降级播放器，默认隐藏，降级时显示)
+    │   └── WebViewVideoPlayer (封装 V2 模板加载)
+    └── 降级切换逻辑
+        ├── ExoPlayer 失败 → 隐藏 GSY，显示 WebView，调用 play()
+        ├── "切换回内置播放器" → 隐藏 WebView，显示 GSY，重新播放
+        └── Fragment.onDestroyView → 销毁 WebView (防内存泄漏)
+```
+
+#### 生命周期管理
+
+| 事件 | GSY VideoPlayer | WebView |
+|------|-----------------|---------|
+| activatePlayer() | startPlayLogic() | JS `video.play()`（若 WebView 可见） |
+| deactivatePlayer() | onVideoPause() + release() | JS `video.pause()`（若 WebView 可见） |
+| onDestroyView() | release() | `loadUrl("about:blank")` + `destroy()` |
+
+#### 触摸事件处理
+
+- WebView 视频区域（`<video>` 元素）设为固定高度，消费自身触摸事件
+- WebView 非视频区域（控件栏/标题）设为 `clickable=false`，触摸穿透到 ViewPager2
+- 通过 V2 模板的 CSS 控制：`#video-wrapper { height: 56vh; }`，`#video-controls-bar { pointer-events: auto; }`
+
 ## Architecture Decisions（架构决策）
 
 ### ADR-1: 降级策略选择
@@ -162,6 +230,20 @@ hls.config.xhrSetup = function(xhr, url) {
 - **and accepted** V2 模板需要手动传入视频 URL
 - **to achieve** 降级场景已有视频 URL，V2 直接加载最合适
 - **neglecting** V1 的自动提取能力（降级场景不需要）
+
+### ADR-4: WebView 降级保持 ViewPager2 架构不变（用户反馈2）
+
+**Context**: 降级到 WebView 后，需确认是否仍支持 ViewPager2 上下滑动切换视频
+
+**Decision**: 保持 ViewPager2 + VideoFragment 架构不变，在 Fragment 内部 View 替换（GSY ↔ WebView）
+
+**Y-Statement**:
+- **In the context of** ExoPlayer 失败降级到 WebView 播放
+- **facing** Fragment 内部 View 替换/整个 Fragment 替换为 WebView Fragment/放弃 ViewPager2
+- **we decided for** Fragment 内部 View 替换（GSY 隐藏 + WebView 显示）
+- **and accepted** 需扩展 activatePlayer/deactivatePlayer 管理 WebView 生命周期/需处理触摸事件穿透/WebView 内存开销
+- **to achieve** ViewPager2 滑动机制完全不受影响/Fragment 复用机制不破坏/降级状态可保存
+- **neglecting** 双播放器并存的内存开销（GSY + WebView 同时存在于 Fragment）
 
 ## Data Flow（数据流）
 
@@ -221,8 +303,16 @@ hls.config.xhrSetup = function(xhr, url) {
 | 文件 | 修改内容 |
 |------|---------|
 | `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt` | ClassCastException 类型容错（String→List） |
-| `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt` | 网络重试机制（Connection reset） |
+| `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt` | 网络重试机制（Connection reset）+ Cronet 系统错误回退 OkHttp |
 | `app/src/main/java/io/legado/app/model/rss/Rss.kt` | 加密解密失败容错（IllegalBlockSizeException） |
+
+### 新发现问题修改文件
+
+| 文件 | 修改内容 |
+|------|---------|
+| `app/src/main/java/io/legado/app/help/gsyVideo/Exo2MediaPlayer.kt` | 补充 UnrecognizedInputFormatException + HlsPlaylistStuckException 的友好提示和降级触发 |
+| `app/src/main/java/io/legado/app/data/dao/`（待定位具体 DAO） | SQLiteBlobTooBigException 容错（跳过超大记录） |
+| 待定位（Grep `webView\.` 排查） | WebView 线程违规修复（主线程包裹） |
 
 ## 风险评估
 
