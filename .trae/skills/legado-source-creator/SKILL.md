@@ -114,8 +114,9 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 | 78 | searchUrl验证码用<js>+getVerificationCode | 搜索验证码用`<js>java.getVerificationCode(imgUrl)</js>`处理，JS代码必须用ES5（var/字符串拼接），禁止ES6模板字符串。JS返回后接搜索URL+POST选项 |
 | 79 | NativeJavaObject toString输出哈希 | Rhino JS返回Java对象时`toString()`输出`NativeJavaObject@hash`而非实际内容。JAR仿真器已内置`unwrapRhinoResult()`自动处理6种Rhino特殊类型（NativeJavaObject/NativeArray/NativeObject/NativeJavaArray/Undefined/ConsString），真机无此问题 |
 | 80 | 分类列表图片CF拦截-需Cookie预热 | searchUrl的`<js>`块会通过`java.ajax()`预热CF Cookie，但sortUrl是简单URL无预热。导致ruleImage中`java.ajax(href)`被CF拦截返回挑战页。修复：ruleImage中添加Cookie预热（`java.get/put`时间戳控制频率，每5分钟访问首页一次）+ CF拦截检测（`challenges.cloudflare.com`/`请稍候`关键词触发重试） |
+| 81 | 内置播放器404防盗链 | type=2内置播放器(ExoPlayer)请求视频URL返回404但WebView模式正常。根因：CDN防盗链校验Referer，ExoPlayer默认不携带。修复已实现：系统自动注入Header（ruleContent不为空→AnalyzeUrl.headerMap；R5自动抓取→注入Referer=文章页面URL），通过ExoPlayerHelper.setDefaultHeaders注入okhttpDataFactory。singleUrl模式不注入Referer(YAGNI，URL本身就是视频地址)。详见`video-audio.md` 5.6节常见问题 |
 
-> 完整80条陷阱+详细解释：`references/troubleshooting/_index.md`
+> 完整81条陷阱+详细解释：`references/troubleshooting/_index.md`
 
 ---
 
@@ -201,7 +202,7 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
      - Interactive → loginCheckJs: `java.startBrowserAwait(source.sourceUrl, '通过验证');`
    - 登录/验证码 → `references/special-scenarios/login.md` + `captcha.md`
    - 加密 → `references/special-scenarios/encryption.md` + `references/js-patterns/crypto-patterns.md`
-   - 视频/图片 → `references/special-scenarios/video-audio.md` + `encrypted-images.md` + `templates/` 播放器模板
+   - 视频/图片 → `references/special-scenarios/video-audio.md`（**5.6节 type=2 内置播放器 ruleContent 编写指南：单URL/多行URL/JSON数组/嵌套JSON多线路四种格式**）+ `rss-advanced.md`（**7.10/7.11节 方案C type=2 内置播放器决策树**）+ `encrypted-images.md` + `templates/` 播放器模板
 
 **完成检查清单**：
 - [ ] 执行知识库查阅（Grep references/），输出"已查阅的陷阱清单"（陷阱编号+标题）
@@ -425,7 +426,7 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 1. 字段扁平：ruleArticles/ruleTitle/ruleLink等都是独立String?字段
 2. 搜索复用列表规则：searchUrl + 同一套ruleArticles/ruleTitle/ruleLink
 3. ruleContent是扁平String?：直接写CSS/JS规则，非嵌套对象
-4. 视频播放器：用`templates/auto-video-player.html`模板，type=0
+4. 视频播放器：优先用 type=2 内置播放器（ruleContent 返回 JSON 数组即多集、嵌套 JSON 即多线路，详见 [references/special-scenarios/video-audio.md](references/special-scenarios/video-audio.md) 5.6 节）；需自定义播放器界面时用 `templates/` 模板 type=0
 
 ---
 

@@ -227,3 +227,276 @@ result = html;
 **所以 type=2 + ruleContent 是合法组合**：当视频链接需要从详情页提取时，设置 type=2 + ruleContent。VideoPlay 会先请求详情页，用 ruleContent 提取视频URL，再传给 ExoPlayer 播放。
 
 ⚠️ **type=0 + 自定义HLS.js播放器**：使用自定义HTML播放器时确实需要 type=0（WebView渲染HTML），但 type=2 + ruleContent返回m3u8地址也是可行的方案（用内置ExoPlayer播放）。
+
+## 5.6 type=2 内置视频播放器内容规则编写指南
+
+> 当订阅源 `type=2`（视频）且使用内置视频播放器时，`ruleContent` 的编写指南。
+> 内置播放器基于 GSY + ExoPlayer，支持 m3u8/HLS、mp4 等格式，无需 WebView。
+> 代码实现：`VideoPlay.kt` 的 `parseRssEpisodes()` / `parseRssRoutes()` / R5 分支。
+
+### 何时使用 type=2（内置播放器）vs type=0（WebView）
+
+| 对比项 | type=2 内置播放器 | type=0 WebView 播放器 |
+|--------|------------------|----------------------|
+| 播放引擎 | ExoPlayer（原生） | HLS.js（WebView） |
+| ruleContent 返回 | 视频URL/JSON数组 | 完整HTML页面 |
+| 多集支持 | ✅ JSON数组/多行URL | ✅ JS数组 |
+| 多线路支持 | ✅ 嵌套JSON | ❌ 需自行实现 |
+| 上下滑动切换文章 | ✅ ViewPager2 | ❌ |
+| 3秒自动隐藏控件 | ✅ 单击切换显隐 | ❌ |
+| 缓冲进度条 | ✅ 灰色缓冲+白色播放 | ✅ |
+| 倍速/快进快退 | ✅ | ✅ |
+| 适用场景 | 视频URL可直接提取 | 需自定义播放器界面/复杂JS |
+
+### ruleContent 四种格式
+
+#### 格式①：单 URL（最简，100%向后兼容）
+
+ruleContent 返回单个视频 URL 字符串：
+
+```
+https://example.com/video/episode1.m3u8
+```
+
+CSS 简写：
+```
+video source@src
+```
+
+JS 写法：
+```javascript
+<js>
+result = 'https://example.com/video/episode1.m3u8';
+</js>
+```
+
+**适用**：单集视频，视频URL可直接从详情页提取。
+
+#### 格式②：多行 URL（简写多集）
+
+ruleContent 返回多行 URL，每行一个视频地址：
+
+```
+https://example.com/video/ep1.m3u8
+https://example.com/video/ep2.m3u8
+https://example.com/video/ep3.m3u8
+```
+
+CSS 简写（页面有多个 `<source>` 标签时自动返回多行）：
+```
+video source@src
+```
+
+**判定条件**：每行必须以 `http://`、`https://` 或 `/` 开头（相对路径自动拼接 baseUrl）。
+
+**集数标题**：自动生成"第1集"、"第2集"...
+
+**适用**：多集视频，每集 URL 可通过同一CSS规则批量提取。
+
+#### 格式③：JSON 数组（完整多集，支持自定义标题）
+
+ruleContent 返回 JSON 数组，每个对象代表一集：
+
+```json
+[
+  {"url": "https://example.com/video/ep1.m3u8", "title": "第1集"},
+  {"url": "https://example.com/video/ep2.m3u8", "title": "第2集"},
+  {"url": "https://example.com/video/ep3.m3u8", "title": "大结局"}
+]
+```
+
+JS 写法：
+```javascript
+<js>
+JSON.stringify([
+  {url: 'https://example.com/video/ep1.m3u8', title: '第1集'},
+  {url: 'https://example.com/video/ep2.m3u8', title: '第2集'},
+  {url: 'https://example.com/video/ep3.m3u8', title: '大结局'}
+]);
+</js>
+```
+
+**JSON 对象字段定义**：
+
+| 字段 | 类型 | 必须 | 缺省值 | 说明 |
+|------|------|------|--------|------|
+| `url` | String | ✅ 必须 | 无（缺失则该集被过滤） | 播放地址（m3u8/mp4/mpd），相对路径自动拼接 baseUrl |
+| `title` | String | ❌ 可选 | "第N集" | 集数标题，显示在左下角集数选择器 |
+| `duration` | Long | ❌ 可选 | 0（预留） | 时长（毫秒，未来扩充） |
+| `cover` | String | ❌ 可选 | ""（预留） | 封面 URL（未来扩充） |
+
+**适用**：需要自定义集数标题的多集视频。
+
+#### 格式④：嵌套 JSON（多线路多集）
+
+ruleContent 返回嵌套 JSON 数组，支持多条播放线路（不同CDN/不同清晰度）：
+
+```json
+[
+  {
+    "name": "线路1",
+    "episodes": [
+      {"url": "https://cdn1.example.com/ep1.m3u8", "title": "第1集"},
+      {"url": "https://cdn1.example.com/ep2.m3u8", "title": "第2集"}
+    ]
+  },
+  {
+    "name": "线路2",
+    "episodes": [
+      {"url": "https://cdn2.example.com/ep1.m3u8", "title": "第1集"},
+      {"url": "https://cdn2.example.com/ep2.m3u8", "title": "第2集"}
+    ]
+  }
+]
+```
+
+JS 写法：
+```javascript
+<js>
+JSON.stringify([
+  {
+    name: '线路1',
+    episodes: [
+      {url: 'https://cdn1.example.com/ep1.m3u8', title: '第1集'},
+      {url: 'https://cdn1.example.com/ep2.m3u8', title: '第2集'}
+    ]
+  },
+  {
+    name: '线路2',
+    episodes: [
+      {url: 'https://cdn2.example.com/ep1.m3u8', title: '第1集'},
+      {url: 'https://cdn2.example.com/ep2.m3u8', title: '第2集'}
+    ]
+  }
+]);
+</js>
+```
+
+**线路对象字段定义**：
+
+| 字段 | 类型 | 必须 | 缺省值 | 说明 |
+|------|------|------|--------|------|
+| `name` | String | ❌ 可选 | "线路N" | 线路名称，显示在线路选择器 |
+| `episodes` | Array | ✅ 必须 | 无 | 集数列表，元素结构同格式③ |
+
+**判定条件**：JSON 数组的第一个元素包含 `episodes` 字段时，判定为多线路格式。
+
+**适用**：同一视频有多条播放线路（不同CDN/不同清晰度/备用源）。
+
+### ruleContent 为空时：R5 自动抓取
+
+当 `ruleContent` 为空且 `type=2` 时，系统自动从文章页面 HTML 中抓取视频链接：
+
+1. 请求文章页面 URL（`rssArticle.link`）
+2. 用五种方法自动提取视频 URL（按精确度优先级）：
+   - ① `<video>`/`<source>` 标签 src 属性（jsoup，最精确）
+   - ② OG/Meta 标签（`og:video`，开放图谱协议）
+   - ③ `<script>` 标签内 JSON 中的视频 URL（`"url":"...m3u8"`）
+   - ④ JS 变量赋值（`var url = "...m3u8"`）
+   - ⑤ 正则兜底匹配（`.m3u8`/`.mp4` 结尾的 URL）
+3. 播放器页面 URL 自动解析（如 `/player/?url=https%3A%2F%2F...m3u8`）
+4. 提取到多个 URL 时自动构建多集列表
+
+**适用**：视频 URL 嵌入在 HTML 中，无需手动编写提取规则。
+
+**限制**：无法提取需要 JS 运行时动态生成的 URL（需用 type=0 WebView 模式）。
+
+**代码实现**：`VideoUrlExtractor.kt` 的 `extract()` 方法。
+
+### 内置视频播放器功能清单
+
+| 功能 | 说明 |
+|------|------|
+| 抖音风格沉浸式布局 | 竖屏全屏播放，左下角标题+线路/集数选择器，右侧功能按钮列 |
+| 上下滑动切换文章 | 从订阅源文章列表进入后，上下滑动切换上一篇/下一篇文章视频 |
+| 分页加载 | 滑到最后一个文章时自动异步加载下一页文章列表 |
+| 预缓冲 | 当前视频播放到80%时后台预加载下一文章页面HTML |
+| 位置记忆 | 退出返回列表时自动滚动到正在看的文章位置 |
+| 3秒自动隐藏控件 | 控件显示后3秒无操作自动隐藏进入纯净播放态，单击屏幕重新显示 |
+| 缓冲进度条 | 底部进度条显示缓冲进度（灰色）+ 播放进度（白色） |
+| 倍速播放 | 1x/2x/3x/5x/10x/15x 六档可选 |
+| 快进快退 | 可配置时间（10/30/60/90/120秒，默认60秒） |
+| 多线路切换 | 左下角线路选择器（多线路时自动显示） |
+| 多集切换 | 左下角集数选择器（多集时自动显示） |
+| 调试面板 | 播放失败时显示错误码/原因/建议 |
+| 横屏全屏 | 支持横屏全屏播放，双指拉伸触发全屏 |
+
+### 兼容性保证
+
+1. **现有单 URL 订阅源无需修改**：自动走格式①（100%向后兼容）
+2. **格式判定优先级**：JSON数组（`[`开头）→ 多行URL（每行合法URL）→ 单URL
+3. **JSON 解析失败回退**：非合法JSON自动回退到多行URL或单URL模式
+4. **HTML含换行不会误判**：HTML标签不以 `http://`/`https://` 开头，不会误判为多行URL
+5. **相对路径自动拼接**：所有URL支持相对路径，自动拼接文章页面URL作为baseUrl
+6. **url 为空的对象被过滤**：JSON数组中 `url` 为空的集数会被自动过滤
+
+### 常见问题
+
+#### 问题1：内置播放器返回 404 错误（CDN 防盗链）
+
+**问题现象**：type=2 内置播放器（ExoPlayer）请求视频 URL 返回 HTTP 404，但同一 URL 在 type=0 WebView 模式（HLS.js 播放器）下可以正常播放。
+
+**根因**：CDN 防盗链验证失败。部分视频 CDN 会校验请求头中的 `Referer` 字段，若 Referer 不匹配文章页面域名则返回 404。内置播放器（ExoPlayer）默认不携带 Referer，而 WebView 模式下浏览器自动携带 Referer。
+
+**修复方案**（已实现，源码验证 2026-07-12）：
+
+系统自动注入 Header 解决防盗链问题，**源开发者无需处理**，但需了解以下机制：
+
+1. **ruleContent 不为空分支**（VideoPlay.kt L219）：
+   - Header 来自 `AnalyzeUrl(rssArticle.link).headerMap`
+   - 通过 `player.mapHeadData = analyzeUrl.headerMap` 传递给播放器
+   - ExoPlayerManager.initVideoPlayer 调用 `ExoPlayerHelper.setDefaultHeaders(headers)` 注入到 `okhttpDataFactory`
+
+2. **R5 自动抓取分支**（VideoPlay.kt L263-268）：
+   - 自动注入 `Referer = rssArticle.link`（文章页面 URL），模拟 WebView 行为
+   - 判断逻辑：`if (!playAnalyzeUrl.headerMap.any { it.key.equals("Referer", ignoreCase = true) })` 避免覆盖用户已配置的 Referer
+   - fallback URL 分支（L300-305）同样注入 Referer
+
+3. **Header 注入实现**（ExoPlayerManager.kt L60-64 → ExoPlayerHelper.kt L130-132）：
+   ```kotlin
+   // ExoPlayerManager.kt
+   model.getMapHeadData()?.takeIf { it.isNotEmpty() }?.let { headers ->
+       ExoPlayerHelper.setDefaultHeaders(headers)
+   }
+   // ExoPlayerHelper.kt
+   fun setDefaultHeaders(headers: Map<String, String>) {
+       okhttpDataFactory.setDefaultRequestProperties(headers)
+   }
+   ```
+
+**源开发者需知**：
+- 若视频 URL 需要特殊 Header（如自定义 UA/Cookie/Referer），在 RssSource 的 `header` 字段中配置，系统会自动注入
+- R5 自动抓取分支会自动注入 `Referer = 文章页面URL`，无需手动配置
+- 若仍遇 404，检查 CDN 是否校验其他 Header（如 Origin），在 `header` 字段中补充
+
+#### 问题2：singleUrl 模式不注入 Referer
+
+**现象**：singleUrl 模式（RssSource.singleUrl=true）下，内置播放器不自动注入 Referer。
+
+**原因**：YAGNI 原则。singleUrl 模式下 URL 本身就是视频地址，没有"文章页面 URL"作为 Referer 来源。`rssArticle.link` 在 singleUrl 模式下就是视频 URL 本身，用它作 Referer 无意义。
+
+**解决方案**：若 singleUrl 模式下视频 URL 需要防盗链 Header，在 RssSource 的 `header` 字段中手动配置 `Referer`。
+
+#### 问题3：自定义 Headers 配置方法
+
+**方法1：RssSource header 字段（推荐）**
+
+在 RssSource JSON 中配置 `header` 字段（JSON 字符串），系统自动注入到所有请求（包括内置播放器）：
+
+```json
+{
+  "header": "{\"Referer\":\"https://example.com/\",\"User-Agent\":\"Mozilla/5.0...\",\"Cookie\":\"session=xxx\"}"
+}
+```
+
+**方法2：ruleContent 中通过 AnalyzeUrl 传递**
+
+ruleContent 不为空时，系统通过 `AnalyzeUrl(rssArticle.link)` 解析 header，自动传递给播放器。AnalyzeUrl 会处理 URL 中的 Header 参数（如 `,{headers:{...}}` 后缀）。
+
+**方法3：ExoPlayerHelper "🚧" 编码（内部机制，源开发者不直接使用）**
+
+ExoPlayerHelper 内部有 `SPLIT_TAG = "🚧"`（U+1F6A7）编码方式：
+- `createMediaItem(url, headers)` 将 URL 和 headers JSON 拼接为 `url + "🚧" + GSON.toJson(headers)`
+- `resolvingDataSource` 拦截请求时拆分出真实 URL 和 headers
+
+⚠️ **注意**：Exo2MediaPlayer（type=2 使用的播放器）使用 no-op resolver `{ it }`，**不处理 "🚧" 编码**。实际 Header 注入通过 `setDefaultHeaders` 方法。此编码方式是 ExoPlayerHelper 的内部设计，源开发者不直接使用，了解即可。

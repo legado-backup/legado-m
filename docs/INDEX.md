@@ -122,6 +122,10 @@
 | [specs/source-layout-detail-refinement/](./specs/source-layout-detail-refinement/) | 书源/订阅源布局细节精修（D1标签+分组两模式 / D2按类型分组修复+返回键 / D3订阅源二级页还原列表 / D4搜索框 / D5视频缓存下拉选择 / D6倍速15x保留） ✅ 实施完成待文档同步 |
 | [specs/rss-video-player-enhancement/](./specs/rss-video-player-enhancement/) | 订阅源视频播放器增强（R1多集选择播放 + R2 m3u8播放失败调试日志 + R3学习旧订阅源布局 + R4日志异常优化 + R5自动抓取视频链接+Header修复404） 🔄 实施完成待用户实测（7.1/7.2/7.5/7.6 + 3.17 Bug修复 L2通过；7.3/7.4/7.7/7.8 需真实视频站点验证） |
 | [specs/douyin-style-video-player/](./specs/douyin-style-video-player/) | 抖音风格沉浸式竖屏视频播放器重设计（ViewPager2+Fragment架构 / 三种状态PURE/NORMAL/FULLSCREEN / 左下角标题+线路+集数 / 右侧快退/静音/收藏/倍速/设置/快进 / 横屏全屏+双指缩放 / 控件默认显示+双指左右滑动隐藏 / 综合设置面板BottomSheet） 🔄 实施完成待L2真机验证 |
+| [specs/video-article-swipe-switch/](./specs/video-article-swipe-switch/) | 视频播放器上下滑动切换文章（ViewPager2+Fragment+文章列表模式+分页加载+预缓冲+位置记忆） ✅ 实施完成（阶段1-8全部代码完成+L2验证通过） |
+| [specs/video-control-visibility-enhancement/](./specs/video-control-visibility-enhancement/) | 视频播放器控件显隐与缓冲条优化（F1缓冲进度条修复+secondaryProgress绑定 / F2控件3秒自动隐藏+单击切换+触摸事件根因修复OnTouchListener设到surface_container） ✅ 实施完成（L2真机验证通过） |
+| [specs/video-ui-dedup-layout-adjust/](./specs/video-ui-dedup-layout-adjust/) | 视频播放器 UI 去重与布局调整（移除右侧静音/倍速按钮避免与GSY底部控件重叠 + 左下角标题区和全屏按钮上移32dp避免遮挡GSY底部播放条 + VideoFragment.kt死代码清理） ✅ 实施完成（Phase 1-4全部完成+L2验证通过） |
+| [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（ExoPlayer HLS失败降级WebView + 播放器类型配置 + 加密解密失败容错 + ClassCastException类型容错 + 网络重试 + JSON格式容错） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |
