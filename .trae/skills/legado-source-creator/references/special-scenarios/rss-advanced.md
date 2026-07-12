@@ -224,7 +224,7 @@ function initPlayer(src){
     └── 自定义 → 分析JS源码，用java内置方法实现
 ```
 
-## 7.10 多集视频站（BookSource vs RssSource + HTML播放页）
+## 7.10 多集视频站（BookSource vs RssSource + HTML播放页 vs type=2 内置播放器）
 
 > 实战案例：acgfta.com（饭团动漫），详情页有多条播放线路，每条线路下有多集。
 
@@ -233,9 +233,52 @@ function initPlayer(src){
 | 方案 | 源类型 | 优点 | 缺点 |
 |------|--------|------|------|
 | **A. BookSource 目录规则** | BookSource | Legado 原生目录管理，翻页方便 | 每集需单独进入，无法在页面内切换 |
-| **B. RssSource + HTML播放页** | RssSource | 一个页面内选择所有集数，体验更好 | 需要组装 HTML，技术复杂度高 |
+| **B. RssSource + HTML播放页** | RssSource (type=0) | 一个页面内选择所有集数 | 需要组装 HTML，技术复杂度高 |
+| **C. RssSource + type=2 内置播放器（推荐）** | RssSource (type=2) | 原生 ExoPlayer 播放、上下滑动切换文章、3秒自动隐藏控件、JSON数组即多集、嵌套JSON即多线路 | 视频URL需可直接提取（非JS动态生成） |
 
-> **推荐方案B**：用 RssSource + ruleContent 组装 HTML 播放页面，用户在一个页面内选择集数播放。
+> **推荐方案C**：用 RssSource type=2 + ruleContent 返回 JSON 数组，内置播放器自动解析多集/多线路，无需组装 HTML，体验最佳。
+> 方案B 适用于需要自定义播放器界面的复杂场景（如 HLS.js + 自定义控件）。
+
+### 方案C 核心原理（type=2 内置播放器，推荐）
+
+ruleContent 返回 JSON 数组时，内置播放器（VideoPlay.kt）自动调用 `parseRssEpisodes()` 解析为多集列表，左下角集数选择器切换。返回嵌套 JSON 时调用 `parseRssRoutes()` 解析为多线路。
+
+**单线路多集（JSON 数组）**：
+```javascript
+<js>
+JSON.stringify([
+  {url: 'https://example.com/ep1.m3u8', title: '第1集'},
+  {url: 'https://example.com/ep2.m3u8', title: '第2集'},
+  {url: 'https://example.com/ep3.m3u8', title: '大结局'}
+]);
+</js>
+```
+
+**多线路多集（嵌套 JSON）**：
+```javascript
+<js>
+JSON.stringify([
+  {
+    name: '线路1',
+    episodes: [
+      {url: 'https://cdn1.example.com/ep1.m3u8', title: '第1集'},
+      {url: 'https://cdn1.example.com/ep2.m3u8', title: '第2集'}
+    ]
+  },
+  {
+    name: '线路2',
+    episodes: [
+      {url: 'https://cdn2.example.com/ep1.m3u8', title: '第1集'},
+      {url: 'https://cdn2.example.com/ep2.m3u8', title: '第2集'}
+    ]
+  }
+]);
+</js>
+```
+
+**ruleContent 为空时**：自动 R5 抓取（五种方法从 HTML 提取视频 URL），无需编写规则。
+
+> **完整编写指南**：字段定义、四种格式详解、兼容性保证详见 [video-audio.md](video-audio.md) 5.6 节
 
 ### 方案B 核心原理
 
@@ -344,17 +387,21 @@ if (eps.length == 0) {
 |------|----------|--------|-------------|----------|
 | **单视频型** | 机房哥(jfg) | RssSource | 详情页自定义属性 `playdata` | 无（`"-"`) |
 | **iframe嵌入型** | 18AV(mjv006) | RssSource | 详情页 iframe src | 无（`"-"`) |
-| **多集动漫型** | 饭团动漫(acgfta) | **BookSource** | 播放页 JS 变量 `player_aaaa.url` | **必须配置** |
+| **多集动漫型** | 饭团动漫(acgfta) | **RssSource type=2**（推荐）/ BookSource | 播放页 JS 变量 `player_aaaa.url` | type=2 无需目录规则，ruleContent 返回 JSON 数组 |
 
 **源类型选择决策树**：
 
 ```
 详情页是否有多个视频/集数？
-├── 否 → RssSource（type=2 视频）
+├── 否 → RssSource（type=2 视频，内置播放器）
 │   ├── 视频地址在自定义属性 → ruleContent: CSS选择器@属性
 │   ├── 视频地址在iframe → ruleContent: @js:正则提取
-│   └── 视频地址需JS渲染 → ruleContent: webJs模式
-└── 是 → BookSource（bookSourceType=3）
-    ├── 苹果CMS → chapterList: .episode a, content: @js:提取player_aaaa.url
-    └── 自定义 → chapterList: 分析HTML结构, content: 按需提取
+│   ├── 视频地址需JS渲染 → ruleContent: webJs模式
+│   └── 不确定/想省事 → ruleContent 留空（R5 自动抓取五种方法）
+└── 是 → 优先 RssSource type=2 内置播放器（JSON数组即多集，嵌套JSON即多线路）
+    ├── 视频URL可直接提取 → ruleContent: <js>JSON.stringify([{url,title}])</js>
+    ├── 多条播放线路 → ruleContent: <js>JSON.stringify([{name,episodes}])</js>
+    └── 视频URL需JS动态生成 → BookSource（bookSourceType=3）或 type=0 HTML播放页
 ```
+
+> **type=2 内置播放器优势**：原生 ExoPlayer 播放（无需 WebView）、上下滑动切换文章、3秒自动隐藏控件、JSON数组即多集、嵌套JSON即多线路、ruleContent为空自动R5抓取。完整指南见 [video-audio.md](video-audio.md) 5.6 节。

@@ -51,7 +51,7 @@
 |------|------|------|
 | [rule-syntax.md](./rule-syntax.md) | 规则语法 | 全部 |
 | [special-scenarios/rss-basic.md](./special-scenarios/rss-basic.md) | RSS基础 | 订阅源创建流程 |
-| [special-scenarios/rss-advanced.md](./special-scenarios/rss-advanced.md) | RSS高级 | HLS/iframe/多集视频 |
+| [special-scenarios/rss-advanced.md](./special-scenarios/rss-advanced.md) | RSS高级 | HLS/iframe/多集视频/方案C type=2 内置播放器决策树（7.10/7.11节） |
 | [examples.md](./examples.md) | 示例源分析 | 订阅源部分 |
 | [js-patterns/master-analysis.md](./js-patterns/master-analysis.md) | 订阅源JS技巧 | 第十三章 |
 
@@ -87,7 +87,7 @@
 | 新的登录/验证码方案 | special-scenarios/login.md 或 captcha.md | 登录和验证码处理方案 |
 | 新的加密认证**方案** | special-scenarios/encryption.md | 成功的加密/签名实现方案（陷阱归 troubleshooting） |
 | 新的加密图片**方案** | special-scenarios/encrypted-images.md | 成功的图片解密模板（陷阱归 troubleshooting） |
-| 新的视频/音频方案 | special-scenarios/video-audio.md | 播放地址提取和播放器配置 |
+| 新的视频/音频方案 | special-scenarios/video-audio.md | 播放地址提取、**type=2 内置播放器内容规则（5.6节）**、播放器配置 |
 | 新的反爬/CF**方案** | special-scenarios/anti-crawl.md | 主动绕过方案（诊断归 troubleshooting） |
 | 新的WebSocket/真机调试经验 | special-scenarios/websocket-debug.md | WebSocket调试协议、端口、陷阱 |
 | 新的批量校验/死源清理经验 | SKILL.md "能力边界"章节 + basic-memory | 批量校验模式、死源清理流程、前端一键清理 |

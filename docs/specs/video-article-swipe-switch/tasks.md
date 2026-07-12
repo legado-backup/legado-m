@@ -59,37 +59,37 @@
 
 #### 8.1 分页加载（F9）
 
-- [ ] 8.1.1 VideoPlay.kt 新增分页上下文字段：rssSortName/rssSortUrl/rssNextPageUrl/rssArticlePage/rssArticlesHasMore/isLoadingMoreArticles
-- [ ] 8.1.2 VideoPlay.kt 新增 loadMoreArticles() 方法（复用 Rss.getArticles 逻辑，追加到 rssArticles，postEvent 通知）
-- [ ] 8.1.3 EventBus.kt 新增 ARTICLES_LOADED 事件常量
-- [ ] 8.1.4 ReadRss.kt readRss 方法新增 sortName/sortUrl/nextPageUrl/page 参数，传递给 VideoPlay
-- [ ] 8.1.5 RssArticlesFragment.kt readRss 回调传递分页上下文（从 ViewModel 获取 sortName/nextPageUrl/page）
-- [ ] 8.1.6 VideoPlayerActivity.kt onPageSelected 检测到最后一个时触发 loadMoreArticles()
-- [ ] 8.1.7 VideoPlayerActivity.kt 新增 ARTICLES_LOADED 事件监听，调用 adapter.notifyItemRangeInserted
-- [ ] 8.1.8 VideoPlayerActivity.kt finish() 清理分页上下文字段
+- [x] 8.1.1 VideoPlay.kt 新增分页上下文字段：rssSortName/rssSortUrl/rssNextPageUrl/rssArticlePage/rssArticlesHasMore/isLoadingMoreArticles
+- [x] 8.1.2 VideoPlay.kt 新增 loadMoreArticles() 方法（复用 Rss.getArticles 逻辑，追加到 rssArticles，postEvent 通知）
+- [x] 8.1.3 EventBus.kt 新增 ARTICLES_LOADED 事件常量
+- [x] 8.1.4 ReadRss.kt readRss 方法新增 sortName/sortUrl/nextPageUrl/page 参数，传递给 VideoPlay
+- [x] 8.1.5 RssArticlesFragment.kt readRss 回调传递分页上下文（从 ViewModel 获取 sortName/nextPageUrl/page）
+- [x] 8.1.6 VideoPlayerActivity.kt onPageSelected 检测到最后一个时触发 loadMoreArticles()
+- [x] 8.1.7 VideoPlayerActivity.kt 新增 ARTICLES_LOADED 事件监听，调用 adapter.notifyItemRangeInserted
+- [x] 8.1.8 VideoPlayerActivity.kt finish() 清理分页上下文字段
 
 #### 8.2 预缓冲（F10）
 
-- [ ] 8.2.1 VideoPlay.kt 新增 preloadedVideoUrls/preloadedArticles 字段
-- [ ] 8.2.2 VideoPlay.kt 新增 preloadNextArticleVideo(currentIndex) 方法（R5 抓取或 ruleContent 解析）
-- [ ] 8.2.3 VideoPlay.kt 新增 getCachedVideoUrl(articleLink) 方法
-- [ ] 8.2.4 VideoPlay.kt 新增 clearPreloadCache() 方法
-- [ ] 8.2.5 VideoPlay.kt switchToArticle 方法添加缓存检查（有缓存直接使用，无缓存走现有逻辑）
-- [ ] 8.2.6 VideoFragment.kt 新增进度监听 Coroutine（每5秒轮询，进度超80%触发预缓冲）
-- [ ] 8.2.7 VideoFragment.kt onPrepared 回调中启动进度监听
-- [ ] 8.2.8 VideoFragment.kt onDestroyView 中取消进度监听
-- [ ] 8.2.9 VideoPlayerActivity.kt finish() 调用 clearPreloadCache()
+- [x] 8.2.1 VideoPlay.kt 新增 preloadedHtmls/preloadedArticles 字段（**设计变更**：preloadedVideoUrls→preloadedHtmls，缓存HTML更高效）
+- [x] 8.2.2 VideoPlay.kt 新增 preloadNextArticleHtml(currentIndex) 方法（**设计变更**：方法名变更，缓存HTML而非视频URL）
+- [x] 8.2.3 ~~VideoPlay.kt 新增 getCachedVideoUrl(articleLink) 方法~~（**设计变更**：不需要单独方法，缓存在 startPlay R5分支直接检查）
+- [x] 8.2.4 VideoPlay.kt 新增 clearPreloadCache() 方法
+- [x] 8.2.5 VideoPlay.kt startPlay R5分支添加缓存检查（**设计变更**：从 switchToArticle 改为 startPlay R5分支，只需修改一处）
+- [x] 8.2.6 VideoFragment.kt 新增进度监听 Handler（**设计变更**：Coroutine→Handler，更简洁不需要额外import）
+- [x] 8.2.7 VideoFragment.kt onPrepared 回调中启动进度监听
+- [x] 8.2.8 VideoFragment.kt onDestroyView + deactivatePlayer 中取消进度监听
+- [x] 8.2.9 VideoPlayerActivity.kt finish() 调用 clearPreloadCache()
 
 #### 8.3 位置记忆（F11）
 
-- [ ] 8.3.1 VideoPlay.kt 新增 lastPlayedArticleLink 字段
-- [ ] 8.3.2 VideoPlayerActivity.kt finish() 保存当前文章 link 到 lastPlayedArticleLink
-- [ ] 8.3.3 RssArticlesFragment.kt onResume() 检查 lastPlayedArticleLink 并滚动到对应位置
-- [ ] 8.3.4 RssArticlesFragment.kt 滚动后清除 lastPlayedArticleLink（一次性标记）
+- [x] 8.3.1 VideoPlay.kt 新增 lastPlayedArticleLink 字段
+- [x] 8.3.2 VideoPlayerActivity.kt finish() 保存当前文章 link 到 lastPlayedArticleLink
+- [x] 8.3.3 RssArticlesFragment.kt onResume() 检查 lastPlayedArticleLink 并滚动到对应位置
+- [x] 8.3.4 RssArticlesFragment.kt 滚动后清除 lastPlayedArticleLink（一次性标记）
 
 #### 8.4 编译验证 + 真机测试
 
-- [ ] 8.4.1 编译验证（`.gradlew.bat assembleDebug`）BUILD SUCCESSFUL
+- [x] 8.4.1 编译验证（`.\gradlew.bat assembleDebug`）BUILD SUCCESSFUL in 3m 32s（2026-07-11）
 - [ ] 8.4.2 APK 安装到 MEmu 模拟器
 - [ ] 8.4.3 L1 验证：App 正常启动无崩溃
 - [ ] 8.4.4 L2 验证：分页加载（滑到最后一个文章触发加载下一页，新文章可继续滑动）
@@ -138,6 +138,26 @@
 - 修复：添加从 rssArticles 列表获取的兜底 `?: rssArticles?.getOrNull(rssArticleIndex)`
 - 影响范围：startPlay 第213行 + playRssEpisode 第784行，两处都已修复
 - 设计合理性：rssStar/rssRecord 优先（可能包含更完整信息），rssArticles 列表兜底（基本信息足够播放视频）
+
+### 2026-07-11 阶段8实施（分页加载 + 预缓冲 + 位置记忆）
+
+**偏差6：预缓冲方案设计变更（preloadedVideoUrls → preloadedHtmls）**
+- 原设计：缓存视频URL（preloadedVideoUrls: MutableMap<String, String>），需要修改 switchToArticle 方法添加缓存检查
+- 问题：switchToArticle 调用 startPlay，startPlay 的 R5 分支会重新抓取 HTML 并提取视频URL。如果缓存视频URL，还需要修改 switchToArticle 跳过 startPlay 的 R5 分支，逻辑复杂且与 startPlay 重复
+- 变更：改为缓存页面HTML（preloadedHtmls: MutableMap<String, String>），只需在 startPlay 的 R5 分支检查缓存HTML，跳过 `pageAnalyzeUrl.getStrResponseAwait()` 网络请求
+- 优势：改动最小（只修改 startPlay 一处），跳过最大的延迟部分（网络请求），VideoUrlExtractor.extract 仍需执行但耗时极低
+- ADR-8 记录：只预加载页面 HTML（轻量级），不预缓冲完整视频流（避免多播放器实例管理复杂度）
+
+**偏差7：预缓冲进度监听从 Coroutine 改为 Handler**
+- 原设计：VideoFragment.kt 新增进度监听 Coroutine（每5秒轮询）
+- 问题：Coroutine 需要额外 import（Job/delay/launch/isActive/lifecycleScope），增加代码复杂度
+- 变更：改为 Handler + Runnable 实现，只需 import android.os.Handler 和 android.os.Looper
+- 优势：更简洁，不需要额外的协程依赖，Handler 在主线程运行可安全访问 GSY 播放器进度
+
+**偏差8：getCachedVideoUrl 方法取消（设计冗余）**
+- 原设计：单独新增 getCachedVideoUrl(articleLink) 方法用于查询缓存
+- 问题：缓存在 startPlay R5 分支直接检查更简洁，不需要单独方法
+- 变更：取消 getCachedVideoUrl 方法，缓存在 startPlay R5 分支用 `preloadedHtmls[rssArticle.link]` 直接检查
 
 ---
 

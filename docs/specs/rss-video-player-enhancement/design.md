@@ -180,6 +180,36 @@ data class RssEpisode(
 - XPath 简写（模式②）：`//source/@src`
 - JS 完整（模式③）：`<js>JSON.stringify([{url:...,title:...}])</js>`
 
+#### 1.5.1 R3 多线路格式（嵌套 JSON）
+
+ruleContent 返回嵌套 JSON 数组时，解析为多线路列表：
+
+```json
+[{"name":"线路1","episodes":[{"title":"第1集","url":"..."}]}]
+```
+
+| 字段 | 类型 | 必须 | 缺省值 | 说明 |
+|------|------|------|--------|------|
+| `name` | String | ❌ 可选 | "线路N" | 线路名称 |
+| `episodes` | Array | ✅ 必须 | 无 | 集数列表，元素结构同 1.5 节格式③ |
+
+**判定条件**：JSON 数组第一个元素包含 `episodes` 字段 → 多线路格式；否则 → 扁平 JSON（单线路）。
+
+**兼容性**：扁平 JSON/多行 URL/单 URL 自动包装为单线路 `List<RssRoute>`，现有订阅源无需修改。
+
+#### 1.5.2 R5 自动抓取（ruleContent 为空时）
+
+当 `ruleContent` 为空且 `type=2` 时，系统自动从文章页面 HTML 抓取视频链接（`VideoUrlExtractor.extract()`）：
+
+1. 请求文章页面 URL（`rssArticle.link`）
+2. 五种方法按精确度优先提取：① video/source 标签 → ② OG/Meta → ③ script JSON → ④ JS 变量 → ⑤ 正则兜底
+3. 播放器页面 URL 自动解析（`/player/?url=...m3u8` → 实际视频流 URL）
+4. 多个 URL → 自动构建多集列表
+
+**限制**：无法提取需 JS 运行时动态生成的 URL（需用 type=0 WebView 模式）。
+
+> **完整编写指南**：[.trae/skills/legado-source-creator/references/special-scenarios/video-audio.md](../../../../.trae/skills/legado-source-creator/references/special-scenarios/video-audio.md) 5.6 节
+
 ### R2 m3u8 播放失败分析+调试日志
 
 #### 2.1 错误回调链

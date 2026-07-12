@@ -60,13 +60,17 @@ VideoPlayerActivity 修改：
 
 **内容规则编写指南**（用户核心诉求：明确 ruleContent 写法 + 编写便捷性 + 兼容性）：
 
-订阅源 type=2（视频）时，ruleContent 规则返回的内容支持三种格式（向后兼容）：
+订阅源 type=2（视频）时，ruleContent 规则返回的内容支持四种格式（向后兼容）：
 
 | 模式 | ruleContent 返回值 | 多集支持 | 编写方式 |
 |------|-------------------|---------|---------|
 | ① 单 URL（现有兼容） | 单个 URL 字符串 | ❌ 单集 | CSS/XPath/JSONPath/正则/JS 任选，返回单个 URL |
 | ② 多行 URL（简写多集） | 多行 URL（每行 http/https 开头） | ✅ 自动多集 | 规则返回多个 URL，用 `\n` 分隔 |
 | ③ JSON 数组（完整多集） | `[{"url":"...","title":"..."}]` | ✅ 带标题多集 | JS 规则返回 JSON 数组对象 |
+| ④ 嵌套 JSON（多线路多集，R3 新增） | `[{"name":"线路1","episodes":[...]}]` | ✅ 多线路+多集 | JS 规则返回嵌套 JSON 数组 |
+
+> **模式④ R3 多线路格式**：JSON 数组首元素含 `episodes` 字段时判定为多线路格式，解析为 `List<RssRoute>`。详见 [design.md 1.5.1 节](./design.md#151-r3-多线路格式嵌套-json)。
+> **完整编写指南**（含 type=2 vs type=0 对比、四种格式详解、R5 自动抓取、功能清单、兼容性保证）：[video-audio.md 5.6 节](../../../.trae/skills/legado-source-creator/references/special-scenarios/video-audio.md)
 
 **JSON 数组对象结构定义**（模式③，JS 编写场景，用户核心诉求 F4/F5/F6）：
 
