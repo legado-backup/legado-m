@@ -503,10 +503,17 @@ def scenario_error_patterns(device):
     - P1-A: ClassCastException / cannot be cast（ImageUtils类型容错）
     - P2-A: IllegalBlockSizeException / DATA_NOT_MULTIPLE（图片解密长度校验）
 
+    新增验证（071317版本修复点）：
+    - P1-A-new: FileUriExposedException（系统浏览器打开file://崩溃）
+    - P1-B-new: UnrecognizedInputFormatException + .mpd（MPD误判）
+    - P2-A-new: 图片解密错误 + CancellationException（协程取消误报）
+    - P2-C: PROTOCOL_ERROR / StreamReset（HTTP/2协议错误）
+    - P2-B: ECONNREFUSED + 127.0.0.1（DNS劫持到本地地址）
+
     验证方法：清空logcat → 播放视频20秒 → 滑动切换文章 → 抓取logcat → 检查错误模式
     """
-    print("\n=== 场景8: 错误模式验证（4个修复点）===")
-    print("  检查 P2(Malformed URL) / P1-C(destroy failed) / P1-A(ClassCastException) / P2-A(IllegalBlockSize)")
+    print("\n=== 场景8: 错误模式验证（9个修复点）===")
+    print("  检查 旧4项(Malformed/destroy/ClassCast/IllegalBlockSize) + 新5项(FileUri/MPD/Cancellation/PROTOCOL_ERROR/ECONNREFUSED)")
 
     # 清空logcat
     run_adb("logcat -c")
@@ -525,12 +532,17 @@ def scenario_error_patterns(device):
     result = run_adb("logcat -d")
     log = result.stdout
 
-    # 定义4个错误模式
+    # 定义错误模式（旧4项 + 新5项）
     error_patterns = {
         "P2 Malformed URL": ["Malformed", "HttpDataSourceException"],
         "P1-C destroy failed": ["destroy failed", "WebView method", "another thread"],
         "P1-A ClassCastException": ["ClassCastException", "cannot be cast"],
         "P2-A IllegalBlockSize": ["IllegalBlockSize", "DATA_NOT_MULTIPLE"],
+        # 071317新增修复点
+        "P1-B FileUriExposed": ["FileUriExposedException"],
+        "P1-A-new MPD误判": ["UnrecognizedInputFormatException"],  # .mpd误判导致ExoPlayer解析失败
+        "P2-C HTTP/2协议错误": ["PROTOCOL_ERROR", "StreamReset"],
+        "P2-B DNS劫持本地": ["ECONNREFUSED"],  # 127.0.0.1连接拒绝
     }
 
     all_pass = True
@@ -545,6 +557,17 @@ def scenario_error_patterns(device):
             all_pass = False
         else:
             print(f"  ✅ {name}: 0错误")
+
+    # P2-A-new: 图片解密错误中不应包含 CancellationException（协程取消误报修复验证）
+    decrypt_cancel_lines = [l for l in log.splitlines()
+                            if "解密错误" in l and ("CancellationException" in l or "JobCancellationException" in l)]
+    if decrypt_cancel_lines:
+        print(f"  ❌ P2-A-new 协程取消误报: {len(decrypt_cancel_lines)}个")
+        for e in decrypt_cancel_lines[:2]:
+            print(f"     {e[:120]}")
+        all_pass = False
+    else:
+        print(f"  ✅ P2-A-new 协程取消误报: 0")
 
     # 检查FATAL EXCEPTION
     fatal = [l for l in log.splitlines() if "FATAL" in l]
