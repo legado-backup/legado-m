@@ -18,6 +18,9 @@
 | 2. 导入订阅源 | `import_rss_source.py` | 从JSON导入订阅源到legado.db（含WAL模式处理） | `python ai_tests/scripts/import_rss_source.py <json_path>` |
 | 3. L2验证视频播放器 | `l2_verify_video_player.py` | 视频播放器L2功能验证（导航+错误模式分析） | `python ai_tests/scripts/l2_verify_video_player.py` |
 | 4. SwipeTest日志分析 | `swipe_test_log.py` | SwipeTest日志抓取分析（仅临时日志验证时用） | `python ai_tests/scripts/swipe_test_log.py [clear\|capture\|analyze]` |
+| 5. 修复点覆盖度分析 | `fix_coverage_check.py` | 检查每个修复点的正向日志是否触发（10个修复点） | `python ai_tests/scripts/fix_coverage_check.py` |
+| 6. 批量源遍历 | `batch_source_test.py` | 自动遍历多个RSS源检测修复点触发（全程脱敏） | `python ai_tests/scripts/batch_source_test.py [起始编号] [结束编号]` |
+| 7. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
 
 ### ⚠️ 重要：Room WAL 模式（2026-07-13 新增）
 
