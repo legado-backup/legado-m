@@ -39,26 +39,40 @@ def run_adb(cmd, timeout=30):
 
 
 def pull_db(tmp_path):
-    """从设备pull legado.db"""
-    print("\n--- Pull legado.db ---")
+    """从设备pull legado.db（含WAL/SHM文件）
+
+    重要：Room使用WAL模式，必须同时pull .db-wal/.db-shm文件。
+    如果只pull主.db文件，WAL中的旧状态会在App启动时覆盖导入的新数据。
+    详见 project_memory.md "Room WAL模式DB导入" 教训。
+    """
+    print("\n--- Pull legado.db (含WAL/SHM) ---")
     # 确保 databases 目录存在
     run_adb(f"shell su -c 'mkdir -p {DB_DIR}'")
-    # 复制 db 到可访问路径
+    # 复制 db 及 WAL/SHM 到可访问路径
     run_adb(f"shell su -c 'cp {DB_DEVICE_PATH} /sdcard/legado.db'")
     run_adb(f"shell su -c 'chmod 666 /sdcard/legado.db'")
-    # pull
+    # WAL/SHM文件可能不存在（已checkpoint时），忽略错误
+    run_adb(f"shell su -c 'cp {DB_DEVICE_PATH}-wal /sdcard/legado.db-wal 2>/dev/null; chmod 666 /sdcard/legado.db-wal 2>/dev/null; true'")
+    run_adb(f"shell su -c 'cp {DB_DEVICE_PATH}-shm /sdcard/legado.db-shm 2>/dev/null; chmod 666 /sdcard/legado.db-shm 2>/dev/null; true'")
+    # pull 主DB
     result = run_adb(f"pull /sdcard/legado.db {tmp_path}")
-    if result.returncode == 0:
-        print(f"✅ DB pulled to {tmp_path}")
-        return True
-    else:
-        print(f"❌ Pull失败: {result.stderr}")
+    if result.returncode != 0:
+        print(f"❌ Pull主DB失败: {result.stderr}")
         return False
+    # pull WAL/SHM（可能不存在，忽略失败）
+    run_adb(f"pull /sdcard/legado.db-wal {tmp_path}-wal")
+    run_adb(f"pull /sdcard/legado.db-shm {tmp_path}-shm")
+    print(f"✅ DB pulled to {tmp_path} (含WAL/SHM)")
+    return True
 
 
 def push_db(tmp_path):
-    """Push legado.db回设备"""
-    print("\n--- Push legado.db ---")
+    """Push legado.db回设备，并删除设备端WAL/SHM文件
+
+    重要：必须删除设备端的.db-wal/.db-shm文件，否则App启动时Room会加载
+    旧WAL数据覆盖新导入的数据。
+    """
+    print("\n--- Push legado.db (清理WAL/SHM) ---")
     # push
     result = run_adb(f"push {tmp_path} /sdcard/legado.db")
     if result.returncode != 0:
@@ -67,7 +81,9 @@ def push_db(tmp_path):
     # 复制回原位置
     run_adb(f"shell su -c 'cp /sdcard/legado.db {DB_DEVICE_PATH}'")
     run_adb(f"shell su -c 'chmod 660 {DB_DEVICE_PATH}'")
-    print(f"✅ DB pushed back")
+    # 删除设备端WAL/SHM文件（关键！否则旧WAL覆盖新数据）
+    run_adb(f"shell su -c 'rm -f {DB_DEVICE_PATH}-wal {DB_DEVICE_PATH}-shm'")
+    print(f"✅ DB pushed back (WAL/SHM已清理)")
     return True
 
 
@@ -84,9 +100,14 @@ def import_rss(json_path, db_path):
 
     print(f"  JSON包含 {len(sources)} 个订阅源")
 
-    # 连接数据库
+    # 连接数据库（WAL文件在同目录时sqlite3会自动加载）
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+
+    # 关键：checkpoint WAL合并到主DB，避免WAL旧状态覆盖新数据
+    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    checkpoint_result = cursor.fetchone()
+    print(f"  WAL checkpoint: {checkpoint_result}")
 
     # 获取 rssSources 表结构
     cursor.execute("PRAGMA table_info(rssSources)")
@@ -116,6 +137,11 @@ def import_rss(json_path, db_path):
         print(f"  ✅ 导入: {source_name} | {source_url}")
 
     conn.commit()
+
+    # 最终checkpoint：确保导入的数据写入主DB文件（而非留在新WAL中）
+    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    print(f"  Final WAL checkpoint: {cursor.fetchone()}")
+
     conn.close()
     print(f"  共导入 {imported} 个订阅源")
     return imported
@@ -160,9 +186,11 @@ def main():
         print("=" * 60)
 
     finally:
-        # 清理临时文件
-        if os.path.exists(tmp_db_path):
-            os.unlink(tmp_db_path)
+        # 清理临时文件（含WAL/SHM）
+        for suffix in ['', '-wal', '-shm']:
+            path = tmp_db_path + suffix
+            if os.path.exists(path):
+                os.unlink(path)
 
 
 if __name__ == "__main__":
