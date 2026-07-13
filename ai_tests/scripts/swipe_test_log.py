@@ -38,6 +38,7 @@ LOG_TMP_PATH = Path(__file__).parent.parent / "tmp_swipetest_log.txt"
 
 # 关键路径模式（用于 analyze）
 KEY_PATTERNS = {
+    # SwipeTest 关键路径（rss-video-player-enhancement）
     "onPageSelected": r"onPageSelected.*position=(\d+)",
     "activatePlayer": r"activatePlayer.*articleIndex=(\d+)",
     "switchToArticle": r"switchToArticle.*index=(\d+)",
@@ -48,6 +49,12 @@ KEY_PATTERNS = {
     "clearPreloadCache": r"clearPreloadCache",
     "finish_save_link": r"finish.*saveLink=(\S+)",
     "onResume_scroll": r"onResume.*scrollTo=(\d+)",
+    # VideoGesture 关键路径（video-gesture-overhaul 手势交互重构）
+    "vg_onLongPress": r"onLongPress triggered.*speed=([\d.]+)",
+    "vg_onDoubleTap": r"onDoubleTap triggered.*state=(\d+)",
+    "vg_slideSeekStarted": r"slideSeek started.*dx=([\d.-]+)",
+    "vg_slideSeekReleased": r"slideSeek released.*target=(\d+)ms",
+    "vg_longPressReleased": r"longPressSpeed released.*restored to ([\d.]+)",
 }
 
 
@@ -69,9 +76,9 @@ def clear_logcat():
 
 
 def capture_log():
-    """抓取SwipeTest标签日志"""
-    print("=== 抓取 SwipeTest 日志 ===")
-    result = run_adb('logcat -d -s SwipeTest:D')
+    """抓取SwipeTest + VideoGesture标签日志"""
+    print("=== 抓取 SwipeTest + VideoGesture 日志 ===")
+    result = run_adb('logcat -d -s SwipeTest:D VideoGesture:D')
 
     if result.returncode != 0:
         print(f"❌ 抓取失败: {result.stderr}")
@@ -82,7 +89,9 @@ def capture_log():
     # 保存到临时文件
     LOG_TMP_PATH.write_text(log_content, encoding='utf-8')
     print(f"✅ 日志已保存到 {LOG_TMP_PATH}")
-    print(f"   SwipeTest 日志行数: {len([l for l in log_content.split(chr(10)) if 'SwipeTest' in l])}")
+    swipe_count = len([l for l in log_content.split(chr(10)) if 'SwipeTest' in l])
+    gesture_count = len([l for l in log_content.split(chr(10)) if 'VideoGesture' in l])
+    print(f"   SwipeTest 日志行数: {swipe_count}, VideoGesture 日志行数: {gesture_count}")
 
     # 输出前20行预览
     lines = [l for l in log_content.split('\n') if l.strip()]
@@ -91,7 +100,7 @@ def capture_log():
         for line in lines[:20]:
             print(f"  {line.strip()}")
     else:
-        print("⚠️ 未捕获到 SwipeTest 日志（确认App中已添加 Log.d(\"SwipeTest\", ...)）")
+        print("⚠️ 未捕获到日志（确认App中已添加 Log.d(\"SwipeTest\", ...) 或 Log.d(\"VideoGesture\", ...)）")
 
 
 def analyze_log():
@@ -121,23 +130,34 @@ def analyze_log():
 
     # 输出时序摘要
     print("\n--- 时序摘要 ---")
-    lines = [l for l in log_content.split('\n') if 'SwipeTest' in l]
+    lines = [l for l in log_content.split('\n') if 'SwipeTest' in l or 'VideoGesture' in l]
     for line in lines:
-        # 提取时间和消息
-        parts = line.split('SwipeTest')
-        if len(parts) >= 2:
-            msg = parts[1].strip().lstrip(':').strip()
-            print(f"  {msg[:100]}")
+        # 提取时间和消息（支持 SwipeTest 和 VideoGesture 两种 tag）
+        for tag in ['SwipeTest', 'VideoGesture']:
+            if tag in line:
+                parts = line.split(tag)
+                if len(parts) >= 2:
+                    msg = parts[1].strip().lstrip(':').strip()
+                    print(f"  [{tag}] {msg[:100]}")
+                break
 
     # 判定结果
     print("\n--- 判定结果 ---")
+    # SwipeTest 关键路径（rss-video-player-enhancement）
     critical_paths = ["onPageSelected", "activatePlayer"]
     all_critical = all(p in found_paths for p in critical_paths)
     if all_critical:
-        print("✅ 关键路径已触发（onPageSelected + activatePlayer）")
+        print("✅ SwipeTest 关键路径已触发（onPageSelected + activatePlayer）")
     else:
         missing = [p for p in critical_paths if p not in found_paths]
-        print(f"⚠️ 缺失关键路径: {missing}")
+        print(f"⚠️ SwipeTest 缺失关键路径: {missing}")
+    # VideoGesture 关键路径（video-gesture-overhaul）
+    vg_paths = ["vg_onLongPress", "vg_slideSeekReleased", "vg_longPressReleased"]
+    vg_found = [p for p in vg_paths if p in found_paths]
+    if vg_found:
+        print(f"✅ VideoGesture 路径已触发: {vg_found}")
+    else:
+        print("ℹ️ VideoGesture 路径未触发（需执行手势操作：长按/左右滑动/双击）")
 
     return found_paths
 

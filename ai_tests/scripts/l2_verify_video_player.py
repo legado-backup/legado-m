@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 r"""l2_verify_video_player.py — 视频播放器L2功能验证
 
-固定测试流程步骤3：导航到视频播放器 + 执行场景操作 + SwipeTest日志验证
+固定测试流程步骤3：导航到视频播放器 + 执行场景操作 + 日志验证
 
 用法：
     ai_tests\venv\Scripts\python.exe ai_tests/scripts/l2_verify_video_player.py [--scenario SCENARIO] [--manual]
 
 场景：
-    swipe_article       - 上下滑动切换文章
-    pagination          - 分页加载（滑到最后一个触发加载下一页）
-    preload             - 预缓冲（视频播放到80%触发预加载）
-    position_memory     - 位置记忆（退出返回列表自动滚动）
-    backward_compat     - 向后兼容（无 rssArticles 时不触发新功能）
-    buffer_progress     - 缓冲进度条更新（F1：secondaryProgress 更新验证）
-    control_visibility  - 控件自动隐藏（F2：3秒后自动隐藏验证）
+    swipe_article       - 上下滑动切换文章（⚠️依赖已移除的SwipeTest临时日志，可能全部未触发）
+    pagination          - 分页加载（⚠️同上）
+    preload             - 预缓冲（⚠️同上）
+    position_memory     - 位置记忆（⚠️同上）
+    backward_compat     - 向后兼容
+    buffer_progress     - 缓冲进度条更新（⚠️依赖已移除的F1临时日志）
+    control_visibility  - 控件自动隐藏（⚠️依赖已移除的F2临时日志）
+    error_patterns      - ★推荐★ 错误模式验证（永久日志，验证4个修复点0错误）
     all                 - 全部场景（默认）
+
+注意：
+    swipe_article/pagination/preload/position_memory/buffer_progress/control_visibility
+    场景依赖SwipeTest/F1/F2临时日志，这些日志已在任务#69/#77/#109中移除。
+    这些场景会显示"未触发"是预期行为，非代码问题。
+    推荐使用 error_patterns 场景验证修复点：检查Malformed URL/destroy failed/
+    ClassCastException/IllegalBlockSizeException四种错误模式是否为0。
 
 模式：
     自动模式（默认）：脚本自动启动App并导航到视频播放器
@@ -128,36 +136,69 @@ def navigate_to_video_player(device):
     if device:
         print("  尝试通过 uiautomator2 导航...")
         try:
-            # 查找并点击订阅源Tab（底部导航栏）
-            rss_tab = device(text="订阅源")
+            # 查找并点击订阅Tab（底部导航栏）
+            # 修复：实际Tab content-desc="订阅" resourceId=menu_rss，非text="订阅源"
+            rss_tab = device(resourceId="io.legado.app.debug:id/menu_rss")
             if rss_tab.exists:
                 rss_tab.click()
                 time.sleep(2)
-                print("  已点击订阅源Tab")
+                print("  已点击订阅Tab (menu_rss)")
             else:
-                print("  ⚠️ 未找到订阅源Tab，尝试从书架切换...")
-                # 尝试通过底部导航栏的第2个Tab
-                tabs = device(className="android.widget.TabWidget")
-                if tabs.exists:
-                    children = tabs.child(className="android.widget.TextView")
-                    if len(children) >= 2:
-                        children[1].click()
-                        time.sleep(2)
+                print("  ⚠️ 未找到订阅Tab，导航失败")
+                return False
 
-            # 查找视频类型的订阅源（含视频图标或视频标签的项）
-            # 这里简化处理：点击第一个订阅源
-            source_item = device(className="androidx.recyclerview.widget.RecyclerView").child(index=0)
-            if source_item.exists:
-                source_item.click()
-                time.sleep(3)
-                print("  已点击订阅源")
+            # 查找视频类型的订阅源（优先找已知视频源名称）
+            video_source_names = [
+                "奈飞中文网--内置视频播放器",
+                "18AV-new-内置播放器",
+            ]
+            source_clicked = False
+            for name in video_source_names:
+                src = device(text=name)
+                if src.exists:
+                    src.click()
+                    time.sleep(3)
+                    print(f"  已点击视频源: {name}")
+                    source_clicked = True
+                    break
+            if not source_clicked:
+                # 回退：点击第一个订阅源
+                source_item = device(resourceId="io.legado.app.debug:id/recycler_view").child(index=0)
+                if source_item.exists:
+                    source_item.click()
+                    time.sleep(3)
+                    print("  已点击第一个订阅源（回退）")
+                    source_clicked = True
+            if not source_clicked:
+                print("  ⚠️ 未找到可点击的订阅源")
+                return False
+
+            # 进入分类页后，点击第一个分类
+            time.sleep(3)
+            # 查找分类（排除footer文本如"我是有底线的"）
+            categories = ["电影", "剧集", "综艺", "动漫", "无码破解", "最新"]
+            cat_clicked = False
+            for cat_name in categories:
+                cat = device(text=cat_name)
+                if cat.exists:
+                    cat.click()
+                    time.sleep(8)  # 等待文章列表加载
+                    print(f"  已点击分类: {cat_name}")
+                    cat_clicked = True
+                    break
+            if not cat_clicked:
+                print("  ⚠️ 未找到分类，可能已在文章列表")
+                cat_clicked = True  # 可能直接进入了文章列表
 
             # 在文章列表中点击第一篇文章
-            article = device(className="androidx.recyclerview.widget.RecyclerView").child(index=0)
-            if article.exists:
-                article.click()
-                time.sleep(5)
-                print("  已点击文章")
+            time.sleep(2)
+            rv = device(resourceId="io.legado.app.debug:id/recycler_view")
+            if rv.exists:
+                articles = rv.child(className="android.view.ViewGroup", clickable="true")
+                if articles.count > 0:
+                    articles[0].click()
+                    time.sleep(10)  # 等待视频播放器加载（含WebView嗅探m3u8）
+                    print("  已点击第一篇文章")
 
             # 检查是否进入视频播放器
             result = run_adb("shell dumpsys activity activities | findstr mResumedActivity")
@@ -453,15 +494,93 @@ def scenario_control_visibility(device):
         return False
 
 
+def scenario_error_patterns(device):
+    """场景8: 错误模式验证（永久日志，替代已移除的SwipeTest临时日志）
+
+    验证4个已修复的错误模式不再出现：
+    - P2: Malformed URL / HttpDataSourceException（ExoPlayer file://协议）
+    - P1-C: destroy failed / WebView method on another thread（WebViewPool线程安全）
+    - P1-A: ClassCastException / cannot be cast（ImageUtils类型容错）
+    - P2-A: IllegalBlockSizeException / DATA_NOT_MULTIPLE（图片解密长度校验）
+
+    验证方法：清空logcat → 播放视频20秒 → 滑动切换文章 → 抓取logcat → 检查错误模式
+    """
+    print("\n=== 场景8: 错误模式验证（4个修复点）===")
+    print("  检查 P2(Malformed URL) / P1-C(destroy failed) / P1-A(ClassCastException) / P2-A(IllegalBlockSize)")
+
+    # 清空logcat
+    run_adb("logcat -c")
+    print("  等待视频播放20秒...")
+
+    # 等待视频播放
+    time.sleep(20)
+
+    # 滑动切换文章（触发新的视频加载和图片加载）
+    if device:
+        print("  滑动切换文章...")
+        device.swipe(360, 600, 360, 300, 1.0)
+        time.sleep(8)
+
+    # 抓取logcat
+    result = run_adb("logcat -d")
+    log = result.stdout
+
+    # 定义4个错误模式
+    error_patterns = {
+        "P2 Malformed URL": ["Malformed", "HttpDataSourceException"],
+        "P1-C destroy failed": ["destroy failed", "WebView method", "another thread"],
+        "P1-A ClassCastException": ["ClassCastException", "cannot be cast"],
+        "P2-A IllegalBlockSize": ["IllegalBlockSize", "DATA_NOT_MULTIPLE"],
+    }
+
+    all_pass = True
+    for name, patterns in error_patterns.items():
+        errors = []
+        for pattern in patterns:
+            errors.extend([l for l in log.splitlines() if pattern in l])
+        if errors:
+            print(f"  ❌ {name}: {len(errors)}个错误")
+            for e in errors[:2]:
+                print(f"     {e[:120]}")
+            all_pass = False
+        else:
+            print(f"  ✅ {name}: 0错误")
+
+    # 检查FATAL EXCEPTION
+    fatal = [l for l in log.splitlines() if "FATAL" in l]
+    if fatal:
+        print(f"  ❌ FATAL EXCEPTION: {len(fatal)}个")
+        for f in fatal[:3]:
+            print(f"     {f[:120]}")
+        all_pass = False
+    else:
+        print(f"  ✅ FATAL EXCEPTION: 0")
+
+    # 检查ExoPlayer是否在播放（EventLogger loading事件）
+    loading_events = [l for l in log.splitlines() if "EventLogger" in l and "loading" in l]
+    if loading_events:
+        print(f"  ✅ ExoPlayer播放活跃: {len(loading_events)}个loading事件")
+    else:
+        print(f"  ⚠️ ExoPlayer loading事件为0（视频可能未播放）")
+
+    if all_pass:
+        print("✅ 场景8验证通过: 4个修复点全部0错误")
+        return True
+    else:
+        print("⚠️ 场景8验证未通过: 存在错误")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="视频播放器L2功能验证")
     parser.add_argument(
         "--scenario",
         choices=["swipe_article", "pagination", "preload",
                  "position_memory", "backward_compat",
-                 "buffer_progress", "control_visibility", "all"],
+                 "buffer_progress", "control_visibility",
+                 "error_patterns", "all"],
         default="all",
-        help="验证场景（默认all）"
+        help="验证场景（默认all）。推荐error_patterns验证修复点"
     )
     parser.add_argument(
         "--manual",
@@ -501,6 +620,7 @@ def main():
         "backward_compat": scenario_backward_compat,
         "buffer_progress": scenario_buffer_progress,
         "control_visibility": scenario_control_visibility,
+        "error_patterns": scenario_error_patterns,
     }
 
     if args.scenario == "all":

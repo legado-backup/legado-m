@@ -15,9 +15,16 @@
 | 步骤 | 脚本 | 说明 | 用法 |
 |------|------|------|------|
 | 1. 编译+安装+L1 | `quick_build_install.py` | 编译APK+启动MEmu+安装+L1验证 | `python ai_tests/scripts/quick_build_install.py` |
-| 2. 导入订阅源 | `import_rss_source.py` | 从JSON导入订阅源到legado.db | `python ai_tests/scripts/import_rss_source.py <json_path>` |
-| 3. L2验证视频播放器 | `l2_verify_video_player.py` | 视频播放器L2功能验证（导航+SwipeTest日志） | `python ai_tests/scripts/l2_verify_video_player.py` |
-| 4. SwipeTest日志分析 | `swipe_test_log.py` | SwipeTest日志抓取分析 | `python ai_tests/scripts/swipe_test_log.py [clear\|capture\|analyze]` |
+| 2. 导入订阅源 | `import_rss_source.py` | 从JSON导入订阅源到legado.db（含WAL模式处理） | `python ai_tests/scripts/import_rss_source.py <json_path>` |
+| 3. L2验证视频播放器 | `l2_verify_video_player.py` | 视频播放器L2功能验证（导航+错误模式分析） | `python ai_tests/scripts/l2_verify_video_player.py` |
+| 4. SwipeTest日志分析 | `swipe_test_log.py` | SwipeTest日志抓取分析（仅临时日志验证时用） | `python ai_tests/scripts/swipe_test_log.py [clear\|capture\|analyze]` |
+
+### ⚠️ 重要：Room WAL 模式（2026-07-13 新增）
+
+`import_rss_source.py` 已更新支持 Room WAL 模式：
+- **问题**：Room 使用 WAL 模式，如果只 pull/push 主 `.db` 文件，WAL 中的旧状态会在 App 启动时覆盖新导入的数据
+- **修复**：脚本现在同时 pull `.db-wal`/`.db-shm` 文件，用 `PRAGMA wal_checkpoint(TRUNCATE)` 合并 WAL 到主 DB，push 后删除设备端 WAL/SHM
+- **注意**：导入前必须 `am force-stop` App，否则 App 可能覆盖 DB
 
 ## 环境要求
 
@@ -52,11 +59,23 @@ python ai_tests/scripts/xxx.py
 
 | 场景 | 说明 | 关键验证点 |
 |------|------|-----------|
-| `swipe_article` | 上下滑动切换文章 | onPageSelected→activatePlayer→switchToArticle→startPlay |
-| `pagination` | 分页加载（滑到最后一个触发加载下一页） | ARTICLES_LOADED 事件+adapter.notifyItemRangeInserted |
-| `preload` | 预缓冲（视频播放到80%触发预加载） | preloadNextArticleHtml 调用+preloadedHtmls 缓存 |
-| `position_memory` | 位置记忆（退出返回列表自动滚动） | finish 保存 link→onResume 滚动→clearPreloadCache |
-| `backward_compat` | 向后兼容（无 rssArticles 时不触发新功能） | isArticleMode=false→handlePlayerTouchEvent 原有逻辑 |
+| `swipe_article` | 上下滑动切换文章 | ⚠️依赖已移除的SwipeTest临时日志，会显示"未触发" |
+| `pagination` | 分页加载 | ⚠️同上 |
+| `preload` | 预缓冲 | ⚠️同上 |
+| `position_memory` | 位置记忆 | ⚠️同上 |
+| `backward_compat` | 向后兼容 | 无SwipeTest日志触发=通过 |
+| `buffer_progress` | 缓冲进度条更新 | ⚠️依赖已移除的F1临时日志 |
+| `control_visibility` | 控件自动隐藏 | ⚠️依赖已移除的F2临时日志 |
+| `error_patterns` | ★推荐★ 错误模式验证 | P2 Malformed URL / P1-C destroy failed / P1-A ClassCastException / P2-A IllegalBlockSize 四种错误模式0出现=通过 |
+| `all` | 全部场景 | 含error_patterns |
+
+### SwipeTest 临时日志状态说明
+
+> **2026-07-13 更新**：SwipeTest/F1/F2 临时日志已在任务 #69/#77/#109 中移除（验证通过后清理）。
+>
+> 依赖这些日志的场景（swipe_article/pagination/preload/position_memory/buffer_progress/control_visibility）会显示"未触发"，这是**预期行为**，非代码问题。
+>
+> **验证修复点请使用 `error_patterns` 场景**：通过 logcat 直接分析 4 种错误模式（Malformed URL/destroy failed/ClassCastException/IllegalBlockSizeException）是否为 0，永久有效。
 
 ## SwipeTest 临时日志规范
 

@@ -16,13 +16,14 @@
 | 日志规范 | [project-rules/logging_rules.md](./project-rules/logging_rules.md) | AppLog+LogUtils+DebugLog三层体系+标签约定+使用规则 |
 | 架构模式 | [project-rules/architecture_rules.md](./project-rules/architecture_rules.md) | 手动DI+ViewModel模式+Room配置+Web服务器+事件系统+模块依赖+构建配置 |
 | 测试规范 | [project-rules/testing_rules.md](./project-rules/testing_rules.md) | JUnit4+书源自测三阶段+测试运行命令 |
-| 工作流程 | [project-rules/openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec四文档+强制检查点+文档同步映射表 |
+| 工作流程 | [project-rules/openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec四文档+强制检查点+文档同步映射表+子代理使用指导+上下文预算检查 |
 | 延伸版本对比方法论 | [project-rules/forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 27+延伸版本清单+五阶段对比流程+优先级矩阵+踩坑案例 |
 | E2E测试流程 | [project-rules/ai_e2e_testing_workflow.md](./project-rules/ai_e2e_testing_workflow.md) | 5.5.1-5.5.8八步强制流程+固化层保护+V3.1快速验证脚本 |
 | 测试用例设计 | [project-rules/test-case-design-guide.md](./project-rules/test-case-design-guide.md) | 双轨制+源码溯源字段+步骤语义化 |
 | 改造过程日志 | [project-rules/logging-during-refactoring.md](./project-rules/logging-during-refactoring.md) | 10类必加日志场景+永久/临时双轨+Tag规范+验证检查清单 |
 | 版本交付同步 | [project-rules/version-delivery-sync.md](./project-rules/version-delivery-sync.md) | 同步清单+updateLog.md格式+编译前更新时机 |
 | 复杂任务流水线 | [project-rules/complex-task-pipeline.md](./project-rules/complex-task-pipeline.md) | 五阶段流水线+硬性约束（单子代理≤12文件）+反模式 |
+| 子代理质量管理 | [project-rules/sub-agent-quality-management.md](./project-rules/sub-agent-quality-management.md) | 分级子代理策略（低风险强制/高风险禁止）+prompt四要素+主代理监控+二次验证+兜底机制 |
 
 ---
 
@@ -123,6 +124,7 @@
 | [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表页 DiffUtil 增量更新 + WebView cacheFirst 默认 true） ✅ 已实施，待真机验证 |
 | [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静音 + 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮） ✅ 已实施，待真机验证 |
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
+| [specs/sub-agent-budget-optimization/](./specs/sub-agent-budget-optimization/) | 子代理编排与思考预算优化（强制子代理规避GLM-5.2思考上限，同对话内虚拟拆分任务不增加成本，监控+质量保证+规范冲突处理） ✅ 已完成 |
 | [specs/yesterday-changes-deep-audit/](./specs/yesterday-changes-deep-audit/) | 昨日改动（2026-07-08）深度自我审查（书源订阅源布局+视频播放器，6 Agent 并行审查发现 29 项 bug + 7 阻塞点 + 1 需求偏差） ✅ 审查完成 |
 | [specs/context-compression-feedback-preservation/](./specs/context-compression-feedback-preservation/) | 上下文压缩用户反馈保全 + 主线任务完成质量三层审查 + 打包功能差距三层修复（Part A 反馈持久化+四件套 + Part B B0openspec偏差/B1代码/B2交付 + Part C C1偏差归属/C2 F1-F10核查/C3 E2E+L2） ✅ 已完成（D1偏差已修正，7类细节不符需新建spec） |
 | [specs/source-layout-detail-refinement/](./specs/source-layout-detail-refinement/) | 书源/订阅源布局细节精修（D1标签+分组两模式 / D2按类型分组修复+返回键 / D3订阅源二级页还原列表 / D4搜索框 / D5视频缓存下拉选择 / D6倍速15x保留） ✅ 实施完成待文档同步 |
@@ -132,7 +134,8 @@
 | [specs/video-control-visibility-enhancement/](./specs/video-control-visibility-enhancement/) | 视频播放器控件显隐与缓冲条优化（F1缓冲进度条修复+secondaryProgress绑定 / F2控件3秒自动隐藏+单击切换+触摸事件根因修复OnTouchListener设到surface_container） ✅ 实施完成（L2真机验证通过） |
 | [specs/video-ui-dedup-layout-adjust/](./specs/video-ui-dedup-layout-adjust/) | 视频播放器 UI 去重与布局调整（移除右侧静音/倍速按钮避免与GSY底部控件重叠 + 左下角标题区和全屏按钮上移32dp避免遮挡GSY底部播放条 + VideoFragment.kt死代码清理） ✅ 实施完成（Phase 1-4全部完成+L2验证通过） |
 | [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（10类问题：ExoPlayer失败降级WebView用skill V2模板 + 播放器类型配置 + ViewPager2兼容性 + 加密解密容错 + ClassCastException容错 + SQLiteBlobTooBig容错 + WebView线程安全 + 网络重试 + JSON容错 + HlsPlaylistStuck + Cronet回退） ✅ 实施完成（L2真机验证通过，5.6 ViewPager2滑动切换核心修复 onInterceptTouchEvent 方案） |
-| [specs/video-back-fullscreen-fix/](./specs/video-back-fullscreen-fix/) | 视频播放器返回按钮修复+全屏按钮迁移+真全屏优化（B1: setNavigationOnClickListener绕过onSupportNavigateUp时序冲突 / U1: btn_fullscreen移入right_buttons随整体显隐 / F1: TitleBar gone()替代ActionBar hide()释放布局空间） 🔄 设计中 |
+| [specs/video-back-fullscreen-fix/](./specs/video-back-fullscreen-fix/) | 视频播放器返回按钮修复+全屏按钮迁移+真全屏优化（B1: setNavigationOnClickListener绕过onSupportNavigateUp时序冲突 / U1: btn_fullscreen移入right_buttons随整体显隐 / F1: TitleBar gone()替代ActionBar hide()释放布局空间） 🔄 开发中（代码完成+L1通过，待真机L2验证） |
+| [specs/video-gesture-overhaul/](./specs/video-gesture-overhaul/) | 视频播放器手势交互重构（修复长按加速丢失+去掉快退快进按钮改左右滑动+长按倍速+双击暂停/播放，7种手势统一管理不冲突） ✅ 已完成 |
 | [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制） ✅ 已完成（检查点3最终验收通过 2026-07-13） |
 ### 归档 Specs
 
