@@ -62,26 +62,23 @@ git log -5 --name-only
 git checkout master-public
 ```
 
-### 步骤3：合并私仓更新并删除敏感文件
+### 步骤3：合并私仓更新并更新.gitignore
 
 ```bash
 # 合并私仓分支的最新更新
 git merge master-private
 
 # 如果合并成功但有冲突，手动解决冲突
-# 删除合并带来的敏感文件
-rm -rf .trae ai_tests
-rm AGENTS.md
-rm app/google-services.json
-rm .github/workflows/legado.jks
-rm app/逍遥-开源阅读1122.bat
-rm .github/scripts/tg_bot.py
+# 确保公仓专用的.gitignore保持有效（包含敏感文件忽略规则）
 
-# 检查其他敏感文件（见下方清单）
-# ...
+# 如果敏感文件被合并回来，停止跟踪（但不删除工作区文件）
+git rm -r --cached .trae
+git rm -r --cached ai_tests
+git rm --cached AGENTS.md
+git rm --cached app/google-services.json
 
-git add .
-git commit -m "sync: 合并私仓更新并删除敏感文件"
+git add .gitignore
+git commit -m "sync: 合并私仓更新并更新.gitignore"
 ```
 
 ### 步骤4：推送公仓分支
@@ -248,7 +245,7 @@ git checkout master-private
 **答**：AI在私仓分支修改文档后，按照标准流程提交公仓：
 1. 在私仓分支修改文档（如`README.md`、`LICENSE`）
 2. 提交到私仓分支
-3. 执行公仓提交流程（审查→切换→合并→提交→切回）
+3. 执行公仓提交流程（审查→切换→合并更新.gitignore→提交→切回）
 
 ### Q3: 如何确认当前在哪个分支？
 
