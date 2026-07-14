@@ -136,7 +136,10 @@
 | [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复第1轮（10类问题：ExoPlayer失败降级WebView用skill V2模板 + 播放器类型配置 + ViewPager2兼容性 + 加密解密容错 + ClassCastException容错 + SQLiteBlobTooBig容错 + WebView线程安全 + 网络重试 + JSON容错 + HlsPlaylistStuck + Cronet回退） ✅ 实施完成（L2真机验证通过，5.6 ViewPager2滑动切换核心修复 onInterceptTouchEvent 方案） |
 | [specs/video-back-fullscreen-fix/](./specs/video-back-fullscreen-fix/) | 视频播放器返回按钮修复+全屏按钮迁移+真全屏优化（B1: setNavigationOnClickListener绕过onSupportNavigateUp时序冲突 / U1: btn_fullscreen移入right_buttons随整体显隐 / F1: TitleBar gone()替代ActionBar hide()释放布局空间） 🔄 开发中（代码完成+L1通过，待真机L2验证） |
 | [specs/video-gesture-overhaul/](./specs/video-gesture-overhaul/) | 视频播放器手势交互重构（修复长按加速丢失+去掉快退快进按钮改左右滑动+长按倍速+双击暂停/播放，7种手势统一管理不冲突） ✅ 已完成 |
-| [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制） ✅ 已完成（检查点3最终验收通过 2026-07-13） |
+| [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制） ✅ 已完成（检查点3最终验收通过 2026-07-13，整合策略已被global-spec-restructure颠覆） |
+| [specs/global-spec-restructure/](./specs/global-spec-restructure/) | 全局规范重组（多文件拆分策略：11个全局规范文件，核心5文件9.42KB系统注入+6个按需加载，AGENTS.md瘦身533→354行，test-prompt.md待新对话验证） 🔄 实施中（检查点2） |
+| [specs/app-stability-round2/](./specs/app-stability-round2/) | App 稳定性第二轮修复（P1-1~P1-4+P2-1~P2-2+P3-1共7项：Room去description+图片解密文件头检测+ExoPlayer setMimeType+视频抓取流程优化+Cronet运行时降级+协程取消守卫+ruleContent非空分支content校验） ✅ 全部完成（检查点3验收通过，16源扩展测试通过） |
+| [specs/build-workflow-optimization/](./specs/build-workflow-optimization/) | 打包流程规整（统一包名规范：测试包/共存包/正式包三种分类，修复build-legado.bat默认包名不一致，设计面向AI执行的详细打包流程，更新build-apk-guide.md） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |

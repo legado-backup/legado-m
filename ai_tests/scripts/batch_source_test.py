@@ -61,13 +61,25 @@ def try_source(d, idx):
         rss_tab.click()
         time.sleep(2)
 
-    # 点击源idx
+    # 点击源idx（支持滚动：idx>VISIBLE_ITEMS时先滚动列表使目标源可见）
     rv = d(resourceId=f"{PACKAGE}:id/recycler_view")
     if not rv.exists:
         return False, {}
+    # 先滚动到顶部
+    for _ in range(5):
+        d.swipe(360, 200, 360, 1000, 0.3)
+    time.sleep(1)
+    # 计算屏幕可见项数（约6个），需要滚动多少屏
+    VISIBLE_ITEMS = 6
+    screens_to_scroll = (idx - 1) // VISIBLE_ITEMS
+    for _ in range(screens_to_scroll):
+        d.swipe(360, 900, 360, 300, 0.5)
+    time.sleep(1)
+    # 计算在当前屏幕中的位置
     bounds = rv.info.get("bounds", {})
     item_h = 140
-    cy = bounds.get("top", 120) + item_h * (idx - 1) + item_h // 2
+    pos_in_screen = (idx - 1) % VISIBLE_ITEMS
+    cy = bounds.get("top", 120) + item_h * pos_in_screen + item_h // 2
     cx = (bounds.get("left", 0) + bounds.get("right", 720)) // 2
     d.click(cx, cy)
     time.sleep(4)
