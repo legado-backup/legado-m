@@ -140,6 +140,7 @@
 | [specs/global-spec-restructure/](./specs/global-spec-restructure/) | 全局规范重组（多文件拆分策略：11个全局规范文件，核心5文件9.42KB系统注入+6个按需加载，AGENTS.md瘦身533→354行，test-prompt.md待新对话验证） 🔄 实施中（检查点2） |
 | [specs/app-stability-round2/](./specs/app-stability-round2/) | App 稳定性第二轮修复（P1-1~P1-4+P2-1~P2-2+P3-1共7项：Room去description+图片解密文件头检测+ExoPlayer setMimeType+视频抓取流程优化+Cronet运行时降级+协程取消守卫+ruleContent非空分支content校验） ✅ 全部完成（检查点3验收通过，16源扩展测试通过） |
 | [specs/build-workflow-optimization/](./specs/build-workflow-optimization/) | 打包流程规整（统一包名规范：测试包/共存包/正式包三种分类，修复build-legado.bat默认包名不一致，设计面向AI执行的详细打包流程，更新build-apk-guide.md） 🔄 设计中 |
+| [specs/rss-parse-optimization/](./specs/rss-parse-optimization/) | 订阅源解析全流程性能优化（5维度22个优化点：5个P1+17个P2，核心6项分三批实施：Pattern缓存+RssArticle索引/scriptCache全局共享+HTTP响应缓存/解密缓存扩容+预连接） ✅ 全部完成（检查点3验收通过，4文件+106行变更，APK legado_app_3.26.071419.apk） |
 ### 归档 Specs
 
 | 文档 | 说明 |

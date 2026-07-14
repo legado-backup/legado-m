@@ -18,7 +18,6 @@
 | **applicationId** | `io.legado.app` | **固定值**,无动态参数 |
 | **release后缀** | `.release` | 最终包名:`io.legado.app.release` |
 | **debug后缀** | `.debug` | 最终包名:`io.legado.app.debug` |
-| **自定义包名** | **不支持** | 无`-PcustomAppId`参数机制 |
 | **productFlavors** | 仅`app`一个 | 用于构建变体,不影响包名 |
 
 #### 原版核心代码
@@ -51,9 +50,9 @@ productFlavors {
 
 #### 原版与本项目对比
 
-| 对比项 | 原版legado-E | 本项目(missapp) | 差异说明 |
+| 对比项 | 原版legado-E | 本项目 | 差异说明 |
 |--------|-------------|----------------|---------|
-| **基础包名** | `io.legado.app`(固定) | `io.legado.missapp`(支持自定义) | 本项目支持`-PcustomAppId`动态参数 |
+| **基础包名** | `io.legado.app`(固定) | `io.legado.app`(支持自定义) | 本项目支持`-PcustomAppId`动态参数 |
 | **自定义包名** | 不支持 | 支持`project.hasProperty("customAppId")` | 本项目可自定义包名实现共存 |
 | **包名灵活性** | 单一包名 | 三类包(测试/共存/正式) | 本项目扩展性更强 |
 | **后缀机制** | `.debug`/`.release` | 相同 | 一致 |
