@@ -67,12 +67,13 @@ git push private master-private
 # 创建公仓分支
 git checkout -b master-public
 
-# 在公仓分支创建公仓专用的.gitignore（替代删除文件）
+# 在公仓分支创建公仓专用的.gitignore
 # 复制预先准备好的.gitignore.public到.gitignore
 cp docs/specs/git-multi-remote-isolation/.gitignore.public .gitignore
 
-# 停止跟踪敏感文件（如果已跟踪）
-git rm -r --cached .trae
+# 停止跟踪敏感文件（不删除工作区文件）
+# 注意：.gitignore只对未跟踪文件生效，已跟踪文件必须先用git rm --cached停止跟踪
+git rm -r --cached .trae           # --cached参数确保工作区文件不被删除
 git rm -r --cached ai_tests
 git rm --cached AGENTS.md
 git rm --cached app/google-services.json
@@ -253,7 +254,7 @@ git push private master-private
     ↓
 git checkout master-public
     ↓
-git merge master-private（手动删除敏感文件）
+git merge master-private（停止跟踪敏感文件）
     ↓
 git add <files>
     ↓
@@ -283,7 +284,9 @@ pre-push Hook检测
 | `.gitignore`（公仓版本） | 添加敏感文件排除规则 |
 | Git远程配置 | 添加private和public远程 |
 
-### 删除文件（公仓分支）
+### 停止跟踪文件（公仓分支）
+
+> **重要说明**：以下文件在工作区保留，仅停止Git跟踪（`git rm --cached`），配合.gitignore防止提交到公仓。
 
 | 文件路径 | 说明 |
 |----------|------|
@@ -294,7 +297,7 @@ pre-push Hook检测
 | `.github/workflows/legado.jks` | 签名密钥（已在目录中） |
 | `app/逍遥-开源阅读1122.bat` | 可能含本地路径的脚本 |
 
-### 可选删除文件（根据开源策略）
+### 可选停止跟踪文件（根据开源策略）
 
 | 文件路径 | 说明 |
 |----------|------|
@@ -363,7 +366,7 @@ pre-push Hook检测
 
 2. **阶段2：分支创建**
    - 创建master-private分支
-   - 创建master-public分支并删除敏感文件
+   - 创建master-public分支并停止跟踪敏感文件
 
 3. **阶段3：Git Hook配置**
    - 创建pre-push Hook脚本
