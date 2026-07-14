@@ -1,0 +1,39 @@
+# 公仓专用.gitignore（仅用于master-public分支）
+
+# === A类：AI相关文档（必须隔离）===
+.trae/
+ai_tests/
+AGENTS.md
+
+# === B类：敏感配置（必须隔离）===
+app/google-services.json
+.github/workflows/legado.jks
+app/逍遥-开源阅读1122.bat
+.github/scripts/tg_bot.py
+
+# === C类：技术细节文件（可选隔离）===
+app/schemas/
+modules/web/package.json
+modules/web/package-lock.json
+
+# === D类：临时文件/构建产物（通用）===
+temp/
+output/
+*.log
+build/
+.gradle/
+*.iml
+.idea/
+local.properties
+
+# === E类：Python缓存 ===
+__pycache__/
+*.pyc
+*.pyo
+
+# === F类：其他敏感文件 ===
+*.jks
+*.keystore
+*.pem
+*.key
+.env

@@ -67,51 +67,25 @@ git push private master-private
 # 创建公仓分支
 git checkout -b master-public
 
-# 在公仓分支删除敏感文件
-rm -rf .trae ai_tests
-rm AGENTS.md
-rm app/google-services.json
+# 在公仓分支创建公仓专用的.gitignore（替代删除文件）
+# 复制预先准备好的.gitignore.public到.gitignore
+cp docs/specs/git-multi-remote-isolation/.gitignore.public .gitignore
 
-# 创建公仓专用.gitignore
-cat > .gitignore << 'EOF'
-# 公仓专用.gitignore
+# 停止跟踪敏感文件（如果已跟踪）
+git rm -r --cached .trae
+git rm -r --cached ai_tests
+git rm --cached AGENTS.md
+git rm --cached app/google-services.json
 
-# === 敏感文件（绝对禁止推送）===
-.trae/
-ai_tests/
-AGENTS.md
-app/google-services.json
-
-# === 其他敏感文件 ===
-*.jks
-*.keystore
-*.pem
-*.key
-.env
-local.properties
-
-# === 构建产物 ===
-build/
-.gradle/
-*.iml
-.idea/
-
-# === Python 缓存 ===
-__pycache__/
-*.pyc
-*.pyo
-
-# === 临时文件 ===
-temp/
-output/
-*.log
-EOF
-
+# 提交公仓初始化变更（.gitignore更新）
 git add .gitignore
-git commit -m "公仓初始化：删除敏感文件，配置.gitignore"
+git commit -m "公仓初始化：配置.gitignore忽略敏感文件"
 
 # 推送公仓分支到公仓远程
 git push public master-public
+
+# 切回私仓分支
+git checkout master-private
 ```
 
 #### 3. Git pre-push Hook实现
