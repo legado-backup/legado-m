@@ -24,6 +24,12 @@
 | 版本交付同步 | [project-rules/version-delivery-sync.md](./project-rules/version-delivery-sync.md) | 同步清单+updateLog.md格式+编译前更新时机 |
 | 复杂任务流水线 | [project-rules/complex-task-pipeline.md](./project-rules/complex-task-pipeline.md) | 五阶段流水线+硬性约束（单子代理≤12文件）+反模式 |
 | 子代理质量管理 | [project-rules/sub-agent-quality-management.md](./project-rules/sub-agent-quality-management.md) | 分级子代理策略（低风险强制/高风险禁止）+prompt四要素+主代理监控+二次验证+兜底机制 |
+| 全局思考检查清单 | [project-rules/global-thinking-checklist.md](./project-rules/global-thinking-checklist.md) | 改动功能前强制门禁：前端入口+后端接口+数据库+覆盖安装+使用场景+回填点6维度盘点 |
+| 错误沉淀机制 | [project-rules/spec-sedimentation-mechanism.md](./project-rules/spec-sedimentation-mechanism.md) | 错误→沉淀→子规范→主规范引用闭环+5条沉淀规则+3次验证流程 |
+| 数据库升级安全规范 | [project-rules/database-migration-safety.md](./project-rules/database-migration-safety.md) | DatabaseView修改DROP+CREATE+migration runCatching+version递增+覆盖安装兼容性 |
+| 真机测试流程复用 | [project-rules/real-device-test-reuse.md](./project-rules/real-device-test-reuse.md) | 可用脚本清单+测试流程模板+问题闭环+数据库验证（WAL）+校验必须触发真实路径 |
+| 包名规范 | [project-rules/package-naming.md](./project-rules/package-naming.md) | 构建APK包名配置+与原版共存 |
+| 延伸版本参考 | [project-rules/forks-reference.md](./project-rules/forks-reference.md) | 网络层/前端/协程/WebView/数据管理组件优化或功能借鉴任务的方法论 |
 
 ---
 
@@ -140,6 +146,9 @@
 | [specs/global-spec-restructure/](./specs/global-spec-restructure/) | 全局规范重组（多文件拆分策略：11个全局规范文件，核心5文件9.42KB系统注入+6个按需加载，AGENTS.md瘦身533→354行，test-prompt.md待新对话验证） 🔄 实施中（检查点2） |
 | [specs/app-stability-round2/](./specs/app-stability-round2/) | App 稳定性第二轮修复（P1-1~P1-4+P2-1~P2-2+P3-1共7项：Room去description+图片解密文件头检测+ExoPlayer setMimeType+视频抓取流程优化+Cronet运行时降级+协程取消守卫+ruleContent非空分支content校验） ✅ 全部完成（检查点3验收通过，16源扩展测试通过） |
 | [specs/build-workflow-optimization/](./specs/build-workflow-optimization/) | 打包流程规整（统一包名规范：测试包/共存包/正式包三种分类，修复build-legado.bat默认包名不一致，设计面向AI执行的详细打包流程，更新build-apk-guide.md） 🔄 设计中 |
+| [specs/rss-concurrency-and-checksource-optimization/](./specs/rss-concurrency-and-checksource-optimization/) | 订阅源解析并发配置化+书源/订阅源校验去重优化（需求一：Semaphore(6)配置化+图片加载并发+双参数分离；需求二：书源域名校验走AnalyzeUrl真实请求+订阅源5维度校验+域名+type多维度去重） 🔄 设计中 |
+| [specs/real-device-test-plan/](./specs/real-device-test-plan/) | 真机测试计划：rss-concurrency-and-checksource-optimization 全24项变更功能真机端到端测试（分层UI+Service+数据+日志，用真实书源数据，weight回填验证，经验沉淀） 🔄 设计中 |
+| [specs/global-issue-fix-and-spec-sedimentation/](./specs/global-issue-fix-and-spec-sedimentation/) | 全局问题修复与规范沉淀（13项用户反馈：数据库升级覆盖安装+高亮规则崩溃+校验逻辑重构+lastHost三层回填+UI Bug修复+工程规范沉淀机制+全局思考检查清单） 🔄 设计中 |
 | [specs/rss-parse-optimization/](./specs/rss-parse-optimization/) | 订阅源解析全流程性能优化（5维度22个优化点：5个P1+17个P2，核心6项分三批实施：Pattern缓存+RssArticle索引/scriptCache全局共享+HTTP响应缓存/解密缓存扩容+预连接） ✅ 全部完成（检查点3验收通过，4文件+106行变更，APK legado_app_3.26.071419.apk） |
 ### 归档 Specs
 

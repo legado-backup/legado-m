@@ -107,10 +107,12 @@ versionL=$(date -d "8 hour" -u +3.%y.%m%d%H%M) # 3.26.06301435
 
 ```bash
 RELEASE_STORE_FILE=./legado.jks
-RELEASE_KEY_ALIAS=legado
-RELEASE_STORE_PASSWORD=gedoor_legado  # 测试版固定密码
-RELEASE_KEY_PASSWORD=gedoor_legado
+RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
+RELEASE_STORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}
+RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
 ```
+
+> 注意：签名密钥（.jks）已从仓库移除，改用 GitHub Secrets 注入。详见 repo-cleanup spec。
 
 ### 2.3 release.yml（正式发布流程）
 

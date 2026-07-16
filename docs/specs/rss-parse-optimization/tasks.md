@@ -49,50 +49,50 @@
 
 ### 🔴 硬性前提（违反必崩溃，代码审查重点验证）
 
-- [ ] 3.0a **硬性前提1**：scriptCache/regexCache 提升为 companion object 后，访问处必须线程安全
+- [x] 3.0a **硬性前提1**：scriptCache/regexCache 提升为 companion object 后，访问处必须线程安全
   - 依据：6 并发协程同时访问全局缓存，非线程安全会崩溃/数据错乱
   - 方案：用 `LruCache`（自带 synchronized）+ `@Synchronized` 保护编译操作
   - 验证：grep 确认 `globalScriptCache`/`globalRegexCache` 访问处无裸 `hashMapOf`
-- [ ] 3.0b **硬性前提2**：stringRuleCache 保持 per-instance
+- [x] 3.0b **硬性前提2**：stringRuleCache 保持 per-instance
   - 依据：stringRuleCache 含 `putMap` 等实例状态，跨实例共享不安全
   - 验证：grep 确认 `stringRuleCache` 仍为实例字段（非 companion object）
 
 ### 3.1 scriptCache/regexCache 全局共享（优化点 2.2 + 5.1）
 
-- [ ] 3.1.1 `AnalyzeRule.kt` 删除实例字段 `regexCache`（行 82）和 `scriptCache`（行 83）
-- [ ] 3.1.2 companion object 新增 `globalScriptCache: LruCache<String, CompiledScript>(32)`
-- [ ] 3.1.3 companion object 新增 `globalRegexCache: LruCache<String, Regex?>(64)`
-- [ ] 3.1.4 新增 `getOrCompileScript(script: String): CompiledScript?`（@Synchronized，kotlin.runCatching 捕获异常）
-- [ ] 3.1.5 新增 `getOrCompileRegex(pattern: String): Regex?`（@Synchronized，kotlin.runCatching 捕获异常）
-- [ ] 3.1.6 `evalJS` 内部 `compileScriptCache` 调用改为 `getOrCompileScript`
-- [ ] 3.1.7 `splitRule` 内部 `regexCache` 访问改为 `getOrCompileRegex`
-- [ ] 3.1.8 添加日志：JS 编译时 `AppLog.put("AnalyzeRule", "JS 编译并缓存: script 长度=${script.length}")`
-- [ ] 3.1.9 添加日志：编译失败时记录错误
-- [ ] 3.1.10 编译验证第二批 3.1 修改无语法错误
-- [ ] 3.1.11 **代码审查复核**：确认 3.0a + 3.0b 两个硬性前提已满足
+- [x] 3.1.1 `AnalyzeRule.kt` 删除实例字段 `regexCache`（行 82）和 `scriptCache`（行 83）
+- [x] 3.1.2 companion object 新增 `globalScriptCache: LruCache<String, CompiledScript>(32)`
+- [x] 3.1.3 companion object 新增 `globalRegexCache: LruCache<String, Regex?>(64)`
+- [x] 3.1.4 新增 `getOrCompileScript(script: String): CompiledScript?`（@Synchronized，kotlin.runCatching 捕获异常）
+- [x] 3.1.5 新增 `getOrCompileRegex(pattern: String): Regex?`（@Synchronized，kotlin.runCatching 捕获异常）
+- [x] 3.1.6 `evalJS` 内部 `compileScriptCache` 调用改为 `getOrCompileScript`
+- [x] 3.1.7 `splitRule` 内部 `regexCache` 访问改为 `getOrCompileRegex`
+- [x] 3.1.8 添加日志：JS 编译时 `AppLog.put("AnalyzeRule", "JS 编译并缓存: script 长度=${script.length}")`
+- [x] 3.1.9 添加日志：编译失败时记录错误
+- [x] 3.1.10 编译验证第二批 3.1 修改无语法错误
+- [x] 3.1.11 **代码审查复核**：确认 3.0a + 3.0b 两个硬性前提已满足
 
 ### 3.2 HTTP 响应缓存（优化点 1.2）
 
-- [ ] 3.2.1 `HttpHelper.kt` 新增 `cacheDir` 字段（`File(appCtx.cacheDir, "okhttp_cache").apply { mkdirs() }`）
-- [ ] 3.2.2 `okHttpClient` 配置 `.cache(Cache(cacheDir, 50L * 1024 * 1024))`
-- [ ] 3.2.3 新增 `warmUpConnection(url: String)` 辅助函数（HEAD 请求，kotlin.runCatching 捕获异常，供第三批使用）
-- [ ] 3.2.4 添加日志：缓存命中时 `AppLog.put("HttpHelper", "缓存命中: $pathPattern")`（只记录路径模式，不输出完整 URL）
-- [ ] 3.2.5 添加日志：预连接失败时记录错误
-- [ ] 3.2.6 编译验证第二批 3.2 修改无语法错误
+- [x] 3.2.1 `HttpHelper.kt` 新增 `cacheDir` 字段（`File(appCtx.cacheDir, "okhttp_cache").apply { mkdirs() }`）
+- [x] 3.2.2 `okHttpClient` 配置 `.cache(Cache(cacheDir, 50L * 1024 * 1024))`
+- [x] 3.2.3 新增 `warmUpConnection(url: String)` 辅助函数（HEAD 请求，kotlin.runCatching 捕获异常，供第三批使用）
+- [x] 3.2.4 添加日志：缓存命中时 `AppLog.put("HttpHelper", "缓存命中: $pathPattern")`（只记录路径模式，不输出完整 URL）
+- [x] 3.2.5 添加日志：预连接失败时记录错误
+- [x] 3.2.6 编译验证第二批 3.2 修改无语法错误
 
 ### 3.3 第二批整体验证
 
-- [ ] 3.3.0 更新 `app/src/main/assets/updateLog.md`（编译前，顶部追加第二批变更条目）
-- [ ] 3.3.1 第二批全部修改后编译 APK
-- [ ] 3.3.2 安装到模拟器
-- [ ] 3.3.3 测试场景 S2：JS 模式源列表加载 → scriptCache 共享，JS 编译只发生一次
-- [ ] 3.3.4 测试场景 S6：重复请求场景 → HTTP 响应缓存命中
-- [ ] 3.3.5 测试场景 S8：普通订阅源无回归
-- [ ] 3.3.6 测试场景 S9：网络异常 → HTTP 缓存不缓存错误响应
-- [ ] 3.3.7 **并发安全重点验证**：6 并发协程同时 evalJS 同一 CompiledScript，确认无并发崩溃
-- [ ] 3.3.9 **代码审查复核**：确认 @Synchronized 保护编译操作、LruCache 上限、Cache 目录配置；执行 `git diff` 确认变更范围仅涉及预期文件
-- [ ] 3.3.10 测试场景 S1 回归：Regex 模式源列表加载正常（验证 splitRule 改动未破坏 Regex 解析）
-- [ ] 3.3.11 测试场景：HTTP 缓存过期后刷新，确认走网络而非返回过期缓存
+- [x] 3.3.0 更新 `app/src/main/assets/updateLog.md`（编译前，顶部追加第二批变更条目）
+- [x] 3.3.1 第二批全部修改后编译 APK
+- [x] 3.3.2 安装到模拟器
+- [x] 3.3.3 测试场景 S2：JS 模式源列表加载 → scriptCache 共享，JS 编译只发生一次
+- [x] 3.3.4 测试场景 S6：重复请求场景 → HTTP 响应缓存命中
+- [x] 3.3.5 测试场景 S8：普通订阅源无回归
+- [x] 3.3.6 测试场景 S9：网络异常 → HTTP 缓存不缓存错误响应
+- [x] 3.3.7 **并发安全重点验证**：6 并发协程同时 evalJS 同一 CompiledScript，确认无并发崩溃
+- [x] 3.3.9 **代码审查复核**：确认 @Synchronized 保护编译操作、LruCache 上限、Cache 目录配置；执行 `git diff` 确认变更范围仅涉及预期文件
+- [x] 3.3.10 测试场景 S1 回归：Regex 模式源列表加载正常（验证 splitRule 改动未破坏 Regex 解析）
+- [x] 3.3.11 测试场景：HTTP 缓存过期后刷新，确认走网络而非返回过期缓存
 
 ## 4. 第三批（中收益低风险，2 项）
 
@@ -100,29 +100,29 @@
 
 > 注：`sizeOf` 覆写已存在（按 `ByteArray.size` 计算实际占用），只需修改 `LruCache` 构造参数，无需新增 `sizeOf`。
 
-- [ ] 4.1.1 `ImageUtils.kt` 的 `decodeCache` 构造参数上限从 `2 * 1024 * 1024` 改为 `(Runtime.getRuntime().maxMemory() / 32).toInt().coerceIn(4 * 1024 * 1024, 16 * 1024 * 1024)`（sizeOf 已存在，无需新增）
-- [ ] 4.1.2 添加日志：初始化时 `AppLog.put("ImageUtils", "解密缓存上限: ${decodeCache.size()} bytes")`
-- [ ] 4.1.3 编译验证第三批 4.1 修改无语法错误
+- [x] 4.1.1 `ImageUtils.kt` 的 `decodeCache` 构造参数上限从 `2 * 1024 * 1024` 改为 `(Runtime.getRuntime().maxMemory() / 32).toInt().coerceIn(4 * 1024 * 1024, 16 * 1024 * 1024)`（sizeOf 已存在，无需新增）
+- [x] 4.1.2 添加日志：初始化时 `AppLog.put("ImageUtils", "解密缓存上限: ${decodeCache.size()} bytes")`
+- [x] 4.1.3 编译验证第三批 4.1 修改无语法错误
 
 ### 4.2 预连接/DNS 预解析（优化点 1.4）
 
-- [ ] 4.2.1 `Rss.kt` `getArticlesAwait` 列表解析完成后，新增预连接前 3 篇文章域名逻辑
-- [ ] 4.2.2 调用 `HttpHelper.warmUpConnection(article.link)`（link 用 `isNullOrBlank()` 判空）
-- [ ] 4.2.3 预连接改为 `async{}.awaitAll()` 并行执行（`coroutines.map { async { warmUpConnection(it) } }.awaitAll()`），避免串行等待
-- [ ] 4.2.4 用 `kotlin.runCatching` 捕获预连接异常，失败不影响列表显示
-- [ ] 4.2.5 添加日志：预连接触发时 `AppLog.put("Rss", "预连接: 第${index+1}篇")`（不输出 URL）
-- [ ] 4.2.6 添加日志：预连接失败时记录错误
-- [ ] 4.2.7 编译验证第三批 4.2 修改无语法错误
+- [x] 4.2.1 `Rss.kt` `getArticlesAwait` 列表解析完成后，新增预连接前 3 篇文章域名逻辑
+- [x] 4.2.2 调用 `HttpHelper.warmUpConnection(article.link)`（link 用 `isNullOrBlank()` 判空）
+- [x] 4.2.3 预连接改为 `async{}.awaitAll()` 并行执行（`coroutines.map { async { warmUpConnection(it) } }.awaitAll()`），避免串行等待
+- [x] 4.2.4 用 `kotlin.runCatching` 捕获预连接异常，失败不影响列表显示
+- [x] 4.2.5 添加日志：预连接触发时 `AppLog.put("Rss", "预连接: 第${index+1}篇")`（不输出 URL）
+- [x] 4.2.6 添加日志：预连接失败时记录错误
+- [x] 4.2.7 编译验证第三批 4.2 修改无语法错误
 
 ### 4.3 第三批整体验证
 
-- [ ] 4.3.0 更新 `app/src/main/assets/updateLog.md`（编译前，顶部追加第三批变更条目）
-- [ ] 4.3.1 第三批全部修改后编译 APK
-- [ ] 4.3.2 安装到模拟器
-- [ ] 4.3.3 测试场景 S3：图片源列表滚动 → 解密缓存命中率 >80%
-- [ ] 4.3.4 测试场景 S7：首次点击文章内容页 → 预连接生效，加载减少 300-1000ms
-- [ ] 4.3.5 测试场景 S8：普通订阅源无回归
-- [ ] 4.3.6 **代码审查复核**：确认 LruCache 动态上限、预连接 async 并行、HEAD 请求；执行 `git diff` 确认变更范围仅涉及预期文件
+- [x] 4.3.0 更新 `app/src/main/assets/updateLog.md`（编译前，顶部追加第三批变更条目）
+- [x] 4.3.1 第三批全部修改后编译 APK
+- [x] 4.3.2 安装到模拟器
+- [x] 4.3.3 测试场景 S3：图片源列表滚动 → 解密缓存命中率 >80%
+- [x] 4.3.4 测试场景 S7：首次点击文章内容页 → 预连接生效，加载减少 300-1000ms
+- [x] 4.3.5 测试场景 S8：普通订阅源无回归
+- [x] 4.3.6 **代码审查复核**：确认 LruCache 动态上限、预连接 async 并行、HEAD 请求；执行 `git diff` 确认变更范围仅涉及预期文件
 
 ## 5. 可选优化（P2 级未列入三批的 15 项）
 
@@ -194,8 +194,8 @@
 
 ## 7. 文档同步
 
-- [ ] 7.1 更新 `app/src/main/assets/updateLog.md`（顶部追加日期条目，分三批写明用户可感知的变更）
-- [ ] 7.2 更新 `docs/INDEX.md`（spec 状态标记：🔄 设计中 → ✅ 已完成）
+- [x] 7.1 更新 `app/src/main/assets/updateLog.md`（顶部追加日期条目，分三批写明用户可感知的变更）
+- [x] 7.2 更新 `docs/INDEX.md`（spec 状态标记：🔄 设计中 → ✅ 已完成）
 - [ ] 7.3 更新 `docs/project-flow/task-navigation.md`（如涉及代码锚点变更）
 - [ ] 7.4 更新项目记忆 basic-memory（决策记录：三批优化实施情况 + ADR-1/2/3/4 决策）
 - [ ] 7.5 更新 AGENTS.md 相关章节（如有架构变更说明，如 AnalyzeRule 缓存层级提升）
@@ -226,4 +226,5 @@
   - 验证阶段：移除 S5 Semaphore 测试、S10 getElement 缓存命中测试
   - 准备阶段：移除原 1.5 读取 RssParserByRule.kt（可选不实施则不需要），重新编号 1.5~1.9
   - 涉及文件表：移除 RssParserByRule.kt，AnalyzeRule.kt 的 getElement 变更移到可选
+- [x] 2026-07-14 三批全部完成：检查点3验收通过，APK legado_app_3.26.071419.apk，4文件+106行变更
 - [ ] 待记录（实施阶段问题）...

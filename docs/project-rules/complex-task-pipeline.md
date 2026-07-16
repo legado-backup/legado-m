@@ -24,7 +24,7 @@ Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 | 阶段 | 动作 | 产出 |
 |------|------|------|
 | **Phase 1** | 3 个搜索子代理并行扫描，按 8-12 文件/组划分 | 文件分组清单 |
-| **Phase 2** | N 个分析子代理并行分析，生成临时文档到 `docs/temp-analysis/` | 临时分析文档 |
+| **Phase 2** | N 个分析子代理并行分析，结论直接写入 `docs/specs/{功能名}/design.md` | 分析结论 |
 | **Phase 3** | M 个验证子代理交叉对比临时文档 vs 现有文档 | ERROR/WARN/INFO 报告 |
 | **Phase 4** | K 个修复子代理基于验证报告精准修复 | 修复后的文档 |
 | **Phase 5** | 同步 AGENTS.md / overview.md / README.md 统计数字和索引 | 更新后的导航 |
