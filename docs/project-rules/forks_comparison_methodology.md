@@ -266,7 +266,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 
 #### 3.5.1 输出文档
 
-对比分析结果写入 `docs/temp-analysis/forks-{领域}-comparison.md`，格式：
+对比分析结果写入 `docs/specs/{功能名}/` 下的 design.md 对应章节，格式：
 
 ```markdown
 # Legado 延伸版本 {领域} 对比分析
@@ -419,10 +419,10 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 
 ## 六、输出规范
 
-### 6.1 临时分析文档
+### 6.1 分析文档
 
-- 位置：`docs/temp-analysis/`
-- 命名：`{领域}-comparison.md` 或 `{领域}-deep-analysis.md`
+- 位置：`docs/specs/{功能名}/` 下的 design.md 对应章节
+- 命名：在 design.md 中以章节形式组织
 - 行数上限：1000 行（超过说明分组过大，应拆分）
 - 必须包含：数据来源、对比方法、差异矩阵、借鉴建议
 
@@ -463,7 +463,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ## Alternatives Considered
 
 ### 方案A：借鉴蛋蛋Max 的 XXX
-- 来源：docs/temp-analysis/forks-{领域}-comparison.md 第 X 节
+- 来源：design.md 对比分析章节
 - 收益：XXX
 - 风险：XXX
 
@@ -499,17 +499,19 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 - [ ] 是否评估了每个差异的收益和风险？
 - [ ] 是否输出了借鉴决策表？
 - [ ] 是否记录了新的踩坑经验（如有）？
-- [ ] 是否将对比结论写入 `docs/temp-analysis/`？
+- [ ] 是否将对比结论写入 design.md 对应章节？
 - [ ] 是否在 OpenSpec 四文档中引用了对比结果？
 
 ---
 
 ## 九、参考案例
 
-- **网络层对比案例**：[docs/temp-analysis/forks-network-comparison.md](../temp-analysis/forks-network-comparison.md)（2026-07-06，442 行）
-- **前端对比案例**：[docs/temp-analysis/forks-frontend-analysis.md](../temp-analysis/forks-frontend-analysis.md)（2026-07-06，323 行）
-- **Cronet 深度分析案例**：[docs/temp-analysis/cronent-deep-analysis.md](../temp-analysis/cronent-deep-analysis.md)（2026-07-06，498 行）
-- **多线程深度分析案例**：[docs/temp-analysis/multithreading-deep-analysis.md](../temp-analysis/multithreading-deep-analysis.md)（2026-07-06，1060 行）
+> 以下案例原位于 `docs/temp-analysis/`，已清理。分析结论已沉淀到对应功能的设计文档中。
+
+- **网络层对比案例**：已沉淀至 [network-perf-stability/design.md](../specs/network-perf-stability/design.md)
+- **前端对比案例**：已沉淀至对应 specs/ 设计文档
+- **Cronet 深度分析案例**：已沉淀至 [network-perf-stability/design.md](../specs/network-perf-stability/design.md)
+- **多线程深度分析案例**：已沉淀至 [app-stability-round2/design.md](../specs/app-stability-round2/design.md)
 
 ---
 

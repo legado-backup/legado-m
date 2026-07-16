@@ -149,18 +149,20 @@ P3 暂缓实施（5 项高风险优化，可能影响书源可用性）
 | [design.md](./design.md) | Technical Approach / Architecture Decisions（ADR Y-Statement）/ Data Flow / File Changes |
 | [tasks.md](./tasks.md) | `- [ ] X.Y` 格式任务清单 + AOAdapt 日志 |
 
-### 3.2 8 份临时分析文档（深度分析依据）
+### 3.2 深度分析依据（已沉淀至 design.md/spec.md）
 
-| 文档 | 行数 | 内容 |
-|------|------|------|
-| [cronent-deep-analysis.md](../../temp-analysis/cronent-deep-analysis.md) | 498 | Cronet 组件深度分析 |
-| [httpclient-deep-analysis.md](../../temp-analysis/httpclient-deep-analysis.md) | 652 | HttpClient 组件深度分析 |
-| [multithreading-deep-analysis.md](../../temp-analysis/multithreading-deep-analysis.md) | 1060 | 多线程组件深度分析 |
-| [webview-deep-analysis.md](../../temp-analysis/webview-deep-analysis.md) | 550 | WebView 组件深度分析 |
-| [forks-network-comparison.md](../../temp-analysis/forks-network-comparison.md) | 442 | 延伸版本网络层对比 |
-| [forks-frontend-analysis.md](../../temp-analysis/forks-frontend-analysis.md) | 323 | 延伸版本前端分析 |
-| [optimization-impact-analysis.md](../../temp-analysis/optimization-impact-analysis.md) | 1471 | 优化点对现有功能影响分析 |
-| [forks-missing-features.md](../../temp-analysis/forks-missing-features.md) | 904 | 延伸版本缺失功能分析 |
+> 以下临时分析文档已清理，分析结论已沉淀到本 spec 的 design.md 和 spec.md 中。
+
+| 原文档 | 行数 | 内容 |
+|--------|------|------|
+| cronent-deep-analysis.md | 498 | Cronet 组件深度分析 |
+| httpclient-deep-analysis.md | 652 | HttpClient 组件深度分析 |
+| multithreading-deep-analysis.md | 1060 | 多线程组件深度分析 |
+| webview-deep-analysis.md | 550 | WebView 组件深度分析 |
+| forks-network-comparison.md | 442 | 延伸版本网络层对比 |
+| forks-frontend-analysis.md | 323 | 延伸版本前端分析 |
+| optimization-impact-analysis.md | 1471 | 优化点对现有功能影响分析 |
+| forks-missing-features.md | 904 | 延伸版本缺失功能分析 |
 
 ### 3.3 子规范文档
 

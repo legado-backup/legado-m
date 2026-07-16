@@ -211,7 +211,7 @@ gh repo edit syq17496152/legado --visibility public --accept-visibility-change-c
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| `modules/rhino/lib/rhino-1.7.14.jar` | ~1.5 MB | Rhino JS 引擎（锁定版本，不变更） |
+| ~~`modules/rhino/lib/rhino-1.7.14.jar`~~ | ~~~1.5 MB~~ | ~~已移除（改用 Gradle 依赖 `libs.mozilla.rhino`）~~ |
 | `app/cronetlib/*.jar` | ~数 MB | Cronet 网络库（锁定版本） |
 | `.trae/skills/legado-source-creator/tools/legado-jvm.jar` | ~数 MB | JVM 仿真器 |
 
