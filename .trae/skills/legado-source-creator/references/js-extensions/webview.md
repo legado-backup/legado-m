@@ -256,17 +256,28 @@ result=u+','+JSON.stringify({
 
 webView() 可自动通过 Cloudflare JS Challenge（5秒盾），因为 WebView 是真实浏览器引擎，会执行 CF 的验证 JS。
 
-### loginUrl 中使用
-```javascript
-@js:java.webView(null, source.sourceUrl, null, false);
-```
+> ⚠️ **重要修正**（2026-07-17）：原推荐的 `loginUrl: "@js:java.webView(null, source.sourceUrl, null, false);"` 已被源码验证为**错误**——[WebViewLoginFragment.loadUrl()](../../../../../../app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt) 直接把 loginUrl 当 URL 加载，**不识别 `@js:` 形式**。`@js:` 形式仅在 SourceLoginDialog 中有效（且需 `loginUi` 非空才走该分支）。
 
-### 执行流程
-1. webView() 加载页面 → 自动执行 CF JS Challenge → CF 验证通过
-2. cf_clearance Cookie → CookieManager → CookieStore（onPageFinished 自动同步）
-3. 后续 OkHttp 请求自动携带 Cookie
+### 正确用法（不通过 loginUrl 触发）
+
+CF 绕过的正确流程：
+
+1. `loginUrl` 设为**普通首页 URL**（如 `https://example.com/`）
+2. `loginCheckJs` 检测到 CF 时返回 `'CF_BLOCKED'` 标识（不调 `java.startBrowserAwait()`，避免陷阱#57 无限循环）
+3. 用户手动点击"登录"按钮 → SourceLoginActivity → WebViewLoginFragment.loadUrl(loginUrl) 加载首页
+4. WebView 自动执行 CF JS Challenge → Cookie 写入 CookieManager → onPageFinished 同步到 CookieStore
+
+### webView() 方法的其他用途（非 loginUrl）
+
+webView() 方法本身可用于在 JS 规则中获取**渲染后的 HTML**（如 PJAX 站点空壳 HTML，陷阱#50），此时返回值为渲染后的 HTML 字符串。
+
+### 执行流程（用户手动触发）
+1. 用户点击"登录"按钮 → WebView 加载 loginUrl（普通 URL）
+2. WebView 自动执行 CF JS Challenge → CF 验证通过
+3. cf_clearance Cookie → CookieManager → CookieStore（onPageFinished 自动同步）
+4. 后续 OkHttp 请求自动携带 Cookie
 
 ### 注意事项
 - webView() 是同步阻塞操作（5-10秒），不适合放在 loginCheckJs 中
-- 仅能自动通过 JS Challenge，Turnstile/Interactive 需 startBrowserAwait()
-- 返回值为渲染后 HTML（String?），在 loginUrl 中被忽略，仅用于触发 Cookie 同步
+- 仅能自动通过 JS Challenge，Turnstile/Interactive 需用户手动操作
+- **loginUrl 中禁止使用 `@js:java.webView(...)` 形式**（源码锚定：WebViewLoginFragment.loadUrl 不识别 @js: 形式）

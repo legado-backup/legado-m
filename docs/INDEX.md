@@ -113,6 +113,7 @@
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
 | [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
+| [specs/legado-skill-optimization-v2/](./specs/legado-skill-optimization-v2/) | Legado Skill V2 优化（聚焦修复错误知识+门禁强化+架构瘦身，避免历次"声称完成≠实际生效"陷阱） 🔄 设计中 |
 | [specs/legado-skill-v2-rebuild/](./specs/legado-skill-v2-rebuild/) | Legado Skill V2 重建 |
 | [specs/skill-core-capability-rebuild/](./specs/skill-core-capability-rebuild/) | Skill 核心能力重建 |
 | [specs/skill-usability-optimization/](./specs/skill-usability-optimization/) | Skill 可用性优化 |
@@ -122,6 +123,7 @@
 | [specs/dependency-upgrade-optimization/](./specs/dependency-upgrade-optimization/) | 依赖升级性能优化+minSdk迁移（Coroutines 9.8x+Lifecycle 2.11+Core 1.19+7组AndroidX升级+OkHttp 5.4+WebView修复） ✅ 实施完成 |
 | [specs/legado-skill-unified-redesign/](./specs/legado-skill-unified-redesign/) | Legado Skill 统一重设计 |
 | [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构） ✅ 实施完成（P0+P1），待真机验证 |
+| [specs/ssl-handshake-investigation/](./specs/ssl-handshake-investigation/) | SSL握手失败根因排查（net_error -101）：OkHttp升级路径审计+WebView链路审计，结论"非升级导致" ✅ 调查完成 |
 | [specs/e2e-automated-testing/](./specs/e2e-automated-testing/) | APK 端到端自动化测试验证系统（MEmu+uiautomator2+AI 日志分析，一键打包→装包→跑用例→出报告） 🔄 设计中 |
 | [specs/e2e-ui-executor-hardening/](./specs/e2e-ui-executor-hardening/) | E2E UI 执行器加固（scroll_find 滚动查找/自愈重构/失败跳过/dismiss_dialogs 误判修复/规则分析器 uiautomator2 崩溃排除/证据收集路径修复/测试用例对齐 Compose UI） ✅ 实施完成，单用例 pass_rate=100% |
 | [specs/apk-size-optimization/](./specs/apk-size-optimization/) | APK 体积审核与精简优化（v3：debug APK解压分析+打包技术手段全量评估，已用所有稳定优化，零功能影响预估-2.5~3.5MB，附折中选项） 🔄 设计中 |

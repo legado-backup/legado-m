@@ -87,7 +87,7 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 | 50 | PJAX空壳HTML | 用`java.webView()`获取渲染后内容 |
 | 52 | ajax()返回String | 获取byte[]必须用`Packages.okhttp3.OkHttpClient()` |
 | 53 | Mirages图片加密 | AES-CBC解密→详见`references/troubleshooting/crypto-traps.md` |
-| 54 | CF JS Challenge | webView()自动通过（loginUrl中调用） |
+| 54 | CF JS Challenge | ⚠️ loginUrl **不能**用 `@js:java.webView()`！必须是普通 URL，用户手动点击登录后 WebView 自动通过 CF（源码锚定：`app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt` 的 loadUrl 不识别 @js: 形式） |
 | 55 | loginCheckJs必须返回StrResponse | loginCheckJs返回值必须是StrResponse对象（非String），否则解析失败 |
 | 56 | CF Cookie同步 | WebView→CookieStore自动同步（onPageFinished） |
 | 57 | loginCheckJs无限循环 | loginCheckJs每次请求都执行，检测CF弹浏览器→通过→又检测→无限循环。CF站不要设loginCheckJs |
@@ -142,16 +142,60 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 
 ## JVM 测试基础设施
 
-> **定位**：JVM 服务端是**可选的测试工具，非必须依赖**。纯 Python 覆盖率 35-40%，JVM 提升到 85-90%。JVM 不可用时自动降级到 verify-source.py，工作流不中断。完整详情（legado-jvm架构/API速查/使用示例/ajax差异/可信度标注/降级路径）：[references/jvm-infrastructure.md](./references/jvm-infrastructure.md)
+> **定位**（v2 修正声明，2026-07-17）：JVM 服务端是**可选的测试工具，非必须依赖**。纯 Python 覆盖率 35-40%，JVM 提升**规则引擎层**到 85-90%（**❌ 不覆盖** WebView/Activity/Cookie同步）。JVM 不可用时自动降级到 verify-source.py，工作流不中断。完整详情（legado-jvm架构/API速查/使用示例/ajax差异/可信度标注/降级路径）：[references/jvm-infrastructure.md](./references/jvm-infrastructure.md)
 
-**legado-jvm 覆盖能力**：legado-jvm 从 Legado 源码抽取完整规则引擎（Rhino JS 引擎 + jsoup CSS + hutool 加密 + AnalyzeRule），覆盖率 85-90%，无需按场景选择 legado-jvm。
-**降级**：JVM可用→debug-source.py(首选) → JVM不可用→verify-source.py+手动curl → 网站不可访问→标记需真机验证
+**legado-jvm 覆盖能力**（v2 修正声明，2026-07-17）：legado-jvm 从 Legado 源码抽取完整规则引擎，**规则引擎层覆盖率 85-90%**（Rhino JS 引擎 + jsoup CSS + hutool 加密 + AnalyzeRule）。**❌ 不覆盖**：Android WebView 系统组件 / Activity 生命周期 / Cookie 自动同步 / 真机网络栈。涉及 WebView 字段（loginUrl/loginCheckJs/cookie）时**必须**走 Phase 0 源码验证 + 真机测试，不可依赖 JVM 仿真。
+**降级**：JVM可用→debug-source.py(首选) → JVM不可用→verify-source.py+手动curl → 网站不可访问→标记需真机验证 → 涉及WebView字段→强制Phase 0+真机
 
 ---
 
-## 核心工作流（5阶段闭环）
+## Phase 0 源码验证门禁（v2 新增，强制执行）
 
-> **MANDATORY流程！** 经验优先→构建规则→测试驱动→源码深挖→经验反哺。测试失败必须进Phase 4。
+> **触发条件**（任一即触发）：涉及以下字段/方法时**必须**先执行源码验证，再写入 references/ 或 basic-memory：
+> - `loginUrl` / `loginCheckJs` / `loginUi`
+> - `webView` / `startBrowserAwait` / `startBrowser`
+> - `cookie` / `CookieStore` / `CookieManager`
+> - `ruleContent` 中涉及视频播放器配置
+> - `header` 中 @js: 形式
+
+> **根因**（2026-07-17 v2 修正）：原 cf-bypass.md 推荐 `loginUrl: @js:java.webView(null, source.sourceUrl, null, false);` 被源码证伪——[WebViewLoginFragment.loadUrl()](../../../app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt) 不识别 `@js:` 形式。错误经验一旦写入会反复强化，必须在写入前拦截。
+
+### Phase 0 执行步骤（强制）
+
+1. **Grep Legado 源码**定位字段实际使用位置：
+   ```
+   Grep "loginUrl" app/src/main/java/io/legado/app/ --type kotlin
+   ```
+2. **Read 关键源码文件**确认实现（不依赖记忆/经验）：
+   - `loginUrl` → `app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt`
+   - `loginCheckJs` → `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt`
+   - `Cookie 同步` → `app/src/main/java/io/legado/app/help/http/BackstageWebView.kt`
+3. **在 references/ 中带 `source_ref:` 字段**记录源码位置：
+   ```
+   source_ref: app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt#L123-L145
+   ```
+4. **写入 basic-memory 时带 `verified_against_source:` 字段**：
+   ```
+   metadata={"verified_against_source": "app/src/.../Xxx.kt#L123", "verified_date": "2026-07-17"}
+   ```
+
+### Phase 0 失败处理
+
+- 无法找到源码依据时，**禁止**写入 references/ 和 basic-memory
+- 记录为"Phase 0 未通过，需真机验证"
+- 标记 `needsUserIntervention=true`，由用户手动测试验证
+
+### Phase 0 通过条件
+
+- ✅ 找到源码位置（带行号）
+- ✅ references/ 中带 `source_ref:` 字段
+- ✅ basic-memory 中带 `verified_against_source:` 字段
+
+---
+
+## 核心工作流（6阶段闭环，Phase 0-5）
+
+> **MANDATORY流程！** Phase 0源码验证→经验优先→构建规则→测试驱动→源码深挖→经验反哺。涉及 WebView/loginUrl/loginCheckJs/cookie 字段时**必须**先执行 Phase 0。测试失败必须进Phase 4。
 
 ### Phase 1: 经验优先
 
@@ -196,10 +240,10 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
    - **BookSource 构建顺序**：searchUrl → ruleSearch → ruleBookInfo → ruleToc → ruleContent
    - **RssSource 构建顺序**：sourceUrl → ruleArticles → ruleTitle/ruleLink/ruleImage → ruleContent（详见"订阅源核心差异"章节 + `references/source-analysis/rss-source-entity.md`）
 4. **处理特殊场景**：
-   - CF反爬 → `references/special-scenarios/anti-crawl.md`，使用三级策略：
-     - JS Challenge → loginUrl: `@js:java.webView(null, source.sourceUrl, null, false);`
-     - Turnstile → loginCheckJs: `java.startBrowserAwait(source.sourceUrl, '通过Cloudflare验证');`
-     - Interactive → loginCheckJs: `java.startBrowserAwait(source.sourceUrl, '通过验证');`
+   - CF反爬 → `references/special-scenarios/cf-bypass.md`（v2 已修正），使用三级策略：
+     - JS Challenge → loginUrl 设为**普通首页 URL**（禁止用 `@js:java.webView(...)`，源码锚定：WebViewLoginFragment.loadUrl 不识别 @js: 形式）；用户手动点击"登录"按钮触发 WebView 加载
+     - Turnstile → loginCheckJs 检测到 CF 时返回 `'CF_BLOCKED'` 标识字符串（禁止直接调 `java.startBrowserAwait()`，会触发陷阱#57 无限循环）；由用户手动触发登录
+     - Interactive → 同 Turnstile 策略
    - 登录/验证码 → `references/special-scenarios/login.md` + `captcha.md`
    - 加密 → `references/special-scenarios/encryption.md` + `references/js-patterns/crypto-patterns.md`
    - 视频/图片 → `references/special-scenarios/video-audio.md`（**5.6节 type=2 内置播放器 ruleContent 编写指南：单URL/多行URL/JSON数组/嵌套JSON多线路四种格式**）+ `rss-advanced.md`（**7.10/7.11节 方案C type=2 内置播放器决策树**）+ `encrypted-images.md` + `templates/` 播放器模板
@@ -227,7 +271,7 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
    > > **实现状态**：已实现（V2 重建阶段 6.3 完成）。debug_runner.py 在 FileNotFoundError（JAR 缺失）和 RuntimeError（Java 缺失/启动失败/ping 失败/启动超时）时自动降级到 Python 模式，输出 `[WARN] JAR 仿真服务端不可用，降级到 Python 模式` 并调用 `_run_python_fallback` 执行 verify-source.py 基本校验。
    >
    > **错误诊断闭环**（新增）：JAR 失败时自动调用 error_diagnoser 诊断错误类型，可自动修复的错误（CSS选择器未匹配/URL格式错误等）调用 auto_fixer 自动修复后重试（最多3次），需用户介入的错误（登录/验证码/CF破盾）调用 user_interaction 生成交互请求。
-   > > **实现状态**：已实现（V2 重建阶段 5.1/5.2/7.9 完成）。debug_runner.apply_auto_fix() 薄壳包装 auto_fixer.auto_fix_error()，接入 14 种自动修复（rule_parse/css/url_empty/network/rule_empty/relative_url/css_selector_empty/js_error/http_403/field_missing/syntax_error/cf_challenge/search_empty）+ 4 种需用户介入（need_login/jar_crash/jar_timeout/behavior_mismatch）。verify_fix() 调用 debug_book_source/debug_rss_source 执行端到端规则验证。阶段7.9新增并修复三处 BUG：①fix_cf_bypass（CF盾 loginUrl+WebView 绕过：配置 `loginUrl=@js:java.webView(null,"{url}",null,false)` 触发 WebView 自动通过 CF JS Challenge，Cookie 自动同步 CookieStore，陷阱#54；移除有 Rhino 1.8.1 语法错误的 `<js>java.ajax()</js>` 块；禁止设置 loginCheckJs 防止无限循环，陷阱#57；补全 UA/Accept/Referer headers）②fix_website_revamp（网站改版重分析：获取HTML→BeautifulSoup分析DOM→生成新CSS选择器；SSR/SPA降级配置 loginUrl+WebView 渲染动态内容，Nuxt.js/Next.js/Vue SSR）③fix_css_selector（无HTML时不修改选择器，禁止破坏性驼峰转换/模糊匹配；有HTML时用BeautifulSoup验证选择器是否匹配）。
+   > > **实现状态**：已实现（V2 重建阶段 5.1/5.2/7.9 完成；2026-07-17 v2 修正 cf-bypass 错误）。debug_runner.apply_auto_fix() 薄壳包装 auto_fixer.auto_fix_error()，接入 14 种自动修复（rule_parse/css/url_empty/network/rule_empty/relative_url/css_selector_empty/js_error/http_403/field_missing/syntax_error/cf_challenge/search_empty）+ 4 种需用户介入（need_login/jar_crash/jar_timeout/behavior_mismatch）。verify_fix() 调用 debug_book_source/debug_rss_source 执行端到端规则验证。阶段7.9新增并修复三处 BUG：①fix_cf_bypass（CF盾绕过：v2 修正后 loginUrl 设为**普通首页 URL**，禁止用 `@js:java.webView(null,...)` 形式——源码锚定 WebViewLoginFragment.loadUrl() 不识别 @js:；用户需手动点击"登录"按钮触发 WebView 加载；移除有 Rhino 1.8.1 语法错误的 `<js>java.ajax()</js>` 块；禁止设置 loginCheckJs 防止无限循环，陷阱#57；补全 UA/Accept/Referer headers）②fix_website_revamp（网站改版重分析：获取HTML→BeautifulSoup分析DOM→生成新CSS选择器；SSR/SPA降级 loginUrl 设为普通 URL，用户手动触发 WebView 渲染动态内容，Nuxt.js/Next.js/Vue SSR）③fix_css_selector（无HTML时不修改选择器，禁止破坏性驼峰转换/模糊匹配；有HTML时用BeautifulSoup验证选择器是否匹配）。
 
    **脚本选择决策树**：
    ```
@@ -302,7 +346,7 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 | CF JS Challenge 绕过 | JsExtensions.kt (webView方法) |
 | Cookie 同步机制 | CookieStore.kt + BackstageWebView.kt |
 | loginCheckJs 执行 | Rss.kt (L53-77) |
-| loginUrl 执行 | SourceLoginDialog.kt |
+| loginUrl 执行 | `WebViewLoginFragment.kt` (loadUrl 方法，不识别 @js: 形式) + `SourceLoginDialog.kt` (仅 loginUi 非空时走 @js: 分支) |
 
 > **源码访问**：本项目中 `app/src/main/java/` 下可直接读取，或从 GitHub [gedoor/legado](https://github.com/gedoor/legado) 获取最新版。
 

@@ -36,11 +36,11 @@ L4: Legado源码               ← 绝对真相：不可变
 
 ### JVM 测试基础设施
 
-> 纯Python模拟覆盖率仅35-40%，JVM仿真器提升到85-90%。环境要求：JDK 17+。
+> **v2 修正声明**（2026-07-17）：纯Python模拟覆盖率仅35-40%，JVM仿真器提升**规则引擎层**到85-90%。**❌ 不覆盖**：Android WebView 系统组件 / Activity 生命周期 / Cookie 自动同步 / 真机网络栈。涉及 WebView 字段（loginUrl/loginCheckJs/cookie）时**必须**走 Phase 0 源码验证 + 真机测试。环境要求：JDK 17+。
 
 | JAR 文件 | 覆盖率 | 能力 |
 |----------|--------|------|
-| `legado-jvm/build/libs/legado-jvm.jar` | 85-90% | 从 Legado 源码抽取的完整规则引擎（最高覆盖率） |
+| `legado-jvm/build/libs/legado-jvm.jar` | **规则引擎层** 85-90% | 从 Legado 源码抽取的完整规则引擎（Rhino JS + jsoup CSS + hutool 加密 + AnalyzeRule）。**❌ 不覆盖** WebView/Activity/Cookie同步/真机网络栈 |
 
 **Python客户端**：`tools/rule_engine_client.py`（JDK自动检测+JAR多路径回退）
 **共享模块**：`tools/jvm_helpers.py`（add_jvm_args/init_jvm_client/assess_confidence）

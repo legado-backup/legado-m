@@ -697,15 +697,17 @@ def _identify_book_list(soup) -> dict:
 
 
 def fix_cf_bypass(error, source_json, html=None):
-    """CF盾自动绕过：loginUrl+WebView + UA增强 + Referer添加。
+    """CF盾自动绕过：loginUrl 设为普通首页 URL + UA增强 + Referer添加。
 
-    策略（基于陷阱#54/#57源码核实）：
-    1. 配置loginUrl触发WebView加载首页（WebView自动执行CF JS Challenge，Cookie自动同步CookieStore）
-    2. 补全真实浏览器headers（UA/Accept/Referer）到searchUrl配置块和源级header
-    3. 禁止设置loginCheckJs（陷阱#57：会导致无限循环）
+    策略（基于陷阱#54/#57源码核实，2026-07-17 v2 修正）：
+    1. loginUrl 设为**普通首页 URL**（不可用 @js:java.webView(...)，源码锚定：
+       WebViewLoginFragment.loadUrl() 不识别 @js: 形式）
+    2. 用户需手动点击"登录"按钮触发 WebView 加载 → 自动通过 CF JS Challenge
+    3. 补全真实浏览器headers（UA/Accept/Referer）到searchUrl配置块和源级header
+    4. 禁止设置loginCheckJs（陷阱#57：会导致无限循环）
 
     常见修正：
-    1. loginUrl配置WebView（CF JS Challenge自动通过）
+    1. loginUrl 设为普通 URL（用户手动触发登录后 WebView 自动通过 CF）
     2. searchUrl配置块补全headers（含Referer）
     3. 源级header补全
     """
@@ -726,14 +728,15 @@ def fix_cf_bypass(error, source_json, html=None):
     if base_url_clean:
         default_headers['Referer'] = base_url_clean
 
-    # 1. 配置loginUrl触发WebView（CF JS Challenge自动通过，陷阱#54）
-    # 禁止设置loginCheckJs（陷阱#57：CF站设loginCheckJs会导致无限循环）
+    # 1. loginUrl 设为普通首页 URL（v2 修正：禁止用 @js:java.webView(...) 形式）
+    # 源码锚定：app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt 的 loadUrl 不识别 @js:
+    # 用户需手动点击"登录"按钮触发 WebView 加载，WebView 自动执行 CF JS Challenge
     if base_url_clean:
-        webview_login = f'@js:java.webView(null, "{base_url_clean}", null, false);'
+        # loginUrl 设为普通 URL（用户手动触发登录后 WebView 自动通过 CF）
         existing_login = source.get('loginUrl', '')
-        if existing_login != webview_login:
-            source['loginUrl'] = webview_login
-            fixes.append('CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）')
+        if existing_login != base_url_clean:
+            source['loginUrl'] = base_url_clean
+            fixes.append(f'CF绕过: loginUrl 设为普通 URL（用户需手动点击"登录"按钮触发 WebView 加载首页，自动通过 CF JS Challenge）')
         # 移除loginCheckJs（如果存在，防止无限循环）
         if 'loginCheckJs' in source:
             del source['loginCheckJs']
@@ -817,13 +820,15 @@ def fix_website_revamp(error, source_json, html=None):
 
     # 检测SSR/SPA
     if _is_ssr_spa(html):
-        # SSR/SPA网站需要WebView渲染，配置loginUrl触发WebView（陷阱#54）
+        # SSR/SPA网站需要 WebView 渲染动态内容
+        # v2 修正（2026-07-17）：loginUrl 设为普通首页 URL，禁止用 @js:java.webView(...)
+        # 源码锚定：WebViewLoginFragment.loadUrl() 不识别 @js: 形式
         base_url = source.get('bookSourceUrl') or source.get('sourceUrl') or ''
         base_url_clean = re.sub(r'#.*$', '', base_url).strip()
         if base_url_clean:
-            webview_login = f'@js:java.webView(null, "{base_url_clean}", null, false);'
-            source['loginUrl'] = webview_login
-            fixes.append('SSR/SPA降级: loginUrl配置WebView（渲染动态内容，Nuxt.js/Next.js/Vue SSR）')
+            # loginUrl 设为普通 URL，用户手动点击"登录"后 WebView 加载并渲染动态内容
+            source['loginUrl'] = base_url_clean
+            fixes.append('SSR/SPA降级: loginUrl 设为普通 URL（用户手动点击"登录"按钮后 WebView 加载并渲染动态内容，Nuxt.js/Next.js/Vue SSR）')
             # 移除loginCheckJs（防止无限循环）
             if 'loginCheckJs' in source:
                 del source['loginCheckJs']

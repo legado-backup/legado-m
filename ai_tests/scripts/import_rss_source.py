@@ -62,7 +62,15 @@ def pull_db(tmp_path):
     # pull WAL/SHM（可能不存在，忽略失败）
     run_adb(f"pull /sdcard/legado.db-wal {tmp_path}-wal")
     run_adb(f"pull /sdcard/legado.db-shm {tmp_path}-shm")
-    print(f"✅ DB pulled to {tmp_path} (含WAL/SHM)")
+    # 删除本地WAL/SHM文件，避免sqlite3打开时报"database disk image is malformed"
+    # 原因：pull的WAL文件可能与主DB不匹配（App被force-stop时WAL可能处于不一致状态）
+    # 安全性：App被force-stop后Room已将已提交事务checkpoint到主DB，WAL中数据已包含在主DB中
+    for ext in ['-wal', '-shm']:
+        wal_path = f"{tmp_path}{ext}"
+        if os.path.exists(wal_path):
+            os.unlink(wal_path)
+            print(f"  清理本地{ext}文件（避免malformed）")
+    print(f"✅ DB pulled to {tmp_path} (主DB，WAL/SHM已清理避免malformed)")
     return True
 
 

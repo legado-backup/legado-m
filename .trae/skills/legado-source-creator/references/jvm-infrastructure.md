@@ -6,7 +6,20 @@
 
 ## 核心问题
 
-纯 Python 模拟覆盖率仅 35-40%，JS 规则验证 0%。JVM 仿真器将覆盖率提升到 85-90%。
+> **v2 修正声明**（2026-07-17）：纯 Python 模拟覆盖率仅 35-40%，JS 规则验证 0%。JVM 仿真器将**规则引擎层**覆盖率提升到 85-90%。**❌ 不覆盖**：Android WebView 系统组件 / Activity 生命周期 / Cookie 自动同步 / 真机网络栈。涉及 WebView 字段（loginUrl/loginCheckJs/cookie）时**必须**走 Phase 0 源码验证 + 真机测试，不可依赖 JVM 仿真。
+
+### v2 能力边界明细
+
+| 层次 | 覆盖 | 不覆盖 |
+|------|------|--------|
+| 规则引擎层 | ✅ Rhino JS 引擎 / jsoup CSS / hutool 加密 / AnalyzeRule 规则解析（含自定义索引+组合逻辑） | - |
+| WebView 层 | - | ❌ Android WebView 系统组件（loadUrl/onPageFinished/shouldInterceptRequest 等） |
+| Activity 层 | - | ❌ Activity 生命周期 / Fragment 事务 / UI 事件 |
+| Cookie 层 | - | ❌ CookieManager → CookieStore 自动同步（onPageFinished 触发） |
+| 网络栈层 | - | ❌ 真机网络栈（BoringSSL/Cronet/OkHttp 真实请求） |
+| UI 交互层 | - | ❌ SourceLoginDialog / SourceLoginActivity 用户交互 |
+
+> **重要**：涉及上表"不覆盖"层次的功能时，JVM 测试通过**不代表**真机一定能工作。必须走 Phase 0 源码验证 + 真机测试。
 
 ---
 

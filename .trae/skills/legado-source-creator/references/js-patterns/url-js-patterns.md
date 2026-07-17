@@ -158,14 +158,27 @@ while ((match = reg.exec(result)) !== null) {
 
 ## CF 绕过模式
 
-### JS Challenge 自动通过
-```javascript
-@js:java.webView(null, source.sourceUrl, null, false);
-```
-适用：CF JS Challenge（5秒盾），webView() 自动执行验证 JS，Cookie 自动同步。
+> ⚠️ **重要修正**（2026-07-17）：原推荐的 `@js:java.webView(null, source.sourceUrl, null, false);` 用作 loginUrl 已被源码验证为**错误**——WebViewLoginFragment.loadUrl() 不识别 @js: 形式。详见 [cf-bypass.md](../special-scenarios/cf-bypass.md)。
+
+### JS Challenge 正确绕过流程
+
+CF JS Challenge（5秒盾）的正确绕过方式：
+
+1. `loginUrl` 设为**普通首页 URL**（不可用 `@js:java.webView(...)` 形式）
+2. `loginCheckJs` 检测到 CF 时返回 `'CF_BLOCKED'` 标识字符串
+3. 用户手动点击"登录"按钮触发 WebView 加载首页 → 自动通过 CF JS Challenge
+4. Cookie 通过 onPageFinished 自动同步到 CookieStore
 
 ### Turnstile 手动通过（降级方案）
+
 ```javascript
-@js:java.startBrowserAwait(source.sourceUrl, '通过Cloudflare验证');
+// 在 loginCheckJs 中检测（不直接调用 startBrowserAwait，避免陷阱#57 无限循环）
+var s = result.body() + '';
+if (s.indexOf('cf_chl_opt') != -1) {
+    'CF_BLOCKED';  // 返回标识，由用户手动触发登录
+} else {
+    result;
+}
 ```
+
 适用：CF Turnstile/Interactive Challenge，需用户手动操作。
