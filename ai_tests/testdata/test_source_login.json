@@ -1,0 +1,20 @@
+[
+  {
+    "sourceUrl": "https://mjv012.com",
+    "sourceName": "测试源A",
+    "sourceComment": "问题7登录测试",
+    "enabledCookieJar": 1,
+    "loginUrl": "https://mjv012.com",
+    "header": "",
+    "ruleArticles": "",
+    "ruleNextPage": "",
+    "sortUrl": "",
+    "customOrder": 0,
+    "enabled": 1,
+    "type": 0,
+    "style": 0,
+    "articleStyle": 0,
+    "singleUrl": 0,
+    "lastHost": null
+  }
+]
