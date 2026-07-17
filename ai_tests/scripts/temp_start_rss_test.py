@@ -5,6 +5,7 @@ import sys
 import os
 import sqlite3
 import time
+import re
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -16,6 +17,16 @@ DB = r'f:\myself\github\WeAgentChat\temp\legado\temp\query_db.db'
 def adb(*args, timeout=30):
     cmd = [ADB, '-s', HOST] + list(args)
     return subprocess.run(cmd, capture_output=True, timeout=timeout, text=False)
+
+def sanitize(line):
+    """脱敏：移除完整 URL，截断长行（但保留 DecompressDebug/CookieDebug 完整行）"""
+    line = re.sub(r'https?://[^\s,]+', '[URL]', line)
+    # DecompressDebug/CookieDebug 行不截断（需要完整信息分析）
+    if 'DecompressDebug' in line or 'CookieDebug' in line:
+        return line
+    if len(line) > 250:
+        return line[:120] + f'...[truncated {len(line)-120} chars]'
+    return line
 
 # 1. 从数据库查询第一个有 loginUrl 的源的 sourceUrl
 print('--- query sourceUrl from DB ---')
@@ -69,31 +80,17 @@ print('--- wait 15s ---')
 time.sleep(15)
 
 # 8. 抓取日志（只过滤技术 tag，不输出完整 URL）
-print('\n=== CronetDebug logcat ===')
+print('\n=== All AppLog (Legado tag) ===')
 r = adb('logcat', '-d', '-s', 'Legado:I', timeout=15)
 logs = r.stdout.decode('utf-8', errors='replace')
-# 过滤包含 CronetDebug 或 CookieDebug 的行
 for line in logs.split('\n'):
-    if 'CronetDebug' in line or 'CookieDebug' in line or 'Cronet 协议错误' in line or 'Cronet 请求失败' in line:
-        # 脱敏：移除完整 URL，只保留路径片段
-        import re
-        # 移除 http:// 或 https:// 开头的 URL
-        safe_line = re.sub(r'https?://[^\s,]+', '[URL]', line)
-        print(safe_line)
+    if any(kw in line for kw in ['CronetDebug', 'CookieDebug', 'DecompressDebug', 'Cronet 协议错误', 'Cronet 请求失败', 'Cronet install failed']):
+        print(sanitize(line))
 
-print('\n=== sourceDebug logcat (last 3000 chars) ===')
+print('\n=== sourceDebug logcat (last 30 lines, sanitized) ===')
 r = adb('logcat', '-d', '-s', 'sourceDebug:D', timeout=15)
 logs = r.stdout.decode('utf-8', errors='replace')
-# 脱敏：移除完整 URL
-import re
-safe_logs = re.sub(r'https?://[^\s,]+', '[URL]', logs)
-# 截断长行（避免输出大量乱码）
-safe_lines = []
-for line in safe_logs.split('\n'):
-    if len(line) > 200:
-        safe_lines.append(line[:100] + f'...[truncated {len(line)-100} chars]')
-    else:
-        safe_lines.append(line)
+safe_lines = [sanitize(line) for line in logs.split('\n')]
 print('\n'.join(safe_lines[-30:]))
 
 print('\n=== Done ===')
