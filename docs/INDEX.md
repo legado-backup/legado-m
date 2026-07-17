@@ -151,6 +151,7 @@
 | [specs/global-issue-fix-and-spec-sedimentation/](./specs/global-issue-fix-and-spec-sedimentation/) | 全局问题修复与规范沉淀（13项用户反馈：数据库升级覆盖安装+高亮规则崩溃+校验逻辑重构+lastHost三层回填+UI Bug修复+工程规范沉淀机制+全局思考检查清单） 🔄 设计中 |
 | [specs/v3.26.0717-bug-fix-batch/](./specs/v3.26.0717-bug-fix-batch/) | v3.26.0717 真机测试 Bug 批量修复（6问题：订阅源并发显示+颜色选择器主题+替换规则崩溃+设置项数值显示+域名分组排序+视图布局评估） 🔄 设计中 |
 | [specs/rss-parse-optimization/](./specs/rss-parse-optimization/) | 订阅源解析全流程性能优化（5维度22个优化点：5个P1+17个P2，核心6项分三批实施：Pattern缓存+RssArticle索引/scriptCache全局共享+HTTP响应缓存/解密缓存扩容+预连接） ✅ 全部完成（检查点3验收通过，4文件+106行变更，APK legado_app_3.26.071419.apk） |
+| [specs/source-layout-bookshelf-style/](./specs/source-layout-bookshelf-style/) | Issue-6 书源/订阅源布局参考书架重构（方案D：3个XML重构+SourceExt.kt新建+4个Adapter适配+订阅源upSourceHost链路改造+RssSourceActivity异常输入修复，21个ADR） ✅ 实施完成（编译通过+真机启动无崩溃，APK legado_app_3.26.071720.apk） |
 ### 归档 Specs
 
 | 文档 | 说明 |
