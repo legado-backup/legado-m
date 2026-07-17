@@ -1,10 +1,10 @@
 # Issues Found - v3.26.0717 真机测试深度分析
 
-> 状态统计：总计 7，已修复 6（含本轮 Issue-7 根因修复），加强修复 1（Issue-3），待验证 6（问题6评估）
+> 状态统计：总计 7，已修复 7（含本轮 Issue-7 真机验证通过），加强修复 1（Issue-3），待用户确认 1（问题6评估）
 > 日志来源：`temp/tmp/Downloadslogs.(1)..zip`
 > 日志版本：`versionName=3.26.071619debug`（7月16日19时编译，修复前版本）
-> 当前编译版本：`legado_app_3.26.071714.apk`（7月17日14时，含 Issue-7 根因修复）
-> Issue-7 验证版本：`legado_app_3.26.071714.apk`（已通过 L1+无回归+登录流程验证）
+> 当前编译版本：`legado_app_3.26.071718.apk`（7月17日18时，含 Issue-7 修复+调试日志清理）
+> Issue-7 最终验证版本：`legado_app_3.26.071718.apk`（真机验证：清空WebView→登录→多次刷新列表正常）
 
 ## 日志深度分析结论
 
@@ -171,21 +171,25 @@
 
 ### 真机验证
 
-- ✅ 编译安装成功（`legado_app_3.26.071714.apk`）
+- ✅ 编译安装成功（`legado_app_3.26.071718.apk`）
 - ✅ L1 验证通过：App 正常启动无崩溃
 - ✅ 无回归测试通过：源 RSS 加载 20/20 成功，cookie 正常发送
 - ✅ 登录流程验证：空 cookie（cookieLen=0）现在被正确缓存（修复前会被跳过）
 - ✅ 登录流程验证：非空 cookie（cookieLen=73）被正确保存
+- ✅ 最终端到端验证：清空WebView数据→登录→进入列表→多次刷新列表，cookie 始终保持87字节3个key，响应体正常（45KB+ HTML），列表数据正常展示
+- ✅ 调试日志确认：cookie 读取链路稳定，lruTriggered=false，无 LRU 误删
 
 ### 调试日志清理
 
-已清理以下文件中 Issue-7 调试日志（`[CookieDebug]`、`[DecompressDebug]`）：
-- `CookieStore.kt`：移除 setCookie/getCookie 调试日志及 `lruTriggered` 变量
+已清理以下文件中所有调试日志（`[CookieDebug]`、`[DecompressDebug]`、`[CookieTrace]`、`[RssDebug]`）：
+- `CookieStore.kt`：移除 setCookie/getCookie 调试日志及 `lruTriggered` 变量、调用栈追踪日志
 - `CookieManager.kt`：无调试日志（仅保留 issue7 修复注释作为文档）
 - `WebViewLoginFragment.kt`：移除 onPageStarted/onPageFinished 调试日志及 AppLog import
 - `DecompressInterceptor.kt`：移除全部解压调试日志，恢复简洁实现
 - `CronetCoroutineInterceptor.kt`：移除 cookie 注入调试日志及 AppLog import
 - `AnalyzeUrl.kt`：移除 setCookie 调试日志
+- `BackstageWebView.kt`：移除 setCookie 场景标记日志
+- `Rss.kt`：移除响应体预览日志
 
 ---
 
