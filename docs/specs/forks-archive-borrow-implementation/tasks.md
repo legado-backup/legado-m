@@ -5,6 +5,8 @@
 > **实施周期**：P0 立即启动 / P1 季度内 / P2 年度内（AI 执行，按依赖顺序实施，无工期估算）
 > **决策来源**：`docs/specs/forks-archive-comparison/final-adjustment.md` §四 v5.0 终版完整清单
 > **总览统计**：P0 14 项 / P1 19 项 / P2 21 项 = 54 项借鉴
+> **minSdk 一致性**（与 design.md ADR-022 一致）：所有任务统一遵循 minSdk 23（与本项目 `app/build.gradle:66` 实际一致）；引入新依赖或使用新 API 时需验证 minSdk 23 兼容性
+> **借鉴代码合并策略**（与 design.md ADR-010b 一致）：本项目优先 + fork 仓库参考；合并冲突时以本项目实现为准，fork 仓库仅作参考；涉及加密密钥的场景需实现密钥丢失恢复机制（从备份恢复 + 用户提示）
 
 ---
 
@@ -12,27 +14,34 @@
 
 > **特征**：收益≥4.5 + 风险≤2 + 复杂度低/中，100% 聚焦用户核心场景（看书/订阅/视频）
 > **v5.1 调整**：RSS-B-05/VIDEO-B-02/VIDEO-E-01/VIDEO-E-02 从 P1 升级 P0（基于 analysis-task-priority.md 用户价值再评估，评分 90-96）
+> **P0 数量说明**（与 analysis-task-priority.md 跨文档一致性）：P0=14 项（v5.1 调整后），analysis-task-priority.md §1.1 表格写 P0=10 是 v5.0 版本；本 tasks.md 以 v5.1 终版为准
+> **实施顺序**（与 design.md ADR-002 + R22 一致）：4 个组按文件隔离原则顺序执行（组间逻辑并行但物理串行，主 Agent 单线程），4 组分别为 RSS 组（1.1/1.5/1.7/1.8/1.11）、THEME 组（1.3/1.6）、EPUB 组（1.9/1.10）、VIDEO 组（1.4/1.12/1.13/1.14）+ DEPS（1.2）
+> **文件清单补充**（与 design.md 文件清单一致）：每个新增 Activity/界面组件的任务，除主体代码外必须同步修改 3 个文件：①`app/src/main/AndroidManifest.xml` 注册组件；②`app/src/main/res/values/strings.xml` 新增字符串；③`app/proguard-rules.pro` 新增 keep 规则。任务 1.1 已展开为子任务 1.1.5/1.1.6/1.1.7，其他新增界面任务按同模式补充
 
 ### 1.1 RSS-B-01: RssSearchActivity（用户价值 5.0）
-- [ ] 1.1.1 创建 RssSearchActivity.kt（基于 Archive 104 行实现，激活 searchUrl 字段）
+- [ ] 1.1.1 创建 RssSearchActivity.kt（继承 VMBaseActivity 本项目基类 `app/src/main/java/io/legado/app/base/VMBaseActivity.kt:9`；基于 Archive 104 行实现，激活 searchUrl 字段）
 - [ ] 1.1.2 创建 RssSearchViewModel.kt
 - [ ] 1.1.3 创建 RssSearchAdapter.kt
-- [ ] 1.1.4 RssFragment 添加搜索入口（5 行代码）
-- [ ] 1.1.5 单元测试覆盖搜索/分页/异常
-- [ ] 1.1.6 真机验证订阅内容搜索
+- [ ] 1.1.4 `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` 添加搜索入口（5 行代码）
+- [ ] 1.1.5 修改 `app/src/main/AndroidManifest.xml` 注册 RssSearchActivity
+- [ ] 1.1.6 修改 `app/src/main/res/values/strings.xml` 新增搜索相关字符串
+- [ ] 1.1.7 修改 `app/proguard-rules.pro` 新增 RssSearchActivity keep 规则
+- [ ] 1.1.8 单元测试覆盖搜索/分页/异常
+- [ ] 1.1.9 真机验证订阅内容搜索
 - **状态**：待启动
 - **依赖**：无（数据已就绪，RssSource.searchUrl 字段已存在）
-- **预计工作量**：1-2 天
+- **说明**：本项目 `app/src/main/java/io/legado/app/ui/rss/` 下无 search/ 子目录，需新建 `ui/rss/search/` 子目录存放 RssSearchActivity/ViewModel/Adapter
 
 ### 1.2 DEPS-B-01: markwon 3 扩展（用户价值 5.0）
+- [x] 1.2.0 ✅ 已实现（`app/build.gradle:329-332` 已引入 markwon core+image-glide+tables+html）
 - [ ] 1.2.1 在 app/build.gradle 添加 markwon-strikethrough 依赖
 - [ ] 1.2.2 添加 markwon-tasklist 依赖
 - [ ] 1.2.3 添加 markwon-linkify 依赖
 - [ ] 1.2.4 配置 Markwon 引擎使用新扩展（订阅文章渲染入口）
 - [ ] 1.2.5 真机验证订阅文章渲染（删除线/任务列表/链接识别）
-- **状态**：待启动
+- **状态**：markwon core 已引入 / 需补充 tasklist+strikethrough+linkify
 - **依赖**：无
-- **预计工作量**：0.5 天
+- **说明**：markwon 核心已引入，仅需补充 3 个扩展模块
 
 ### 1.3 THEME-B-01: 纸墨风格（用户价值 5.0）
 - [ ] 1.3.1 创建 PaperInkHelper.kt（基于 Paint.setShadowLayer，60 行零外部依赖）
@@ -51,18 +60,19 @@
 - **状态**：待启动
 - **依赖**：无
 - **预计工作量**：1 天
+- **说明**：本项目 `app/src/main/java/io/legado/app/ui/rss/` 下无 video/ 子目录，需新建 `ui/rss/video/` 子目录存放视频书相关组件
 
 ### 1.5 RSS-E-06: cacheFirst 默认值（用户价值 4.8）
-- [ ] 1.5.1 RSS 列表页 cacheFirst 默认 true（RssSource 序列化默认值）
+- [x] 1.5.1 ✅ 已完成（`app/src/main/java/io/legado/app/data/entities/RssSource.kt:113` cacheFirst: Boolean = true 已是默认值，无需调整）
 - [ ] 1.5.2 WebView cacheFirst 默认 true（订阅文章加载入口）
 - [ ] 1.5.3 真机验证 RSS 加载速度（首次/二次进入对比）
-- **状态**：待启动
+- **状态**：1.5.1 已完成 / 1.5.2-1.5.3 待启动
 - **依赖**：无
-- **预计工作量**：0.5 天
+- **说明**：数据层默认值已是 true，仅保留 WebView 层验证子任务
 
 ### 1.6 THEME-B-02: 字体撞色检测（用户价值 4.8）
 - [ ] 1.6.1 实现 sanitizeFontColorAgainstSurfaces 方法
-- [ ] 1.6.2 集成 AndroidColorUtils.calculateContrast（计算与背景对比度）
+- [ ] 1.6.2 集成 AndroidColorUtils.calculateContrast（计算与背景对比度；本项目使用 `lib/theme/ThemeUtils.kt`，无 ThemeColorUtils.kt）
 - [ ] 1.6.3 在主题设置界面添加撞色检测提示
 - [ ] 1.6.4 真机验证配色异常场景提示
 - **状态**：待启动
@@ -88,7 +98,7 @@
 - **预计工作量**：2 天
 
 ### 1.9 EPUB-B-01: 章节资源索引（用户价值 4.5）
-- [ ] 1.9.1 修改 EpubFile.kt 使用 spine 优先索引（替代全资源遍历）
+- [ ] 1.9.1 修改 `app/src/main/java/io/legado/app/model/localBook/EpubFile.kt` 使用 spine 优先索引（替代全资源遍历）
 - [ ] 1.9.2 真机验证 EPUB 章节加载速度提升
 - [ ] 1.9.3 单元测试覆盖 spine 索引逻辑（章节顺序/异常 EPUB/空 spine）
 - [ ] 1.9.4 性能基准测试（首章加载时间基线 vs 改造后对比）
@@ -106,7 +116,7 @@
 - **预计工作量**：1 天
 
 ### 1.11 RSS-B-05: RssFragment openRssSearch 入口（用户价值 4.8，评分 96）
-- [ ] 1.11.1 RssFragment 添加 openRssSearch 方法
+- [ ] 1.11.1 `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` 添加 openRssSearch 方法
 - [ ] 1.11.2 真机验证入口跳转
 - **状态**：待启动（v5.1 从 P1 升级 P0）
 - **依赖**：RSS-B-01（1.1）
@@ -121,15 +131,19 @@
 - **说明**：视频核心场景连续性优化
 
 ### 1.13 VIDEO-E-01: ReadRecentBook 写入（用户价值 4.5，评分 90）
-- [ ] 1.13.1 视频书播放时写入 ReadRecentBook 表
-- [ ] 1.13.2 真机验证视频书出现在"最近阅读"
+- [ ] 1.13.1 新增 ReadRecentBook 实体+DAO（`app/src/main/java/io/legado/app/data/entities/ReadRecentBook.kt` + `app/src/main/java/io/legado/app/data/dao/ReadRecentBookDao.kt`）
+- [ ] 1.13.2 新增数据库 Migration（AppDatabase 升级 + schema 导出；迁移范围需包含 pureSearch 字段，与 design.md ADR-013 一致）
+- [ ] 1.13.3 视频书搜索结果分支集成（VideoPlay.kt 写入最近阅读）
+- [ ] 1.13.4 真机验证视频书出现在"最近阅读"
 - **状态**：待启动（v5.1 从 P1 升级 P0）
 - **依赖**：无
 - **说明**：视频书最近阅读，与 VIDEO-B-01/B-02 构成视频场景完整闭环
+- **重要提示**：本项目当前无 ReadRecentBook 表，仅 fork 仓库有，需从 fork 仓库参考实现
 
 ### 1.14 VIDEO-E-02: ChoiceSpeedDialog 增强（用户价值 4.5，评分 90）
-- [ ] 1.14.1 增强 ChoiceSpeedDialog 倍速选项
-- [ ] 1.14.2 真机验证倍速切换
+- [ ] 1.14.1 增强 `app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt` 倍速选项
+- [ ] 1.14.2 在 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt`（本项目无 VideoActivity.kt，使用 VideoPlayerActivity.kt）中集成倍速对话框
+- [ ] 1.14.3 真机验证倍速切换
 - **状态**：待启动（v5.1 从 P1 升级 P0）
 - **依赖**：无
 - **说明**：视频倍速增强，高频交互优化
@@ -207,7 +221,7 @@
 - **依赖**：THEME-B-03（2.1.7）
 
 #### 2.1.11 EPUB-B-03: 性能日志+图片尺寸缓存（用户价值 4.0）
-- [ ] 2.1.11.1 EpubFile.kt 添加性能日志
+- [ ] 2.1.11.1 `app/src/main/java/io/legado/app/model/localBook/EpubFile.kt` 添加性能日志
 - [ ] 2.1.11.2 实现图片尺寸缓存
 - [ ] 2.1.11.3 真机验证 EPUB 性能
 - **状态**：待启动
@@ -220,8 +234,9 @@
 - **依赖**：无
 
 #### 2.1.13 VIDEO-E-03: Exo2MediaPlayer 增强（用户价值 4.0）
-- [ ] 2.1.13.1 增强 Exo2MediaPlayer 封装
-- [ ] 2.1.13.2 真机验证播放器稳定性
+- [ ] 2.1.13.1 增强 `app/src/main/java/io/legado/app/help/gsyVideo/Exo2MediaPlayer.kt` 封装
+- [ ] 2.1.13.2 在 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt` 中集成增强后的播放器
+- [ ] 2.1.13.3 真机验证播放器稳定性
 - **状态**：待启动
 - **依赖**：VIDEO-B-01（1.4）【v5.1 补充：播放器增强应基于预加载架构】
 
@@ -246,18 +261,21 @@
 - [ ] 2.2.3.3 验证 CI 调试证书隔离
 - **状态**：待启动
 - **依赖**：无
+- **P1 资格提示**：用户价值 2.8 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
 
 #### 2.2.4 BUILD-B-03: CI 增量构建缓存（用户价值 3.0）
 - [ ] 2.2.4.1 配置 actions/cache/restore + save 缓存 .gradle/.kotlin/build
 - [ ] 2.2.4.2 验证 CI 构建加速
 - **状态**：待启动
 - **依赖**：无
+- **P1 资格提示**：用户价值 3.0 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
 
 #### 2.2.5 BUILD-B-04: VERSION 注入（用户价值 3.0）
 - [ ] 2.2.5.1 app/build.gradle 支持 -PVERSION_NAME / -PVERSION_CODE 注入
 - [ ] 2.2.5.2 验证 CI 版本号注入
 - **状态**：待启动
 - **依赖**：无
+- **P1 资格提示**：用户价值 3.0 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
 
 #### 2.2.6 DEPS-B-05: lazycolumnscrollbar Compose 滚动条（用户价值 3.8）
 - [ ] 2.2.6.1 引入 lazycolumnscrollbar 2.2.0 依赖
@@ -281,10 +299,11 @@
 - **依赖**：无
 
 #### 3.1.2 DEPS-B-03: sora-editor 代码编辑器（用户价值 3.0）
-- [ ] 3.1.2.1 引入 soraEditor BOM + core + language.textmate
-- [ ] 3.1.2.2 应用于书源规则编辑界面
+- [x] 3.1.2.0 ✅ 已实现（`app/build.gradle:356-358` 已引入 soraEditor BOM+core+language.textmate）
+- [ ] 3.1.2.1 验证 sora-editor 版本兼容性（与现有依赖无冲突）
+- [ ] 3.1.2.2 应用于书源规则编辑界面（功能完整性验证）
 - [ ] 3.1.2.3 真机验证代码编辑体验
-- **状态**：待启动
+- **状态**：sora-editor 已引入 / 工作量调整为验证版本兼容性+功能完整性
 - **依赖**：无
 
 #### 3.1.3 DEPS-B-09: Glide ksp 迁移（用户价值 3.0）
@@ -424,6 +443,7 @@
 | 2026-07-18 | v5.1 优先级调整：RSS-B-05/VIDEO-B-02/VIDEO-E-01/VIDEO-E-02 从 P1 升级 P0（基于 analysis-task-priority.md 用户价值再评估，评分 90-96）。调整后 P0 14 / P1 19 / P2 21。 |
 | 2026-07-18 | v5.1 依赖关系修正（基于 analysis-task-priority.md §5）：补充 THEME-E-05→THEME-B-04、VIDEO-E-03→VIDEO-B-01、THEME-B-07→THEME-E-04、EPUB-B-08→EPUB-B-03、THEME-E-02→THEME-E-01；删除 EPUB-E-05→EPUB-E-06（功能独立）。 |
 | 2026-07-18 | v5.1 删除工期估算：所有"2 周内""3 个月""12 个月""X 天"等工期估算改为"按依赖顺序实施（AI 执行无工期估算）"（用户反馈：AI 执行不需要工期估算）。 |
+| 2026-07-18 | v5.2 文档修复（12 项严重问题）：A1 任务1.13 拆分为 3 子任务（ReadRecentBook 实体+DAO/Migration/集成）+fork 仓库参考提示；A2 任务1.1 BaseSearchActivity→VMBaseActivity；A3 任务1.5.1 标记已完成（cacheFirst 已是 true）；A4 修正 6 文件路径（EpubFile/RssFragment/VideoPlayerActivity/ChoiceSpeedDialog/Exo2MediaPlayer/ThemeUtils）；A5 标注 markwon+sora-editor 已引入；A6 标注 ui/rss/search/ 和 ui/rss/video/ 新建子目录；B1 补充 4 组顺序执行说明（ADR-002+R22）；B2 数据库迁移补充 pureSearch（ADR-013）；B3 任务1.1 补充 Manifest/strings/proguard 子任务；B4 统一 minSdk 23（ADR-022）；B5 补充借鉴代码合并策略+密钥恢复（ADR-010b）；C1 标注 P0=14 是 v5.1 调整后；C2 BUILD-B-01/03/04 标注 P1 资格提示。P0=14/P1=19/P2=21 数据不变。 |
 
 ---
 

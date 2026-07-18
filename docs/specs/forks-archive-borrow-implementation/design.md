@@ -87,13 +87,13 @@
 
 - **Status**：Accepted
 - **Context**：P0 阶段 14 项任务经交叉审查发现：**P0 内部无 P0→P0 强依赖**，所有依赖链均为组内同文件串行（如 RSS-B-05 RssFragment 入口与 RSS-B-01 共用 RssFragment.kt；VIDEO-B-02 章节链接缓存依赖 VIDEO-B-01；EPUB-B-01 与 EPUB-B-02 共用 EpubFile.kt）。原 v1.0 描述的"THEME-B-01 → THEME-B-02"经核实为**依赖关系错误**：THEME-B-01 是 PaperInkHelper.kt（基于 Paint.setShadowLayer），THEME-B-02 是 ThemeColorUtils.kt 中新增 sanitizeFontColorAgainstSurfaces 方法（基于 AndroidColorUtils.calculateContrast），两者功能独立、修改文件不同，无代码依赖关系。并发文件修改规范仅要求"同一源码文件的所有 Edit 必须由主 Agent 串行执行"，**不冲突文件可分组并行**。**P0 范围调整为 14 项**（升级 4 项 P1→P0：RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-03 剔除回 P1）。
-- **Decision**：P0 14 项任务按"文件隔离原则"分为 4 个并行组执行，主 Agent 协调，组内串行、组间并行（AI 执行，无工期估算）：
+- **Decision**：P0 14 项任务按"文件隔离原则"分为 4 个组，**4 个组按文件隔离原则顺序执行（组间逻辑并行但物理串行，主 Agent 单线程）**，组内串行（AI 执行，无工期估算，与 R22 缓解措施一致）：
   ```
   组A（RSS 主线，组内串行+并行，5 项）
-    ├─ RSS-B-05 (RssFragment openRssSearch 入口) → RSS-B-01 (RssSearchActivity) [同文件串行]
+    ├─ RSS-B-05 (RssFragment openRssSearch 入口，v5.1 调整后已升级 P0) → RSS-B-01 (RssSearchActivity) [同文件串行]
     ├─ RSS-B-02 (SourceSelectDialog) [独立，可与 RSS-B-01 并行]
     ├─ RSS-B-03 (SearchBookMergeUtils) [独立，可与 RSS-B-01 并行]
-    └─ RSS-E-06 (cacheFirst 默认值) [独立，可与 RSS-B-01 并行]
+    └─ RSS-E-06 (cacheFirst 默认值，数据层已完成 RssSource.kt:113，仅 WebView 层需验证) [独立，可与 RSS-B-01 并行]
 
   组B（THEME 视觉，组内并行，2 项）
     ├─ THEME-B-01 (纸墨风格 PaperInkHelper.kt) [独立]
@@ -105,13 +105,13 @@
     └─ EPUB-B-02 (资源过滤+标题归一化 EpubFile.kt) [依赖 EPUB-B-01 同文件，串行]
 
   组D（VIDEO 增强，组内串行+并行，5 项）
-    ├─ VIDEO-B-01 (VideoBookPreloader) [独立] → VIDEO-B-02 (预加载集成) [依赖 VIDEO-B-01]
-    ├─ VIDEO-E-01 (ReadRecentBook 写入) [独立，可与 VIDEO-B-02 并行]
-    ├─ VIDEO-E-02 (ChoiceSpeedDialog 增强) [独立，可与 VIDEO-B-02 并行]
+    ├─ VIDEO-B-01 (VideoBookPreloader) [独立] → VIDEO-B-02 (预加载集成，v5.1 调整后已升级 P0) [依赖 VIDEO-B-01]
+    ├─ VIDEO-E-01 (ReadRecentBook 写入，v5.1 调整后已升级 P0) [独立，可与 VIDEO-B-02 并行]
+    ├─ VIDEO-E-02 (ChoiceSpeedDialog 增强，v5.1 调整后已升级 P0) [独立，可与 VIDEO-B-02 并行]
     └─ DEPS-B-01 (markwon 扩展) [独立无依赖，可与 VIDEO 并行]
   ```
 - **Consequences**：
-  - 正向：**4 个并行组文件隔离执行，组内串行、组间并行（AI 执行，无工期估算）**；无依赖项可在不同文件上并行；每项任务完成可独立验证；遵守"同一源码文件串行"规范；P0 范围扩大至 14 项覆盖更多用户核心场景
+  - 正向：**4 个组按文件隔离原则顺序执行（组间逻辑并行但物理串行，主 Agent 单线程），避免并发冲突**；组内独立任务可借用子代理分担分析；每项任务完成可独立验证；遵守"同一源码文件串行"规范；P0 范围扩大至 14 项覆盖更多用户核心场景
   - 负向：需主 Agent 协调 4 个并行组的合并节点；EPUB-B-01 与 EPUB-B-02 共用 EpubFile.kt 必须串行；RSS-B-05 与 RSS-B-01 共用 RssFragment.kt 必须串行
 - **Alternatives**：
   - 备选 A：完全串行执行 P0 任务 → 否决（无依赖项被人为拉长，P0 内部无 P0→P0 强依赖）
@@ -189,6 +189,7 @@
   - rhino 1.8.1（锁定，minSdk 已提升至 23 但仍低于 24）
   - hutool 5.8.22（锁定，书源加解密依赖）
   - 其余 7 项锁定（两边一致，互信基础）
+  - **sora-editor + markwon 已引入**（非新增依赖，`app/build.gradle:329-332, 356-358` 已存在），DEPS-B-01（markwon 3 扩展）与 DEPS-B-02（sora-editor）仅需验证版本兼容性 + 补充缺失子依赖，不再列为新增依赖引入任务
 - **Consequences**：
   - 正向：避免破坏性变更；保持与两边互信基础；书源规则兼容性保证
   - 负向：无法享受新版本功能与性能优化
@@ -203,7 +204,7 @@
 - **Context**：本项目 RssSource 实体已有 `searchUrl` 字段但**没有任何 Activity/Fragment 使用它**（数据已就绪但 UI 入口缺失）。Archive 项目通过新增 `RssSearchActivity.kt`（104 行）激活了这一能力。借鉴投入产出比极高：仅需 1 个 Activity + 5 行入口代码即可让用户搜索所有订阅源的内容。
 - **Decision**：采用双轨方案激活 RSS 搜索能力：
   - **数据轨**：复用已有 RssSource.searchUrl 字段（零数据变更，字段已就绪）
-  - **UI 轨**：新增 RssSearchActivity.kt（继承 BaseSearchActivity）+ RssSearchViewModel.kt + RssSearchAdapter.kt + RssFragment 添加搜索入口（5 行代码）
+  - **UI 轨**：新增 RssSearchActivity.kt（继承 VMBaseActivity，本项目基类，`app/src/main/java/io/legado/app/base/VMBaseActivity.kt:9`，本项目无 BaseSearchActivity）+ RssSearchViewModel.kt + RssSearchAdapter.kt + RssFragment 添加搜索入口（5 行代码）
 - **Consequences**：
   - 正向：数据零变更降低风险；UI 入口补全激活能力；用户价值 5.0（最高）
   - 负向：新增 3 个文件需测试覆盖
@@ -268,12 +269,14 @@
 - **Decision**：P2 借鉴 Archive 主题包云端同步能力：
   - THEME-B-06 AppearanceKit 套件架构、THEME-B-07 主题包云端同步（WebDAV）、THEME-B-08 KitBinding、THEME-E-01 5 种 RED 格式兼容、THEME-E-02 主题包目录化结构、THEME-E-03 KitBinding 跨组件绑定
   - **冲突合并策略**：基于时间戳的合并策略，冲突时用户选择保留版本，本地备份后再合并
+  - **代码借鉴冲突合并策略**：本项目优先 + fork 仓库参考，逐文件对比差异，保留本项目修改 + 借鉴 fork 仓库新增功能，禁止直接覆盖本项目已有逻辑
   - **回退策略**：同步失败时保留本地版本，提示用户重试；网络异常时退化为仅本地模式
   - **数据加密**：主题包云端同步前必须本地加密（密钥由用户密码派生，符合 ADR-019 网络安全与隐私策略）
+  - **加密密钥丢失恢复机制**：从备份恢复 + 用户提示，禁止静默丢失；密钥派生失败时引导用户重新设置密码并从云端备份恢复主题数据
   - **用户额外负担**：需配置 WebDAV 云盘
 - **Consequences**：
   - 正向：用户可跨设备同步主题；主题数据云端备份；与 Archive 云端同步能力对齐
-  - 负向：需用户配置云盘（额外负担）；冲突合并复杂；网络异常时体验降级
+  - 负向：需用户配置云盘（额外负担）；冲突合并复杂；网络异常时体验降级；**冲突合并可能引入隐藏 bug，需逐文件 Code Review**；加密密钥丢失可能导致主题数据无法解密（已有恢复机制兜底）
 - **Alternatives**：
   - 备选 A：不实施云端同步，仅本地导入导出 → 否决（用户跨设备需求无法满足）
   - 备选 B：使用第三方云盘 SDK（如 Dropbox/OneDrive）→ 否决（依赖第三方服务，隐私风险）
@@ -312,10 +315,10 @@
 ### ADR-013 数据库迁移安全策略
 
 - **Status**：Accepted
-- **Context**：THEME-B-04 Config 字段扩展（参考 Archive 30+ 字段，本项目 9 字段）与 VIDEO-E-01 ReadRecentBook 写入涉及数据库 schema 变更。项目规范 `database-migration-safety.md` 要求"数据库 version 变更/@DatabaseView 修改/实体字段修改/新增 migration 任务"必须先评估迁移安全。覆盖安装场景若处理不当可能导致用户数据丢失。
+- **Context**：THEME-B-04 Config 字段扩展（参考 Archive 30+ 字段，本项目 9 字段）、VIDEO-E-01 ReadRecentBook 写入（新增 ReadRecentBook 表，CREATE TABLE）、RSS-B-04 pureSearch 字段（ALTER TABLE rssSource ADD COLUMN pureSearch）涉及数据库 schema 变更。项目规范 `database-migration-safety.md` 要求"数据库 version 变更/@DatabaseView 修改/实体字段修改/新增 migration 任务"必须先评估迁移安全。覆盖安装场景若处理不当可能导致用户数据丢失。
 - **Decision**：遵循 database-migration-safety.md 规范，采用 AutoMigration + runCatching 兜底 + 覆盖安装兼容性测试三段式策略：
-  1. **优先使用 Room AutoMigration**：字段新增/删除场景使用 `@AutoMigration` 注解自动生成迁移代码
-  2. **复杂变更手写 Migration**：字段重命名/类型变更/数据迁移场景手写 `Migration_N_to_N+1`，所有新字段必须有默认值确保向后兼容
+  1. **优先使用 Room AutoMigration**：字段新增/删除场景使用 `@AutoMigration` 注解自动生成迁移代码（如 RSS-B-04 pureSearch 字段新增：`ALTER TABLE rssSource ADD COLUMN pureSearch INTEGER NOT NULL DEFAULT 0`）
+  2. **复杂变更手写 Migration**：字段重命名/类型变更/数据迁移/新表创建场景手写 `Migration_N_to_N+1`，所有新字段必须有默认值确保向后兼容（如 VIDEO-E-01 ReadRecentBook 表创建：`CREATE TABLE IF NOT EXISTS readRecentBook (...)`，新建实体 + DAO）
   3. **runCatching 兜底**：所有 Migration 调用包裹 `runCatching`，失败时回退到 fallback 数据库重建（保留书源数据，丢弃缓存）
   4. **覆盖安装兼容性测试**：每个 Migration 必须真机验证"旧版本→新版本"覆盖安装流程，验证数据完整性
 - **Consequences**：
@@ -481,7 +484,7 @@
 
 - **Status**：Accepted
 - **Context**：项目 minSdk 已提升至 23，但部分新增依赖可能要求 API 24+（如 rhino 1.8.1 锁定原因之一是 API 24 以下缺少 Arrays.setAll）。liquidglass 1.0.3、lottie 6.6.6 等新增依赖的 minSdk 兼容性未明确。屏幕适配（如 Compose 列表、FlexboxLayout）未明确。需明确 Android API 最低版本 + 屏幕适配范围，避免运行时崩溃。
-- **Decision**：minSdk 21（Android 5.0），targetSdk 36，支持 5.0-7.0 寸屏幕（兼顾平板）：
+- **Decision**：minSdk 23（Android 6.0，与本项目 `app/build.gradle:66` 实际一致），targetSdk 36，支持 5.0-7.0 寸屏幕（兼顾平板）：
   1. **minSdk 锁定**：保持 minSdk 23 不变（不提升至 24，避免丢失低版本用户）；新增依赖必须支持 API 23+
   2. **targetSdk**：targetSdk 36（Android 16），跟随主流 Android 版本
   3. **API 级别检查**：使用 @RequiresApi 注解 + 运行时版本判断，低版本降级处理
@@ -492,7 +495,7 @@
   - 负向：低版本 API 限制；部分新特性无法使用
 - **Alternatives**：
   - 备选 A：提高 minSdk 至 24（丢用户）→ 否决（影响现有用户）
-  - 备选 B：保持 minSdk 21（推荐）→ 采纳（保守稳妥，兼容性优先）
+  - 备选 B：保持 minSdk 23（推荐）→ 采纳（保守稳妥，兼容性优先，与本项目 build.gradle:66 实际一致）
   - 备选 C：不验证依赖兼容性 → 否决（运行时崩溃风险）
 - **Drawbacks**：低版本 API 限制（部分新 API 无法使用）；缓解措施：使用降级方案 + @RequiresApi 注解
 
@@ -826,7 +829,7 @@ flowchart TD
 
 **关键说明**：
 - 旧版本 schema → AutoMigration 检测变更 → 生成 Migration → 执行迁移 → 验证数据完整性
-- 涉及任务：VIDEO-E-01 ReadRecentBook 写入 / THEME-B-04 Config 字段扩展
+- 涉及任务：VIDEO-E-01 ReadRecentBook 写入（CREATE TABLE 建新表）/ THEME-B-04 Config 字段扩展 / RSS-B-04 pureSearch 字段新增（ALTER TABLE rssSource ADD COLUMN pureSearch）
 - 关联 ADR：ADR-013 数据库迁移安全策略
 - 关联规范：`database-migration-safety.md`
 
@@ -840,32 +843,33 @@ flowchart TD
 
 | # | 文件路径 | 操作 | 用途 | 关联任务 |
 |---|---------|------|------|---------|
-| 1 | `app/src/main/java/io/legado/app/ui/rss/search/RssSearchActivity.kt` | 新增 | RSS 搜索 Activity（继承 BaseSearchActivity，激活 searchUrl 字段） | RSS-B-01 |
+| 1 | `app/src/main/java/io/legado/app/ui/rss/search/RssSearchActivity.kt` | 新增 | RSS 搜索 Activity（继承 VMBaseActivity 本项目基类，激活 searchUrl 字段，**ui/rss/search/ 为新建子目录**） | RSS-B-01 |
 | 2 | `app/src/main/java/io/legado/app/ui/rss/search/RssSearchViewModel.kt` | 新增/修改 | RSS 搜索 ViewModel（调度多源并发搜索）+ pureSearch 参数支持（P1） | RSS-B-01, RSS-B-04 |
 | 3 | `app/src/main/java/io/legado/app/ui/rss/search/RssSearchAdapter.kt` | 新增 | RSS 搜索结果 Adapter（按订阅源分组展示） | RSS-B-01 |
-| 4 | `app/src/main/java/io/legado/app/ui/rss/RssFragment.kt` | 修改 | 添加搜索入口（5 行代码 openRssSearch 方法，P0）+ focusSearch 参数支持（P2） | RSS-B-01(P0), RSS-B-05(P0), RSS-E-03(P2) |
+| 4 | `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` | 修改 | 添加搜索入口（5 行代码 openRssSearch 方法，P0）+ focusSearch 参数支持（P2） | RSS-B-01(P0), RSS-B-05(P0), RSS-E-03(P2) |
 | 5 | `app/src/main/java/io/legado/app/ui/rss/SourceSelectDialog.kt` | 新增 | 统一源选择 Dialog（BottomSheetDialog，book/rss 源统一选择） | RSS-B-02 |
 | 6 | `app/src/main/java/io/legado/app/utils/SearchBookMergeUtils.kt` | 新增 | 搜索结果合并工具（按书名+作者去重，保留多源信息） | RSS-B-03 |
-| 7 | `app/src/main/java/io/legado/app/model/rss/RssSource.kt` | 修改 | cacheFirst 默认值调整为 true（仅默认值变更，无数据迁移）+ pureSearch 字段（P1） | RSS-E-06, RSS-B-04 |
+| 7 | `app/src/main/java/io/legado/app/model/rss/RssSource.kt` | 修改 | **数据层已完成（RssSource.kt:113 cacheFirst: Boolean = true 已是默认值），仅 WebView 层需验证** + pureSearch 字段（P1） | RSS-E-06, RSS-B-04 |
 | 8 | `app/src/main/java/io/legado/app/ui/rss/SearchBookPreviewOverlay.kt` | 新增 | 搜索结果预览覆盖层（P1 阶段） | RSS-E-05 |
-| 9 | `app/src/main/java/io/legado/app/ui/rss/RssWebActivity.kt` | 修改 | WebView cacheFirst 默认 true（订阅文章加载入口，P0） | RSS-E-06 |
+| 9 | `app/src/main/java/io/legado/app/ui/rss/RssWebActivity.kt` | 修改 | WebView cacheFirst 默认 true（订阅文章加载入口，P0，数据层 RssSource.kt:113 已是默认值，仅 WebView 层需验证） | RSS-E-06 |
 
-### 4.2 视频播放模块（5 个文件）
+### 4.2 视频播放模块（6 个文件）
 
 | # | 文件路径 | 操作 | 用途 | 关联任务 |
 |---|---------|------|------|---------|
 | 1 | `app/src/main/java/io/legado/app/help/gsyVideo/VideoBookPreloader.kt` | 新增 | 视频书预加载单例（90 行，搜索结果页预加载目录） | VIDEO-B-01 |
-| 2 | `app/src/main/java/io/legado/app/ui/rss/video/VideoActivity.kt` | 修改 | 集成 VideoBookPreloader + chapterLinkCache + preloadNextEpisode | VIDEO-B-01(P0), VIDEO-B-02(P0) |
-| 3 | `app/src/main/java/io/legado/app/ui/rss/video/ChoiceSpeedDialog.kt` | 修改 | 倍速选项增强（P0） | VIDEO-E-02(P0) |
-| 4 | `app/src/main/java/io/legado/app/ui/rss/video/Exo2MediaPlayer.kt` | 修改 | ExoPlayer 封装增强（P1） | VIDEO-E-03(P1) |
-| 5 | `app/src/main/java/io/legado/app/data/entities/ReadRecentBook.kt` | 修改 | 视频书写入最近阅读（P0，需评估数据库迁移） | VIDEO-E-01(P0) |
+| 2 | `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt` | 修改 | 集成 VideoBookPreloader + chapterLinkCache + preloadNextEpisode（实际文件名 VideoPlayerActivity.kt，非 VideoActivity.kt，**实际路径 ui/video/ 非 ui/rss/video/，ui/video/ 为新建子目录**） | VIDEO-B-01(P0), VIDEO-B-02(P0) |
+| 3 | `app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt` | 修改 | 倍速选项增强（P0） | VIDEO-E-02(P0) |
+| 4 | `app/src/main/java/io/legado/app/help/gsyVideo/Exo2MediaPlayer.kt` | 修改 | ExoPlayer 封装增强（P1） | VIDEO-E-03(P1) |
+| 5 | `app/src/main/java/io/legado/app/data/entities/ReadRecentBook.kt` | 新增 | 视频书写入最近阅读实体类（P0，需评估数据库迁移，CREATE TABLE 建表） | VIDEO-E-01(P0) |
+| 6 | `app/src/main/java/io/legado/app/data/dao/ReadRecentBookDao.kt` | 新增 | ReadRecentBook 表 DAO（P0，配合 VIDEO-E-01 提供读写访问） | VIDEO-E-01(P0) |
 
 ### 4.3 主题管理模块（11 个文件）
 
 | # | 文件路径 | 操作 | 用途 | 关联任务 |
 |---|---------|------|------|---------|
 | 1 | `app/src/main/java/io/legado/app/lib/theme/PaperInkHelper.kt` | 新增 | 纸墨风格工具类（60 行，基于 Paint.setShadowLayer，零外部依赖） | THEME-B-01 |
-| 2 | `app/src/main/java/io/legado/app/lib/theme/ThemeColorUtils.kt` | 修改 | 新增 sanitizeFontColorAgainstSurfaces 方法（基于 AndroidColorUtils.calculateContrast） | THEME-B-02 |
+| 2 | `app/src/main/java/io/legado/app/lib/theme/ThemeUtils.kt` | 修改 | 新增 sanitizeFontColorAgainstSurfaces 方法（基于 AndroidColorUtils.calculateContrast，实际文件名 ThemeUtils.kt，无 ThemeColorUtils.kt） | THEME-B-02 |
 | 3 | `app/src/main/java/io/legado/app/lib/theme/ThemePackageManager.kt` | 新增/修改 | 主题包管理器（基于 Archive 1428 行实现，可裁剪，ZIP 导入导出，P1）+ 目录化结构改造（P2） | THEME-B-03(P1), THEME-E-04(P1), THEME-E-02(P2) |
 | 4 | `app/src/main/java/io/legado/app/lib/theme/ThemeConfig.kt` | 修改 | Config 字段扩展（参考 Archive 30+ 字段，本项目 9 字段） | THEME-B-04 |
 | 5 | `app/src/main/java/io/legado/app/lib/theme/ThemeFontHelper.kt` | 新增 | 字体内嵌支持（P1） | THEME-B-05 |
@@ -880,7 +884,7 @@ flowchart TD
 
 | # | 文件路径 | 操作 | 用途 | 关联任务 |
 |---|---------|------|------|---------|
-| 1 | `app/src/main/java/io/legado/app/help/book/EpubFile.kt` | 修改 | spine 优先索引 + 资源过滤 + 标题归一化 + 性能日志 + 图片尺寸缓存 + 相邻预加载 + 双模式开关（useExperimentalEpubCore） | EPUB-B-01, EPUB-B-02, EPUB-B-03, EPUB-B-08, EPUB-E-04 |
+| 1 | `app/src/main/java/io/legado/app/model/localBook/EpubFile.kt` | 修改 | spine 优先索引 + 资源过滤 + 标题归一化 + 性能日志 + 图片尺寸缓存 + 相邻预加载 + 双模式开关（useExperimentalEpubCore） | EPUB-B-01, EPUB-B-02, EPUB-B-03, EPUB-B-08, EPUB-E-04 |
 | 2 | `app/src/main/java/io/legado/app/help/book/EpubAnnotationHelper.kt` | 新增 | EPUB 注解系统（footnote/endnote，P2） | EPUB-B-05 |
 | 3 | `app/src/main/java/io/legado/app/help/book/EpubTextSelector.kt` | 新增/修改 | EPUB 文本选择器（P1）+ 错误回退增强（P2） | EPUB-E-06, EPUB-B-07 |
 | 4 | `app/src/main/java/io/legado/app/help/book/EpubFontHelper.kt` | 新增 | EPUB 字体内嵌支持（P1） | EPUB-E-02 |
@@ -916,18 +920,27 @@ flowchart TD
 | 1 | `app/build.gradle` | 修改 | markwon 3 扩展依赖 + composeBom 升级 + reorderable/lazycolumnscrollbar/liquidglass/lottie/sora-editor 依赖 + -Pabi/-PVERSION_NAME/-PVERSION_CODE 注入 + Glide ksp 迁移 | DEPS-B-01~09, BUILD-B-02, BUILD-B-04 |
 | 2 | `.github/workflows/` | 新增/修改 | CI 专用调试证书 + armv8 单架构 CI + 增量构建缓存 + gitee 镜像同步 + android-fast 工作流 | BUILD-B-01, BUILD-B-03, BUILD-B-05, BUILD-B-06/07/08 |
 
-### 4.8 文件变更统计
+### 4.8 全局配置文件（3 个文件）
+
+| # | 文件路径 | 操作 | 用途 | 关联任务 |
+|---|---------|------|------|---------|
+| 1 | `app/src/main/res/values/strings.xml` | 修改 | 新增字符串（RSS 搜索/主题预览/EPUB 注解等用户可见文案，符合 ADR-018 国际化规范，新增 strings.xml 化条目） | RSS-B-01, THEME-E-05, EPUB-B-05, 全模块 |
+| 2 | `app/src/main/AndroidManifest.xml` | 修改 | 新增 Activity 注册（RssSearchActivity / VideoPlayerActivity 等新增 Activity 必须在 Manifest 注册） | RSS-B-01, VIDEO-B-01 |
+| 3 | `app/proguard-rules.pro` | 修改 | 新增 keep 规则（新增类若被反射需同步更新 proguard-rules.pro，本项目 minify=true，符合 ADR-026 代码质量策略） | 全模块（反射类） |
+
+### 4.9 文件变更统计
 
 | 模块 | 新增 | 修改 | 合计 |
 |------|------|------|------|
 | RSS/订阅源 | 6 | 3 | 9 |
-| 视频播放 | 1 | 4 | 5 |
+| 视频播放 | 3 | 3 | 6 |
 | 主题管理 | 9 | 2 | 11 |
 | EPUB | 8 | 1 | 9 |
 | 发现页 | 2 | 0 | 2 |
 | UI 优化 | 2 | 1 | 3 |
 | 构建配置 | 1 | 1 | 2 |
-| **合计** | **29** | **12** | **41** |
+| 全局配置文件 | 0 | 3 | 3 |
+| **合计** | **31** | **14** | **45** |
 
 > **统计说明**：相比 v1.0 的 33 个文件，本次修复补充遗漏的 9 项任务对应文件（THEME-E-05/EPUB-E-02/RSS-B-04/EPUB-B-06/EPUB-B-08/THEME-E-01/THEME-E-02/EPUB-E-03/EPUB-E-05），并补充布局/资源文件，覆盖全部 54 项任务。
 
@@ -992,18 +1005,18 @@ flowchart TD
 
 ## 6. 实施顺序与依赖
 
-### 6.1 Phase 1 (P0 - 14 项)：用户核心场景优先（分组并行）
+### 6.1 Phase 1 (P0 - 14 项)：用户核心场景优先（4 组顺序执行）
 
-> **策略升级**：基于交叉审查发现 P0 内部无 P0→P0 强依赖，已将原"串行化"改为"4 个并行组"（详见 ADR-002）。**P0 范围调整为 14 项**（升级 4 项 P1→P0：RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-03 已剔除回 P1）。AI 执行，无工期估算，按依赖顺序实施。
+> **P0 范围明确**：P0=14 项（v5.1 调整后），4 组分工如下。基于交叉审查发现 P0 内部无 P0→P0 强依赖，4 个组按文件隔离原则顺序执行（详见 ADR-002，与 R22 缓解措施一致）。**P0 范围调整为 14 项**（升级 4 项 P1→P0：RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02，均标注"v5.1 调整后已升级 P0"；THEME-B-03 已剔除回 P1）。AI 执行，无工期估算，按依赖顺序实施。
 
 ```
 Phase 1 (P0 - 14项): 用户核心场景优先（立即启动，分组并行，AI 执行无工期估算）
 
   组A（RSS 主线，组内串行+并行，5 项）
-    ├─ RSS-B-05 (RssFragment openRssSearch 入口) → RSS-B-01 (RssSearchActivity) [同文件串行]
+    ├─ RSS-B-05 (RssFragment openRssSearch 入口，v5.1 调整后已升级 P0) → RSS-B-01 (RssSearchActivity) [同文件串行]
     ├─ RSS-B-02 (SourceSelectDialog) [独立，可与 RSS-B-01 并行]
     ├─ RSS-B-03 (SearchBookMergeUtils) [独立，可与 RSS-B-01 并行]
-    └─ RSS-E-06 (cacheFirst 默认值) [独立，可与 RSS-B-01 并行]
+    └─ RSS-E-06 (cacheFirst 默认值，数据层已完成 RssSource.kt:113，仅 WebView 层需验证) [独立，可与 RSS-B-01 并行]
 
   组B（THEME 视觉，组内并行，2 项）
     ├─ THEME-B-01 (纸墨风格 PaperInkHelper.kt) [独立]
@@ -1015,9 +1028,9 @@ Phase 1 (P0 - 14项): 用户核心场景优先（立即启动，分组并行，A
     └─ EPUB-B-02 (资源过滤+标题归一化 EpubFile.kt) [依赖 EPUB-B-01 同文件，串行]
 
   组D（VIDEO 增强，组内串行+并行，5 项）
-    ├─ VIDEO-B-01 (VideoBookPreloader) [独立] → VIDEO-B-02 (预加载集成) [依赖 VIDEO-B-01]
-    ├─ VIDEO-E-01 (ReadRecentBook 写入) [独立，可与 VIDEO-B-02 并行]
-    ├─ VIDEO-E-02 (ChoiceSpeedDialog 增强) [独立，可与 VIDEO-B-02 并行]
+    ├─ VIDEO-B-01 (VideoBookPreloader) [独立] → VIDEO-B-02 (预加载集成，v5.1 调整后已升级 P0) [依赖 VIDEO-B-01]
+    ├─ VIDEO-E-01 (ReadRecentBook 写入，v5.1 调整后已升级 P0) [独立，可与 VIDEO-B-02 并行]
+    ├─ VIDEO-E-02 (ChoiceSpeedDialog 增强，v5.1 调整后已升级 P0) [独立，可与 VIDEO-B-02 并行]
     └─ DEPS-B-01 (markwon 扩展) [独立无依赖，可与 VIDEO 并行]
 ```
 
@@ -1060,10 +1073,10 @@ Phase 2 (P1 - 19项): 性能体验增强（按依赖顺序实施，AI 执行无�
   │   ├─ DEPS-B-04 (reorderable 拖拽排序) [独立]
   │   └─ DEPS-B-05 (lazycolumnscrollbar 滚动条) [独立]
   └─ BUILD 模块优化
-      ├─ BUILD-B-01 (CI 专用调试证书) [独立]
+      ├─ BUILD-B-01 (CI 专用调试证书) [独立，用户价值低于 P1 下限，P1 实施前需再次评估是否降级 P2]
       ├─ BUILD-B-02 (armv8 单架构 CI) [独立]
-      ├─ BUILD-B-03 (CI 增量构建缓存) [独立]
-      ├─ BUILD-B-04 (VERSION 注入) [独立]
+      ├─ BUILD-B-03 (CI 增量构建缓存) [独立，用户价值低于 P1 下限，P1 实施前需再次评估是否降级 P2]
+      ├─ BUILD-B-04 (VERSION 注入) [独立，用户价值低于 P1 下限，P1 实施前需再次评估是否降级 P2]
       └─ BUILD-B-05 (gitee 镜像同步) [独立]
 ```
 
@@ -1282,7 +1295,7 @@ Phase 3 (P2 - 21项): UI 优化与扩展（按依赖顺序实施，AI 执行无�
 
 ---
 
-**设计文档完成**（v2.1 修订版）。共 27 个 ADR + 6 个数据流图 + 41 个文件变更清单 + 30 项风险缓解 + 三阶段实施顺序（P0 14 项 4 组并行） + 4 层测试策略 + 文档同步要求。基于 v5.0 终版决策（54 借鉴 / 64 不借鉴 / 0 待评估），P0 14 项 100% 聚焦用户核心场景，AI 执行无工期估算。
+**设计文档完成**（v2.2 修订版）。共 27 个 ADR + 6 个数据流图 + 45 个文件变更清单 + 30 项风险缓解 + 三阶段实施顺序（P0 14 项 4 组顺序执行） + 4 层测试策略 + 文档同步要求。基于 v5.0 终版决策（54 借鉴 / 64 不借鉴 / 0 待评估），P0 14 项 100% 聚焦用户核心场景，AI 执行无工期估算。
 
 **v2.0 修订摘要**：
 - 修复 ADR-002 依赖错误（THEME-B-01 ↔ THEME-B-02 实际无依赖），P0 改为 4 个并行组执行

@@ -4,7 +4,7 @@
 > **创建时间**：2026-07-18
 > **当前阶段**：OpenSpec 设计阶段 - 修复迭代中（检查点4 需调整反馈后，正在全量修复+优化）
 > **决策版本**：v5.0 终版（54 借鉴 / 64 不借鉴 / 0 待评估）
-> **实施范围**：54 项借鉴决策（P0: 13 / P1: 20 / P2: 21）
+> **实施范围**：54 项借鉴决策（P0: 14 / P1: 19 / P2: 21）
 > **ADR 决策**：27 个（含拆分 ADR-010 为 010a/010b，合并 ADR-011/012 为 ADR-011，新增 ADR-019~027）
 > **实施方式**：AI 执行，按依赖顺序实施（无工期估算）
 
@@ -38,8 +38,8 @@
 
 | 优先级 | 数量 | 实施窗口 |
 |--------|------|---------|
-| P0 立即启动 | 13 | AI 执行，按依赖顺序实施 |
-| P1 季度规划 | 20 | AI 执行，按依赖顺序实施 |
+| P0 立即启动 | 14 | AI 执行，按依赖顺序实施 |
+| P1 季度规划 | 19 | AI 执行，按依赖顺序实施 |
 | P2 年度规划 | 21 | AI 执行，按依赖顺序实施 |
 | **合计** | **54** | - |
 
@@ -51,13 +51,16 @@
 
 | 文档 | 状态 | 说明 |
 |------|------|------|
-| spec.md | ✅ 已完成 | Intent/Scope/Approach/Requirements(P0 10+P1 23+P2 21)/Scenarios(S1-S11) |
+| spec.md | ✅ 已完成 | Intent/Scope/Approach/Requirements(P0 14+P1 19+P2 21)/Scenarios(S1-S11) |
 | tasks.md | ✅ 已完成 | 54 项实施任务清单，按 P0/P1/P2 三级分类 |
 | design.md | ✅ 已完成 | ADR 决策 + 数据流图 + 文件变更清单 + 风险缓解 |
 | README.md | ✅ 本文档 | 状态追踪 + 文档索引 + 决策汇总 |
 | review-spec-tasks.md | ✅ 已完成 | spec.md + tasks.md 审查报告 |
 | review-design-readme.md | ✅ 已完成 | design.md + README.md 审查报告 |
 | review-cross-optimization.md | ✅ 已完成 | 交叉审查+决策优化报告 |
+| review-design-rationality-spec-tasks.md | ✅ v2.2 新增 | 第三轮审查：spec.md + tasks.md 设计合理性审查（1194 行） |
+| review-design-rationality-design.md | ✅ v2.2 新增 | 第三轮审查：design.md 设计合理性审查（1628 行） |
+| review-implementation-simulation.md | ✅ v2.2 新增 | 第三轮审查：实施过程仿真模拟审查（2006 行） |
 
 ### 2.2 关联分析文档（forks-archive-comparison/）
 
@@ -96,9 +99,9 @@
 
 ### 3.2 v5.0 借鉴决策按优先级
 
-#### P0（13 项 - 用户核心场景优先）
+#### P0（14 项 - 用户核心场景优先）
 
-> v1.2 调整：原 P0 10 项 + 新增 4 项（RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02）- 调整 1 项（THEME-B-02 从 P0 移到 P1，按模块分布表 THEME P0=1）= 13 项
+> v1.2 调整：原 P0 10 项 + 新增 4 项（RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02）+ 保留 THEME-B-02 = 14 项（与 spec.md/tasks.md/design.md 一致）
 
 | # | 决策ID | 决策项 | 用户价值 | 实施成本 | 用户场景 |
 |---|--------|--------|---------|---------|---------|
@@ -106,21 +109,22 @@
 | 2 | RSS-B-05 | RssFragment openRssSearch 入口 | 4.8 | 低 | RSS 搜索入口集成 |
 | 3 | DEPS-B-01 | markwon 3 扩展 | 5.0 | 低 | 订阅文章渲染 |
 | 4 | THEME-B-01 | 纸墨风格 | 5.0 | 低 | 阅读视觉体验 |
-| 5 | VIDEO-B-01 | VideoBookPreloader | 5.0 | 低 | 视频播放加速 |
-| 6 | RSS-E-06 | cacheFirst 默认值 | 4.8 | 低 | RSS 加载更快 |
-| 7 | RSS-B-02 | SourceSelectDialog | 4.5 | 中 | 源管理简化 |
-| 8 | RSS-B-03 | SearchBookMergeUtils | 4.5 | 中 | 搜索结果统一 |
-| 9 | EPUB-B-01 | 章节资源索引 | 4.5 | 低 | EPUB 加载加速 |
-| 10 | EPUB-B-02 | 资源过滤+标题归一化 | 4.5 | 低 | EPUB 阅读体验 |
-| 11 | VIDEO-B-02 | 章节链接缓存+下一集预加载 | 4.8 | 中 | 视频连续看剧流畅 |
-| 12 | VIDEO-E-01 | ReadRecentBook 写入 | 4.5 | 低 | 视频书最近阅读 |
-| 13 | VIDEO-E-02 | ChoiceSpeedDialog 增强 | 4.5 | 低 | 视频倍速交互优化 |
+| 5 | THEME-B-02 | 字体撞色检测 | 4.8 | 低 | 避免配色错误 |
+| 6 | VIDEO-B-01 | VideoBookPreloader | 5.0 | 低 | 视频播放加速 |
+| 7 | RSS-E-06 | cacheFirst 默认值 | 4.8 | 低 | RSS 加载更快 |
+| 8 | RSS-B-02 | SourceSelectDialog | 4.5 | 中 | 源管理简化 |
+| 9 | RSS-B-03 | SearchBookMergeUtils | 4.5 | 中 | 搜索结果统一 |
+| 10 | EPUB-B-01 | 章节资源索引 | 4.5 | 低 | EPUB 加载加速 |
+| 11 | EPUB-B-02 | 资源过滤+标题归一化 | 4.5 | 低 | EPUB 阅读体验 |
+| 12 | VIDEO-B-02 | 章节链接缓存+下一集预加载 | 4.8 | 中 | 视频连续看剧流畅 |
+| 13 | VIDEO-E-01 | ReadRecentBook 写入 | 4.5 | 低 | 视频书最近阅读 |
+| 14 | VIDEO-E-02 | ChoiceSpeedDialog 增强 | 4.5 | 低 | 视频倍速交互优化 |
 
-#### P1（20 项 - 性能体验增强）
+#### P1（19 项 - 性能体验增强）
 
-> v1.2 调整：原 P1 23 项 - 升级 P0 4 项（RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02）+ 接收 1 项（THEME-B-02 从 P0 移入）= 20 项
+> v1.2 调整：原 P1 23 项 - 升级 P0 4 项（RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02）= 19 项（THEME-B-02 保留 P0）
 
-**用户中高收益（14 项）**：THEME-B-02、RSS-E-05、THEME-E-05、EPUB-E-04、DEPS-B-04、EPUB-E-02、RSS-B-04、THEME-B-03/04/05、THEME-E-04、EPUB-B-03、EPUB-E-06、VIDEO-E-03
+**用户中高收益（13 项）**：RSS-E-05、THEME-E-05、EPUB-E-04、DEPS-B-04、EPUB-E-02、RSS-B-04、THEME-B-03/04/05、THEME-E-04、EPUB-B-03、EPUB-E-06、VIDEO-E-03
 
 **开发者侧优化（6 项）**：BUILD-B-01/02/03/04/05、DEPS-B-05
 
@@ -148,7 +152,7 @@
 |--------|--------|----------|----------|
 | ADR 数量 | 12 个（ADR-001~012） | 18 个（新增 ADR-013~018） | **27 个**（拆分 ADR-010 为 010a/010b + 合并 ADR-011/012 为 ADR-011 + 新增 ADR-019~027） |
 | P0 实施策略 | 串行化执行 | 分组并行执行（4 个并行组） | AI 执行，按依赖顺序实施（无工期估算） |
-| P0 任务数量 | 10 项 | 10 项 | **13 项**（新增 RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-02 移到 P1） |
+| P0 任务数量 | 10 项 | 10 项 | **14 项**（新增 RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-02 保留 P0） |
 
 **v1.2 ADR 全量清单（27 个）**：
 
@@ -193,7 +197,7 @@
 | 并行组 | 任务 | 修改文件 |
 |--------|------|---------|
 | 组1（RSS 主线） | RSS-B-05 → RSS-B-01 → RSS-B-02 + RSS-B-03 + RSS-E-06 | RssSearchActivity.kt / RssFragment.kt / SourceSelectDialog.kt / SearchBookMergeUtils.kt / RssSource.kt |
-| 组2（THEME 视觉） | THEME-B-01（独立） | PaperInkHelper.kt |
+| 组2（THEME 视觉） | THEME-B-01 + THEME-B-02（并行） | PaperInkHelper.kt / ThemeColorUtils.kt |
 | 组3（EPUB 加速） | EPUB-B-01 + EPUB-B-02（并行） | EpubFile.kt |
 | 组4（VIDEO 增强） | VIDEO-B-01 → VIDEO-B-02 + VIDEO-E-01 + VIDEO-E-02 + DEPS-B-01 | VideoBookPreloader.kt / VideoActivity.kt / ReadRecentBook.kt / ChoiceSpeedDialog.kt / app/build.gradle |
 
@@ -238,7 +242,7 @@
 
 ## 5. 实施阶段路线图
 
-### 5.1 Phase 1: P0 用户核心场景（13 项 - 分组并行）
+### 5.1 Phase 1: P0 用户核心场景（14 项 - 分组并行）
 
 - **实施策略**：AI 执行，按依赖顺序实施（4 个并行组，文件隔离原则，主 Agent 协调）
 - **关键依赖链**：RSS-B-05 → RSS-B-01，VIDEO-B-01 → VIDEO-B-02
@@ -251,11 +255,11 @@
 | 并行组 | 任务执行顺序 | 实施方式 |
 |--------|------------|----------|
 | 组 A（RSS 主线） | RSS-B-05 → RSS-B-01 → RSS-B-02 + RSS-B-03 + RSS-E-06 | AI 执行，按依赖顺序实施 |
-| 组 B（THEME 视觉） | THEME-B-01（独立） | AI 执行，按依赖顺序实施 |
+| 组 B（THEME 视觉） | THEME-B-01 + THEME-B-02（并行） | AI 执行，按依赖顺序实施 |
 | 组 C（EPUB 加速） | EPUB-B-01 + EPUB-B-02（并行） | AI 执行，按依赖顺序实施 |
 | 组 D（VIDEO 增强） | VIDEO-B-01 → VIDEO-B-02 + VIDEO-E-01 + VIDEO-E-02 + DEPS-B-01 | AI 执行，按依赖顺序实施 |
 
-**P0 任务明细（13 项）**：
+**P0 任务明细（14 项）**：
 
 | 任务 | 决策ID | 用户价值 | 所属并行组 |
 |------|--------|---------|----------|
@@ -263,6 +267,7 @@
 | RssFragment openRssSearch 入口 | RSS-B-05 | 4.8 | 组 A RSS 主线 |
 | markwon 3 扩展 | DEPS-B-01 | 5.0 | 组 D VIDEO 增强 |
 | 纸墨风格 | THEME-B-01 | 5.0 | 组 B THEME 视觉 |
+| 字体撞色检测 | THEME-B-02 | 4.8 | 组 B THEME 视觉 |
 | VideoBookPreloader | VIDEO-B-01 | 5.0 | 组 D VIDEO 增强 |
 | cacheFirst 默认值 | RSS-E-06 | 4.8 | 组 A RSS 主线 |
 | SourceSelectDialog | RSS-B-02 | 4.5 | 组 A RSS 主线 |
@@ -273,9 +278,9 @@
 | ReadRecentBook 写入 | VIDEO-E-01 | 4.5 | 组 D VIDEO 增强 |
 | ChoiceSpeedDialog 增强 | VIDEO-E-02 | 4.5 | 组 D VIDEO 增强 |
 
-### 5.2 Phase 2: P1 性能体验增强（20 项）
+### 5.2 Phase 2: P1 性能体验增强（19 项）
 
-- **包含**：RSS 订阅源优化、ExoPlayerHelper Bug 修复、主题扩展（含 THEME-B-02 字体撞色检测）等
+- **包含**：RSS 订阅源优化、ExoPlayerHelper Bug 修复、主题扩展（THEME-B-03 主题包 ZIP 导入导出、THEME-B-04 Config 字段扩展等）等
 - **完成标准**：所有 P1 任务实施完成 + 真机测试通过
 - **文档同步**：同 Phase 1
 - **实施方式**：AI 执行，按依赖顺序实施（无工期估算）
@@ -351,18 +356,18 @@
 
 ### 8.1 借鉴项按模块分布
 
-> v1.2 调整：P0 从 10 项升级为 13 项（新增 RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-02 移到 P1）
+> v1.2 调整：P0 从 10 项升级为 14 项（新增 RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-02 保留 P0）
 
 | 模块 | P0 | P1 | P2 | 小计 | 备注 |
 |------|---|---|---|------|------|
-| SA-1 主题管理（THEME） | 1 | 6 | 6 | 13 | 含 AppearanceKit 套件架构；THEME-B-02 移到 P1 |
+| SA-1 主题管理（THEME） | 2 | 5 | 6 | 13 | 含 AppearanceKit 套件架构；THEME-B-02 保留 P0 |
 | SA-2 EPUB | 2 | 4 | 4 | 10 | 渐进式优化策略 |
 | SA-3 AI 助手 | 0 | 0 | 0 | 0 | 全量否决 |
 | SA-4 RSS/发现页 | 5 | 2 | 3 | 10 | P0 占比最高（含 RSS-B-05 升级） |
 | SA-5 视频（VIDEO） | 4 | 1 | 0 | 5 | 本项目已领先；VIDEO-B-02/E-01/E-02 升级 P0 |
 | SA-6 构建（BUILD） | 0 | 5 | 3 | 8 | CI 优化为主 |
 | SA-7 依赖（DEPS） | 1 | 2 | 5 | 8 | UI 优化集中在 P2 |
-| **合计** | **13** | **20** | **21** | **54** | - |
+| **合计** | **14** | **19** | **21** | **54** | - |
 
 ### 8.2 不借鉴项按类别分布
 
@@ -391,13 +396,13 @@
 | 检查点 1 | ✅ 已完成 | spec.md 已完成（Intent/Scope/Approach/Requirements/Scenarios） |
 | 检查点 2 | ✅ 已完成 | tasks.md 已完成（54 项任务清单，按 P0/P1/P2 分类） |
 | 检查点 3 | ✅ 已完成 | design.md 已完成（v5.0 决策整合，含 ADR + 数据流图 + 文件变更清单） |
-| 检查点 4 | 🔄 需调整 | 用户验收需调整 - 三大调整执行中（P0 范围升级 4 项变 13 项 + ADR 全量调整变 27 个 + 删除工期估算改为 AI 执行） |
+| 检查点 4 | 🔄 需调整 | 用户验收需调整 - 三大调整已完成（P0 范围升级 4 项变 14 项 + ADR 全量调整变 27 个 + 删除工期估算改为 AI 执行），等待三次验收 |
 
 ### 9.2 下一步
 
 1. **完成 4 个文档全量修复**（spec/tasks/design/README）
 2. **修复完成后再次发起检查点4 验收**
-3. **通过后进入实施阶段**：Phase 1 P0 分组并行实施（4 个并行组，13 项任务，AI 执行按依赖顺序实施）
+3. **通过后进入实施阶段**：Phase 1 P0 分组并行实施（4 个并行组，14 项任务，AI 执行按依赖顺序实施）
 4. **每阶段完成后**：
    - 执行真机测试（ai_tests/scripts/）
    - 同步 updateLog.md（基于 git diff 真实变更）
@@ -410,6 +415,43 @@
 - [ ] 用户通过检查点 4 验收
 - [ ] 确认实施顺序（建议：RSS-B-01 → DEPS-B-01 → THEME-B-01 → VIDEO-B-01 → ...）
 - [ ] 创建 Phase 1 任务跟踪 Issue
+
+### 9.4 实施前必须确认的事实清单（v2.2 新增）
+
+> 基于第三轮深度审查，实施前必须逐项确认以下事实，避免按 fork 仓库（Archive 项目）假设实施。
+
+#### 9.4.1 文件路径已修正
+
+| # | 文件 | 修正说明 |
+|---|------|---------|
+| 1 | `EpubFile.kt` | EPUB-B-01/B-02 修改目标文件，路径已核实 |
+| 2 | `RssFragment.kt` | RSS-B-01/B-05 修改目标文件，路径已核实（注意与 RSS-B-05 串行） |
+| 3 | `VideoPlayerActivity.kt` | VIDEO-B-02 修改目标文件，路径已核实 |
+| 4 | `ChoiceSpeedDialog.kt` | VIDEO-E-02 修改目标文件，路径已核实 |
+| 5 | `Exo2MediaPlayer.kt` | VIDEO-E-03 修改目标文件，路径已核实 |
+| 6 | `ThemeUtils.kt` | THEME-B-02 修改目标文件，路径已核实（撞色检测方法新增位置） |
+
+#### 9.4.2 新增子目录
+
+| # | 子目录 | 关联任务 |
+|---|--------|---------|
+| 1 | `ui/rss/search/` | RSS-B-01（RssSearchActivity 及其 ViewModel/Adapter） |
+| 2 | `ui/video/` | VIDEO-E-01/E-02（视频模块新增组件，避免与现有 video 模块文件冲突） |
+
+#### 9.4.3 新增文件
+
+| # | 文件 | 关联任务 | 备注 |
+|---|------|---------|------|
+| 1 | `ReadRecentBook.kt` | VIDEO-E-01 | 本项目无此文件，需新建（参考 fork 仓库实现） |
+| 2 | `ReadRecentBookDao.kt` | VIDEO-E-01 | 本项目无此文件，需新建（Room DAO） |
+
+#### 9.4.4 配置文件修改
+
+| # | 配置文件 | 修改内容 | 关联任务 |
+|---|---------|---------|---------|
+| 1 | `strings.xml` | 新增用户可见字符串（双版本 values/ + values-zh/） | 所有 P0 任务（ADR-018） |
+| 2 | `AndroidManifest.xml` | 新增 Activity 注册（RssSearchActivity 等） | RSS-B-01 |
+| 3 | `proguard-rules.pro` | 新增反射类 keep 规则 | 涉及反射的新增类（B10 阻塞点） |
 
 ---
 
@@ -441,6 +483,17 @@
 3. `@DatabaseView` 修改需评估影响
 4. 实体字段修改需评估向后兼容性
 
+### 10.4 关键事实标注（v2.2 新增）
+
+> 基于第三轮深度审查确认的本项目关键事实，实施前必须核对这些事实，避免按 fork 仓库（Archive 项目）假设实施。
+
+| # | 事实 | 证据位置 | 实施影响 |
+|---|------|---------|---------|
+| F1 | **本项目 minSdk=23** | `build.gradle:66` | 所有新增依赖必须支持 API 23+；rhino 1.8.1 锁定原因之一是 API 24 以下缺少 Arrays.setAll（minSdk 已提升至 23 但仍低于 24），ADR-022 兼容性策略以此为基线 |
+| F2 | **sora-editor + markwon 已引入** | `build.gradle:329-332, 356-358` | DEPS-B-01（markwon 3 扩展）仅需添加扩展依赖，无需新增核心库；DEPS-B-03（sora-editor）已引入，P2 任务仅做能力扩展 |
+| F3 | **本项目无 ReadRecentBook.kt** | 本项目源码扫描 | 仅 fork 仓库（Archive 项目）有 ReadRecentBook.kt；VIDEO-E-01 实施时需新建 `ReadRecentBook.kt` + `ReadRecentBookDao.kt`（参考 fork 仓库实现） |
+| F4 | **本项目无 BaseSearchActivity** | 本项目源码扫描 | 本项目只有 `VMBaseActivity`；RSS-B-01 实施时 `RssSearchActivity` 父类需重新评估（继承 VMBaseActivity 或 SearchActivity，而非 BaseSearchActivity） |
+
 ---
 
 ## 11. 变更历史
@@ -449,20 +502,74 @@
 |------|------|----------|
 | 2026-07-18 | v1.0 | 初始创建：基于 v5.0 最终决策生成 spec/tasks/design/README |
 | 2026-07-18 | v1.1 | 全量修复+优化：修复 5 类严重问题 + 8 项中等问题 + 新增 6 个 ADR（ADR-013~018）+ 优化 P0 为分组并行（4 组）|
-| 2026-07-18 | v1.2 | 三大调整：P0 范围升级 4 项变 13 项 + ADR 全量调整变 27 个 + 删除工期估算（AI 执行无需工期）|
+| 2026-07-18 | v1.2 | 三大调整：P0 范围升级 4 项变 14 项 + ADR 全量调整变 27 个 + 删除工期估算（AI 执行无需工期）|
+| 2026-07-18 | v2.2 | 第三轮深度审查全量修复：基于 3 份审查报告（共 4828 行）全量修复 12 项严重问题（A.事实偏差类 6 项 + B.ADR 决策类 5 项 + C.跨文档矛盾类 1 项），详见 §12 v2.2 修复详情 |
 
 ---
 
-## 12. 文档使用说明
+## 12. v2.2 修复详情（2026-07-18）
 
-### 12.1 阅读顺序建议
+> 基于第三轮深度审查（3 份报告共 4828 行）的全量修复，统一 P0=14 / P1=19 / P2=21 / ADR=27 数据基线。
+
+### 12.1 审查报告来源（3 份，共 4828 行）
+
+| 报告 | 行数 | 主要审查范围 |
+|------|------|------------|
+| review-design-rationality-spec-tasks.md | 1194 | spec.md + tasks.md 设计合理性审查 |
+| review-design-rationality-design.md | 1628 | design.md 设计合理性审查 |
+| review-implementation-simulation.md | 2006 | 实施过程仿真模拟审查 |
+
+### 12.2 12 项严重问题分类与修复
+
+#### A. 事实偏差类（6 项）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| A1 | ReadRecentBook.kt 存在性误判 | 标注"本项目无 ReadRecentBook.kt（仅 fork 仓库有）"，实施时需新建该文件 |
+| A2 | BaseSearchActivity 存在性误判 | 标注"本项目无 BaseSearchActivity（只有 VMBaseActivity）"，RssSearchActivity 父类需重新评估 |
+| A3 | cacheFirst 默认值描述偏差 | 修正 cacheFirst 默认值变更影响范围说明 |
+| A4 | 文件路径错误 | 修正 EpubFile.kt/RssFragment.kt/VideoPlayerActivity.kt/ChoiceSpeedDialog.kt/Exo2MediaPlayer.kt/ThemeUtils.kt 等文件路径标注 |
+| A5 | sora-editor+markwon 引入状态偏差 | 标注"sora-editor+markwon 已引入（build.gradle:329-332, 356-358）"，DEPS-B-01/P2 任务无需新增依赖 |
+| A6 | 子目录结构缺失 | 补充新增子目录说明：ui/rss/search/ + ui/video/ |
+
+#### B. ADR 决策类（5 项）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| B1 | ADR-002 与 R22 矛盾 | 统一 ADR-002（P0 分组并行）与 R22（RssFragment.kt 并发修改风险）的描述，明确文件隔离原则 |
+| B2 | ADR-013 pureSearch 策略 | 修正 ADR-013 数据库迁移安全策略与 pureSearch 的关系说明（pureSearch 不涉及数据库变更） |
+| B3 | 文件清单不完整 | 补充 design.md 文件变更清单遗漏的文件（ReadRecentBookDao.kt 等） |
+| B4 | minSdk 描述偏差 | 标注"本项目 minSdk=23（build.gradle:66）"，修正 ADR-022 兼容性策略的基线 |
+| B5 | ADR-010b 范围 | 明确 ADR-010b 主题包云端同步仅覆盖 P2 部分，与 ADR-010a 拆分边界清晰 |
+
+#### C. 跨文档矛盾类（1 项）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | P0 范围+P1 下限跨文档不一致 | 4 份文档（README/spec/tasks/design）+ 3 份分析报告统一为 P0=14 / P1=19 / P2=21 / ADR=27 |
+
+### 12.3 v2.2 修复后数据基线
+
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| P0 数量 | 10/13/14 混用 | **14** |
+| P1 数量 | 19/23 混用 | **19** |
+| P2 数量 | 21 | **21** |
+| ADR 数量 | 18/27 混用 | **27** |
+| 总借鉴数 | 54 | **54** |
+
+---
+
+## 13. 文档使用说明
+
+### 13.1 阅读顺序建议
 
 1. **首次阅读**：第 1 章项目概述 → 第 3 章决策汇总 → 第 9 章当前状态
 2. **实施参考**：第 5 章路线图 → 第 10 章技术约束 → tasks.md 任务清单
 3. **决策追溯**：第 4 章核心发现 → borrow-decisions.md 决策表 → analysis-report.md 分析报告
 4. **模块深度**：intermediate/SA-*-*.md 对应模块中间文件
 
-### 12.2 维护规则
+### 13.2 维护规则
 
 - **状态更新**：每阶段完成后更新第 9 章当前状态
 - **变更记录**：所有重大变更记录到第 11 章变更历史

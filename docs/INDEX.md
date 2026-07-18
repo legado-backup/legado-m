@@ -114,6 +114,7 @@
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
 | [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
 | [specs/legado-skill-optimization-v2/](./specs/legado-skill-optimization-v2/) | Legado Skill V2 优化（聚焦修复错误知识+门禁强化+架构瘦身，避免历次"声称完成≠实际生效"陷阱） 🔄 设计中 |
+| [specs/rss-batch-optimize-v2/](./specs/rss-batch-optimize-v2/) | RSS 订阅源批量优化 v2（222源，复用v1工作流+占位符/模板源处理+域名迁移+反爬配置+skill反哺） 🔄 设计中 |
 | [specs/legado-skill-v2-rebuild/](./specs/legado-skill-v2-rebuild/) | Legado Skill V2 重建 |
 | [specs/skill-core-capability-rebuild/](./specs/skill-core-capability-rebuild/) | Skill 核心能力重建 |
 | [specs/skill-usability-optimization/](./specs/skill-usability-optimization/) | Skill 可用性优化 |
