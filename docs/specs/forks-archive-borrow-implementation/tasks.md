@@ -20,7 +20,7 @@
 
 ### 1.1 RSS-B-01: RssSearchActivity（用户价值 5.0）
 - [ ] 1.1.1 创建 RssSearchActivity.kt（继承 VMBaseActivity 本项目基类 `app/src/main/java/io/legado/app/base/VMBaseActivity.kt:9`；基于 Archive 104 行实现，激活 searchUrl 字段）
-- [ ] 1.1.2 创建 RssSearchViewModel.kt
+- [ ] 1.1.2 复用现有 RssSortViewModel（⚠️ **不新增 RssSearchViewModel**——Archive 项目 RssSearchActivity.kt:20 实际 `class RssSearchActivity : VMBaseActivity<ActivityRssSearchBinding, RssSortViewModel>()` 复用现有 RssSortViewModel，与 Archive 借鉴源一致，降低实施风险）
 - [ ] 1.1.3 创建 RssSearchAdapter.kt
 - [ ] 1.1.4 `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` 添加搜索入口（5 行代码）
 - [ ] 1.1.5 修改 `app/src/main/AndroidManifest.xml` 注册 RssSearchActivity
@@ -30,18 +30,19 @@
 - [ ] 1.1.9 真机验证订阅内容搜索
 - **状态**：待启动
 - **依赖**：无（数据已就绪，RssSource.searchUrl 字段已存在）
-- **说明**：本项目 `app/src/main/java/io/legado/app/ui/rss/` 下无 search/ 子目录，需新建 `ui/rss/search/` 子目录存放 RssSearchActivity/ViewModel/Adapter
+- **说明**：本项目 `app/src/main/java/io/legado/app/ui/rss/` 下无 search/ 子目录，需新建 `ui/rss/search/` 子目录存放 RssSearchActivity/Adapter（⚠️ ViewModel 复用现有 RssSortViewModel，无需新建）
 
-### 1.2 DEPS-B-01: markwon 3 扩展（用户价值 5.0）
-- [x] 1.2.0 ✅ 已实现（`app/build.gradle:329-332` 已引入 markwon core+image-glide+tables+html）
+### 1.2 DEPS-B-01: markwon 4.6.2 扩展（用户价值 5.0）
+- [x] 1.2.0 ✅ 已实现（`app/build.gradle:329-332` 已引入 markwon core+image-glide+tables+html；`gradle/libs.versions.toml:24` markwon = "4.6.2"）
 - [ ] 1.2.1 在 app/build.gradle 添加 markwon-strikethrough 依赖
 - [ ] 1.2.2 添加 markwon-tasklist 依赖
 - [ ] 1.2.3 添加 markwon-linkify 依赖
 - [ ] 1.2.4 配置 Markwon 引擎使用新扩展（订阅文章渲染入口）
 - [ ] 1.2.5 真机验证订阅文章渲染（删除线/任务列表/链接识别）
-- **状态**：markwon core 已引入 / 需补充 tasklist+strikethrough+linkify
+- [ ] 1.2.6 验证 3.x 与 4.x API 兼容性（现有 4 个依赖 core/image-glide/tables/html 与新扩展 tasklist/strikethrough/linkify 的 API 兼容性）
+- **状态**：markwon 4.6.2 core 已引入 / 需补充 tasklist+strikethrough+linkify + 验证 API 兼容性
 - **依赖**：无
-- **说明**：markwon 核心已引入，仅需补充 3 个扩展模块
+- **说明**：markwon 4.6.2 核心已引入，仅需补充 3 个扩展模块。⚠️ **markwon 3.x 与 4.x API 不兼容**，借鉴 Archive 项目时（如 Archive 用 markwon 3）需进行 API 适配；现有 4 个依赖（core/image-glide/tables/html）与新扩展（tasklist/strikethrough/linkify）的兼容性必须在实施时验证
 
 ### 1.3 THEME-B-01: 纸墨风格（用户价值 5.0）
 - [ ] 1.3.1 创建 PaperInkHelper.kt（基于 Paint.setShadowLayer，60 行零外部依赖）
@@ -53,26 +54,26 @@
 - **预计工作量**：1 天
 
 ### 1.4 VIDEO-B-01: VideoBookPreloader（用户价值 5.0）
-- [ ] 1.4.1 创建 VideoBookPreloader.kt（基于 Archive 90 行实现）
-- [ ] 1.4.2 集成到搜索结果页（搜索视频书时预加载目录）
+- [ ] 1.4.1 创建 VideoBookPreloader.kt（基于 Archive 90 行实现，放置在 `app/src/main/java/io/legado/app/help/gsyVideo/`）
+- [ ] 1.4.2 集成到 SearchActivity.kt（搜索结果页预加载视频书目录；⚠️ **不是 VideoPlayerActivity.kt**——VideoBookPreloader 在搜索结果页预加载，VideoPlayerActivity.kt 是视频播放页）
 - [ ] 1.4.3 真机验证视频播放启动速度提升
 - [ ] 1.4.4 单元测试覆盖预加载逻辑（缓存命中/超时/异常场景）
 - **状态**：待启动
 - **依赖**：无
 - **预计工作量**：1 天
-- **说明**：本项目 `app/src/main/java/io/legado/app/ui/rss/` 下无 video/ 子目录，需新建 `ui/rss/video/` 子目录存放视频书相关组件
+- **说明**：⚠️ 原 tasks.md 描述"集成到 VideoPlayerActivity.kt"是错误的（design.md §4.2 #2 错误标注），正确集成位置是 `app/src/main/java/io/legado/app/ui/book/search/SearchActivity.kt`（搜索结果页，已存在）。VideoBookPreloader.kt 放置在 `app/src/main/java/io/legado/app/help/gsyVideo/`，与 ChoiceSpeedDialog.kt/Exo2MediaPlayer.kt 同目录
 
 ### 1.5 RSS-E-06: cacheFirst 默认值（用户价值 4.8）
 - [x] 1.5.1 ✅ 已完成（`app/src/main/java/io/legado/app/data/entities/RssSource.kt:113` cacheFirst: Boolean = true 已是默认值，无需调整）
-- [ ] 1.5.2 WebView cacheFirst 默认 true（订阅文章加载入口）
+- [x] 1.5.2 ✅ 已完成（`app/src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt:421` 已实现 `cacheMode = if (s.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT`；原 design.md §4.1 #9 标注的 `RssWebActivity.kt` 文件不存在，正确文件为 `ReadRssActivity.kt`）
 - [ ] 1.5.3 真机验证 RSS 加载速度（首次/二次进入对比）
-- **状态**：1.5.1 已完成 / 1.5.2-1.5.3 待启动
+- **状态**：✅ 已完成（仅 WebView 层需真机验证 1.5.3）
 - **依赖**：无
-- **说明**：数据层默认值已是 true，仅保留 WebView 层验证子任务
+- **说明**：数据层（RssSource.kt:113）+ WebView 层（ReadRssActivity.kt:421）均已完成，仅保留真机验证子任务
 
 ### 1.6 THEME-B-02: 字体撞色检测（用户价值 4.8）
 - [ ] 1.6.1 实现 sanitizeFontColorAgainstSurfaces 方法
-- [ ] 1.6.2 集成 AndroidColorUtils.calculateContrast（计算与背景对比度；本项目使用 `lib/theme/ThemeUtils.kt`，无 ThemeColorUtils.kt）
+- [ ] 1.6.2 集成 AndroidColorUtils.calculateContrast（计算与背景对比度；本项目使用 `app/src/main/java/io/legado/app/lib/theme/ThemeUtils.kt`，无 ThemeColorUtils.kt）
 - [ ] 1.6.3 在主题设置界面添加撞色检测提示
 - [ ] 1.6.4 真机验证配色异常场景提示
 - **状态**：待启动
@@ -131,22 +132,23 @@
 - **说明**：视频核心场景连续性优化
 
 ### 1.13 VIDEO-E-01: ReadRecentBook 写入（用户价值 4.5，评分 90）
-- [ ] 1.13.1 新增 ReadRecentBook 实体+DAO（`app/src/main/java/io/legado/app/data/entities/ReadRecentBook.kt` + `app/src/main/java/io/legado/app/data/dao/ReadRecentBookDao.kt`）
-- [ ] 1.13.2 新增数据库 Migration（AppDatabase 升级 + schema 导出；迁移范围需包含 pureSearch 字段，与 design.md ADR-013 一致）
+- [ ] 1.13.1 新增 ReadRecentBook 实体+DAO（`app/src/main/java/io/legado/app/data/entities/ReadRecentBook.kt` + `app/src/main/java/io/legado/app/data/dao/ReadRecentBookDao.kt`；@Entity + @Parcelize + 字段默认值，遵循 Room 实体规范）
+- [ ] 1.13.2 新增数据库 Migration（⚠️ **AppDatabase.kt 当前 version=98**，需新增 `Migration_98_to_99` 手写 Migration + entities 数组加入 `ReadRecentBook::class` + version 升级 98→99；迁移范围需包含 pureSearch 字段，与 design.md ADR-013 一致；schema 导出 + 真机验证覆盖安装流程）
 - [ ] 1.13.3 视频书搜索结果分支集成（VideoPlay.kt 写入最近阅读）
 - [ ] 1.13.4 真机验证视频书出现在"最近阅读"
 - **状态**：待启动（v5.1 从 P1 升级 P0）
 - **依赖**：无
 - **说明**：视频书最近阅读，与 VIDEO-B-01/B-02 构成视频场景完整闭环
-- **重要提示**：本项目当前无 ReadRecentBook 表，仅 fork 仓库有，需从 fork 仓库参考实现
+- **重要提示**：本项目当前无 ReadRecentBook 表（AppDatabase.kt:79-85 entities 数组共 26 个实体无 ReadRecentBook），仅 fork 仓库有，需从 fork 仓库参考实现。⚠️ 涉及数据库迁移（ADR-013），需独立验证覆盖安装流程，不可与其他任务简单并行
 
 ### 1.14 VIDEO-E-02: ChoiceSpeedDialog 增强（用户价值 4.5，评分 90）
 - [ ] 1.14.1 增强 `app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt` 倍速选项
-- [ ] 1.14.2 在 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt`（本项目无 VideoActivity.kt，使用 VideoPlayerActivity.kt）中集成倍速对话框
+- [ ] 1.14.2 修改 ChoiceSpeedDialog 调用点（⚠️ 实际调用点是 `app/src/main/java/io/legado/app/help/gsyVideo/VideoPlayer.kt:600` 实例化 ChoiceSpeedDialog，**不是** `VideoPlayerActivity.kt:725-737`——VideoPlayerActivity.kt:725-737 用的是 Spinner 实现倍速，并非 ChoiceSpeedDialog）
 - [ ] 1.14.3 真机验证倍速切换
 - **状态**：待启动（v5.1 从 P1 升级 P0）
 - **依赖**：无
 - **说明**：视频倍速增强，高频交互优化
+- **⚠️ 同文件冲突提示**：VIDEO-B-01/B-02/E-02 都修改 `VideoPlayerActivity.kt`，必须按顺序串行：VIDEO-B-01 → VIDEO-B-02 → VIDEO-E-02（违反并发文件修改规范"同一源码文件的所有 Edit 必须由主 Agent 串行执行"）
 
 ---
 

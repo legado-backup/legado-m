@@ -28,7 +28,7 @@
 | ADR | 标题 | Status | 类型 |
 |-----|------|--------|------|
 | ADR-001 | 三阶段实施策略 | Accepted | 实施策略类 |
-| ADR-002 | P0 阶段分组并行执行 | Accepted | 实施策略类 |
+| ADR-002 | P0 阶段分组顺序执行 | Accepted | 实施策略类 |
 | ADR-003 | AI 模块全量否决 | Accepted | 模块决策类 |
 | ADR-004 | UI 优化放最后并接受包体积增加 | Accepted | 实施策略类 |
 | ADR-005 | 用户价值评估四维度标准 | Accepted | 评估方法类 |
@@ -73,7 +73,7 @@
 - **建议**：保持原样
 - **理由**：三阶段策略是整个项目的实施骨架，决策合理、备选充分、Consequences 完整。已在 ADR-002 中细化 P0 内部并行策略，整体闭环。
 
-### 2.2 ADR-002 P0 阶段分组并行执行（已修复）
+### 2.2 ADR-002 P0 阶段分组顺序执行（已修复）
 
 - **Status**：Accepted
 - **Context 准确性**：✅ 通过
@@ -828,13 +828,13 @@
   - 导入导出无用户额外负担，云端同步需配置云盘
   - 拆分后可更清晰地约束各自的实施要求
 - **拆分后**：
-  - **ADR-010a 主题导入导出**：
+  - **ADR-010a 主题导入导出（P0 阶段仅本地视觉）**：
     - Status：Accepted
     - Context：本项目主题管理采用扁平 themeConfig.json，Archive 采用目录化主题包
     - Decision：P0 借鉴 THEME-B-01 纸墨风格 + THEME-B-02 字体撞色检测；P1 借鉴 THEME-B-03 主题包 ZIP 导入导出 + THEME-B-04 Config 字段扩展 + THEME-B-05 字体内嵌 + THEME-E-04 主题包导入导出格式 + THEME-E-05 主题预览能力
     - Consequences：正向 - 主题管理能力大幅提升、用户可备份/分享主题；负向 - AppearanceKit 架构改造工程量大
     - 用户额外负担：无
-  - **ADR-010b 主题包云端同步**：
+  - **ADR-010b 主题包云端同步与扩展能力**：
     - Status：Accepted
     - Context：用户价值评估 3.3（P2），需配置云盘
     - Decision：P2 借鉴 THEME-B-06 AppearanceKit 套件架构 + THEME-B-07 主题包云端同步 + THEME-B-08 KitBinding + THEME-E-01 5 种 RED 格式兼容 + THEME-E-02 主题包目录化结构 + THEME-E-03 KitBinding 跨组件绑定
