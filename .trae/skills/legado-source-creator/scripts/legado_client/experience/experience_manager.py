@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from legado_client.utils.config import config
+from legado_client.utils.file_utils import sanitize_source_json
 
 
 class ExperienceManager:
@@ -317,7 +318,7 @@ class ExperienceManager:
         """提取规则模式：检测源中使用的解析方式（CSS/XPath/JSONPath/JS/变量）。"""
         patterns = []
         # 检查规则中使用的解析方式
-        all_rules = json.dumps(source_obj, ensure_ascii=False)
+        all_rules = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
         if "@CSS:" in all_rules or "class." in all_rules:
             patterns.append("CSS选择器")
         if "@XPath:" in all_rules:

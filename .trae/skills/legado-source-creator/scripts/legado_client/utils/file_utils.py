@@ -123,3 +123,39 @@ def detect_source_type(source_json: str) -> str:
     if "ruleArticles" in obj or "sourceUrl" in obj:
         return "rss"
     return "book"
+
+
+def sanitize_source_json(obj: Any) -> Any:
+    """递归过滤 None 值，避免序列化为字符串 "None" 触发 Rss.kt:64 ReferenceError。
+
+    Bug 背景（2026-07-17 真机测试发现）：
+        Python `json.dumps({"loginCheckJs": None})` 输出 `"loginCheckJs": null`，
+        但若字段值被先 str() 再序列化则变成 `"loginCheckJs": "None"`，
+        Legado `Rss.kt:64` 直接 eval 该字符串作为 JS 代码 → ReferenceError: None is not defined。
+
+    处理规则：
+        - None → 空字符串 ''（在 JS 中是 falsy，不会被当 JS 代码执行）
+        - dict / list 递归处理
+        - 保留 False / 0 / [] / {} 等有效 falsy 值（仅 None 被替换）
+
+    Args:
+        obj: 任意 Python 对象（dict / list / 标量）
+
+    Returns:
+        过滤后的对象，结构相同但所有 None 值替换为空字符串
+
+    Examples:
+        >>> sanitize_source_json({"a": None, "b": 1, "c": {"d": None}})
+        {'a': '', 'b': 1, 'c': {'d': ''}}
+        >>> sanitize_source_json([None, 1, {"x": None}])
+        ['', 1, {'x': ''}]
+        >>> sanitize_source_json(None)
+        ''
+    """
+    if obj is None:
+        return ''
+    if isinstance(obj, dict):
+        return {k: sanitize_source_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_source_json(item) for item in obj]
+    return obj

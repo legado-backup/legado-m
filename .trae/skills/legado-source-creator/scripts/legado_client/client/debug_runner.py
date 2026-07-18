@@ -37,7 +37,7 @@ from legado_client.analyzer.source_navigation import navigate_to_source
 from legado_client.analyzer.parse_strategy import select_parse_strategy
 from legado_client.client.user_interaction import create_interaction_request
 from legado_client.experience.experience_manager import search_experience, ExperienceManager
-from legado_client.utils.file_utils import load_source_object
+from legado_client.utils.file_utils import load_source_object, sanitize_source_json
 from legado_client.analyzer.source_validator import SourceValidator
 from legado_client.analyzer.rule_precheck import RulePrecheck
 
@@ -470,7 +470,7 @@ def apply_auto_fix(source_obj: dict, collector: DebugCollector) -> Optional[dict
         return None
 
     error = collector.errors[0]
-    source_json = json.dumps(source_obj, ensure_ascii=False)
+    source_json = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
     # 提取已收集的HTML用于辅助修复（如CSS选择器修正）
     html = None
     if collector.html_sources:
@@ -533,7 +533,7 @@ def iterative_repair_loop(client: RuleEngineClient, source_obj: dict, key: str,
             break
 
         # 相同修复检测：连续两轮修复结果相同，说明修复无效，退出
-        fixed_json = json.dumps(fixed_obj, ensure_ascii=False)
+        fixed_json = json.dumps(sanitize_source_json(fixed_obj), ensure_ascii=False)
         if fixed_json == last_fixed_json:
             print(f"[迭代 {iteration+2}/{max_iterations}] 修复无变化，退出迭代")
             break
@@ -545,7 +545,7 @@ def iterative_repair_loop(client: RuleEngineClient, source_obj: dict, key: str,
         print(f"{'='*60}")
 
         # 重新调试
-        current_json = json.dumps(current_obj, ensure_ascii=False)
+        current_json = json.dumps(sanitize_source_json(current_obj), ensure_ascii=False)
         collector = DebugCollector(source_obj=current_obj, site_url=collector.site_url,
                                    cookie_store=collector.cookie_store)
         try:
@@ -879,7 +879,7 @@ def _execute_jvm_test(args, source_obj: dict, source_type: str) -> Tuple[DebugCo
 
     不调用 sys.exit()，用于 run_and_return() 的内部调用。
     """
-    source_json = json.dumps(source_obj, ensure_ascii=False)
+    source_json = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
     site_url = source_obj.get("bookSourceUrl") or source_obj.get("sourceUrl") or ""
     _cookie_store: dict = {}
 
@@ -1162,7 +1162,7 @@ def _dict_to_debug_result(result: Dict[str, Any], source_obj: dict) -> DebugResu
         device_jar_diff=None,
         fix_detail=result.get("fix_details"),
         duration_ms=int(elapsed * 1000),
-        source_json=json.dumps(source_obj, ensure_ascii=False),
+        source_json=json.dumps(sanitize_source_json(source_obj), ensure_ascii=False),
     )
 
 
@@ -1197,7 +1197,7 @@ def run(args, source_obj: dict) -> None:
     --timeout 参数：通过 args.timeout 传递给 RuleEngineClient。
     --skip-db-lookup / --db-only：3.7/3.8 新增参数，使用 getattr 安全读取。
     """
-    source_json = json.dumps(source_obj, ensure_ascii=False)
+    source_json = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
 
     # 检测源类型（JSON去重：直接用 source_obj）
     source_type = _detect_type_from_obj(source_obj)
@@ -1294,7 +1294,7 @@ def run(args, source_obj: dict) -> None:
             db_source = json.loads(db_cached["source_json"]) if isinstance(db_cached["source_json"], str) else db_cached["source_json"]
             if db_source:
                 test_source_obj = db_source
-                source_json = json.dumps(test_source_obj, ensure_ascii=False)
+                source_json = json.dumps(sanitize_source_json(test_source_obj), ensure_ascii=False)
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -1359,7 +1359,7 @@ def run(args, source_obj: dict) -> None:
 
     # 7.7: 进度反馈 - 调试启动
     if _INTERACTIVE_GUIDE_AVAILABLE:
-        report_progress("调试启动", 0, "准备启动 JVM 端到端调试")
+        _lazy_report_progress("调试启动", 0, "准备启动 JVM 端到端调试")
 
     print(f"{'='*60}\n")
 
@@ -1412,7 +1412,7 @@ def run(args, source_obj: dict) -> None:
                     client, test_source_obj, args.key, source_type,
                     collector, args.max_iterations
                 )
-                source_json = json.dumps(source_obj, ensure_ascii=False)
+                source_json = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
 
             # 生成验证报告（集成 evaluate_confidence）
             confidence = collector.generate_report()

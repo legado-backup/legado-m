@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MEMUC_PATH = r"D:\Program Files\Microvirt\MEmu\memuc.exe"
 ADB_PATH = r"D:\Program Files\Microvirt\MEmu\adb.exe"
 MEMU_INSTANCE_ID = 0
-MEMU_ADB_HOST = "127.0.0.1:21503"
+MEMU_ADB_HOST = "127.0.0.1:21513"
 
 # === Legado App ===
 # 简化说明：默认 debug 构建，与 build.gradle applicationId="io.legado.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.app.release + 改 APK_GLOB_DIR 到 release 路径 | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE（V4）

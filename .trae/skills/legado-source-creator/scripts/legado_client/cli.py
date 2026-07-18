@@ -188,8 +188,14 @@ async def _db_reset() -> None:
 
 async def _db_import_dir(dir_path: Path) -> None:
     """db import-dir：解析指定目录下 JSON 并入库。"""
-    from legado_client.fetcher.source_parser import parse_source_json, deduplicate_sources
-    from legado_client.storage.repository import bulk_upsert
+    # v3 重构（2026-07-17）：fetcher.source_parser 和 storage.repository 已归档
+    try:
+        from legado_client.fetcher.source_parser import parse_source_json, deduplicate_sources
+        from legado_client.storage.repository import bulk_upsert
+    except ImportError:
+        print("错误: db import-dir 功能已归档（v3 重构移除 MySQL storage 和 fetcher 模块）", file=sys.stderr)
+        print("如需恢复，请从 .trae/skills/legado-source-creator-archive/ 回滚相关模块", file=sys.stderr)
+        sys.exit(1)
 
     if not await _ensure_db():
         print("错误: 数据库不可用", file=sys.stderr)
@@ -271,8 +277,14 @@ async def _db_backup(output_path: str) -> None:
 
 async def _db_restore(input_path: str) -> None:
     """db restore：从 JSON 文件恢复到数据库。"""
-    from legado_client.fetcher.source_parser import parse_source_json, deduplicate_sources
-    from legado_client.storage.repository import bulk_upsert
+    # v3 重构（2026-07-17）：fetcher.source_parser 和 storage.repository 已归档
+    try:
+        from legado_client.fetcher.source_parser import parse_source_json, deduplicate_sources
+        from legado_client.storage.repository import bulk_upsert
+    except ImportError:
+        print("错误: db restore 功能已归档（v3 重构移除 MySQL storage 和 fetcher 模块）", file=sys.stderr)
+        print("如需恢复，请从 .trae/skills/legado-source-creator-archive/ 回滚相关模块", file=sys.stderr)
+        sys.exit(1)
 
     if not await _ensure_db():
         print("错误: 数据库不可用", file=sys.stderr)

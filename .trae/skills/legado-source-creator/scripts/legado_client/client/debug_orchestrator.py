@@ -24,6 +24,7 @@ from typing import Any, Optional
 from legado_client.client.debug_result import DebugResultData
 from legado_client.experience.experience_manager import ExperienceManager
 from legado_client.utils.config import config
+from legado_client.utils.file_utils import sanitize_source_json
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ class DebugOrchestrator:
                 test_mode="device",
                 started_at=started_at, finished_at=datetime.now(),
                 duration_ms=int((datetime.now() - started_at).total_seconds() * 1000),
-                source_json=json.dumps(source_obj, ensure_ascii=False),
+                source_json=json.dumps(sanitize_source_json(source_obj), ensure_ascii=False),
             )
         except Exception as e:
             logger.error("真机测试异常: %s", e)
@@ -272,7 +273,7 @@ class DebugOrchestrator:
 
         # 尝试自动修复
         error = {"msg": initial_result.message, "failedStage": initial_result.stage}
-        source_json = json.dumps(source_obj, ensure_ascii=False)
+        source_json = json.dumps(sanitize_source_json(source_obj), ensure_ascii=False)
         fix_result = auto_fix_error(error, source_json)
 
         if not fix_result.get("fixes_applied"):
@@ -296,7 +297,7 @@ class DebugOrchestrator:
             "fixes": fix_result.get("fixes_applied", []),
         }
         if retest_result.status == "pass":
-            retest_result.source_json = json.dumps(fixed_source, ensure_ascii=False)
+            retest_result.source_json = json.dumps(sanitize_source_json(fixed_source), ensure_ascii=False)
 
         return retest_result
 

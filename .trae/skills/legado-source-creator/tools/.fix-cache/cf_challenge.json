@@ -1,35 +1,5 @@
 [
   {
-    "solution": "CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:53:58.318812"
-  },
-  {
-    "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:53:58.327421"
-  },
-  {
-    "solution": "CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:56:55.559655"
-  },
-  {
-    "solution": "CF绕过: searchUrl headers补全UA/Accept/Referer",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:56:55.566763"
-  },
-  {
-    "solution": "源级header: 补全默认UA+Referer",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:56:55.580761"
-  },
-  {
-    "solution": "CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:56:59.247638"
-  },
-  {
     "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
     "error_type": "cf_challenge",
     "timestamp": "2026-06-24T09:56:59.256223"
@@ -248,5 +218,35 @@
     "solution": "源级header: 补全默认UA+Referer",
     "error_type": "cf_challenge",
     "timestamp": "2026-07-18T09:14:44.233893"
+  },
+  {
+    "solution": "CF绕过: loginUrl 设为普通 URL（用户需手动点击\"登录\"按钮触发 WebView 加载首页，自动通过 CF JS Challenge）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:41:57.982119"
+  },
+  {
+    "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:41:57.989356"
+  },
+  {
+    "solution": "源级header: 补全默认UA+Referer",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:41:57.990700"
+  },
+  {
+    "solution": "CF绕过: loginUrl 设为普通 URL（用户需手动点击\"登录\"按钮触发 WebView 加载首页，自动通过 CF JS Challenge）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:44:21.376112"
+  },
+  {
+    "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:44:21.383279"
+  },
+  {
+    "solution": "源级header: 补全默认UA+Referer",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T14:44:21.384835"
   }
 ]

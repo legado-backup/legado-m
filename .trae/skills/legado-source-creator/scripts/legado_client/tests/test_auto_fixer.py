@@ -406,8 +406,12 @@ def test_fix_rule_syntax_empty():
 # ==================== auto_fix_error 主函数测试 ====================
 
 def test_auto_fix_error_rule_parse():
-    """正常用例：rule_parse 错误自动修复。"""
-    source = {"ruleSearch": {"name": "@.data.list"}}
+    """正常用例：rule_parse 错误自动修复。
+
+    v4 更新：source 必须包含 sourceUrl（CRITICAL 必填字段），
+    否则 MandatoryFieldValidator 会直接拒绝，不进入修复流程。
+    """
+    source = {"sourceUrl": "https://example.com", "ruleSearch": {"name": "@.data.list"}}
     result = auto_fix_error(
         {'msg': 'CSS选择器错误', 'suggestion': {'error_type': 'rule_parse'}},
         source
