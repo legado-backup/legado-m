@@ -1,0 +1,1 @@
+import{_ as r}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{c as s,a as o,o as t}from"./index-CRfxPgQE.js";const c={},a={class:"source-page"};function n(l,e){return t(),s("div",a,[...e[0]||(e[0]=[o("h2",null,"源管理",-1),o("p",null,"源列表页面（由其他子代理实现）",-1)])])}const p=r(c,[["render",n]]);export{p as default};

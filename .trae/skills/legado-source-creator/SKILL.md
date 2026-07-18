@@ -295,13 +295,15 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
      - `--stage all|search|detail|toc|content`，key 格式：普通词(完整链路)/`http://...`(仅详情)/`++url`(仅目录)/`--url`(仅正文)
    - 其他脚本命令行详见下方"测试脚本"索引表
 
-   **失败判定标准**（4 种失败条件，触发后进入 Phase 4）：
+   **失败判定标准**（6 种失败/触发条件，触发后进入 Phase 4）：
    | 失败类型 | 错误特征 | 处理方式 |
    |----------|---------|---------|
    | JVM缺函数 | `TypeError: java.xxx is not a function` | 标记 `jvm_evolution_needed=true`，Phase 5 补全 |
    | 网站反爬 | HTTP 403/503 或 CloudFlare 拦截 | 标记 `cf_detected=true`，需真机验证 |
    | 选择器返回空 | CSS/XPath/JSONPath 结果为空 | Phase 4 源码深挖规则语法 |
    | 解密失败 | decrypt 返回乱码或异常 | 检查 key/iv/mode/padding 参数 |
+   | **触发字段未源码验证**（v2 新增） | 规则含 `loginUrl`/`loginCheckJs`/`webView`/`cookie` 但未执行 Phase 0 | **强制 Phase 4**，即使 JVM 测试通过（JVM 不覆盖 WebView 层，测不出此类错误） |
+   | **可信度=不可验证**（v2 新增） | Phase 3 输出 `confidence=不可验证` 的字段（WebView规则） | **强制 Phase 4**，源码验证 WebView 边界 |
 
 3. **可信度分层**（每个规则字段单独标注，最终汇总）：
 
@@ -324,9 +326,18 @@ description: 开源阅读(Legado)书源与订阅源智能创建。分析目标�
 - [ ] 输出 `[PHASE3_COMPLETE] 测试覆盖率:X%, 高可信:N, 中可信:N, 需真机:N`
 - [ ] 写入 basic-memory 执行证据（按上方模板）
 
-### Phase 4: 源码深挖（测试失败时必须执行）
+### Phase 4: 源码深挖（测试失败或触发字段时必须执行）
 
 **禁止猜测修复！** 必须读Legado源码定位根因。
+
+> **v2 触发条件强化**（2026-07-17）：原触发条件"测试失败"依赖 JVM 报错，但 JVM 不覆盖 WebView/Cookie/Activity 层，导致 `loginUrl: @js:` 形式错误等永不触发 Phase 4。新增 3 类强制触发场景（与 Phase 0 联动）：
+
+**强制触发场景**（任一命中即必须执行 Phase 4，**即使 JVM 测试通过**）：
+1. **触发字段未源码验证**：规则中含 `loginUrl`/`loginCheckJs`/`loginUi`/`webView`/`startBrowserAwait`/`startBrowser`/`cookie` 但未执行 Phase 0 源码验证
+2. **可信度标注为"不可验证"**：Phase 3 输出中存在 `confidence=不可验证` 的字段（WebView规则）
+3. **规则含高危调用**：`@js:java.webView` / `java.startBrowserAwait` / `java.startBrowser` / `java.getVerificationCode` 调用（这些是 JVM 仿真不覆盖的边界，stub 不报错但真机会失败）
+
+> **根因案例**（2026-07-17 v2 修正）：原 cf-bypass.md 推荐 `loginUrl: @js:java.webView(null, source.sourceUrl, null, false);`，JVM 仿真不报错（JsExtensionsStub 中 webView() 是 stub），但真机 `WebViewLoginFragment.loadUrl()` 不识别 @js: 形式→源失效。此类错误必须通过强制触发场景1/3 拦截，不能等"测试失败"。
 
 **工具辅助**（新增，减少手动源码查阅）：
 1. **source_navigation 自动导航**：根据错误类型自动映射到源码文件和行号（如 CSS选择器错误 → AnalyzeRule.kt CSS解析逻辑）
