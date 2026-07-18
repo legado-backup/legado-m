@@ -2,21 +2,6 @@
   {
     "solution": "CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）",
     "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:53:03.511891"
-  },
-  {
-    "solution": "CF绕过: 移除loginCheckJs（陷阱#57：CF站会导致无限循环）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:53:03.523646"
-  },
-  {
-    "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
-    "error_type": "cf_challenge",
-    "timestamp": "2026-06-24T09:53:03.533082"
-  },
-  {
-    "solution": "CF绕过: loginUrl配置WebView（首页CF挑战自动通过，Cookie自动同步）",
-    "error_type": "cf_challenge",
     "timestamp": "2026-06-24T09:53:58.318812"
   },
   {
@@ -248,5 +233,20 @@
     "solution": "源级header: 补全默认UA+Referer",
     "error_type": "cf_challenge",
     "timestamp": "2026-06-26T21:56:15.977585"
+  },
+  {
+    "solution": "CF绕过: loginUrl 设为普通 URL（用户需手动点击\"登录\"按钮触发 WebView 加载首页，自动通过 CF JS Challenge）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T09:14:44.227168"
+  },
+  {
+    "solution": "CF绕过: 创建searchUrl配置块（UA+Referer，无js块）",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T09:14:44.232363"
+  },
+  {
+    "solution": "源级header: 补全默认UA+Referer",
+    "error_type": "cf_challenge",
+    "timestamp": "2026-07-18T09:14:44.233893"
   }
 ]

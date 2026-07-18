@@ -7,9 +7,10 @@ fix_url_template / fix_field_mapping / fix_rule_syntax / auto_fix_error。
 同时支持 `python test_auto_fixer.py` 独立运行和 `pytest test_auto_fixer.py` 运行。
 
 特别测试三处 BUG 修复：
-  ① fix_cf_bypass 生成的 loginUrl 应以 `@js:java.webView` 开头，
+  ① fix_cf_bypass 生成的 loginUrl 应为**普通首页 URL**（禁止 @js:java.webView，
+     源码锚定：WebViewLoginFragment.loadUrl 不识别 @js: 形式），
      searchUrl 不应含 `<js>java.ajax` 块，不应设置 loginCheckJs
-  ② fix_website_revamp SSR/SPA 检测后应配置 loginUrl+WebView（非空字符串）
+  ② fix_website_revamp SSR/SPA 检测后应配置 loginUrl（普通 URL，非 @js:java.webView）
   ③ fix_css_selector 无 HTML 时不应修改选择器（不驼峰转换/不模糊匹配）
 """
 import json
@@ -54,7 +55,7 @@ def _bs4_available():
 # ==================== ① fix_cf_bypass 测试（CF 盾绕过） ====================
 
 def test_fix_cf_bypass_bug1_webview_login():
-    """BUG①: loginUrl 应以 @js:java.webView 开头，searchUrl 不应含 <js>java.ajax 块，不应设置 loginCheckJs。"""
+    """BUG①: loginUrl 应为普通首页 URL（禁止 @js:java.webView），searchUrl 不应含 <js>java.ajax 块，不应设置 loginCheckJs。"""
     source = {
         "bookSourceUrl": "https://example.com",
         "searchUrl": 'https://example.com/search?q={{key}},{"method":"GET","js":"<js>java.ajax()</js>"}',
@@ -62,9 +63,11 @@ def test_fix_cf_bypass_bug1_webview_login():
     }
     fixed, fixes, manual = fix_cf_bypass({'msg': 'CF挑战'}, source)
 
-    # loginUrl 应以 @js:java.webView 开头
-    assert fixed['loginUrl'].startswith('@js:java.webView'), \
-        f"loginUrl 应以 @js:java.webView 开头: {fixed['loginUrl']}"
+    # loginUrl 应为普通首页 URL（禁止 @js:java.webView，源码锚定：WebViewLoginFragment.loadUrl 不识别 @js:）
+    assert fixed['loginUrl'].startswith('http'), \
+        f"loginUrl 应为普通 URL(http开头): {fixed['loginUrl']}"
+    assert not fixed['loginUrl'].startswith('@js:'), \
+        f"loginUrl 禁止用 @js:java.webView 形式: {fixed['loginUrl']}"
     # searchUrl 不应含 <js>java.ajax 块
     assert '<js>java.ajax' not in fixed['searchUrl'], \
         f"searchUrl 不应含 <js>java.ajax: {fixed['searchUrl']}"
@@ -74,14 +77,16 @@ def test_fix_cf_bypass_bug1_webview_login():
 
 
 def test_fix_cf_bypass_normal():
-    """正常用例：CF 绕过配置 WebView + headers。"""
+    """正常用例：CF 绕过配置普通 loginUrl + headers。"""
     source = {
         "bookSourceUrl": "https://example.com",
         "searchUrl": "https://example.com/search?q={{key}}",
     }
     fixed, fixes, manual = fix_cf_bypass({'msg': 'CF挑战'}, source)
 
-    assert fixed['loginUrl'].startswith('@js:java.webView'), f"loginUrl 应配置 WebView: {fixed['loginUrl']}"
+    # loginUrl 应为普通首页 URL（禁止 @js:java.webView，源码锚定：WebViewLoginFragment.loadUrl 不识别 @js:）
+    assert fixed['loginUrl'].startswith('http'), f"loginUrl 应为普通 URL(http开头): {fixed['loginUrl']}"
+    assert not fixed['loginUrl'].startswith('@js:'), f"loginUrl 禁止用 @js:java.webView 形式: {fixed['loginUrl']}"
     assert 'example.com' in fixed['loginUrl'], f"loginUrl 应含 base_url: {fixed['loginUrl']}"
     assert len(fixes) > 0, "应产生修复项"
     # searchUrl 应补全 headers（含 Referer）
@@ -105,13 +110,13 @@ def test_fix_cf_bypass_create_config_block():
 
 
 def test_fix_cf_bypass_no_source_url():
-    """异常用例：无 sourceUrl 无法配置 WebView。"""
+    """异常用例：无 sourceUrl 无法配置 loginUrl。"""
     source = {"searchUrl": "test"}
     fixed, fixes, manual = fix_cf_bypass({'msg': 'CF'}, source)
     assert manual, "无 sourceUrl 应返回 manual 建议"
     # 无 sourceUrl 时不应配置 loginUrl
-    assert not fixed.get('loginUrl', '').startswith('@js:java.webView'), \
-        "无 sourceUrl 不应配置 WebView loginUrl"
+    assert not fixed.get('loginUrl'), \
+        "无 sourceUrl 不应配置 loginUrl"
 
 
 def test_fix_cf_bypass_remove_login_check_js():
@@ -129,7 +134,7 @@ def test_fix_cf_bypass_remove_login_check_js():
 # ==================== ② fix_website_revamp 测试（网站改版重分析） ====================
 
 def test_fix_website_revamp_bug2_ssr_webview():
-    """BUG②: SSR/SPA 检测后应配置 loginUrl+WebView（非空字符串）。"""
+    """BUG②: SSR/SPA 检测后应配置 loginUrl（普通 URL，非 @js:java.webView）。"""
     # 构造 SSR HTML（含 __NEXT_DATA__ 标记）
     ssr_html = '<html><head><script>window.__NEXT_DATA__={}</script></head><body></body></html>'
     source = {
@@ -138,10 +143,12 @@ def test_fix_website_revamp_bug2_ssr_webview():
     }
     fixed, fixes, manual = fix_website_revamp({'msg': '搜索结果为空'}, source, html=ssr_html)
 
-    # SSR/SPA 检测后应配置 loginUrl+WebView（非空字符串）
+    # SSR/SPA 检测后应配置 loginUrl（普通 URL，非 @js:java.webView）
     assert fixed.get('loginUrl', ''), "SSR/SPA 应配置 loginUrl（非空）"
-    assert fixed['loginUrl'].startswith('@js:java.webView'), \
-        f"loginUrl 应为 WebView: {fixed['loginUrl']}"
+    assert fixed['loginUrl'].startswith('http'), \
+        f"loginUrl 应为普通 URL(http开头): {fixed['loginUrl']}"
+    assert not fixed['loginUrl'].startswith('@js:'), \
+        f"loginUrl 禁止用 @js:java.webView 形式: {fixed['loginUrl']}"
     # 不应设置 loginCheckJs
     assert 'loginCheckJs' not in fixed, "不应设置 loginCheckJs"
     assert any('SSR' in f or 'SPA' in f for f in fixes), f"应记录 SSR/SPA 降级: {fixes}"
@@ -435,9 +442,12 @@ def test_auto_fix_error_cf_challenge():
         source
     )
     assert isinstance(result, dict)
-    # cf_challenge 应触发 fix_cf_bypass，配置 loginUrl
-    assert result['fixed_source'].get('loginUrl', '').startswith('@js:java.webView'), \
-        f"应配置 WebView loginUrl: {result['fixed_source'].get('loginUrl')}"
+    # cf_challenge 应触发 fix_cf_bypass，配置 loginUrl（普通 URL，非 @js:java.webView）
+    login_url = result['fixed_source'].get('loginUrl', '')
+    assert login_url.startswith('http'), \
+        f"loginUrl 应为普通 URL(http开头): {login_url}"
+    assert not login_url.startswith('@js:'), \
+        f"loginUrl 禁止用 @js:java.webView 形式: {login_url}"
 
 
 def test_auto_fix_error_empty_source():

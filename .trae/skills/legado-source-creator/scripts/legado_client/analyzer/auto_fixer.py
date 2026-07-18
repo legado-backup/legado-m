@@ -1179,10 +1179,11 @@ if __name__ == '__main__':
     assert manual, f"无HTML时应返回manual建议: {manual}"
     assert '.book-name' in fixed['ruleSearch']['name'], f"选择器不应被破坏: {fixed['ruleSearch']['name']}"
 
-    # 正常用例2：fix_cf_bypass 生成loginUrl（非js块）
+    # 正常用例2：fix_cf_bypass 生成loginUrl（普通URL，禁止@js:java.webView）
     s_cf = {"bookSourceUrl": "https://example.com", "searchUrl": "https://example.com/search?q={{key}}"}
     fixed_cf, fixes_cf, _ = fix_cf_bypass({'msg': 'CF挑战'}, s_cf)
-    assert fixed_cf.get('loginUrl', '').startswith('@js:java.webView'), f"loginUrl应配置WebView: {fixed_cf.get('loginUrl')}"
+    assert fixed_cf.get('loginUrl', '').startswith('http'), f"loginUrl应为普通URL(http开头): {fixed_cf.get('loginUrl')}"
+    assert not fixed_cf.get('loginUrl', '').startswith('@js:'), f"loginUrl禁止用@js:java.webView形式: {fixed_cf.get('loginUrl')}"
     assert '<js>java.ajax' not in fixed_cf.get('searchUrl', ''), f"searchUrl不应含js块: {fixed_cf.get('searchUrl')}"
     assert 'loginCheckJs' not in fixed_cf, "不应设置loginCheckJs（陷阱#57）"
 

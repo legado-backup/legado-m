@@ -42,25 +42,60 @@ from legado_client.analyzer.source_validator import SourceValidator
 from legado_client.analyzer.rule_precheck import RulePrecheck
 
 # 包内核心模块导入（已迁移至 legado_client/，不再需要 try/except 降级）
-from legado_client.client.obstacle_resolver import resolve_obstacle
 from legado_client.analyzer.crypto_analyzer import analyze_encryption
 from legado_client.analyzer.auto_fixer import auto_fix_error
-from legado_client.client.interactive_guide import report_progress
 
-# 数据库查询钩子（3.1-3.5, 3.9）
-from legado_client.fetcher.source_parser import extract_domain_key
+# v3 重构（2026-07-17）：以下模块已归档到 archive/unused-tools/，改为延迟导入
+# - obstacle_resolver（resolve_obstacle）：未使用，已移除
+# - interactive_guide（report_progress）：1327/1346 行使用，改为延迟导入
+# - fetcher.source_parser（extract_domain_key）：617 行使用，改为延迟导入
 
-# 兼容性标志（保留以避免修改使用处逻辑，现在始终为 True）
-_OBSTACLE_RESOLVER_AVAILABLE = True
+# 兼容性标志（保留以避免修改使用处逻辑）
 _CRYPTO_ANALYZER_AVAILABLE = True
 _AUTO_FIXER_AVAILABLE = True
-_INTERACTIVE_GUIDE_AVAILABLE = True
+# v3 重构：以下标志始终为 False（模块已归档）
+_OBSTACLE_RESOLVER_AVAILABLE = False
+_INTERACTIVE_GUIDE_AVAILABLE = False
 
 # 外部可选模块导入已移除（cookie_manager/smart_http_client/knowledge_matcher 待迁移至 legado_client 包内）
 # 简化说明：保留可用性标志为 False 以避免使用处 NameError | 已知上限：Cookie持久化/智能HTTP/知识库匹配功能暂不启用 | 升级路径：模块迁移至包内后恢复导入
 _COOKIE_MANAGER_AVAILABLE = False
 _SMART_HTTP_CLIENT_AVAILABLE = False
 _KNOWLEDGE_MATCHER_AVAILABLE = False
+
+
+def _lazy_extract_domain_key(source_url):
+    """延迟导入 extract_domain_key（fetcher.source_parser 已归档）。
+
+    v3 重构：归档后不可用，返回空字符串降级。
+    """
+    try:
+        # 尝试从归档目录导入（如用户回退）
+        from legado_client.fetcher.source_parser import extract_domain_key
+        return extract_domain_key(source_url)
+    except ImportError:
+        # 归档后降级：用简单域名提取替代
+        if not source_url:
+            return ""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(source_url)
+            return parsed.netloc or ""
+        except Exception:
+            return ""
+
+
+def _lazy_report_progress(title, percent, message):
+    """延迟导入 report_progress（interactive_guide 已归档）。
+
+    v3 重构：归档后不可用，静默降级（无进度反馈）。
+    """
+    try:
+        from legado_client.client.interactive_guide import report_progress
+        return report_progress(title, percent, message)
+    except ImportError:
+        # 归档后降级：直接 print 替代
+        print(f"[进度] {title} {percent}% - {message}")
 
 
 # ==================== 常量定义（方向7.3: STAGE_NAMES 使用字符串键） ====================
@@ -614,7 +649,7 @@ async def _check_database(
 
     # 提取 domain_key
     source_url = source_obj.get("bookSourceUrl") or source_obj.get("sourceUrl", "")
-    domain_key = extract_domain_key(source_url)
+    domain_key = _lazy_extract_domain_key(source_url)
     if not domain_key:
         return "test", None
 
@@ -1343,7 +1378,7 @@ def run(args, source_obj: dict) -> None:
 
             # 7.7: 进度反馈 - 端到端调试开始
             if _INTERACTIVE_GUIDE_AVAILABLE:
-                report_progress("端到端调试", 20, "开始调用 JVM 调试")
+                _lazy_report_progress("端到端调试", 20, "开始调用 JVM 调试")
 
             if source_type == "book":
                 client.debug_book_source(
