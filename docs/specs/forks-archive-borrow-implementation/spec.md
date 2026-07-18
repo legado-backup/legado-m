@@ -13,7 +13,7 @@
 
 ## 1. Intent（意图）
 
-本 spec 基于 forks-archive-comparison 任务的 v5.0 终版决策结果，对阅读 Archive 私仓的 7 模块深度分析进行整合实施。目标是将 54 项用户价值导向的借鉴决策（B = Borrow）落地为本项目的可交付代码改造，按 P0/P1/P2 三级优先级分阶段实施，最大化用户感知收益，同时控制实施风险与改造成本。
+本 spec 基于 forks-archive-comparison 任务的 **v5.1 调整版决策**（v5.0 终版 + analysis-task-priority.md 用户价值再评估），P0=14 项，对阅读 Archive 私仓的 7 模块深度分析进行整合实施。目标是将 54 项用户价值导向的借鉴决策（B = Borrow）落地为本项目的可交付代码改造，按 P0/P1/P2 三级优先级分阶段实施，最大化用户感知收益，同时控制实施风险与改造成本。
 
 核心目标：
 1. 将 14 项 P0 高用户价值借鉴点（用户价值 ≥ 4.5）立即启动，覆盖用户核心场景（搜索/阅读/视频/订阅）
@@ -47,6 +47,7 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 | **合计** | **14** | **19** | **21** | **54** | - |
 
 > **v5.1 调整说明**（基于 analysis-task-priority.md 用户价值再评估）：
+> - ⚠️ analysis-task-priority.md §1.1 表格写 P0=10 是 v5.0 版本，v5.1 调整后 P0=14（升级 4 项 P1→P0）
 > - RSS-B-05（评分 96）从 P1 升级 P0：与 RSS-B-01 入口配套，5 行代码极低成本
 > - VIDEO-B-02（评分 96）从 P1 升级 P0：视频核心场景连续性优化
 > - VIDEO-E-01（评分 90）从 P1 升级 P0：视频书最近阅读直接提升找书体验
@@ -119,8 +120,8 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
    - 缺陷：放弃长期视觉体验提升机会
 
 6. **采用子代理并行实施所有 P0** → 否决
-   - 原因：源码文件修改必须串行化（并发文件修改规范）
-   - 缺陷：多 Agent 并行 Edit 同一源码文件违反规范
+   - 原因：AI 主 Agent 实际串行执行（单线程），分组仅用于工作组织，与 design.md ADR-002 + R22 风险描述一致
+   - 缺陷：多 Agent 并行 Edit 同一源码文件违反并发文件修改规范
 
 ### 3.3 Drawbacks
 
@@ -146,12 +147,16 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **用户价值**：5.0（最高）
 - **实施成本**：低（1 个 Activity + 5 行入口代码）
 - **用户场景**：用户搜索订阅内容
+- **技术前提**（重要）：
+  - 本项目基类为 VMBaseActivity（`app/src/main/java/io/legado/app/base/VMBaseActivity.kt`），无 BaseSearchActivity
+  - 本项目 `ui/rss/` 下无 `search/` 和 `video/` 子目录，实施时需新建（如需按 fork 仓库结构组织）
 - **技术要点**：
   - 数据已就绪（RssSource.searchUrl 字段已有，仅未激活）
-  - 新增 RssSearchActivity.kt 继承自 BaseSearchActivity
+  - 新增 RssSearchActivity.kt 继承自 VMBaseActivity（本项目基类，无 BaseSearchActivity）
   - RssFragment 添加搜索入口（5 行代码）
+  - ⚠️ 本项目 `ui/rss/` 下无 `search/` 子目录，实施时需新建
 - **验收标准**：
-  - [ ] 新增 `RssSearchActivity.kt` 文件
+  - [ ] 新增 `RssSearchActivity.kt` 文件（继承 VMBaseActivity）
   - [ ] RssFragment 添加搜索入口（图标/菜单项）
   - [ ] 用户可搜索所有订阅源的内容
   - [ ] 搜索结果按订阅源分组展示
@@ -162,11 +167,13 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **用户价值**：5.0（最高）
 - **实施成本**：低（仅添加 Gradle 依赖）
 - **用户场景**：订阅文章渲染
+- **技术前提**（重要）：
+  - ⚠️ markwon 核心已实现（`app/build.gradle:329-332` 已引入 markwon core+image-glide+tables+html），本任务仅需补充扩展依赖并验证功能完整性
 - **技术要点**：
   - markwon-strikethrough：删除线渲染
   - markwon-tasklist：任务列表渲染
   - markwon-linkify：链接自动识别
-  - 与现有 markwon 核心库兼容
+  - 与现有 markwon 核心库兼容（核心已引入，仅需补充扩展）
 - **验收标准**：
   - [ ] 添加 markwon-strikethrough 依赖到 app/build.gradle
   - [ ] 添加 markwon-tasklist 依赖
@@ -213,14 +220,16 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 #### REQ-P0-005: cacheFirst 默认值
 - **决策ID**：RSS-E-06
 - **用户价值**：4.8
-- **实施成本**：低（默认值调整）
+- **实施成本**：低（仅 WebView 层验证，数据层已完成）
 - **用户场景**：RSS 加载更快
+- **技术前提**（重要）：
+  - 数据层已完成（`RssSource.kt:113` `cacheFirst: Boolean = true` 已是默认值），仅 WebView 层需验证
 - **技术要点**：
-  - RSS 列表页 cacheFirst 默认 true
+  - RSS 列表页 cacheFirst 默认 true（数据层已完成，仅 WebView 层需验证）
   - WebView cacheFirst 默认 true
   - 后台静默更新内容
 - **验收标准**：
-  - [ ] RSS 列表页 cacheFirst 默认 true
+  - [ ] RSS 列表页 cacheFirst 默认 true（数据层已就绪，验证 WebView 层）
   - [ ] WebView cacheFirst 默认 true
   - [ ] RSS 首次加载速度提升（用户感知 < 500ms）
   - [ ] 后台正确更新内容
@@ -281,11 +290,11 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **实施成本**：低
 - **用户场景**：EPUB 加载加速
 - **技术要点**：
-  - EpubFile.kt 用 spine 优先索引
+  - EpubFile.kt 用 spine 优先索引（路径：`app/src/main/java/io/legado/app/model/localBook/EpubFile.kt`）
   - spine 是 EPUB 规范的阅读顺序定义
   - 预建章节索引表
 - **验收标准**：
-  - [ ] EpubFile.kt 用 spine 优先索引
+  - [ ] EpubFile.kt 用 spine 优先索引（路径：`app/src/main/java/io/legado/app/model/localBook/EpubFile.kt`）
   - [ ] EPUB 章节加载速度提升（首章加载 < 1s）
   - [ ] 章节顺序正确
   - [ ] 兼容现有 EPUB 文件
@@ -311,11 +320,11 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **实施成本**：低（5 行代码）
 - **用户场景**：RSS 搜索入口集成（与 REQ-P0-001 配套）
 - **技术要点**：
-  - RssFragment 添加 openRssSearch 方法
+  - RssFragment 添加 openRssSearch 方法（路径：`app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt`）
   - 与 RssSearchActivity（REQ-P0-001）入口配套
   - 极低成本，单独拆分反增协调成本
 - **验收标准**：
-  - [ ] RssFragment 添加 openRssSearch 方法
+  - [ ] RssFragment 添加 openRssSearch 方法（路径：`app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt`）
   - [ ] 入口跳转正常
   - [ ] 真机验证入口可用
   - [ ] 与 REQ-P0-001 构成 RSS 搜索完整闭环
@@ -338,12 +347,18 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 #### REQ-P0-013: 视频书 ReadRecentBook 写入
 - **决策ID**：VIDEO-E-01
 - **用户价值**：4.5（评分 90）
-- **实施成本**：低
+- **实施成本**：低（仅写入逻辑；如需新建表则成本上调为中）
 - **用户场景**：视频书进入"最近阅读"
+- **技术前提**（重要）：
+  - ⚠️ 本项目当前无 ReadRecentBook 表，仅 fork 仓库（Archive 项目）有此实体
+  - 实施时需先创建 ReadRecentBook.kt 实体 + ReadRecentBookDao.kt DAO + 数据库 Migration
+  - 数据库迁移范围需包含 pureSearch 字段（与 design.md ADR-013 一致）
 - **技术要点**：
+  - 需新增 ReadRecentBook 实体+DAO+Migration（本项目当前无此表，仅 fork 仓库有）
   - 视频书播放时写入 ReadRecentBook 表
   - 与 VIDEO-B-01/B-02 构成视频场景完整闭环
 - **验收标准**：
+  - [ ] 新增 ReadRecentBook.kt 实体 + ReadRecentBookDao.kt DAO + 数据库 Migration
   - [ ] 视频书播放时写入 ReadRecentBook 表
   - [ ] 真机验证视频书出现在"最近阅读"
   - [ ] 不影响书籍最近阅读列表
@@ -354,10 +369,11 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **实施成本**：低
 - **用户场景**：视频倍速选择交互
 - **技术要点**：
-  - 增强 ChoiceSpeedDialog 倍速选项
+  - 增强 ChoiceSpeedDialog 倍速选项（路径：`app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt`）
   - 视频高频交互优化
+  - ⚠️ 本项目无 `ui/rss.video/VideoActivity.kt`，实际为 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt`
 - **验收标准**：
-  - [ ] 增强 ChoiceSpeedDialog 倍速选项
+  - [ ] 增强 ChoiceSpeedDialog 倍速选项（路径：`app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt`）
   - [ ] 真机验证倍速切换
   - [ ] 倍速切换无卡顿
 
@@ -389,10 +405,12 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 |--------|--------|------|---------|---------|
 | REQ-P1-014 | BUILD-B-02 | armv8 单架构 CI | 4.0（开发效率） | 低 |
 | REQ-P1-015 | BUILD-B-05 | gitee 镜像同步 | 4.0（开发效率） | 低 |
-| REQ-P1-016 | BUILD-B-01 | CI 专用调试证书 | 2.8 | 低 |
-| REQ-P1-017 | BUILD-B-03 | CI 增量构建缓存 | 3.0 | 中 |
-| REQ-P1-018 | BUILD-B-04 | VERSION 注入 | 3.0 | 低 |
+| REQ-P1-016 | BUILD-B-01 | CI 专用调试证书 ⚠️ | 2.8 | 低 |
+| REQ-P1-017 | BUILD-B-03 | CI 增量构建缓存 ⚠️ | 3.0 | 中 |
+| REQ-P1-018 | BUILD-B-04 | VERSION 注入 ⚠️ | 3.0 | 低 |
 | REQ-P1-019 | DEPS-B-05 | lazycolumnscrollbar | 3.8 | 低（仅依赖） |
+
+> **⚠️ C2 标注**：REQ-P1-016（BUILD-B-01，2.8）、REQ-P1-017（BUILD-B-03，3.0）、REQ-P1-018（BUILD-B-04，3.0）用户价值低于 P1 下限（3.8），保持 P1=19 数据不变（不降级 P2），但 P1 实施前需再次评估是否降级 P2。
 
 P1 通用验收标准：
 - [ ] 每项必须通过模块级集成测试
@@ -407,10 +425,12 @@ P1 通用验收标准：
 | 需求ID | 决策ID | 描述 | 实施成本 |
 |--------|--------|------|---------|
 | REQ-P2-001 | DEPS-B-02 | composeBom 升级 | 高（兼容性评估） |
-| REQ-P2-002 | DEPS-B-03 | sora-editor 代码编辑器 | 中 |
+| REQ-P2-002 | DEPS-B-03 | sora-editor 代码编辑器 | 中（已实现，调整为验证版本兼容性+功能完整性） |
 | REQ-P2-003 | DEPS-B-09 | Glide ksp 迁移 | 中（ksp 替换 kapt） |
 | REQ-P2-004 | THEME-B-06 | AppearanceKit 套件架构 | 高（架构演进） |
 | REQ-P2-005 | THEME-B-08 | KitBinding | 中 |
+
+> **REQ-P2-002 说明**：sora-editor 已实现（`app/build.gradle:356-358` 已引入 soraEditor BOM+core+language.textmate），任务工作量调整为验证版本兼容性 + 功能完整性。
 
 #### 4.3.2 用户中价值类（7 项）
 
@@ -603,3 +623,21 @@ P2 通用验收标准：
 3. **日志规范**：改造过程日志记录（logging-during-refactoring.md）
 4. **版本交付同步**：编译前更新 updateLog.md（version-delivery-sync.md）
 5. **数据库变更**：如涉及 DB 变更必须先评估迁移安全（database-migration-safety.md）
+6. **minSdk 约束**：本项目 minSdk = 23（与 `app/build.gradle:66` 实际一致，与 design.md ADR-022 一致），所有借鉴代码需兼容 minSdk 23
+7. **借鉴代码合并策略**：本项目优先 + fork 仓库参考（与 design.md ADR-010b 一致）；加密密钥丢失恢复机制：从备份恢复 + 用户提示
+8. **配套文件修改**：实施时需修改 `strings.xml`（新增字符串）+ `AndroidManifest.xml`（新增 Activity 注册）+ `proguard-rules.pro`（新增 keep 规则）
+
+### E. 文件路径对照表（重要）
+
+> ⚠️ 本项目与 fork 仓库（Archive 项目）的文件路径存在差异，实施时以本表为准。
+
+| 文件 | fork 仓库路径（错误） | 本项目实际路径（正确） | 涉及 REQ |
+|------|---------------------|---------------------|---------|
+| EpubFile.kt | `app/src/main/java/io/legado/app/help/book/EpubFile.kt` | `app/src/main/java/io/legado/app/model/localBook/EpubFile.kt` | REQ-P0-009 |
+| RssFragment.kt | `app/src/main/java/io/legado/app/ui/rss/RssFragment.kt` | `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` | REQ-P0-001, REQ-P0-011 |
+| VideoActivity.kt | `app/src/main/java/io/legado/app/ui/rss.video/VideoActivity.kt` | 本项目无此文件，实际为 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt` | REQ-P0-014 |
+| ChoiceSpeedDialog.kt | `app/src/main/java/io/legado/app/ui/rss.video/` | `app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt` | REQ-P0-014 |
+| Exo2MediaPlayer.kt | `app/src/main/java/io/legado/app/ui/rss.video/` | `app/src/main/java/io/legado/app/help/gsyVideo/Exo2MediaPlayer.kt` | REQ-P1-013 |
+| ThemeColorUtils.kt | `lib/theme/ThemeColorUtils.kt` | 本项目无此文件，实际为 `lib/theme/ThemeUtils.kt` | THEME 模块相关 |
+
+> **子目录说明**：本项目 `ui/rss/` 下无 `search/` 和 `video/` 子目录，实施 REQ-P0-001（RssSearchActivity）等需要新建子目录时，按本项目实际目录结构组织。
