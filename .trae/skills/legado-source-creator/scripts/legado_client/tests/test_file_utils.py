@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from utils.file_utils import (
     ensure_dir, read_json, write_json, read_text, write_text,
-    load_source_object, detect_source_type,
+    load_source_object, detect_source_type, sanitize_source_json,
 )
 
 
@@ -194,6 +194,108 @@ def test_detect_source_type_array_takes_first():
     """detect_source_type 数组取首个元素判断。"""
     src = '[{"sourceUrl": "https://x.com/rss"}, {"bookSourceUrl": "https://y.com"}]'
     assert detect_source_type(src) == "rss"
+
+
+# ========== sanitize_source_json (None 序列化 bug 修复) ==========
+
+def test_sanitize_dict_top_level_none():
+    """dict 顶层 None 值替换为空字符串。"""
+    result = sanitize_source_json({"a": None, "b": 1})
+    assert result == {"a": "", "b": 1}
+
+
+def test_sanitize_nested_dict_none():
+    """嵌套 dict 中 None 值递归替换。"""
+    result = sanitize_source_json({"outer": {"inner": None, "keep": 2}})
+    assert result == {"outer": {"inner": "", "keep": 2}}
+
+
+def test_sanitize_list_none():
+    """list 中 None 值替换为空字符串。"""
+    result = sanitize_source_json([None, 1, "text"])
+    assert result == ["", 1, "text"]
+
+
+def test_sanitize_list_of_dict_none():
+    """list 中 dict 的 None 值递归替换。"""
+    result = sanitize_source_json([{"x": None}, {"y": None}])
+    assert result == [{"x": ""}, {"y": ""}]
+
+
+def test_sanitize_none_input_returns_empty_string():
+    """顶层 None 输入返回空字符串。"""
+    assert sanitize_source_json(None) == ""
+
+
+def test_sanitize_preserves_falsy_values():
+    """falsy 但非 None 的值不被替换（False / 0 / [] / {}）。"""
+    result = sanitize_source_json({
+        "f": False, "z": 0, "empty_list": [], "empty_dict": {}, "none_val": None
+    })
+    assert result == {
+        "f": False, "z": 0, "empty_list": [], "empty_dict": {}, "none_val": ""
+    }
+
+
+def test_sanitize_preserves_string_values():
+    """非 None 字符串原样保留（包括空字符串）。"""
+    result = sanitize_source_json({"name": "test", "empty": "", "none": None})
+    assert result == {"name": "test", "empty": "", "none": ""}
+
+
+def test_sanitize_deeply_nested():
+    """深层嵌套结构递归处理。"""
+    data = {"a": {"b": {"c": {"d": None, "e": [None, 1, {"f": None}]}}}}
+    result = sanitize_source_json(data)
+    assert result == {"a": {"b": {"c": {"d": "", "e": ["", 1, {"f": ""}]}}}}
+
+
+def test_sanitize_json_dumps_no_none_string():
+    """端到端验证：sanitize 后 json.dumps 输出不含字符串 'None'。
+
+    这是 bug 修复的核心断言：Python None 不应被序列化为 "None" 字符串，
+    否则 Legado Rss.kt:64 会将其作为 JS 代码执行触发 ReferenceError。
+    """
+    source_obj = {
+        "sourceUrl": "https://example.com",
+        "loginCheckJs": None,
+        "ruleArticles": None,
+        "header": None,
+    }
+    sanitized = sanitize_source_json(source_obj)
+    json_str = json.dumps(sanitized, ensure_ascii=False)
+    assert "None" not in json_str
+    assert "null" not in json_str  # 空字符串而非 null
+
+
+def test_sanitize_simulates_real_source_object():
+    """模拟真实源对象：混合 None 与有效值。"""
+    real_source = {
+        "bookSourceName": "测试源",
+        "bookSourceUrl": "https://example.com",
+        "loginUrl": None,
+        "loginCheckJs": None,
+        "customOrder": 0,
+        "enabled": True,
+        "ruleSearch": {"bookList": ".item", "name": ".title"},
+        "ruleContent": None,
+    }
+    result = sanitize_source_json(real_source)
+    assert result["bookSourceName"] == "测试源"
+    assert result["loginUrl"] == ""
+    assert result["loginCheckJs"] == ""
+    assert result["customOrder"] == 0
+    assert result["enabled"] is True
+    assert result["ruleSearch"]["bookList"] == ".item"
+    assert result["ruleContent"] == ""
+
+
+def test_sanitize_idempotent():
+    """sanitize 幂等性：对已 sanitize 的对象再次 sanitize 结果不变。"""
+    data = {"a": None, "b": 1}
+    once = sanitize_source_json(data)
+    twice = sanitize_source_json(once)
+    assert once == twice
 
 
 if __name__ == "__main__":

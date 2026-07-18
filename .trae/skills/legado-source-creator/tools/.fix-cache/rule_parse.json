@@ -68,5 +68,15 @@
     "solution": "ruleSearch.name → bookName",
     "error_type": "rule_parse",
     "timestamp": "2026-07-18T09:14:44.223996"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T14:43:50.892263"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T14:43:50.900993"
   }
 ]

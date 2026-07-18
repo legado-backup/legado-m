@@ -22,6 +22,8 @@ import tempfile
 import os
 from pathlib import Path
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import ADB_PATH, MEMU_ADB_HOST, PACKAGE
 

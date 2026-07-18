@@ -19,6 +19,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from legado_client.utils.file_utils import sanitize_source_json
+from legado_client.validator import MandatoryFieldValidator, format_validation_report
+
 # basic-memory 可选依赖（try-import 降级）
 # 简化说明：basic-memory 为 MCP 工具，本模块无法直接 import | 已知上限：无法直接读写 basic-memory | 升级路径：宿主集成 MCP 调用
 try:
@@ -930,7 +933,7 @@ def verify_fix(source_json, error_stage):
     else:
         source_type = 'book'
 
-    source_json_str = json.dumps(source, ensure_ascii=False) if isinstance(source, dict) else source_json
+    source_json_str = json.dumps(sanitize_source_json(source), ensure_ascii=False) if isinstance(source, dict) else source_json
 
     try:
         with ClientCls(timeout=30) as client:
@@ -1050,6 +1053,32 @@ def auto_fix_error(error, source_json, html=None):
     stage = err['stage']
     source = _normalize_source(source_json)
 
+    # v4 必填字段预校验：在进入修复流程前检查必填字段完整性
+    # - CRITICAL 字段缺失（sourceUrl/bookSourceUrl）→ 无法修复，直接返回失败
+    # - MANDATORY/RECOMMENDED 字段缺失 → 加入 missing_fields 清单，提示 AI 补全
+    source_type = 'book' if source.get('bookSourceUrl') else 'rss'
+    validator = MandatoryFieldValidator(strict_recommended=False)
+    validation_result = validator.validate(source, source_type=source_type)
+    missing_fields = validation_result.get('all_missing', [])
+    critical_missing = validation_result.get('missing_critical', [])
+
+    if critical_missing:
+        # CRITICAL 字段缺失，源无法导入 Legado，不进入修复流程
+        return {
+            'success': False,
+            'fixed_source': source,
+            'fixes_applied': [],
+            'verify_result': {
+                'status': 'failed',
+                'detail': f'CRITICAL 字段缺失: {", ".join(critical_missing)}',
+            },
+            'attempts': 0,
+            'remaining_errors': [f'必填字段缺失: {f}' for f in critical_missing],
+            'fix_details': [],
+            'missing_fields': missing_fields,
+            'validation_report': format_validation_report(validation_result),
+        }
+
     # 1. 历史方案优先：加载历史修复方案作为参考
     history = load_fix_history(error_type)
 
@@ -1109,19 +1138,20 @@ def auto_fix_error(error, source_json, html=None):
                 'diff': '; '.join(manual_suggestions[:3]),
                 'success': False,
             }],
+            'missing_fields': missing_fields,
         }
 
     attempt = 0
-    source_before = json.dumps(source, ensure_ascii=False)  # 3.6: 修复前快照
+    source_before = json.dumps(sanitize_source_json(source), ensure_ascii=False)  # 3.6: 修复前快照
     for attempt in range(1, 4):
         fixes_this_round = []
 
         # 2-3. 分析错误 + 生成修复
         for fix_func in fix_funcs:
-            source_before_fix = json.dumps(source, ensure_ascii=False)
+            source_before_fix = json.dumps(sanitize_source_json(source), ensure_ascii=False)
             fixed, fixes, _ = fix_func(err, source, html)
             if fixes:
-                source_after_fix = json.dumps(fixed, ensure_ascii=False)
+                source_after_fix = json.dumps(sanitize_source_json(fixed), ensure_ascii=False)
                 # 3.6: 为每个修复生成 fix_detail
                 for fix_desc in fixes:
                     all_fix_details.append({
@@ -1163,6 +1193,7 @@ def auto_fix_error(error, source_json, html=None):
         'attempts': attempt,
         'remaining_errors': [] if verify['status'] == 'passed' else [err['msg']],
         'fix_details': all_fix_details,  # 3.6: 结构化修复详情
+        'missing_fields': missing_fields,  # v4: 必填字段缺失清单
     }
 
 
