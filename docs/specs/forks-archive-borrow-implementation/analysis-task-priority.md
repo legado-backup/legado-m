@@ -76,7 +76,7 @@
 - **建议**：**保持 P0**（最高优先级）
 - **理由**：数据已就绪（RssSource.searchUrl 字段已有但无 Activity 使用），104 行代码激活后用户可搜索所有订阅源内容，用户价值最高且实施成本最低，是 P0 中的"必做项"。
 
-### 2.2 DEPS-B-01 markwon 3 扩展（用户价值 5.0）
+### 2.2 DEPS-B-01 markwon 4.6.2 扩展（用户价值 5.0）
 
 - **当前优先级**：P0
 - **用户价值评分**：100/100
@@ -1001,7 +1001,7 @@ THEME-B-03 (P1) → THEME-B-07 (P2) 云端同步
 |--------|--------|---------|
 | RSS-E-06 cacheFirst 默认值 | 0.5 天 | 可与 RSS-B-01 一并实施（同 RSS 模块） |
 | EPUB-B-01 章节资源索引 | 0.5 天 | 可与 EPUB-B-02 一并实施（同 EPUB 模块） |
-| DEPS-B-01 markwon 3 扩展 | 0.5 天 | 可独立实施（仅添加依赖） |
+| DEPS-B-01 markwon 4.6.2 扩展 | 0.5 天 | 可独立实施（仅添加依赖） |
 
 ---
 
@@ -1012,7 +1012,7 @@ THEME-B-03 (P1) → THEME-B-07 (P2) 云端同步
 | 排名 | 任务ID | 任务名称 | 优先级 | 用户价值评分 |
 |------|--------|---------|--------|------------|
 | 1 | RSS-B-01 | RssSearchActivity | P0 | 100 |
-| 1 | DEPS-B-01 | markwon 3 扩展 | P0 | 100 |
+| 1 | DEPS-B-01 | markwon 4.6.2 扩展 | P0 | 100 |
 | 1 | THEME-B-01 | 纸墨风格 | P0 | 100 |
 | 1 | VIDEO-B-01 | VideoBookPreloader | P0 | 100 |
 | 5 | RSS-E-06 | cacheFirst 默认值 | P0 | 96 |
@@ -1152,7 +1152,7 @@ THEME-B-03 (P1) → THEME-B-07 (P2) 云端同步
 **建议并行实施**（不同模块无文件冲突）：
 
 1. RSS 模块：RSS-B-01（含 RSS-B-05 合并）
-2. DEPS 模块：DEPS-B-01 markwon 3 扩展
+2. DEPS 模块：DEPS-B-01 markwon 4.6.2 扩展
 3. THEME 模块：THEME-B-01 纸墨风格
 4. VIDEO 模块：VIDEO-B-01 VideoBookPreloader
 5. RSS 模块：RSS-E-06 cacheFirst 默认值

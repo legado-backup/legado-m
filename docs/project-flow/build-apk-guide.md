@@ -190,7 +190,7 @@ gradlew --version     # 应显示 Gradle 8.x
 | compileSdk | 36 | `build.gradle` (root) |
 | minSdk | 23 | `app/build.gradle` |
 | targetSdk | 36 | `app/build.gradle` |
-| applicationId | `io.legado.app` | `app/build.gradle` |
+| applicationId | `io.legado.miss.app` | `app/build.gradle` |
 | namespace | `io.legado.app` | `app/build.gradle` |
 | JDK | 17 | `app/build.gradle` (jvmToolchain) |
 | Kotlin | 2.3.10 | `gradle/libs.versions.toml` |
@@ -204,9 +204,9 @@ gradlew --version     # 应显示 Gradle 8.x
 
 | 变体 | applicationId | 后缀 | 用途 |
 |------|--------------|------|------|
-| **appDebug** | `io.legado.app.debug` | `.debug` | 开发调试，不混淆 |
-| **appRelease** | `io.legado.app.release` | `.release` | 正式发布，混淆+收缩 |
-| **googleRelease** | `io.legado.play` | — | Google Play 发布 |
+| **appDebug** | `io.legado.miss.app.debug` | `.debug` | 开发调试，不混淆 |
+| **appRelease** | `io.legado.miss.app.release` | `.release` | 正式发布，混淆+收缩 |
+| **共存包** | `io.legado.app.debug` | `.debug` | 与原版legado-E共存 |
 
 > **注意**：debug 和 release 的 applicationId 不同（后缀不同），可以在同一设备上同时安装。
 
@@ -392,14 +392,14 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 第二个参数为自定义 applicationId，通过 Gradle 项目属性 `-PcustomAppId` 传入。
 
-- 不传第二个参数 → 使用默认包名 `io.legado.app`
-- 传入第二个参数 → 使用自定义包名，如 `com.myname.legado`
+- 不传第二个参数 → 使用默认包名 `io.legado.miss.app`
+- 传入第二个参数 → 使用自定义包名，如 `io.legado.app`（共存包）
 
 自定义包名后，APK 可以和原版 Legado 同时安装在同一设备上（包名不同=不同应用）。
 
 > **原理**：`app/build.gradle` 中已改为：
 > ```groovy
-> applicationId project.hasProperty("customAppId") ? project.property("customAppId") : "io.legado.app"
+> applicationId project.hasProperty("customAppId") ? project.property("customAppId") : "io.legado.miss.app"
 > ```
 > 不传 `-PcustomAppId` 时行为与原版完全一致，不会影响原版构建。
 
@@ -474,9 +474,9 @@ npm run build
 
 | 构建类型 | applicationId | 说明 |
 |---------|--------------|------|
-| Debug | `io.legado.app.debug` | 默认 debug 后缀 |
-| Release | `io.legado.app.release` | 默认 release 后缀 |
-| Google Play | `io.legado.play` | 特殊 product flavor |
+| Debug | `io.legado.miss.app.debug` | 默认 debug 后缀 |
+| Release | `io.legado.miss.app.release` | 默认 release 后缀 |
+| 共存包 | `io.legado.app.debug` | 与原版legado-E共存 |
 
 ### 7.3 修改方法
 

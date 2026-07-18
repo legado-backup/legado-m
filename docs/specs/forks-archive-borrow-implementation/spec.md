@@ -30,7 +30,7 @@
 | 优先级 | 数量 | 实施窗口 | 用户价值区间 | 实施成本 |
 |--------|------|---------|------------|---------|
 | **P0** | 14 项 | 立即启动（按依赖顺序实施，AI 执行无工期估算） | 4.5 - 5.0 | 低-中 |
-| **P1** | 19 项 | 季度规划（按依赖顺序实施，AI 执行无工期估算） | 3.8 - 4.8 | 低-高 |
+| **P1** | 19 项 | 季度规划（按依赖顺序实施，AI 执行无工期估算） | 2.8 - 4.8（含开发者侧 6 项 2.8-4.0） | 低-高 |
 | **P2** | 21 项 | 年度规划（按依赖顺序实施，AI 执行无工期估算） | 含 9 项 UI 优化 | 中-高 |
 | **合计** | **54 项** | - | - | - |
 
@@ -127,7 +127,7 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 
 1. **分阶段实施周期长**：P0 + P1 + P2 三阶段渐进式实施，按依赖顺序推进（AI 执行，无工期估算）
 2. **P2 UI 优化增加 APK 体积**：9 项 UI 优化（liquidglass/lottie 等）预计增加 2-5MB
-3. **部分借鉴点需要兼容性评估**：如 markwon 3 扩展与现有渲染链兼容性、sora-editor 与现有代码编辑器兼容性
+3. **部分借鉴点需要兼容性评估**：如 markwon 4.6.2 扩展与现有渲染链兼容性、sora-editor 与现有代码编辑器兼容性
 4. **实施过程中可能与现有功能冲突**：如 EpubFile 改造可能与 EPUB 阅读已有逻辑冲突
 5. **依赖升级风险**：composeBom 升级、Glide ksp 迁移可能引入兼容性问题
 6. **P1/P2 优先级可能随用户反馈调整**：实施过程中需动态重评估
@@ -162,7 +162,7 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
   - [ ] 搜索结果按订阅源分组展示
   - [ ] 真机测试通过：搜索响应时间 < 3s
 
-#### REQ-P0-002: markwon 3 扩展
+#### REQ-P0-002: markwon 4.6.2 扩展
 - **决策ID**：DEPS-B-01
 - **用户价值**：5.0（最高）
 - **实施成本**：低（仅添加 Gradle 依赖）
@@ -186,16 +186,26 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 #### REQ-P0-003: 纸墨风格
 - **决策ID**：THEME-B-01
 - **用户价值**：5.0（最高）
-- **实施成本**：低（约 60 行代码）
+- **实施成本**：中（需同步修改 ReadBookConfig 新增 paperInkStrength 字段，成本上调）
 - **用户场景**：阅读视觉体验
+- **技术前提**（重要）：
+  - ⚠️ Archive 项目 `PaperInkHelper.kt` 依赖 `ReadBookConfig.paperInkStrength` 字段（第 5/10/47 行）
+  - 本项目 `app/src/main/java/io/legado/app/help/config/ReadBookConfig.kt` Grep `paperInkStrength|paperInk` 无匹配，**本项目无此字段**
+  - 实施时必须同步修改 ReadBookConfig.kt：
+    - 新增 `var paperInkStrength: Int` 字段（参考 Archive 第 302 行）
+    - setter 限定 `coerceIn(0, 100)`（参考 Archive 第 305 行）
+    - 配置实体字段（参考 Archive 第 580 行）
+    - 条件回退逻辑（参考 Archive 第 793 行）
+    - JSON 序列化（参考 Archive 第 894 行）
+  - ⚠️ 原 design.md §4.3 主题管理模块仅列 PaperInkHelper.kt 新增条目，遗漏了 ReadBookConfig.kt 修改条目
 - **技术要点**：
-  - 基于 Paint.setShadowLayer 实现
-  - 零外部依赖（纯 Android SDK API）
+  - 基于 Paint.setShadowLayer 实现（纯 Android SDK API）
   - 新增 PaperInkHelper.kt 工具类
-  - 在阅读 Activity 配置项中添加开关
+  - **同步修改 ReadBookConfig.kt** 新增 paperInkStrength 字段 + 配置实体字段 + JSON 序列化 + 条件回退
+  - 在阅读 Activity 配置项中添加开关（如阅读设置中纸墨风格强度滑块）
 - **验收标准**：
   - [ ] 新增 `PaperInkHelper.kt`（基于 Paint.setShadowLayer）
-  - [ ] 零外部依赖
+  - [ ] 修改 `ReadBookConfig.kt` 新增 paperInkStrength 字段 + 配置实体 + JSON 序列化
   - [ ] 阅读界面设置项可启用/关闭纸墨风格
   - [ ] 启用后字体呈现纸墨质感
   - [ ] 不影响阅读性能（FPS ≥ 50）
@@ -222,18 +232,21 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 - **用户价值**：4.8
 - **实施成本**：低（仅 WebView 层验证，数据层已完成）
 - **用户场景**：RSS 加载更快
+- **实施状态**：✅ 已完成（仅 WebView 层需真机验证）
 - **技术前提**（重要）：
-  - 数据层已完成（`RssSource.kt:113` `cacheFirst: Boolean = true` 已是默认值），仅 WebView 层需验证
+  - 数据层已完成（`RssSource.kt:113` `cacheFirst: Boolean = true` 已是默认值）
+  - WebView 层已完成（`app/src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt:421` 已实现 `cacheMode = if (s.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT`）
+  - ⚠️ 原 design.md §4.1 #9 文件名 `RssWebActivity.kt` 错误（本项目与 Archive 项目均无此文件），正确文件为 `ReadRssActivity.kt`
 - **技术要点**：
-  - RSS 列表页 cacheFirst 默认 true（数据层已完成，仅 WebView 层需验证）
-  - WebView cacheFirst 默认 true
+  - RSS 列表页 cacheFirst 默认 true（数据层已完成）
+  - WebView cacheFirst 默认 true（ReadRssActivity.kt:421 已实现，仅需真机验证）
   - 后台静默更新内容
 - **验收标准**：
-  - [ ] RSS 列表页 cacheFirst 默认 true（数据层已就绪，验证 WebView 层）
-  - [ ] WebView cacheFirst 默认 true
-  - [ ] RSS 首次加载速度提升（用户感知 < 500ms）
-  - [ ] 后台正确更新内容
-  - [ ] 用户可在设置中关闭
+  - [x] RSS 列表页 cacheFirst 默认 true（数据层已就绪 `RssSource.kt:113`）
+  - [x] WebView cacheFirst 默认 true（已实现 `ReadRssActivity.kt:421`）
+  - [ ] RSS 首次加载速度提升（用户感知 < 500ms）— 待真机验证
+  - [ ] 后台正确更新内容 — 待真机验证
+  - [ ] 用户可在设置中关闭 — 待真机验证
 
 #### REQ-P0-006: 字体撞色检测
 - **决策ID**：THEME-B-02
@@ -255,14 +268,19 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 #### REQ-P0-007: SourceSelectDialog 统一源选择
 - **决策ID**：RSS-B-02
 - **用户价值**：4.5
-- **实施成本**：中
+- **实施成本**：中（借鉴源是 Compose 实现，本项目需改写为 View 实现，成本上调）
 - **用户场景**：源管理简化
+- **技术前提**（重要）：
+  - ⚠️ Archive 项目 `SourceSelectDialog.kt` 是 **Compose 实现**，依赖 LegadoMiuixCard/LegadoMiuixChoiceRow/rememberAppDialogStyle/toMiuixPalette 等 Compose 组件（本项目均无）
+  - 本项目 `app/src/main/java/io/legado/app/ui/widget/compose/` 目录无相关 Compose 组件
+  - 实施时需改写为非 Compose 实现，使用本项目已有的 BottomSheetDialog + RecyclerView 模式
 - **技术要点**：
-  - 新增 SourceSelectDialog.kt（BottomSheetDialog）
+  - 新增 SourceSelectDialog.kt（BottomSheetDialog + RecyclerView，**非 Compose 实现**）
   - 实现 book/rss 源统一选择入口
   - 复用现有源列表数据源
+  - ⚠️ 借鉴时需同步调整 package 声明（Archive 项目 `io.legado.app.ui.widget` → 本项目 `io.legado.app.ui.rss`）
 - **验收标准**：
-  - [ ] 新增 `SourceSelectDialog.kt`
+  - [ ] 新增 `SourceSelectDialog.kt`（View 实现，非 Compose）
   - [ ] 实现 book/rss 源统一选择
   - [ ] 简化源选择操作步骤（≥ 2 步）
   - [ ] 真机测试通过
@@ -270,18 +288,23 @@ P0/P1/P2 按模块分布（按 v5.0 终版实际清单统计）：
 #### REQ-P0-008: SearchBookMergeUtils 搜索结果合并
 - **决策ID**：RSS-B-03
 - **用户价值**：4.5
-- **实施成本**：中
+- **实施成本**：中（借鉴源依赖本项目缺失的扩展函数，需改写去重 key 逻辑）
 - **用户场景**：搜索结果统一
+- **技术前提**（重要）：
+  - ⚠️ Archive 项目 `SearchBookMergeUtils.kt` 调用 `book.stableSearchBookKey()` 扩展函数（5 处调用）
+  - 本项目 Grep 全项目搜索 `fun.*stableSearchBookKey` 无匹配，**本项目无此扩展函数**
+  - 本项目 `app/src/main/java/io/legado/app/help/book/BookExtensions.kt` 无 stableSearchBookKey 扩展
+  - 实施时需改写去重 key 计算，基于本项目 SearchBook 已有字段（如 name+author）实现
 - **技术要点**：
   - 新增 SearchBookMergeUtils.kt
   - 实现搜索结果合并入口
-  - 按书名+作者去重
+  - 按书名+作者去重（**改写实现**，不依赖 stableSearchBookKey 扩展）
   - 保留多源信息
 - **验收标准**：
   - [ ] 新增 `SearchBookMergeUtils.kt`
   - [ ] 实现搜索结果合并入口
   - [ ] 用户可统一查看搜索结果
-  - [ ] 去重逻辑正确（书名+作者）
+  - [ ] 去重逻辑正确（书名+作者，不依赖 stableSearchBookKey）
   - [ ] 多源信息保留
 
 #### REQ-P0-009: EPUB 章节资源索引
@@ -635,9 +658,9 @@ P2 通用验收标准：
 |------|---------------------|---------------------|---------|
 | EpubFile.kt | `app/src/main/java/io/legado/app/help/book/EpubFile.kt` | `app/src/main/java/io/legado/app/model/localBook/EpubFile.kt` | REQ-P0-009 |
 | RssFragment.kt | `app/src/main/java/io/legado/app/ui/rss/RssFragment.kt` | `app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt` | REQ-P0-001, REQ-P0-011 |
-| VideoActivity.kt | `app/src/main/java/io/legado/app/ui/rss.video/VideoActivity.kt` | 本项目无此文件，实际为 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt` | REQ-P0-014 |
+| VideoActivity.kt | `app/src/main/java/io/legado/app/ui/rss.video/VideoActivity.kt` | 本项目无此文件，实际为 `app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt` | REQ-P0-012（VIDEO-B-02 章节链接缓存集成）, REQ-P0-014（VIDEO-E-02 ChoiceSpeedDialog 调用点 VideoPlayer.kt:600，非 VideoPlayerActivity.kt:725-737 Spinner） |
 | ChoiceSpeedDialog.kt | `app/src/main/java/io/legado/app/ui/rss.video/` | `app/src/main/java/io/legado/app/help/gsyVideo/ChoiceSpeedDialog.kt` | REQ-P0-014 |
 | Exo2MediaPlayer.kt | `app/src/main/java/io/legado/app/ui/rss.video/` | `app/src/main/java/io/legado/app/help/gsyVideo/Exo2MediaPlayer.kt` | REQ-P1-013 |
-| ThemeColorUtils.kt | `lib/theme/ThemeColorUtils.kt` | 本项目无此文件，实际为 `lib/theme/ThemeUtils.kt` | THEME 模块相关 |
+| ThemeColorUtils.kt | `app/src/main/java/io/legado/app/lib/theme/ThemeColorUtils.kt` | 本项目无此文件，实际为 `app/src/main/java/io/legado/app/lib/theme/ThemeUtils.kt` | THEME 模块相关 |
 
 > **子目录说明**：本项目 `ui/rss/` 下无 `search/` 和 `video/` 子目录，实施 REQ-P0-001（RssSearchActivity）等需要新建子目录时，按本项目实际目录结构组织。

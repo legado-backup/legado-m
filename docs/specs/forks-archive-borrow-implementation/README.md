@@ -107,7 +107,7 @@
 |---|--------|--------|---------|---------|---------|
 | 1 | RSS-B-01 | RssSearchActivity | 5.0 | 低 | 用户搜索订阅内容 |
 | 2 | RSS-B-05 | RssFragment openRssSearch 入口 | 4.8 | 低 | RSS 搜索入口集成 |
-| 3 | DEPS-B-01 | markwon 3 扩展 | 5.0 | 低 | 订阅文章渲染 |
+| 3 | DEPS-B-01 | markwon 4.6.2 扩展 | 5.0 | 低 | 订阅文章渲染 |
 | 4 | THEME-B-01 | 纸墨风格 | 5.0 | 低 | 阅读视觉体验 |
 | 5 | THEME-B-02 | 字体撞色检测 | 4.8 | 低 | 避免配色错误 |
 | 6 | VIDEO-B-01 | VideoBookPreloader | 5.0 | 低 | 视频播放加速 |
@@ -159,7 +159,7 @@
 | ADR | 标题 | 类型 | v1.2 调整 |
 |-----|------|------|---------|
 | ADR-001 | 三阶段实施策略 | 实施策略类 | 保持 |
-| ADR-002 | P0 阶段分组并行执行 | 实施策略类 | 保持 |
+| ADR-002 | P0 阶段分组顺序执行 | 实施策略类 | 保持 |
 | ADR-003 | AI 模块全量否决 | 模块决策类 | 保持 |
 | ADR-004 | UI 优化放最后并接受包体积增加 | 实施策略类 | 保持 |
 | ADR-005 | 用户价值评估四维度标准 | 评估方法类 | 保持 |
@@ -167,8 +167,8 @@
 | ADR-007 | RSS 搜索增强双轨方案 | 模块决策类 | 保持 |
 | ADR-008 | 视频模块保持本项目架构 | 模块决策类 | 保持 |
 | ADR-009 | EPUB 渲染引擎不替换 | 模块决策类 | 保持 |
-| ADR-010a | 主题导入导出 | 模块决策类 | **拆分**（从 ADR-010 拆出，P0/P1 部分） |
-| ADR-010b | 主题包云端同步 | 模块决策类 | **拆分**（从 ADR-010 拆出，P2 部分） |
+| ADR-010a | 主题导入导出（P0 阶段仅本地视觉） | 模块决策类 | **拆分**（从 ADR-010 拆出，P0/P1 部分） |
+| ADR-010b | 主题包云端同步与扩展能力 | 模块决策类 | **拆分**（从 ADR-010 拆出，P2 部分） |
 | ADR-011 | 任务完成强制流程（代码+文档+测试三件套） | 质量保证类 | **合并**（原 ADR-011 + ADR-012） |
 | ADR-013 | 数据库迁移安全策略 | 工程约束类 | 保持（v1.1 新增） |
 | ADR-014 | 网络层兼容性与限流策略 | 工程约束类 | 保持（v1.1 新增） |
@@ -265,7 +265,7 @@
 |------|--------|---------|----------|
 | RssSearchActivity | RSS-B-01 | 5.0 | 组 A RSS 主线 |
 | RssFragment openRssSearch 入口 | RSS-B-05 | 4.8 | 组 A RSS 主线 |
-| markwon 3 扩展 | DEPS-B-01 | 5.0 | 组 D VIDEO 增强 |
+| markwon 4.6.2 扩展 | DEPS-B-01 | 5.0 | 组 D VIDEO 增强 |
 | 纸墨风格 | THEME-B-01 | 5.0 | 组 B THEME 视觉 |
 | 字体撞色检测 | THEME-B-02 | 4.8 | 组 B THEME 视觉 |
 | VideoBookPreloader | VIDEO-B-01 | 5.0 | 组 D VIDEO 增强 |
@@ -453,6 +453,15 @@
 | 2 | `AndroidManifest.xml` | 新增 Activity 注册（RssSearchActivity 等） | RSS-B-01 |
 | 3 | `proguard-rules.pro` | 新增反射类 keep 规则 | 涉及反射的新增类（B10 阻塞点） |
 
+#### 9.4.5 已完成任务标注（v2.3 新增）
+
+> 基于第四轮深度审查（review-code-feasibility.md / review-adr-logic.md / review-dependency-conflict.md），以下 P0 任务实际已完成，仅需真机验证。
+
+| # | 任务 | 状态 | 证据 | 备注 |
+|---|------|------|------|------|
+| 1 | RSS-E-06（cacheFirst 默认值） | ✅ 已完成（仅 WebView 层需真机验证） | `ReadRssActivity.kt:421` 已实现 `cacheMode = if (s.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT`；`RssSource.kt:113` `cacheFirst: Boolean = true` 默认值已就绪 | 数据层 + WebView 层均就绪，仅需真机验证 cacheFirst 行为 |
+| 2 | RssWebActivity.kt 文件名修正 | ✅ 已修正为 `ReadRssActivity.kt` | design.md §4.1 #9 原标注的 `RssWebActivity.kt` 在本项目不存在，正确文件为 `app/src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt` | 实施时无需修改文件名，仅需路径修正 |
+
 ---
 
 ## 10. 关键技术约束
@@ -490,7 +499,7 @@
 | # | 事实 | 证据位置 | 实施影响 |
 |---|------|---------|---------|
 | F1 | **本项目 minSdk=23** | `build.gradle:66` | 所有新增依赖必须支持 API 23+；rhino 1.8.1 锁定原因之一是 API 24 以下缺少 Arrays.setAll（minSdk 已提升至 23 但仍低于 24），ADR-022 兼容性策略以此为基线 |
-| F2 | **sora-editor + markwon 已引入** | `build.gradle:329-332, 356-358` | DEPS-B-01（markwon 3 扩展）仅需添加扩展依赖，无需新增核心库；DEPS-B-03（sora-editor）已引入，P2 任务仅做能力扩展 |
+| F2 | **sora-editor + markwon 已引入** | `build.gradle:329-332, 356-358` | DEPS-B-01（markwon 4.6.2 扩展）仅需添加扩展依赖，无需新增核心库；DEPS-B-03（sora-editor）已引入，P2 任务仅做能力扩展 |
 | F3 | **本项目无 ReadRecentBook.kt** | 本项目源码扫描 | 仅 fork 仓库（Archive 项目）有 ReadRecentBook.kt；VIDEO-E-01 实施时需新建 `ReadRecentBook.kt` + `ReadRecentBookDao.kt`（参考 fork 仓库实现） |
 | F4 | **本项目无 BaseSearchActivity** | 本项目源码扫描 | 本项目只有 `VMBaseActivity`；RSS-B-01 实施时 `RssSearchActivity` 父类需重新评估（继承 VMBaseActivity 或 SearchActivity，而非 BaseSearchActivity） |
 
@@ -504,6 +513,7 @@
 | 2026-07-18 | v1.1 | 全量修复+优化：修复 5 类严重问题 + 8 项中等问题 + 新增 6 个 ADR（ADR-013~018）+ 优化 P0 为分组并行（4 组）|
 | 2026-07-18 | v1.2 | 三大调整：P0 范围升级 4 项变 14 项 + ADR 全量调整变 27 个 + 删除工期估算（AI 执行无需工期）|
 | 2026-07-18 | v2.2 | 第三轮深度审查全量修复：基于 3 份审查报告（共 4828 行）全量修复 12 项严重问题（A.事实偏差类 6 项 + B.ADR 决策类 5 项 + C.跨文档矛盾类 1 项），详见 §12 v2.2 修复详情 |
+| 2026-07-18 | v2.3 | 第四轮深度审查全量修复：基于 3 份审查报告（共约 1300 行）全量修复 10 项严重 + 15 项中等问题（A.代码可行性 6 项 + B.ADR 逻辑链 6 项 + C.依赖链冲突 6 项），数据基线保持不变（P0=14/P1=19/P2=21/ADR=27），详见 §15 v2.3 修复详情 |
 
 ---
 
@@ -575,6 +585,143 @@
 - **变更记录**：所有重大变更记录到第 11 章变更历史
 - **文档同步**：tasks.md 完成进度同步更新到第 9.1 节检查点表
 - **决策调整**：如实施过程中决策调整，需同步更新 spec.md + 第 3 章决策汇总
+
+---
+
+## 14. 文档清理记录
+
+### 14.1 清理时间
+
+- **清理时间**：2026-07-18
+- **触发原因**：CP4 五次验收用户反馈"为防止后续执行任务实施时被不相关的设计文档干扰，对不相关的报告或文件做最后一次审查清理"
+- **清理策略**：移动审查报告到 `archive/` 子目录（用户确认）
+
+### 14.2 清理范围
+
+将 9 份历史审查报告从根目录移动到 `archive/` 子目录，根目录仅保留 7 份核心文档。
+
+**移动的 9 份审查报告**：
+
+| # | 报告名 | 来源轮次 | 行数 |
+|---|--------|---------|------|
+| 1 | review-spec-tasks.md | 第一轮审查 | spec+tasks 审查 |
+| 2 | review-design-readme.md | 第一轮审查 | design+README 审查 |
+| 3 | review-cross-optimization.md | 第一轮审查 | 跨文档优化审查 |
+| 4 | review-design-rationality-spec-tasks.md | 第三轮审查 | spec+tasks 设计合理性 |
+| 5 | review-design-rationality-design.md | 第三轮审查 | design 设计合理性 |
+| 6 | review-implementation-simulation.md | 第三轮审查 | P0 实施模拟+交叉验证 |
+| 7 | review-final-spec-tasks.md | 最终审查 | spec+tasks 修复质量审查 |
+| 8 | review-final-design.md | 最终审查 | design 修复质量审查 |
+| 9 | review-final-cross-simulation.md | 最终审查 | 交叉审查+实施模拟 |
+
+### 14.3 清理后目录结构
+
+```
+docs/specs/forks-archive-borrow-implementation/
+├── spec.md                          # 需求规格（412 行）
+├── tasks.md                         # 任务清单（482 行）
+├── design.md                        # 设计文档（1314 行，27 ADR）
+├── README.md                        # 本文档（含清理记录）
+├── analysis-task-priority.md        # 任务优先级分析（1281 行）
+├── analysis-adr-decisions.md        # ADR 决策分析（1147 行）
+├── analysis-p0-strategy-risks.md    # P0 策略风险分析（1074 行）
+└── archive/                         # 历史审查报告归档
+    ├── review-spec-tasks.md
+    ├── review-design-readme.md
+    ├── review-cross-optimization.md
+    ├── review-design-rationality-spec-tasks.md
+    ├── review-design-rationality-design.md
+    ├── review-implementation-simulation.md
+    ├── review-final-spec-tasks.md
+    ├── review-final-design.md
+    └── review-final-cross-simulation.md
+```
+
+### 14.4 清理后实施工作流
+
+- **实施阶段参考文档**：仅根目录 7 份核心文档
+- **历史审查报告查阅**：如需追溯审查历史，访问 `archive/` 子目录
+- **避免干扰原则**：实施期间不再打开 `archive/` 中的审查报告，避免历史问题清单干扰当前实施
+
+---
+
+## 15. v2.3 修复详情（2026-07-18）
+
+> 基于第四轮深度审查（3 份报告共约 1300 行）的全量修复，聚焦代码可行性、ADR 逻辑链、依赖链冲突三个维度。数据基线保持不变：P0=14 / P1=19 / P2=21 / ADR=27。
+
+### 15.1 审查报告来源（3 份）
+
+| 报告 | 主要审查维度 | 关键发现 |
+|------|------------|---------|
+| review-code-feasibility.md | 代码实施可行性（对照本项目真实源码逐项验证 P0 14 项任务） | 6 项严重发现（RSS-E-06 已完成 / 借鉴源依赖缺失扩展 / markwon 版本错误等） |
+| review-adr-logic.md | ADR 决策逻辑链（27 个 ADR 内部+间逻辑一致性） | 2 项严重硬矛盾（ADR-008 vs ADR-002 P1/P0 矛盾 / ADR-001 备选 B P0 项数矛盾）+ 6 项中等 |
+| review-dependency-conflict.md | P0 14 项任务依赖链与文件冲突 | 3 项严重（VideoPlayerActivity.kt 三任务同文件冲突未识别 / RssWebActivity.kt 不存在 / R22 定义矛盾）+ 3 项中等 |
+
+### 15.2 修复范围总览
+
+| 维度 | 严重 | 中等 | 小计 |
+|------|------|------|------|
+| 代码可行性 | 6 | 6 | 12 |
+| ADR 逻辑链 | 2 | 6 | 8 |
+| 依赖链冲突 | 3 | 3 | 6 |
+| **合计** | **11** | **15** | **26** |
+
+> 实际修复 10 项严重 + 15 项中等（部分严重项归类合并修复），详见各审查报告。
+
+### 15.3 关键修复点
+
+#### A. 代码可行性维度（review-code-feasibility.md）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| A1 | markwon 版本严重不一致（设计文档错误描述为 markwon 3，实际为 markwon 4.6.2） | README 全文"markwon 3 扩展"改为"markwon 4.6.2 扩展"（3 处） |
+| A2 | RSS-E-06 任务实际已完成（`ReadRssActivity.kt:421` 已实现 cacheFirst 逻辑） | §9.4.5 新增已完成任务标注，标注"✅ 已完成（仅 WebView 层需真机验证）" |
+| A3 | RssWebActivity.kt 在本项目不存在（正确文件为 `ReadRssActivity.kt`） | §9.4.5 标注文件名修正，design.md §4.1 #9 同步修正 |
+| A4 | PaperInkHelper 借鉴源依赖 ReadBookConfig.paperInkStrength 字段（设计文档遗漏 ReadBookConfig 修改条目） | design.md §4.3 补充 ReadBookConfig.kt 修改条目，README 在 v2.3 修复详情中记录 |
+| A5 | SourceSelectDialog 借鉴源是 Compose 实现依赖本项目不存在的 Compose 组件 | design.md §4.1 #5 注明需改写为非 Compose 实现，README 在 v2.3 修复详情中记录 |
+| A6 | SearchBookMergeUtils 借鉴源依赖本项目不存在的 stableSearchBookKey 扩展函数 | design.md §4.1 #6 注明需同步借鉴或改写，README 在 v2.3 修复详情中记录 |
+
+#### B. ADR 逻辑链维度（review-adr-logic.md）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| B1 | ADR-008 与 ADR-002 对 VIDEO-B-02/E-01/E-02 优先级阶段直接矛盾（P1 vs P0） | design.md ADR-008 Decision 将 VIDEO-B-02/E-01/E-02 从 P1 改为 P0，添加 v5.1 调整说明；README §3.2 P0 列表已含这 3 项，无需修改 |
+| B2 | ADR-002 标题"分组并行"与内容"物理串行"不一致 | README ADR 全量清单 ADR-002 标题改为"P0 阶段分组顺序执行" |
+| B3 | ADR-010a 标题"主题导入导出"与 Decision P0 阶段任务范围（视觉增强）不符 | README ADR 全量清单 ADR-010a 标题改为"主题导入导出（P0 阶段仅本地视觉）" |
+| B4 | ADR-010b 标题"主题包云端同步"与 Decision 任务范围越界（含架构扩展任务） | README ADR 全量清单 ADR-010b 标题改为"主题包云端同步与扩展能力" |
+| B5 | ADR-013 与 ADR-002 对 VIDEO-E-01 复杂度评估不一致 | design.md ADR-002 组D VIDEO-E-01 标注补充"涉及数据库迁移（ADR-013）"，README 在 v2.3 修复详情中记录 |
+| B6 | ADR-016 要求 P0 前建立基线但 ADR-002 P0 任务清单未列入 | design.md ADR-002 P0 任务清单前增加"P0 前置任务：性能基线建立（ADR-016）"，README 在 v2.3 修复详情中记录 |
+
+#### C. 依赖链冲突维度（review-dependency-conflict.md）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | VideoPlayerActivity.kt 被 3 个 P0 任务修改（VIDEO-B-01/B-02/E-02）但分组方案未识别 VIDEO-E-02 同文件冲突 | design.md ADR-002 组D 修订为 VIDEO-B-01 → VIDEO-B-02 → VIDEO-E-02 同文件严格串行链，README 在 v2.3 修复详情中记录 |
+| C2 | design.md §4.1 #9 文件路径错误（RssWebActivity.kt 不存在） | 同 A3，§9.4.5 标注修正为 ReadRssActivity.kt |
+| C3 | R22 风险定义在 design.md 与 analysis-p0-strategy-risks.md 中不一致 | design.md 统一 R22 定义为"RssFragment.kt 文件冲突风险"，README 在 v2.3 修复详情中记录 |
+| C4 | VIDEO-E-02 tasks.md 1.14.2 描述与实际代码不符（VideoPlayerActivity.kt 用 Spinner 而非 ChoiceSpeedDialog） | tasks.md 1.14.2 明确修改目标，README 在 v2.3 修复详情中记录 |
+| C5 | VIDEO-B-01 集成位置描述不一致（搜索结果页 vs 视频播放页） | design.md §4.2 #2 删除 VIDEO-B-01 对 VideoPlayerActivity.kt 的标注，新增 SearchActivity.kt 条目，README 在 v2.3 修复详情中记录 |
+| C6 | design.md §4.8 AndroidManifest.xml 修改范围错误（VIDEO-B-01 不需要 Manifest 注册） | design.md §4.8 #2 删除 VIDEO-B-01 条目，仅保留 RSS-B-01 注册 RssSearchActivity，README 在 v2.3 修复详情中记录 |
+
+### 15.4 v2.3 修复后数据基线
+
+| 指标 | v2.2 修复后 | v2.3 修复后 |
+|------|------------|------------|
+| P0 数量 | 14 | **14**（不变） |
+| P1 数量 | 19 | **19**（不变） |
+| P2 数量 | 21 | **21**（不变） |
+| ADR 数量 | 27 | **27**（不变） |
+| 总借鉴数 | 54 | **54**（不变） |
+
+> 数据基线保持不变，v2.3 修复仅修订文档描述与决策标注，不调整 P0/P1/P2 范围与 ADR 数量。
+
+### 15.5 v2.3 新增审查报告索引
+
+| 报告 | 路径 | 行数 | 审查维度 |
+|------|------|------|---------|
+| review-code-feasibility.md | `docs/specs/forks-archive-borrow-implementation/review-code-feasibility.md` | 547 | 代码实施可行性深度审查 |
+| review-adr-logic.md | `docs/specs/forks-archive-borrow-implementation/review-adr-logic.md` | 356 | ADR 决策逻辑链深度审查 |
+| review-dependency-conflict.md | `docs/specs/forks-archive-borrow-implementation/review-dependency-conflict.md` | 421 | P0 14 项任务依赖链与文件冲突深度审查 |
 
 ---
 
