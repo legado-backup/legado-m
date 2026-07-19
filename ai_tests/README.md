@@ -160,6 +160,37 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
   M8 源码影响分析器 → M9 源码→测试生成器
 ```
 
+## 脚本清单（ai_tests/scripts/）
+
+> 本节仅列出 RSS 批量优化阶段新增的验证 / 诊断 / 修复脚本。完整脚本清单见 `ai_tests/scripts/` 目录。所有脚本均通过 `ai_tests/venv/Scripts/python.exe` 执行。
+
+### RSS 真机 DB 验证脚本
+
+| 脚本 | 用途 | 用法 | 输出 |
+|------|------|------|------|
+| `real_db_sample_test.py` | 从真机 DB 抽样订阅源，用 Playwright 验证 sourceUrl 可访问性 / sortUrl 分类列表加载 / searchUrl 搜索功能 / ruleNextPage 下一页链接 / type=2 视频元素存在性 | `python ai_tests/scripts/real_db_sample_test.py` | `output/rss/v2_real_test_db_sample.json` |
+| `real_db_full_test_v2.py` | 在 v1 基础上扩展 DOM 选择器（list / pagination / categories / search_form），对全部源做全量验证（每源 5s 超时，每 20 源增量保存，支持 Ctrl+C 中断保存） | `python ai_tests/scripts/real_db_full_test_v2.py` | `output/rss/v2_real_test_db_sample_v2.json` |
+
+### DB 字段诊断与补全脚本
+
+| 脚本 | 用途 | 用法 | 输出 |
+|------|------|------|------|
+| `diagnose_db_fields.py` | 诊断 DB 中订阅源 `sortUrl` / `searchUrl` / `ruleNextPage` / `ruleArticles` 字段填充率，按 `type` 分组统计 | `python ai_tests/scripts/diagnose_db_fields.py` | `output/rss/db_field_diagnose_v3.json` |
+| `fix_image_source_fields.py` | 筛选 `type=1` 且 `sortUrl` 为空的源，用 Playwright 访问首页提取 `sortUrl` / `searchUrl` / `ruleArticles` / `ruleImage` / `ruleNextPage`（每 10 源增量保存） | `python ai_tests/scripts/fix_image_source_fields.py` | `output/rss/image_source_field_fix.json` |
+
+### 失败源重试脚本
+
+| 脚本 | 用途 | 用法 | 输出 |
+|------|------|------|------|
+| `retry_failed_rss_sources.py` | 读取真机 DB 全部源，用 Playwright 识别访问失败源，对每个失败源用 14 种技术手段（5 种 UA + 多种重试策略）依次重试，输出脱敏 JSON 报告 | `python ai_tests/scripts/retry_failed_rss_sources.py` | `output/rss/failed_source_retry_v2.json` + `failed_sources_list.json` + `retry_run.log` |
+
+### 输出安全约束
+
+上述脚本均内置脱敏机制，输出报告遵循以下约束：
+- 用 `源[idx]` 替代真实名称
+- URL 替换为 `[URL]`，域名替换为 `[DOMAIN]`，IP 替换为 `[IP]`
+- 异常消息正则脱敏，禁止输出 cookie / token / 分类名原文
+
 ## 相关文档
 
 - [设计文档](../docs/specs/e2e-automated-testing/design.md)

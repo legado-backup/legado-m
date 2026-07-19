@@ -6,7 +6,7 @@
 
 | 项目 | 值 |
 |------|------|
-| 名称 | Legado（阅读Sigma） |
+| 名称 | Legado（阅读M） |
 | 类型 | Android 应用 |
 | 语言 | Kotlin + Java |
 | 最低SDK | 21 |

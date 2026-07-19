@@ -177,12 +177,13 @@
 - **状态**：待启动
 - **依赖**：EPUB-B-01（1.9）
 
-#### 2.1.4 DEPS-B-04: reorderable 拖拽排序（用户价值 4.2）
+#### 2.1.4 DEPS-B-04: reorderable 拖拽排序（用户价值 4.2）【2026-07-19 降级 P2】
 - [ ] 2.1.4.1 引入 reorderable 3.1.0 依赖
 - [ ] 2.1.4.2 应用于书架/源列表拖拽排序
 - [ ] 2.1.4.3 真机验证拖拽交互
-- **状态**：待启动
+- **状态**：降级 P2（用户决策 2026-07-19）
 - **依赖**：无
+- **降级理由**：项目书架/源列表均为 RecyclerView（非 Compose），reorderable 是 Compose 库无法直接应用；仅 DebugToolsScreen.kt 使用 LazyColumn 但调试工具无需拖拽排序。引入依赖无应用场景属于无效引入（增加 APK 体积无收益），等后续 Compose 化列表改造时再引入
 
 #### 2.1.5 EPUB-E-02: 字体内嵌（用户价值 4.1）
 - [ ] 2.1.5.1 实现 EPUB 字体内嵌支持
@@ -257,34 +258,35 @@
 - **状态**：待启动
 - **依赖**：无
 
-#### 2.2.3 BUILD-B-01: CI 专用调试证书（用户价值 2.8）
+#### 2.2.3 BUILD-B-01: CI 专用调试证书（用户价值 2.8）【2026-07-19 降级 P2】
 - [ ] 2.2.3.1 创建 ci-debug.keystore 独立证书
 - [ ] 2.2.3.2 配置 CI_DEBUG_KEY_* secrets
 - [ ] 2.2.3.3 验证 CI 调试证书隔离
-- **状态**：待启动
+- **状态**：降级 P2（用户决策 2026-07-19）
 - **依赖**：无
-- **P1 资格提示**：用户价值 2.8 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
+- **降级理由**：用户价值 2.8 低于 P1 下限（4.0），且项目为私有仓库 CI 调试证书需求不迫切，留到 P2 实施
 
-#### 2.2.4 BUILD-B-03: CI 增量构建缓存（用户价值 3.0）
+#### 2.2.4 BUILD-B-03: CI 增量构建缓存（用户价值 3.0）【2026-07-19 降级 P2】
 - [ ] 2.2.4.1 配置 actions/cache/restore + save 缓存 .gradle/.kotlin/build
 - [ ] 2.2.4.2 验证 CI 构建加速
-- **状态**：待启动
+- **状态**：降级 P2（用户决策 2026-07-19）
 - **依赖**：无
-- **P1 资格提示**：用户价值 3.0 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
+- **降级理由**：用户价值 3.0 低于 P1 下限（4.0），且 gradle/actions/setup-gradle@v5 已内置基本缓存能力，增量缓存优化收益有限，留到 P2 实施
 
-#### 2.2.5 BUILD-B-04: VERSION 注入（用户价值 3.0）
+#### 2.2.5 BUILD-B-04: VERSION 注入（用户价值 3.0）【2026-07-19 降级 P2】
 - [ ] 2.2.5.1 app/build.gradle 支持 -PVERSION_NAME / -PVERSION_CODE 注入
 - [ ] 2.2.5.2 验证 CI 版本号注入
-- **状态**：待启动
+- **状态**：降级 P2（用户决策 2026-07-19）
 - **依赖**：无
-- **P1 资格提示**：用户价值 3.0 低于 P1 下限（4.0），P1 实施前需再次评估是否降级 P2（保持 P1=19 数据不变）
+- **降级理由**：用户价值 3.0 低于 P1 下限（4.0），现有 release.yml 已通过 sed 命令注入版本号（line 67），-PVERSION_NAME 注入属于优化非新增能力，留到 P2 实施
 
-#### 2.2.6 DEPS-B-05: lazycolumnscrollbar Compose 滚动条（用户价值 3.8）
+#### 2.2.6 DEPS-B-05: lazycolumnscrollbar Compose 滚动条（用户价值 3.8）【2026-07-19 降级 P2】
 - [ ] 2.2.6.1 引入 lazycolumnscrollbar 2.2.0 依赖
 - [ ] 2.2.6.2 应用于 Compose 列表滚动条
 - [ ] 2.2.6.3 真机验证滚动条交互
-- **状态**：待启动
+- **状态**：降级 P2（用户决策 2026-07-19）
 - **依赖**：无
+- **降级理由**：项目仅 DebugToolsScreen.kt 使用 LazyColumn，调试工具无需专业滚动条；书架/源列表均为 RecyclerView 不适用 Compose 滚动条库。引入依赖无足够应用场景，等后续 Compose 化列表改造时再引入
 
 ---
 
@@ -446,22 +448,25 @@
 | 2026-07-18 | v5.1 依赖关系修正（基于 analysis-task-priority.md §5）：补充 THEME-E-05→THEME-B-04、VIDEO-E-03→VIDEO-B-01、THEME-B-07→THEME-E-04、EPUB-B-08→EPUB-B-03、THEME-E-02→THEME-E-01；删除 EPUB-E-05→EPUB-E-06（功能独立）。 |
 | 2026-07-18 | v5.1 删除工期估算：所有"2 周内""3 个月""12 个月""X 天"等工期估算改为"按依赖顺序实施（AI 执行无工期估算）"（用户反馈：AI 执行不需要工期估算）。 |
 | 2026-07-18 | v5.2 文档修复（12 项严重问题）：A1 任务1.13 拆分为 3 子任务（ReadRecentBook 实体+DAO/Migration/集成）+fork 仓库参考提示；A2 任务1.1 BaseSearchActivity→VMBaseActivity；A3 任务1.5.1 标记已完成（cacheFirst 已是 true）；A4 修正 6 文件路径（EpubFile/RssFragment/VideoPlayerActivity/ChoiceSpeedDialog/Exo2MediaPlayer/ThemeUtils）；A5 标注 markwon+sora-editor 已引入；A6 标注 ui/rss/search/ 和 ui/rss/video/ 新建子目录；B1 补充 4 组顺序执行说明（ADR-002+R22）；B2 数据库迁移补充 pureSearch（ADR-013）；B3 任务1.1 补充 Manifest/strings/proguard 子任务；B4 统一 minSdk 23（ADR-022）；B5 补充借鉴代码合并策略+密钥恢复（ADR-010b）；C1 标注 P0=14 是 v5.1 调整后；C2 BUILD-B-01/03/04 标注 P1 资格提示。P0=14/P1=19/P2=21 数据不变。 |
+| 2026-07-19 | P0 验收完成：14 项 P0 任务全部实施 + 真机验证通过（详见 issues-found.md）。检查点 5.1 全部勾选。 |
+| 2026-07-19 | P1 验收完成：19 项 P1 任务处理完毕（14 项实施 + 5 项降级 P2：BUILD-B-01/03/04 + DEPS-B-04/05）。真机测试 18/18 功能点通过（BUG-001 已修复并端到端验证）。检查点 5.2 全部勾选。 |
+| 2026-07-19 | P1 降级记录：5 项 P1 任务降级 P2（用户决策）：BUILD-B-01（用户价值 2.8 低于 P1 下限）/BUILD-B-03（用户价值 3.0 + gradle 内置缓存）/BUILD-B-04（用户价值 3.0 + release.yml 已 sed 注入）/DEPS-B-04（reorderable 是 Compose 库，项目列表为 RecyclerView 无应用场景）/DEPS-B-05（lazycolumnscrollbar 同理）。P1=14 实施 + 5 降级 = 19 处理完毕。 |
 
 ---
 
 ## 5. 验收检查点
 
 ### 5.1 检查点 1：P0 完成（按依赖顺序实施，AI 执行无工期估算）
-- [ ] 14 项 P0 任务全部完成
-- [ ] 真机验证通过（每项任务的"真机验证"子项）
-- [ ] `assets/updateLog.md` 更新（依据 version-delivery-sync.md 规范）
-- [ ] 调试日志已清理（Grep "android.util.Log.d|android.util.Log.e" 确认无残留）
-- [ ] 问题清单记录到 `issues-found.md`
+- [x] 14 项 P0 任务全部完成 ✅（2026-07-19 验收）
+- [x] 真机验证通过（每项任务的"真机验证"子项）✅
+- [x] `assets/updateLog.md` 更新（依据 version-delivery-sync.md 规范）✅
+- [x] 调试日志已清理（Grep "android.util.Log.d|android.util.Log.e" 确认无残留）✅
+- [x] 问题清单记录到 `issues-found.md` ✅
 
 ### 5.2 检查点 2：P1 完成（按依赖顺序实施，AI 执行无工期估算）
-- [ ] 19 项 P1 任务全部完成
-- [ ] 真机验证通过
-- [ ] `assets/updateLog.md` 更新
+- [x] 19 项 P1 任务全部完成 ✅（2026-07-19 验收，14 项实施 + 5 项降级 P2）
+- [x] 真机验证通过 ✅（18/18 功能点端到端验证，详见 issues-found.md §2.4）
+- [x] `assets/updateLog.md` 更新 ✅（L12-30 共 19 条 P1 功能日志）
 
 ### 5.3 检查点 3：P2 完成（按依赖顺序实施，AI 执行无工期估算）
 - [ ] 21 项 P2 任务全部完成（含 9 项 UI 优化放在最后）

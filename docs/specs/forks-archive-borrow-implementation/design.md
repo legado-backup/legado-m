@@ -1319,3 +1319,25 @@ Phase 3 (P2 - 21项): UI 优化与扩展（按依赖顺序实施，AI 执行无�
 - **删除工期估算**：所有人天/人时/本周内/2 周内/3 周内等工期估算全部删除，改为"按依赖顺序实施"或"AI 执行，无工期估算"（用户指示：这都是 AI 执行，要什么工期）
 - **P0 实施策略升级**：P0 范围从 10 项调整为 14 项（升级 4 项 P1→P0：RSS-B-05、VIDEO-B-02、VIDEO-E-01、VIDEO-E-02；THEME-B-03 剔除回 P1），4 个并行组重新分组为组 A（RSS 主线 5 项）/ 组 B（THEME 视觉 2 项）/ 组 C（EPUB 加速 2 项）/ 组 D（VIDEO+DEPS 5 项）
 - **风险清单扩展**：从 20 项扩展为 30 项（保留原 20 项 + 新增 Top 10 高优先级风险：R21 性能基准/R22 单 Agent 串行/R23 编译时间/R24 国际化/R25 文档同步/R26 文件冲突/R27 测试瓶颈/R28 KSP/kapt/R29 API 23/R30 ProGuard），同步更新风险等级矩阵
+
+### 9.6 实施决策与设计不一致分析
+
+> 本章节记录 P0 实施过程中"带着脑子"决策导致的与设计文档预期不一致的内容，供后续审查与回归参考。
+
+#### 9.6.1 RSS-B-03 SearchBookMergeUtils 集成策略调整（2026-07-19）
+
+**设计预期**（§4.6 #3 + §1.8）：在 `SearchActivity.kt` 中集成 `SearchBookMergeUtils`，用于搜索结果合并。
+
+**实施决策**：`SearchBookMergeUtils.kt` 作为独立工具类创建（满足 1.8.1 + 1.8.2），但**不替换** `SearchModel.mergeItems` 的现有合并逻辑，仅在 `SearchActivity.kt` 的 `searchBookLiveData.observe` 处添加注释说明工具类存在与备用用途。
+
+**不一致原因分析**：
+- 本项目 `SearchModel.mergeItems`（`app/src/main/java/io/legado/app/model/webBook/SearchModel.kt:116-197`）已实现"同名书籍多源合并"核心功能，且更复杂：按 `searchKey` 精度分类（equal/contains/tags/other）+ `origins` 合并 + 按 `origins.size` 排序。
+- Archive `SearchBookMergeUtils` 的优势：`stableSearchBookKey` 多级回退（`bookUrl` > `name+author` > `coverUrl` > `time`）+ 字段级合并（`kind`/`coverUrl`/`intro`/`wordCount`/`latestChapterTitle`/`tocUrl`/`variable` 等）+ `appendReplacing`/`prependReplacing` 双向合并策略。
+- 强行替换 `mergeItems` 会改变搜索结果排序行为（从"按 searchKey 精度分类"变为"按 stableSearchBookKey 去重"），破坏用户体验稳定性。
+- 本项目 `mergeItems` 只合并 `origins` 不合并字段是设计选择（保持各源字段独立），与 Archive 字段级合并理念不同。
+
+**工具类备用场景**：P1 RSS-E-05 `SearchBookPreviewOverlay`（搜索结果预览覆盖层）可能需要跨源字段合并展示，届时可调用 `SearchBookMergeUtils.appendReplacing` 对预览数据做字段补全。
+
+**风险与缓解**：
+- 风险：`SearchBookMergeUtils` 长期未被主流程使用，可能因字段变更失效。
+- 缓解：P0 真机测试阶段（1.8.4）通过现有搜索功能验证多源合并行为正常；P1 RSS-E-05 实施时强制使用 `SearchBookMergeUtils`，届时如有字段失效会立即暴露。

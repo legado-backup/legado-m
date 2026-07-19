@@ -95,3 +95,109 @@ python ai_tests/scripts/xxx.py
 - 新增脚本必须在"L2验证场景清单"或新表格中记录用法
 - 脚本必须包含 `if __name__ == "__main__":` 入口和 argparse 参数解析
 - 脚本必须 import config 常量，禁止硬编码路径
+
+## Cronet 库预下载检查（2026-07-18 v5 反哺新增）
+
+> **背景**：真机测试发现部分 HTTPS 源加载失败，logcat 显示 `libcronet.so FileNotFoundException`。
+> legado 使用 Cronet 库（基于 Chromium 网络栈）处理 HTTPS 请求，Cronet 库需要从网络下载或随App打包。
+> 模拟器首次安装 App 时未自动下载 Cronet 库，导致 HTTPS 源全部加载失败（HTTP 源不受影响）。
+
+### 触发条件
+
+真机测试前必须执行 Cronet 库预下载检查，特别是：
+- 首次安装 App 后的第一次测试
+- 模拟器重置/重装后的第一次测试
+- HTTPS 源加载失败时（优先检查 Cronet 库可用性）
+
+### 诊断方法
+
+**症状识别（logcat 关键词）**：
+- `libcronet.so FileNotFoundException` - Cronet 库文件缺失
+- `UnsatisfiedLinkError` + `cronet` - Cronet 库链接失败
+- `Failed to load native library` + `cronet` - Cronet 库加载失败
+
+**诊断脚本**（用 venv Python 执行）：
+
+```python
+# 检查 Cronet 库可用性
+import subprocess
+ADB = "adb"  # 从 config.py 导入
+HOST = "127.0.0.1:21503"  # 从 config.py 导入
+PKG = "io.legado.app"  # 从 config.py 导入
+
+# 1. 检查 Cronet 库文件是否存在
+r = subprocess.run([ADB, '-s', HOST, 'shell', 'su', '-c',
+                    f'ls /data/data/{PKG}/files/cronet/ 2>/dev/null'],
+                   capture_output=True, timeout=10)
+files = r.stdout.decode('utf-8', errors='ignore').strip()
+has_cronet_so = 'libcronet' in files
+print(f'Cronet 库文件存在: {has_cronet_so}')
+
+# 2. 检查 logcat 是否有 Cronet 相关错误
+r = subprocess.run([ADB, '-s', HOST, 'logcat', '-d', '-t', '500'],
+                   capture_output=True, timeout=15)
+log = r.stdout.decode('utf-8', errors='ignore')
+has_cronet_error = ('FileNotFoundException' in log and 'cronet' in log.lower()) or \
+                   ('UnsatisfiedLinkError' in log and 'cronet' in log.lower())
+print(f'Cronet 库错误: {has_cronet_error}')
+```
+
+### 修复流程
+
+| 步骤 | 操作 | 命令/说明 |
+|------|------|---------|
+| 1. 诊断 | 检查文件存在性 + logcat错误 | 见上方诊断脚本 |
+| 2. 触发下载 | 启动 App 等待60秒自动下载 | `adb shell am start -n {PKG}/.ui.MainActivity` 后 sleep 60 |
+| 3. 复检 | 再次检查文件存在性 | 确认 `libcronet.so` 已下载 |
+| 4. 重测 | 重新跑 scenario 验证 | HTTPS 源应能正常加载 |
+
+### 集成到标准测试流水线
+
+**更新后的标准测试流水线**：
+
+```
+编译 → 安装 → 启动App等待Cronet下载(60秒) → L1验证 → 导入订阅源 → L2验证 → 日志分析
+                              ↑ 新增步骤
+```
+
+**新增检查清单**（L1验证前必做）：
+
+```python
+# 在 quick_build_install.py 后增加 Cronet 检查
+def ensure_cronet_ready():
+    """确保 Cronet 库可用（首次安装后必须执行）"""
+    # 1. 启动 App 触发自动下载
+    subprocess.run([ADB, '-s', HOST, 'shell', 'am', 'start',
+                    f'-n {PKG}/.ui.MainActivity'], timeout=10)
+    print('等待60秒让 App 自动下载 Cronet 库...')
+    time.sleep(60)
+
+    # 2. 检查是否下载成功
+    r = subprocess.run([ADB, '-s', HOST, 'shell', 'su', '-c',
+                        f'ls /data/data/{PKG}/files/cronet/'],
+                       capture_output=True, timeout=10)
+    if 'libcronet' in r.stdout.decode('utf-8', errors='ignore'):
+        print('✅ Cronet 库下载成功')
+        return True
+    else:
+        print('❌ Cronet 库下载失败，HTTPS 源将无法加载')
+        return False
+```
+
+### 实战数据（2026-07-18）
+
+| 指标 | 数据 |
+|------|------|
+| HTTPS 源加载失败数 | 7个 |
+| 诊断结果 | 全部命中 `libcronet.so FileNotFoundException` |
+| 触发下载后 | Cronet 库成功下载 |
+| 重测结果 | 7个 HTTPS 源全部加载成功 |
+| HTTP 源影响 | 无（只有 HTTPS 依赖 Cronet） |
+
+### 教训
+
+1. **真机测试前必须预下载 Cronet 库**（首次安装App后等待60秒）
+2. HTTPS 源加载失败时，优先检查 Cronet 库可用性（而非 DNS 或网络问题）
+3. logcat 关键词：`libcronet.so FileNotFoundException` / `UnsatisfiedLinkError` / `Failed to load native library`
+4. Cronet 库位置：`/data/data/{PKG}/files/cronet/libcronet.so`
+5. HTTP 源不受影响（只有 HTTPS 依赖 Cronet），可用于区分诊断

@@ -6,7 +6,7 @@
 
 ### 1.1 项目背景
 
-Legado（阅读Sigma）书源/订阅源智能创建器（legado-source-creator）的全面重建方案。基于对现有 Skill 的设计文档、落地实现、组件能力与测试体系的深度审计，输出对齐现有 Skill 架构的新版统一 OpenSpec 优化设计文档。
+Legado（阅读M）书源/订阅源智能创建器（legado-source-creator）的全面重建方案。基于对现有 Skill 的设计文档、落地实现、组件能力与测试体系的深度审计，输出对齐现有 Skill 架构的新版统一 OpenSpec 优化设计文档。
 
 Skill 用于支撑 AI/Agent 完成书源、订阅源的生成、优化、调试、验证全流程服务。
 
