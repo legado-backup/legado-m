@@ -29,6 +29,7 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.databinding.ActivityBookSearchBinding
+import io.legado.app.help.gsyVideo.VideoBookPreloader
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.accentColor
@@ -38,6 +39,7 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
+import io.legado.app.ui.rss.SearchBookPreviewOverlay
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarMargin
 import io.legado.app.utils.applyNavigationBarPadding
@@ -67,7 +69,8 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     BookAdapter.CallBack,
     HistoryKeyAdapter.CallBack,
     SearchScopeDialog.Callback,
-    SearchAdapter.CallBack {
+    SearchAdapter.CallBack,
+    SearchBookPreviewOverlay.Callback {
 
     override val binding by viewBinding(ActivityBookSearchBinding::inflate)
     override val viewModel by viewModels<SearchViewModel>()
@@ -305,7 +308,14 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             }
         }
         viewModel.searchBookLiveData.observe(this) {
+            // RSS-B-03: 搜索结果合并由 SearchModel.mergeItems 负责（按 searchKey 精度分类+origins 合并）。
+            // SearchBookMergeUtils（io.legado.app.utils.SearchBookMergeUtils）作为独立工具类提供
+            // stableSearchBookKey 多级回退（bookUrl > name+author > coverUrl > time）和字段级合并能力，
+            // 供 P1 RSS-E-05 SearchBookPreviewOverlay 等场景使用，不替换现有 mergeItems 以保持排序稳定性。
             adapter.setItems(it)
+            // VIDEO-B-01: 搜索结果到达后预加载视频书目录（仅视频类型书源，Semaphore 限并发4），
+            // 用户点击进入播放页时可直接从本地数据库读取章节，提升启动速度。
+            VideoBookPreloader.preloadSearchBooks(lifecycleScope, it)
         }
         lifecycleScope.launch {
             appDb.bookSourceDao.flowEnabledGroups().flowOn(IO).collect {
@@ -468,6 +478,23 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             putExtra("author", author)
             putExtra("bookUrl", bookUrl)
         }
+    }
+
+    /**
+     * 长按预览搜索结果（RSS-E-05）
+     * 弹出 SearchBookPreviewOverlay 显示书籍摘要信息，用户可点击"查看详情"跳转 BookInfoActivity
+     */
+    override fun showBookPreview(book: SearchBook) {
+        showDialogFragment(SearchBookPreviewOverlay(book).apply {
+            setCallback(this@SearchActivity)
+        })
+    }
+
+    /**
+     * SearchBookPreviewOverlay.Callback：用户在预览覆盖层点击"查看详情"时跳转 BookInfoActivity
+     */
+    override fun onOpenBookInfo(book: SearchBook) {
+        showBookInfo(book.name, book.author, book.bookUrl)
     }
 
     /**

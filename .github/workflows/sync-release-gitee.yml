@@ -1,0 +1,49 @@
+# BUILD-B-05: Gitee 镜像同步工作流
+# 用途：GitHub Release 发布后将代码同步到 Gitee 镜像仓库，方便国内用户访问
+# 触发：release published 或 workflow_dispatch 手动触发
+# 前置：需在 GitHub Secrets 配置 GITEE_USERNAME 和 GITEE_TOKEN
+# 验证：发布 Release 后检查 Gitee 仓库是否有对应提交
+
+name: Sync Release To Gitee
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # 获取完整历史，确保标签可同步
+
+      - name: Check Gitee Secrets
+        id: check
+        run: |
+          if [ -z "${{ secrets.GITEE_USERNAME }}" ] || [ -z "${{ secrets.GITEE_TOKEN }}" ]; then
+            echo "::warning::GITEE_USERNAME 或 GITEE_TOKEN 未配置，跳过 Gitee 同步"
+            echo "skip=yes" >> $GITHUB_OUTPUT
+          else
+            echo "skip=no" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync To Gitee
+        if: steps.check.outputs.skip != 'yes'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # BUILD-B-05: 推送当前分支到 Gitee 镜像仓库的 master 分支，并同步所有标签
+          git remote add gitee "https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_TOKEN }}@gitee.com/${{ secrets.GITEE_USERNAME }}/legado.git"
+          git push gitee HEAD:master --force --tags
+
+      - name: Sync Summary
+        if: steps.check.outputs.skip != 'yes'
+        run: |
+          echo "✅ Gitee 镜像同步完成"
+          echo "源: ${{ github.repositoryUrl }}"
+          echo "目标: gitee.com/${{ secrets.GITEE_USERNAME }}/legado"
+          echo "分支: master (force push)"
+          echo "标签: 全部同步"

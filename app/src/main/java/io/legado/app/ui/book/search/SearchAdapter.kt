@@ -77,6 +77,13 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
                 callBack.showBookInfo(it.name, it.author, it.bookUrl)
             }
         }
+        // RSS-E-05: 长按预览搜索结果（不破坏单击跳转详情的现有体验）
+        binding.root.setOnLongClickListener {
+            getItem(holder.layoutPosition)?.let {
+                callBack.showBookPreview(it)
+            }
+            true
+        }
     }
 
     private fun bind(binding: ItemSearchBinding, searchBook: SearchBook) {
@@ -145,5 +152,11 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
          * 显示书籍详情
          */
         fun showBookInfo(name: String, author: String, bookUrl: String)
+
+        /**
+         * 长按预览搜索结果（RSS-E-05）
+         * 默认空实现避免破坏其他 CallBack 实现类（如有）
+         */
+        fun showBookPreview(book: SearchBook) {}
     }
 }

@@ -377,6 +377,15 @@ class RssSourceEditActivity :
                     EditEntity.ViewType.checkBox
                 )
             )
+            // RSS-B-04 pureSearch 开关（ADR-014）：纯搜索源在浏览界面隐藏分类 tab 和源管理菜单
+            add(
+                EditEntity(
+                    "pureSearch",
+                    rs.pureSearch.toString(),
+                    R.string.rss_pure_search,
+                    EditEntity.ViewType.checkBox
+                )
+            )
             add(EditEntity("ruleContent", rs.ruleContent, R.string.r_content))
             add(EditEntity("style", rs.style, R.string.r_style))
             add(EditEntity("injectJs", rs.injectJs, R.string.r_inject_js))
@@ -466,6 +475,7 @@ class RssSourceEditActivity :
                 "loadWithBaseUrl" -> source.loadWithBaseUrl = it.value.isTrue()
                 "showWebLog" -> source.showWebLog = it.value.isTrue()
                 "cacheFirst" -> source.cacheFirst = it.value.isTrue()
+                "pureSearch" -> source.pureSearch = it.value.isTrue()
                 "ruleContent" -> source.ruleContent =
                     viewModel.ruleComplete(it.value, source.ruleArticles)
 

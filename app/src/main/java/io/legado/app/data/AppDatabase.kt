@@ -21,6 +21,7 @@ import io.legado.app.data.dao.CoverGalleryDao
 import io.legado.app.data.dao.DictRuleDao
 import io.legado.app.data.dao.HttpTTSDao
 import io.legado.app.data.dao.KeyboardAssistsDao
+import io.legado.app.data.dao.ReadRecentBookDao
 import io.legado.app.data.dao.ReadRecordDao
 import io.legado.app.data.dao.ReplaceRuleDao
 import io.legado.app.data.dao.RssArticleDao
@@ -46,6 +47,7 @@ import io.legado.app.data.entities.CoverGalleryImage
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.KeyboardAssist
+import io.legado.app.data.entities.ReadRecentBook
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordDetail
 import io.legado.app.data.entities.ReplaceRule
@@ -74,7 +76,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 98,
+    version = 100,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -82,7 +84,7 @@ val appDb by lazy {
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         CoverGalleryGroup::class, CoverGalleryImage::class, ReadRecordDetail::class,
-        AutoTaskRule::class, BookHighlight::class],
+        AutoTaskRule::class, BookHighlight::class, ReadRecentBook::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -137,6 +139,7 @@ val appDb by lazy {
         // rss-cache-first: 92→93 使用手动 Migration（DatabaseMigrations.migration_92_93），重建 rssSources 表将 cacheFirst 默认值 0→1
         // rss-concurrency: 93→94 使用手动 Migration（DatabaseMigrations.migration_93_94）
         // rss-weight: 94→95 使用手动 Migration（DatabaseMigrations.migration_94_95），rssSources 表新增 parseConcurrency + weight 字段
+        // rss-pure-search: 99→100 使用手动 Migration（DatabaseMigrations.migration_99_100），rssSources 表新增 pureSearch 字段（RSS-B-04 / ADR-013 / ADR-014）
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -165,6 +168,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val coverGalleryDao: CoverGalleryDao
     abstract val autoTaskRuleDao: AutoTaskRuleDao
     abstract val bookHighlightDao: BookHighlightDao
+    abstract val readRecentBookDao: ReadRecentBookDao
 
     companion object {
 

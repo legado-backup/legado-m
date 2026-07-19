@@ -18,11 +18,13 @@ import io.legado.app.databinding.ItemRssSourceBinding
 import io.legado.app.help.source.sourceInitial
 import io.legado.app.help.source.sourceUrlHost
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.rss.search.RssSearchActivity
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.gone
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.toTimeAgo
 import io.legado.app.utils.visible
 import java.util.Collections
@@ -240,6 +242,13 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
             when (menuItem.itemId) {
                 R.id.menu_top -> callBack.toTop(source)
                 R.id.menu_bottom -> callBack.toBottom(source)
+                R.id.menu_search -> {
+                    if (source.searchUrl.isNullOrBlank()) {
+                        context.toastOnUi(R.string.rss_source_empty)
+                    } else {
+                        RssSearchActivity.start(context, source.sourceUrl)
+                    }
+                }
                 R.id.menu_del -> {
                     callBack.del(source)
                     selected.remove(source)

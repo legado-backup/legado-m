@@ -277,6 +277,21 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.rss_articles, menu)
         menuPage = menu.findItem(R.id.menu_page)
+        // RSS-B-04 pureSearch 模式（ADR-014）：纯搜索源隐藏所有源管理菜单，仅保留搜索
+        val isPureSearch = viewModel.rssSource?.pureSearch == true
+        if (isPureSearch) {
+            listOf(
+                R.id.menu_login,
+                R.id.menu_refresh_sort,
+                R.id.menu_set_source_variable,
+                R.id.menu_edit_source,
+                R.id.menu_clear,
+                R.id.menu_switch_layout,
+                R.id.menu_read_record
+            ).forEach { id ->
+                menu.findItem(id)?.isVisible = false
+            }
+        }
         menu.findItem(R.id.menu_search)?.apply {
             val source = viewModel.rssSource
             val searchUrl = source?.searchUrl ?: return@apply
@@ -376,6 +391,12 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
                 upFragmentsView()
                 return@launch
             }
+            // RSS-B-04 pureSearch 模式（ADR-014）：纯搜索源不展示 sortUrl 分类，等待用户搜索
+            if (source.pureSearch) {
+                sortList.clear()
+                upFragmentsView()
+                return@launch
+            }
             viewModel.sortUrl?.takeIf { it.isNotBlank() }?.let { url ->
                 val urls: List<Pair<String, String>> = try {
                     if (url.isJsonObject()) {
@@ -409,6 +430,14 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
         }
     }
     private fun upFragmentsView() {
+        // RSS-B-04 pureSearch 模式（ADR-014）：纯搜索源隐藏分类 tab，标题提示搜索
+        val isPureSearch = viewModel.rssSource?.pureSearch == true
+        if (isPureSearch) {
+            binding.titleBar.title = viewModel.searchKey ?: getString(R.string.rss_search_hint)
+            binding.tabsContainer.gone()
+            adapter.notifyDataSetChanged()
+            return
+        }
         if (sortList.size == 1) {
             sortList.first().first.takeIf { it.isNotEmpty() }?.let {
                 binding.titleBar.title = viewModel.searchKey ?: it

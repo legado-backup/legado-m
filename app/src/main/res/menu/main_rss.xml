@@ -22,6 +22,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_rss_search"
+        android:title="@string/rss_search_hint"
+        android:icon="@drawable/ic_search_hint"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_group"
         android:title="@string/group"
         android:icon="@drawable/ic_groups"

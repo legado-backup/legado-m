@@ -74,8 +74,14 @@ android {
         buildConfigField "String", "Cronet_Main_Version", "\"$CronetMainVersion\""
 
         // 仅打包主流架构，x86/x86_64 仅模拟器使用，减少 APK 体积约 5MB
+        // BUILD-B-02: 支持 -Pabi=arm64-v8a 动态注入单架构（CI 快速构建）
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            if (project.hasProperty("abi")) {
+                // 支持逗号分隔的多个架构，如 -Pabi=arm64-v8a,armeabi-v7a
+                abiFilters project.property("abi").toString().split(",").toList()
+            } else {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
         }
 
         // F-P1-7 打包压缩优化：仅保留项目已翻译语言，移除第三方库（Material Components/AppCompat 等）自带的其他语言资源
@@ -121,10 +127,15 @@ android {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig signingConfigs.myConfig
             }
-            manifestPlaceholders.put("app_name", "@string/app_name")
+            // 共存包（传-PcustomAppId）显示"阅读M·共存"，默认测试包显示"阅读M.D"
+            if (project.hasProperty("customAppId")) {
+                manifestPlaceholders.put("app_name", "@string/app_name_coexist")
+            } else {
+                manifestPlaceholders.put("app_name", "@string/app_name_debug")
+            }
 
             applicationIdSuffix '.debug'
-            versionNameSuffix 'debug'
+            versionNameSuffix '.D'
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
         }
@@ -154,12 +165,6 @@ android {
                 appIdSuffix = parts.length > 0 ? parts[-1] : "custom"
             }
             outputFileName = "${name}_${appIdSuffix}_${flavor}_${defaultConfig.versionName}.apk"
-            // 不同包名输出到不同子目录，避免共存包覆盖测试包
-            // 默认: app/build/outputs/apk/app/miss/debug/
-            // 共存: app/build/outputs/apk/app/legacy/debug/
-            def originalDir = output.outputFile.parentFile
-            def appDir = new File(originalDir, appIdSuffix)
-            output.outputDirectory = appDir
         }
     }
 
@@ -348,6 +353,10 @@ dependencies {
     implementation(libs.markwon.image.glide)
     implementation(libs.markwon.ext.tables)
     implementation(libs.markwon.html)
+    // DEPS-B-01: 补充 markwon 扩展模块（strikethrough/tasklist/linkify）
+    implementation(libs.markwon.ext.strikethrough)
+    implementation(libs.markwon.ext.tasklist)
+    implementation(libs.markwon.linkify)
 
     //转换繁体
     implementation(libs.quick.chinese.transfer.core)
@@ -374,4 +383,13 @@ dependencies {
     implementation(platform(libs.soraEditor.bom))
     implementation(libs.soraEditor.core)
     implementation(libs.soraEditor.language.textmate)
+
+    // DEPS-B-06: liquidglass 液态玻璃效果（P2，用户价值3.8）
+    // 兼容性：API 24+ 依赖可用，API 33+ (Android 13+) 实际显示效果
+    // minSdk 23 通过 AndroidManifest tools:overrideLibrary 强制兼容
+    implementation(libs.liquidglass)
+
+    // DEPS-B-08: lottie 动画（P2，用户价值3.5）
+    // 兼容性：minSdk 16+，本项目 minSdk 23 完全兼容
+    implementation(libs.lottie)
 }

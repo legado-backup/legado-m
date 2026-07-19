@@ -211,6 +211,84 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     }
 
     /**
+     * VIDEO-E-03 增强：获取所有字幕轨道（与音轨对称）。
+     * @return 字幕轨道列表（索引 + 显示名称）
+     */
+    @OptIn(UnstableApi::class)
+    fun getSubtitleTracks(): List<Pair<Int, String>> {
+        val exoPlayer = mInternalPlayer ?: return emptyList()
+        val textGroups = exoPlayer.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        if (textGroups.isEmpty()) return emptyList()
+        return textGroups.mapIndexed { index, group ->
+            val format = group.getTrackFormat(0)
+            val label = format.label ?: format.language ?: "字幕 ${index + 1}"
+            index to label
+        }
+    }
+
+    /**
+     * VIDEO-E-03 增强：切换到指定字幕轨道。
+     * @param groupIndex 字幕轨道组索引（来自 getSubtitleTracks），-1 表示关闭字幕
+     */
+    @OptIn(UnstableApi::class)
+    fun selectSubtitleTrack(groupIndex: Int) {
+        val exoPlayer = mInternalPlayer ?: return
+        if (groupIndex < 0) {
+            // 关闭字幕
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            return
+        }
+        val textGroups = exoPlayer.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        val targetGroup = textGroups.getOrNull(groupIndex) ?: return
+        val override = TrackSelectionOverride(targetGroup.mediaTrackGroup, 0)
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setOverrideForType(override)
+            .build()
+    }
+
+    /**
+     * VIDEO-E-03 增强：获取所有视频轨道（分辨率切换）。
+     * @return 视频轨道列表（索引 + 显示名称，含分辨率信息）
+     */
+    @OptIn(UnstableApi::class)
+    fun getVideoTracks(): List<Pair<Int, String>> {
+        val exoPlayer = mInternalPlayer ?: return emptyList()
+        val videoGroups = exoPlayer.currentTracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+        if (videoGroups.isEmpty()) return emptyList()
+        return videoGroups.mapIndexed { index, group ->
+            val format = group.getTrackFormat(0)
+            val label = buildString {
+                append("视频 ${index + 1}")
+                if (format.width > 0 && format.height > 0) {
+                    append(" ${format.width}x${format.height}")
+                }
+                if (format.frameRate > 0) {
+                    append(" ${format.frameRate.toInt()}fps")
+                }
+            }
+            index to label
+        }
+    }
+
+    /**
+     * VIDEO-E-03 增强：切换到指定视频轨道（分辨率切换）。
+     * @param groupIndex 视频轨道组索引（来自 getVideoTracks）
+     */
+    @OptIn(UnstableApi::class)
+    fun selectVideoTrack(groupIndex: Int) {
+        val exoPlayer = mInternalPlayer ?: return
+        val videoGroups = exoPlayer.currentTracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+        val targetGroup = videoGroups.getOrNull(groupIndex) ?: return
+        val override = TrackSelectionOverride(targetGroup.mediaTrackGroup, 0)
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon()
+            .setOverrideForType(override)
+            .build()
+    }
+
+    /**
      * R2 m3u8 播放失败调试日志：捕获 ExoPlayer 播放错误并通知 UI 显示
      *
      * 常见错误码：
@@ -335,6 +413,29 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
         }
         AppLog.put(errorInfo, error)
         postEvent(EventBus.VIDEO_PLAY_ERROR, errorInfo)
+    }
+
+    /**
+     * VIDEO-E-03 增强：播放状态变化日志（性能分析用）。
+     *
+     * 状态说明：
+     * - STATE_IDLE (1)：空闲，初始状态或播放停止
+     * - STATE_BUFFERING (2)：缓冲中，正在加载数据
+     * - STATE_READY (3)：就绪，可以播放
+     * - STATE_ENDED (4)：播放结束
+     *
+     * 用于分析首屏加载耗时（BUFFERING→READY 间隔）和卡顿频次（READY→BUFFERING 次数）。
+     */
+    override fun onPlaybackStateChanged(state: Int) {
+        super.onPlaybackStateChanged(state)
+        val stateName = when (state) {
+            Player.STATE_IDLE -> "IDLE"
+            Player.STATE_BUFFERING -> "BUFFERING"
+            Player.STATE_READY -> "READY"
+            Player.STATE_ENDED -> "ENDED"
+            else -> "UNKNOWN($state)"
+        }
+        AppLog.putDebug("Exo2MediaPlayer state=$stateName url=${currentUrl.takeLast(60)}")
     }
 
 

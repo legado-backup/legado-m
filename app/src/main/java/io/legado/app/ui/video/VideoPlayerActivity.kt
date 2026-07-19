@@ -98,9 +98,11 @@ import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 import io.noties.markwon.Markwon
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
+import io.noties.markwon.linkify.LinkifyPlugin
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
@@ -524,6 +526,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         )
                         .usePlugin(HtmlPlugin.create())
                         .usePlugin(TablePlugin.create(context))
+                        .usePlugin(StrikethroughPlugin.create())
+                        .usePlugin(LinkifyPlugin.create())
                         .build()
                     markwon.toMarkdown(mark)
                 }

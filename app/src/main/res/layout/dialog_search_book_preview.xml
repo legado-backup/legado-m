@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <io.legado.app.ui.widget.image.CoverImageView
+        android:id="@+id/iv_cover"
+        android:layout_width="100dp"
+        android:layout_height="140dp"
+        android:contentDescription="@string/img_cover"
+        android:scaleType="centerCrop"
+        android:src="@drawable/image_cover_default"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="@color/primaryText"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
+        app:layout_constraintTop_toTopOf="@id/iv_cover"
+        tools:text="书名" />
+
+    <TextView
+        android:id="@+id/tv_author"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/primaryText"
+        android:textSize="13sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
+        app:layout_constraintTop_toBottomOf="@id/tv_name"
+        tools:text="作者" />
+
+    <TextView
+        android:id="@+id/tv_origin_count"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/secondaryText"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
+        app:layout_constraintTop_toBottomOf="@id/tv_author"
+        tools:text="来源数" />
+
+    <TextView
+        android:id="@+id/tv_lasted"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/secondaryText"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
+        app:layout_constraintTop_toBottomOf="@id/tv_origin_count"
+        tools:text="最新章节" />
+
+    <io.legado.app.ui.widget.LabelsBar
+        android:id="@+id/ll_kind"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
+        app:layout_constraintTop_toBottomOf="@id/tv_lasted" />
+
+    <io.legado.app.ui.widget.text.MultilineTextView
+        android:id="@+id/tv_introduce"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:ellipsize="end"
+        android:maxLines="4"
+        android:textColor="@color/primaryText"
+        android:textSize="13sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/iv_cover"
+        tools:text="简介内容" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_close"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:layout_marginEnd="8dp"
+        android:minHeight="42dp"
+        android:text="@string/close"
+        app:layout_constraintEnd_toStartOf="@id/btn_open"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_introduce" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_open"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="18dp"
+        android:minHeight="42dp"
+        android:text="@string/book_info"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/btn_close"
+        app:layout_constraintTop_toBottomOf="@id/tv_introduce" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

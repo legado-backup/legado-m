@@ -7,4 +7,15 @@
         android:title="剪贴板导入"
         app:showAsAction="always" />
 
+    <!-- BUG-001 修复：THEME-B-03 ZIP 导入导出 UI 入口 -->
+    <item
+        android:id="@+id/menu_import_zip"
+        android:title="从 ZIP 文件导入"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_export_zip"
+        android:title="导出全部主题为 ZIP"
+        app:showAsAction="never" />
+
 </menu>

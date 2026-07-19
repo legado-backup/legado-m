@@ -22,6 +22,7 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.ReadRecentBook
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssEpisode
 import io.legado.app.data.entities.RssReadRecord
@@ -53,10 +54,13 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import org.json.JSONArray
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 object VideoPlay : CoroutineScope by MainScope(){
     private const val VIDEO_POS_NAME = "video_pos_" //单链接播放进度
@@ -64,6 +68,26 @@ object VideoPlay : CoroutineScope by MainScope(){
     private var needClearTemp = true //需要清理缓存
     private const val VIDEO_TEMP_PATH = "video_temp"
     private val videoTempFile by lazy { File(FileUtils.getCachePath(), VIDEO_TEMP_PATH) }
+
+    /**
+     * 章节链接缓存（VIDEO-B-02）。
+     *
+     * 借鉴 Archive `chapterLinkCache`：缓存已解析的播放链接（playUrl+headers+mediaUrl），
+     * 用户切换剧集或回看时直接复用缓存，跳过 WebBook.getContent + AnalyzeUrl 解析，
+     * 提升连续看剧体验。TTL 30 分钟，过期后重新解析。
+     *
+     * 关联任务：VIDEO-B-02（P0）章节链接缓存+下一集预加载。
+     */
+    private const val CHAPTER_LINK_CACHE_TTL = 30 * 60 * 1000L
+    private data class CachedPlayLink(
+        val playUrl: String,
+        val headers: Map<String, String>,
+        val mediaUrl: String,
+        val createdAt: Long
+    )
+    private val chapterLinkCache = ConcurrentHashMap<String, CachedPlayLink>()
+    private val preloadingKeys = ConcurrentHashMap.newKeySet<String>()
+    private val preloadMutex = Mutex()
 
     const val VIDEO_PREF_NAME = "video_config"
 
@@ -484,7 +508,35 @@ object VideoPlay : CoroutineScope by MainScope(){
             appCtx.toastOnUi("未找到章节")
             return
         }
-        WebBook.getContent(loadScope, source as BookSource, book, chapter)
+        val chapterSource = source as BookSource
+        // VIDEO-B-02: 章节链接缓存查询，命中则跳过 WebBook.getContent + AnalyzeUrl 解析
+        val chapterCacheKey = buildChapterCacheKey(chapterSource, book, chapter)
+        val cached = chapterLinkCache[chapterCacheKey]?.takeIf {
+            System.currentTimeMillis() - it.createdAt <= CHAPTER_LINK_CACHE_TTL
+        }
+        if (cached != null) {
+            videoUrl = cached.mediaUrl
+            when (val danmaku = chapter.getDanmaku()) {
+                is String -> danmakuStr = danmaku
+                is File -> danmakuFile = danmaku
+            }
+            // 缓存命中分支无需 withContext(Main)：startPlay 本身在主线程调用，
+            // 缓存查询是 ConcurrentHashMap.get 同步无阻塞，可直接执行 player.setUp 等 UI 操作
+            player.mapHeadData = cached.headers.toMutableMap()
+            currentPlayHeaders = cached.headers
+            // Bug8 修复：缓存命中也需 resolvePlayerPageUrl（纯函数无副作用，同 URL 同结果）
+            val resolvedUrl = VideoUrlExtractor.resolvePlayerPageUrl(cached.playUrl)
+            player.setUp(resolvedUrl, cachePlay, File(appCtx.externalCache, "exoplayer"), chapter.title)
+            if (autoPlay) {
+                player.startPlayLogic()
+            }
+            preloadNextEpisode(chapterSource, book)
+            // VIDEO-E-01: 写入最近阅读记录，使视频书出现在最近阅读列表
+            recordRecentRead(book)
+            isLoading = false
+            return
+        }
+        WebBook.getContent(loadScope, chapterSource, book, chapter)
             .onSuccess(IO) { content ->
                 val content = content.trim()
                 val mUrl = if (content.isEmpty()) {
@@ -509,6 +561,13 @@ object VideoPlay : CoroutineScope by MainScope(){
                     is File -> danmakuFile = danmaku
                 }
                 val playUrl = analyzeUrl.url
+                // VIDEO-B-02: 写入章节链接缓存，供下次切换剧集/回看复用
+                chapterLinkCache[chapterCacheKey] = CachedPlayLink(
+                    playUrl = playUrl,
+                    headers = analyzeUrl.headerMap.toMap(),
+                    mediaUrl = mUrl,
+                    createdAt = System.currentTimeMillis()
+                )
                 withContext(Main) {
                     player.mapHeadData = analyzeUrl.headerMap
                     currentPlayHeaders = analyzeUrl.headerMap
@@ -519,10 +578,106 @@ object VideoPlay : CoroutineScope by MainScope(){
                         player.startPlayLogic()
                     }
                 }
+                // VIDEO-B-02: 触发下一集预加载，提升连续看剧体验
+                preloadNextEpisode(chapterSource, book)
+                // VIDEO-E-01: 写入最近阅读记录，使视频书出现在最近阅读列表
+                recordRecentRead(book)
             }.onError {
                 AppLog.put("获取资源链接出错\n$it", it, true)
             }
         isLoading = false
+    }
+
+    /**
+     * 写入最近阅读记录（VIDEO-E-01）。
+     *
+     * 借鉴 Archive：视频书播放时异步写入 readRecentBooks 表，使视频书出现在"最近阅读"页面。
+     * - 异步执行避免阻塞播放启动
+     * - runCatching 兜底：DB 异常不影响播放
+     * - REPLACE 策略：重复 bookUrl 覆盖更新时间戳
+     *
+     * 实施决策与设计文档不一致分析：
+     * - tasks.md §1.13.3 要求"VideoPlay.kt 写入最近阅读"，按字面意思写入 ReadRecentBook 表
+     * - 但本项目"最近阅读"页面基于 Book.lastReadTime 字段排序（非 readRecentBooks 表查询）
+     * - 视频书播放时 saveRead() → book.update() 已更新 Book.lastReadTime，视频书已能出现在最近阅读
+     * - 决策：保留 ReadRecentBook 表写入（符合 tasks.md 要求+为未来扩展留接口），
+     *   但实际"最近阅读"展示通过 Book.lastReadTime 机制（无需 ReadRecentBook 表）
+     * - §1.13.4 真机验证"视频书出现在最近阅读"通过 book.update() 机制通过，非本方法写入
+     */
+    private fun recordRecentRead(book: Book) {
+        if (book.bookUrl.isBlank()) return
+        Coroutine.async(loadScope, IO) {
+            runCatching {
+                appDb.readRecentBookDao.insert(ReadRecentBook(bookUrl = book.bookUrl))
+            }.onFailure {
+                AppLog.put("VIDEO-E-01: 写入最近阅读记录失败\n${it.localizedMessage}", it)
+            }
+        }
+    }
+
+    /**
+     * 构建章节缓存 key（VIDEO-B-02）。
+     *
+     * 借鉴 Archive `buildChapterCacheKey`：用 sourceKey + bookUrl + chapterUrl 唯一标识一个章节链接，
+     * 避免不同书源/书籍/章节的链接互相覆盖。
+     */
+    private fun buildChapterCacheKey(source: BookSource, book: Book, chapter: BookChapter): String {
+        return "${source.getKey()}|${book.bookUrl}|${chapter.url}"
+    }
+
+    /**
+     * 预加载下一集章节链接（VIDEO-B-02）。
+     *
+     * 借鉴 Archive `preloadNextEpisode`：当前集播放时异步预解析下一集链接并写入 chapterLinkCache，
+     * 用户切换下一集时直接命中缓存，跳过 WebBook.getContent 等待。
+     *
+     * - 使用 preloadingKeys 去重（同一 nextKey 不重复预加载）
+     * - 使用 preloadMutex 串行化预加载（避免并发预加载过多占用网络资源）
+     * - 缓存已存在或预加载失败静默处理（不影响当前播放）
+     */
+    private fun preloadNextEpisode(source: BookSource, book: Book) {
+        val nextChapter = episodes?.getOrNull(chapterInVolumeIndex + 1) ?: return
+        val nextKey = buildChapterCacheKey(source, book, nextChapter)
+        val exists = chapterLinkCache[nextKey]?.let {
+            System.currentTimeMillis() - it.createdAt <= CHAPTER_LINK_CACHE_TTL
+        } == true
+        if (exists || !preloadingKeys.add(nextKey)) return
+        Coroutine.async(loadScope, IO) {
+            preloadMutex.withLock {
+                try {
+                    if (chapterLinkCache[nextKey]?.let {
+                            System.currentTimeMillis() - it.createdAt <= CHAPTER_LINK_CACHE_TTL
+                        } == true
+                    ) return@withLock
+                    val content = WebBook.getContentAwait(source, book, nextChapter).trim()
+                    if (content.isEmpty()) return@withLock
+                    val mUrl = if (content.startsWith("<")) {
+                        val name = MD5Utils.md5Encode(content) + ".mpd"
+                        val file = FileUtils.createFileIfNotExist(videoTempFile, name)
+                        file.writeText(content)
+                        Uri.fromFile(file).toString()
+                    } else {
+                        content
+                    }
+                    val analyzeUrl = AnalyzeUrl(
+                        mUrl,
+                        source = source,
+                        ruleData = book,
+                        chapter = nextChapter
+                    )
+                    chapterLinkCache[nextKey] = CachedPlayLink(
+                        playUrl = analyzeUrl.url,
+                        headers = analyzeUrl.headerMap.toMap(),
+                        mediaUrl = mUrl,
+                        createdAt = System.currentTimeMillis()
+                    )
+                } catch (_: Throwable) {
+                    // 预加载失败静默处理，不影响当前播放
+                } finally {
+                    preloadingKeys.remove(nextKey)
+                }
+            }
+        }
     }
 
     /**

@@ -21,6 +21,7 @@ subagent_retry_failed.py — 54个访问失败RSS订阅源深度重试
 import json
 import re
 import ssl
+import sys
 import time
 import socket
 import http.client
@@ -30,6 +31,13 @@ import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import urlparse
+
+# 强制 UTF-8 输出（避免 Windows GBK 乱码）
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 # ==================== 配置 ====================
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -397,99 +405,136 @@ def extract_hint_url(comment: str) -> Optional[str]:
 
 
 # ==================== 14种技术手段深度重试 ====================
-def deep_retry_14_techniques(url: str, comment: str = '') -> Tuple[bool, str, Optional[str], str]:
+def deep_retry_14_techniques(url: str, comment: str = '', progress_cb=None) -> Tuple[bool, str, Optional[str], str]:
     """
-    14种技术手段深度重试
+    14种技术手段深度重试（分阶段执行，平衡速度与成功率）
     返回: (success, strategy_used, migrated_url, error_type)
+    progress_cb: 可选回调函数，接收进度字符串
     """
+    def log(msg):
+        if progress_cb:
+            progress_cb(msg)
+
+    forbidden_detected = False
+    last_err_type = 'unknown'
+
+    # ========== 阶段A：快速重试组（每手段8s超时，总耗时<60s）==========
     # 1-4. 4种UA（Chrome/Mobile/Bot/Firefox）
     for ua_name, ua in USER_AGENTS:
-        s, c, l, e = http_get(url, ua=ua, timeout=20)
+        log(f'A:ua_{ua_name.lower()}')
+        s, c, l, e = http_get(url, ua=ua, timeout=8)
         if s == 200 and l > 1000:
             return (True, f'ua_{ua_name.lower()}', None, 'ok')
         if is_request_forbidden(c, s):
-            return (False, 'forbidden', None, 'http_403_forbidden')
+            forbidden_detected = True
+        if e is not None:
+            last_err_type = classify_error(e, s, l)
 
     # 5. HTTP HEAD 方法
-    s, c, l, e = http_get(url, method='HEAD', timeout=15)
+    log('A:head')
+    s, c, l, e = http_get(url, method='HEAD', timeout=8)
     if s in (200, 301, 302):
-        # HEAD成功，再用GET确认
-        s2, c2, l2, _ = http_get(url, timeout=20)
-        if s2 == 200 and l2 > 1000:
-            return (True, 'head_method', None, 'ok')
-        if s2 in (200, 301, 302):
-            return (True, 'head_method', None, 'ok')
-
-    # 6. Wayback Machine 存档查询
-    s, c, l, info, e = check_wayback(url, timeout=30)
-    if s == 200 and l > 1000:
-        return (True, f'wayback_{info}', None, 'ok')
+        return (True, 'head_method', None, 'ok')
+    if e is not None:
+        last_err_type = classify_error(e, s, l)
 
     # 7. HTTP/1.1 强制（http.client）
-    s, c, l, e = http11_get(url, timeout=20)
+    log('A:http11')
+    s, c, l, e = http11_get(url, timeout=8)
     if s == 200 and l > 1000:
         return (True, 'http11_force', None, 'ok')
+    if e is not None:
+        last_err_type = classify_error(e, s, l)
 
     # 8. HTTP 降级（https→http）
     if url.startswith('https://'):
+        log('A:http_downgrade')
         http_url = 'http://' + url[8:]
-        s, c, l, e = http_get(http_url, timeout=20)
+        s, c, l, e = http_get(http_url, timeout=8)
         if s == 200 and l > 1000:
             return (True, 'http_downgrade', http_url, 'ok')
+        if e is not None:
+            last_err_type = classify_error(e, s, l)
 
     # 9. 跟随重定向（urllib）
-    final_url, s, l, e = fetch_with_redirects(url, timeout=20)
+    log('A:redirect')
+    final_url, s, l, e = fetch_with_redirects(url, timeout=8)
     if s == 200 and l > 1000 and final_url != url:
         return (True, 'redirect_followed', final_url, 'ok')
+    if e is not None:
+        last_err_type = classify_error(e, s, l)
 
-    # 10. 长 timeout（40秒）
-    s, c, l, e = http_get(url, timeout=40)
+    # ========== 阶段B：慢速重试组（每手段12s超时，总耗时<80s）==========
+    # 6. Wayback Machine 存档查询
+    log('B:wayback')
+    s, c, l, info, e = check_wayback(url, timeout=12)
     if s == 200 and l > 1000:
-        return (True, 'long_timeout_40s', None, 'ok')
+        return (True, f'wayback_{info}', None, 'ok')
 
-    # 11. requests + Session（cookie共享）
-    for ua_name, ua in USER_AGENTS[:2]:  # Chrome + Mobile
-        s, c, l, e = requests_session_get(url, ua=ua, timeout=30)
-        if s == 200 and l > 1000:
-            return (True, f'requests_session_{ua_name.lower()}', None, 'ok')
-        if is_request_forbidden(c, s):
-            return (False, 'forbidden', None, 'http_403_forbidden')
-
-    # 12. Playwright 真实渲染（stealth脚本）
-    s, c, l, e = playwright_render(url, timeout_ms=25000)
+    # 10. 长 timeout（12秒，避免太长）
+    log('B:long_timeout')
+    s, c, l, e = http_get(url, timeout=12)
     if s == 200 and l > 1000:
-        return (True, 'playwright_stealth', None, 'ok')
+        return (True, 'long_timeout_12s', None, 'ok')
 
-    # 13. 8端口组合
+    # 11. requests + Session（cookie共享）— 仅Chrome UA
+    log('B:requests_session')
+    s, c, l, e = requests_session_get(url, ua=USER_AGENTS[0][1], timeout=12)
+    if s == 200 and l > 1000:
+        return (True, 'requests_session_chrome', None, 'ok')
+    if is_request_forbidden(c, s):
+        forbidden_detected = True
+
+    # 13. 8端口组合（每个4s超时，最多24s）
+    log('B:ports')
     ok, strategy, new_url = try_port_combinations(url)
     if ok:
         return (True, strategy, new_url, 'ok')
 
-    # 14. Wayback直接访问 + 60s超时多次重试
-    s, c, l, e = check_wayback_direct(url, timeout=40)
+    # 14. Wayback直接访问
+    log('B:wayback_direct')
+    s, c, l, e = check_wayback_direct(url, timeout=12)
     if s == 200 and l > 1000:
         return (True, 'wayback_direct', None, 'ok')
 
-    # 14b. 多次重试（3次，60s超时）
-    for attempt in range(3):
-        s, c, l, e = http_get(url, timeout=60)
+    # 14b. 多次重试（2次，10s超时）
+    log('B:multi_retry')
+    for attempt in range(2):
+        s, c, l, e = http_get(url, timeout=10)
         if s == 200 and l > 1000:
             return (True, f'multi_retry_{attempt+1}', None, 'ok')
-        time.sleep(1)
+        time.sleep(0.3)
 
-    # 全部失败，尝试域名迁移
+    # ========== 阶段C：Playwright真实渲染（最耗时，最后尝试）==========
+    # 12. Playwright 真实渲染（stealth脚本）
+    log('C:playwright')
+    try:
+        s, c, l, e = playwright_render(url, timeout_ms=12000)
+        if s == 200 and l > 1000:
+            return (True, 'playwright_stealth', None, 'ok')
+    except Exception:
+        pass
+
+    # ========== 阶段D：域名迁移5步闭环 ==========
+    log('D:domain_migrate')
     hint_url = extract_hint_url(comment)
-    new_url, reason = migrate_domain(url, hint_url)
-    if new_url:
-        return (True, f'domain_migrate|{reason}', new_url, 'ok')
+    try:
+        new_url, reason = migrate_domain(url, hint_url)
+        if new_url:
+            return (True, f'domain_migrate|{reason}', new_url, 'ok')
+    except Exception:
+        pass
 
-    # 最终错误类型
-    last_status, last_content, _, last_e = http_get(url, timeout=20)
-    err_type = classify_error(last_e, last_status, len(last_content))
-    if is_request_forbidden(last_content, last_status):
-        err_type = 'http_403_forbidden'
-
-    return (False, 'truly_dead', None, err_type)
+    # 最终错误类型判定
+    if forbidden_detected:
+        return (False, 'forbidden', None, 'http_403_forbidden')
+    if last_err_type == 'unknown':
+        # 最后再确认一次状态
+        s, c, l, e = http_get(url, timeout=8)
+        last_err_type = classify_error(e, s, l)
+        if is_request_forbidden(c, s):
+            return (False, 'forbidden', None, 'http_403_forbidden')
+    return (False, 'truly_dead', None, last_err_type)
 
 
 def add_login_config(source: dict) -> bool:
@@ -591,8 +636,11 @@ def main():
         strategy = 'unknown'
         migrated_url = None
         err_type = 'unknown'
+        progress_steps = []
+        def progress_cb(msg):
+            progress_steps.append(msg)
         try:
-            success, strategy, migrated_url, err_type = deep_retry_14_techniques(source_url, comment)
+            success, strategy, migrated_url, err_type = deep_retry_14_techniques(source_url, comment, progress_cb=progress_cb)
         except KeyboardInterrupt:
             # 捕获中断，标记为 unknown 并继续
             print(f"    -> KeyboardInterrupt caught, marking as unknown", flush=True)
@@ -605,6 +653,9 @@ def main():
             migrated_url = None
             err_type = f'exception:{type(e).__name__}'
             print(f"    -> exception: {err_type}", flush=True)
+        # 输出尝试过的步骤
+        if progress_steps:
+            print(f"    steps_tried: {' -> '.join(progress_steps)}", flush=True)
 
         if success:
             stats['recovered'] += 1

@@ -22,6 +22,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- DEPS-B-06: liquidglass 依赖要求 API 24+，本项目 minSdk 23，强制兼容 -->
+    <uses-sdk tools:overrideLibrary="com.qmdeve.liquidglass" />
+
     <application
         android:name=".App"
         android:allowBackup="true"
@@ -296,6 +299,11 @@
         <activity
             android:name=".ui.rss.article.RssSortActivity"
             android:launchMode="singleTop" />
+        <!-- RSS搜索 -->
+        <activity
+            android:name=".ui.rss.search.RssSearchActivity"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
         <!-- RSS阅读 -->
         <activity
             android:name=".ui.rss.read.ReadRssActivity"

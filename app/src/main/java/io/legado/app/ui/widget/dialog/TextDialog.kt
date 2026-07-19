@@ -22,9 +22,11 @@ import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.noties.markwon.Markwon
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
+import io.noties.markwon.linkify.LinkifyPlugin
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -83,6 +85,8 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                             .usePlugin(GlideImagesPlugin.create(Glide.with(requireContext())))
                             .usePlugin(HtmlPlugin.create())
                             .usePlugin(TablePlugin.create(requireContext()))
+                            .usePlugin(StrikethroughPlugin.create())
+                            .usePlugin(LinkifyPlugin.create())
                             .build()
                         markwon.toMarkdown(content)
                     }

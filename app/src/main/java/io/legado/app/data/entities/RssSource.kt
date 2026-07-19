@@ -120,7 +120,15 @@ data class RssSource(
     @ColumnInfo(defaultValue = "0")
     var weight: Int = 0,
     /**AnalyzeUrl解析后的真实域名(host),校验时回填,UI分组用此字段优先于源URL截取*/
-    var lastHost: String? = null
+    var lastHost: String? = null,
+    /**
+     * 是否为纯搜索源（RSS-B-04 / ADR-014）
+     * 默认 false：保留分类浏览 + 搜索双模式
+     * 设为 true：仅作为搜索入口使用，浏览界面隐藏 sortUrl 分类 tab 与源管理菜单
+     * 并发搜索复用 Semaphore 限流（最大 5-10），单源超时 3s
+     */
+    @ColumnInfo(defaultValue = "0")
+    var pureSearch: Boolean = false
 ) : Parcelable, BaseSource {
 
     @JavascriptInterface
@@ -182,6 +190,7 @@ data class RssSource(
                 && equal(searchUrl, source.searchUrl)
                 && parseConcurrency == source.parseConcurrency
                 && weight == source.weight
+                && pureSearch == source.pureSearch
     }
 
     private fun equal(a: String?, b: String?): Boolean {

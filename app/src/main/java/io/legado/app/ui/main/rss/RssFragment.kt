@@ -32,8 +32,10 @@ import io.legado.app.ui.rss.article.RssSortActivity
 import io.legado.app.ui.rss.favorites.RssFavoritesActivity
 import io.legado.app.ui.rss.read.ReadRssActivity
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
+import io.legado.app.ui.rss.search.RssSearchActivity
 import io.legado.app.ui.rss.source.manage.RssSourceActivity
 import io.legado.app.ui.rss.subscription.RuleSubActivity
+import io.legado.app.ui.widget.dialog.SourceSelectDialog
 import io.legado.app.ui.widget.recycler.GridSpacingItemDecoration
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChange
@@ -41,14 +43,17 @@ import io.legado.app.utils.openUrl
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.transaction
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import io.legado.app.ui.login.SourceLoginActivity
 
 /**
@@ -175,6 +180,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
             R.id.menu_read_record -> showDialogFragment<ReadRecordDialog>()
             R.id.menu_rss_config -> startActivity<RssSourceActivity>()
             R.id.menu_rss_star -> startActivity<RssFavoritesActivity>()
+            R.id.menu_rss_search -> openRssSearch()
             else -> if (item.groupId == R.id.menu_group_text) {
                 // F-01 修复：用 currentGroup 记录归类，不回填 searchView 避免污染搜索框
                 currentGroup = item.title.toString()
@@ -433,6 +439,33 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
         }
         searchView.setQuery("", false)  // 清空搜索框，不触发查询
         upRssFlowJob()  // 直接触发查询
+    }
+
+    /**
+     * RSS 源内容搜索入口（与 RSS-B-01 RssSearchActivity + RSS-B-02 SourceSelectDialog 配套）。
+     * 实现：查询所有启用的、有 searchUrl 的源 → 弹 SourceSelectDialog → 用户选源后跳 RssSearchActivity。
+     * 无可用源时降级提示 toastOnUi。
+     */
+    private fun openRssSearch() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val sources = withContext(IO) {
+                // 简化说明: 直接 flowEnabled().first() 取一次快照; 上限: 源数量极大时可能 ANR; 升级路径: 改用分页或限制数量
+                appDb.rssSourceDao.flowEnabled().first()
+                    .filter { !it.searchUrl.isNullOrBlank() }
+                    .sortedBy { it.customOrder }
+            }
+            if (sources.isEmpty()) {
+                context?.toastOnUi(R.string.rss_source_empty)
+                return@launch
+            }
+            SourceSelectDialog.show(
+                fragmentManager = childFragmentManager,
+                title = getString(R.string.rss_search_hint),
+                sources = ArrayList(sources)
+            ) { source ->
+                RssSearchActivity.start(requireContext(), source.sourceUrl)
+            }
+        }
     }
 
     override fun openRss(rssSource: RssSource) {

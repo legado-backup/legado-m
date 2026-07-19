@@ -320,6 +320,17 @@ object ReadBookConfig {
         }
 
     /**
+     * 纸墨风格强度（0-100，0=禁用，100=最强）。
+     * 关联任务：THEME-B-01（P0）PaperInkHelper.kt 通过此属性获取强度值。
+     * setter 自动 coerceIn(0, 100) 限定范围，防止越界值导致阴影异常。
+     */
+    var paperInkStrength: Int
+        get() = config.paperInkStrength
+        set(value) {
+            config.paperInkStrength = value.coerceIn(0, 100)
+        }
+
+    /**
      * 标题位置 0:居左 1:居中 2:隐藏
      */
     var titleMode: Int
@@ -613,7 +624,13 @@ object ReadBookConfig {
         var tipColor: Int = 0,
         var tipDividerColor: Int = -1,
         var headerMode: Int = 0,
-        var footerMode: Int = 0
+        var footerMode: Int = 0,
+        /**
+         * 纸墨风格强度（0-100，0=禁用，100=最强）。
+         * 关联任务：THEME-B-01（P0）PaperInkHelper.kt 使用此字段控制文字阴影强度。
+         * 借鉴 Archive 项目 ReadBookConfig.paperInkStrength 字段。
+         */
+        var paperInkStrength: Int = 0
     ) {
 
         @Transient

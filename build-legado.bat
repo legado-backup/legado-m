@@ -1,31 +1,36 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 :: ============================================================
 ::  Legado APK Build Script
 ::  Usage: build-legado.bat [debug|release|clean] [package_name]
 ::
 ::  Package Types:
-::  1. Test Package (测试包):
-::     - Package: io.legado.miss.app.debug
-::     - Usage: Development, quick verification
-::     - Command: build-legado.bat
-::
-::  2. Coexist Package (共存包):
+::  1. Coexist Package (共存包) - DAILY DEVELOPMENT DEFAULT:
 ::     - Package: io.legado.app.debug
-::     - Usage: Coexist with official legado-E version
+::     - Display: 阅读M·共存
+::     - Usage: Daily dev, AI feature verification, coexist with official legado-E
 ::     - Command: build-legado.bat debug io.legado.app
+::
+::  2. Test Package (测试包):
+::     - Package: io.legado.miss.app.debug
+::     - Display: 阅读M.D
+::     - Usage: Quick fix verification
+::     - Command: build-legado.bat
 ::
 ::  3. Release Package (正式包):
 ::     - Package: io.legado.miss.app.release
-::     - Usage: Production release
+::     - Display: 阅读M
+::     - Usage: Production release (user delivery)
 ::     - Command: build-legado.bat release
 ::
+::  Strategy: Daily dev uses coexist package; full packages only when
+::  receiving user feedback and ready to deliver.
+::
 ::  Examples:
-::    build-legado.bat                          (test package, default)
-::    build-legado.bat release                  (release package, default)
-::    build-legado.bat debug io.legado.app     (coexist package, with original legado-E)
-::    build-legado.bat release io.legado.app   (coexist package, with original legado-E)
+::    build-legado.bat debug io.legado.app     (coexist package, DAILY DEFAULT)
+::    build-legado.bat                          (test package)
+::    build-legado.bat release                  (release package)
 ::    build-legado.bat clean
 :: ============================================================
 
@@ -163,10 +168,20 @@ set "APK_FOUND=0"
 for /r "%APK_OUTPUT_DIR%" %%f in (*.apk) do (
     echo   %%f
     set "APK_FOUND=1"
+    :: 拷贝APK到分类目录，避免不同包名的APK互相覆盖
+    set "APK_SRC=%%f"
 )
 
 if "%APK_FOUND%"=="0" (
     echo   [WARN] APK not found, check build log.
+) else (
+    :: 创建分类输出目录并拷贝APK
+    set "DIST_DIR=%PROJECT_DIR%\output\%APP_ID_MODE%\%BUILD_TYPE%"
+    if not exist "!DIST_DIR!" mkdir "!DIST_DIR!"
+    for /r "%APK_OUTPUT_DIR%" %%f in (*.apk) do (
+        copy /y "%%f" "!DIST_DIR!\" >nul 2>&1
+        echo   [COPY] %%f -^> !DIST_DIR!\
+    )
 )
 
 echo.

@@ -4,12 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
 import android.text.TextUtils
+import androidx.collection.LruCache
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.encodeURI
@@ -58,7 +60,10 @@ class EpubFile(var book: Book) {
 
         @Synchronized
         override fun getContent(book: Book, chapter: BookChapter): String? {
-            return getEFile(book).getContent(chapter)
+            // EPUB-E-05: 包装错误回退机制，解析失败时返回用户可见的提示 HTML 而非崩溃
+            return io.legado.app.help.book.EpubErrorFallbackHelper.wrapContentParse(book, chapter) {
+                getEFile(book).getContent(chapter)
+            }
         }
 
         @Synchronized
@@ -82,6 +87,28 @@ class EpubFile(var book: Book) {
     private var mCharset: Charset = Charset.defaultCharset()
 
     /**
+     * EPUB-B-03 图片尺寸缓存（P1）。
+     *
+     * 借鉴 Archive `imageDimensionsCache`：用 inJustDecodeBounds=true 解码图片获取尺寸（不分配像素内存），
+     * 缓存到 LruCache 避免重复解码。用于阅读页图片布局预占位，避免图片加载完成后页面跳动。
+     *
+     * key=href, value=Pair(width, height)。
+     */
+    private val imageDimensionsCache = LruCache<String, Pair<Int, Int>>(32)
+
+    /**
+     * EPUB-E-04 章节内容相邻预加载缓存（P1）。
+     *
+     * 借鉴 Archive `chapterContentCache`：缓存最近 N 个章节的解析后内容（HTML 字符串），
+     * 用户翻页到相邻章节时直接命中缓存，避免重复解析 xhtml。
+     *
+     * key=chapter.url（带 fragmentId 区分），value=解析后的 HTML 字符串。
+     *
+     * 与 Archive 差异：Archive 用磁盘缓存支持跨进程重启，本项目保持极简仅内存缓存。
+     */
+    private val chapterContentCache = LruCache<String, String>(5)
+
+    /**
      *持有引用，避免被回收
      */
     private var fileDescriptor: ParcelFileDescriptor? = null
@@ -99,6 +126,26 @@ class EpubFile(var book: Book) {
             }
             return field
         }
+    /**
+     * spine 优先索引（EPUB-B-01）。
+     *
+     * 借鉴 Archive `epubSpineContents`：优先用 `spineReferences` 构建章节资源索引，
+     * 避免 `epubBookContents`（全资源遍历，含图片/CSS/字体等非内容资源）的性能开销。
+     * spine 为空时回退到 `epubBook?.contents`，保证兼容性。
+     *
+     * 关联任务：EPUB-B-01（P0）getContent/parseFirstPage 使用此索引加速章节查找。
+     */
+    private var epubSpineContents: List<Resource>? = null
+        get() {
+            if (field == null || fileDescriptor == null) {
+                val spineResources = epubBook?.spine?.spineReferences
+                    ?.mapNotNull { it.resource }
+                    ?.filter { it.href.isNotBlank() }
+                    .orEmpty()
+                field = spineResources.ifEmpty { epubBook?.contents.orEmpty() }
+            }
+            return field
+        }
 
     init {
         upBookCover(true)
@@ -108,6 +155,8 @@ class EpubFile(var book: Book) {
      * 重写epub文件解析代码，直接读出压缩包文件生成Resources给epublib，这样的好处是可以逐一修改某些文件的格式错误
      */
     private fun readEpub(): EpubBook? {
+        // EPUB-B-03: readEpub 性能日志（P1）
+        val startTime = System.currentTimeMillis()
         return kotlin.runCatching {
             //ContentScheme拷贝到私有文件夹采用懒加载防止OOM
             //val zipFile = BookHelp.getEpubFile(book)
@@ -121,12 +170,28 @@ class EpubFile(var book: Book) {
         }.onFailure {
             AppLog.put("读取Epub文件失败\n${it.localizedMessage}", it)
             it.printOnDebug()
-        }.getOrThrow()
+        }.getOrThrow().also {
+            AppLog.putDebug("EpubFile.readEpub cost=${System.currentTimeMillis() - startTime}ms")
+        }
     }
 
     private fun getContent(chapter: BookChapter): String? {
+        // EPUB-B-03: getContent 性能日志（P1）
+        val startTime = System.currentTimeMillis()
         /*获取当前章节文本*/
-        val contents = epubBookContents ?: return null
+        // EPUB-E-04: 命中相邻预加载缓存直接返回（避免重复解析 xhtml）
+        chapterContentCache[chapter.url]?.let {
+            AppLog.putDebug("EpubFile.getContent hit memory cache url=${chapter.url} cost=${System.currentTimeMillis() - startTime}ms")
+            return it
+        }
+        // EPUB-E-03: 命中磁盘缓存直接返回（跨进程重启有效，避免重复解析 xhtml）
+        io.legado.app.help.book.EpubPageCacheHelper.readCache(book, chapter)?.let { diskContent ->
+            chapterContentCache.put(chapter.url, diskContent)
+            AppLog.putDebug("EpubFile.getContent hit disk cache url=${chapter.url} cost=${System.currentTimeMillis() - startTime}ms")
+            return diskContent
+        }
+        // EPUB-B-01: 优先用 spine 索引（仅章节资源），空时回退到 epubBookContents 保留原语义
+        val contents = epubSpineContents?.takeIf { it.isNotEmpty() } ?: epubBookContents ?: return null
         val nextChapterFirstResourceHref = chapter.getVariable("nextUrl").substringBeforeLast("#")
         val currentChapterFirstResourceHref = chapter.url.substringBeforeLast("#")
         val isLastChapter = nextChapterFirstResourceHref.isBlank()
@@ -180,7 +245,13 @@ class EpubFile(var book: Book) {
             elements.select("rp, rt").remove()
         }
         val html = elements.outerHtml()
-        return HtmlFormatter.formatKeepImg(html)
+        val result = HtmlFormatter.formatKeepImg(html)
+        // EPUB-E-04: 写入相邻预加载缓存（key=chapter.url，最近 5 章 LRU）
+        chapterContentCache.put(chapter.url, result)
+        // EPUB-E-03: 写入磁盘缓存（跨进程重启有效，避免重复解析 xhtml）
+        io.legado.app.help.book.EpubPageCacheHelper.writeCache(book, chapter, result)
+        AppLog.putDebug("EpubFile.getContent miss cache url=${chapter.url} cost=${System.currentTimeMillis() - startTime}ms")
+        return result
     }
 
     private fun getBody(res: Resource, startFragmentId: String?, endFragmentId: String?): Element {
@@ -259,6 +330,71 @@ class EpubFile(var book: Book) {
         return epubBook?.resources?.getByHref(abHref)?.inputStream
     }
 
+    /**
+     * 获取字体资源流（EPUB-E-02）。
+     *
+     * 用于 [io.legado.app.help.book.EpubFontHelper] 提取 EPUB 内嵌字体。
+     * 内部复用 [getImage] 逻辑，EPUB 中字体资源与图片资源都通过 resources.getByHref 获取。
+     *
+     * @param href 字体在 EPUB 中的 href
+     * @return 字体输入流，失败返回 null
+     */
+    fun getFontStream(href: String): InputStream? = getImage(href)
+
+    /**
+     * 获取图片尺寸（EPUB-B-03）。
+     *
+     * 借鉴 Archive `getImageDimensions`：用 inJustDecodeBounds=true 解码图片获取尺寸（不分配像素内存），
+     * 缓存到 [imageDimensionsCache] 避免重复解码。用于阅读页图片布局预占位，避免图片加载完成后页面跳动。
+     *
+     * @param href 图片在 EPUB 中的 href
+     * @return Pair(width, height)，解码失败返回 null
+     */
+    fun getImageDimensions(href: String): Pair<Int, Int>? {
+        imageDimensionsCache[href]?.let { return it }
+        val stream = getImage(href) ?: return null
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        return kotlin.runCatching {
+            BitmapFactory.decodeStream(stream, null, options)
+            val dimen = Pair(options.outWidth, options.outHeight)
+            if (options.outWidth > 0 && options.outHeight > 0) {
+                imageDimensionsCache.put(href, dimen)
+                dimen
+            } else null
+        }.onFailure {
+            AppLog.put("EpubFile.getImageDimensions failed href=$href", it)
+        }.getOrNull().also {
+            stream.close()
+        }
+    }
+
+    /**
+     * 预加载相邻章节内容到缓存（EPUB-E-04）。
+     *
+     * 借鉴 Archive `chapterContentCache` 预加载策略：用户翻页到相邻章节时直接命中缓存，
+     * 避免重复解析 xhtml。调用方传入相邻章节列表，内部用 Coroutine.async 异步预加载，
+     * 不阻塞当前章节加载。
+     *
+     * 与 Archive 差异：Archive 用磁盘缓存支持跨进程重启，本项目保持极简仅内存缓存（[chapterContentCache]）。
+     *
+     * @param adjacentChapters 相邻章节列表（如上一章+下一章），跳过已缓存章节
+     */
+    fun preloadAdjacentChapters(adjacentChapters: List<BookChapter>) {
+        val toPreload = adjacentChapters.filter { chapter ->
+            chapterContentCache[chapter.url] == null
+        }
+        if (toPreload.isEmpty()) return
+        Coroutine.async {
+            toPreload.forEach { chapter ->
+                kotlin.runCatching { getContent(chapter) }.onFailure {
+                    AppLog.put("EpubFile.preloadAdjacentChapters failed url=${chapter.url}", it)
+                }
+            }
+        }.onError {
+            AppLog.put("EpubFile.preloadAdjacentChapters error", it)
+        }
+    }
+
     private fun upBookCover(fastCheck: Boolean = false) {
         try {
             epubBook?.let {
@@ -312,6 +448,8 @@ class EpubFile(var book: Book) {
     }
 
     private fun getChapterList(): ArrayList<BookChapter> {
+        // EPUB-B-03: getChapterList 性能日志（P1）
+        val startTime = System.currentTimeMillis()
         val chapterList = ArrayList<BookChapter>()
         epubBook?.let { eBook ->
             val refs = eBook.tableOfContents.tocReferences
@@ -339,10 +477,12 @@ class EpubFile(var book: Book) {
                     chapter.index = i
                     chapter.bookUrl = book.bookUrl
                     chapter.url = resource.href
-                    if (i == 0 && title.isEmpty()) {
+                    // EPUB-B-02: 标题归一化（清理后为空则走"封面"分支，比原 title.isEmpty() 更严格）
+                    val cleanedTitle = title.cleanEpubChapterTitle()
+                    if (i == 0 && cleanedTitle.isEmpty()) {
                         chapter.title = "封面"
                     } else {
-                        chapter.title = title
+                        chapter.title = cleanedTitle
                     }
                     chapterList.lastOrNull()?.putVariable("nextUrl", chapter.url)
                     chapterList.add(chapter)
@@ -357,6 +497,7 @@ class EpubFile(var book: Book) {
             }
         }
         getWordCount(chapterList, book)
+        AppLog.putDebug("EpubFile.getChapterList cost=${System.currentTimeMillis() - startTime}ms size=${chapterList.size}")
         return chapterList
     }
 
@@ -367,14 +508,16 @@ class EpubFile(var book: Book) {
         chapterList: ArrayList<BookChapter>,
         refs: List<TOCReference>?
     ) {
-        val contents = epubBook?.contents
-        if (epubBook == null || contents == null || refs == null) return
+        // EPUB-B-01: 优先用 spine 索引（仅章节资源），避免全资源遍历
+        val contents = epubSpineContents
+        if (contents.isNullOrEmpty() || refs == null) return
         val firstRef = refs.firstOrNull { it.resource != null } ?: return
         var i = 0
         durIndex = 0
         while (i < contents.size) {
             val content = contents[i]
-            if (!content.mediaType.toString().contains("htm")) {
+            // EPUB-B-02: 用 isReadableEpubResource 统一过滤非内容资源（图片/CSS/字体等）
+            if (!content.isReadableEpubResource()) {
                 i++
                 continue
             }
@@ -397,7 +540,7 @@ class EpubFile(var book: Book) {
                         "--卷首--"
             }
             chapter.bookUrl = book.bookUrl
-            chapter.title = title
+            chapter.title = title.cleanEpubChapterTitle()
             chapter.url = content.href
             chapter.startFragmentId =
                 if (content.href.substringAfter("#") == content.href) null
@@ -420,7 +563,7 @@ class EpubFile(var book: Book) {
             if (ref.resource != null) {
                 val chapter = BookChapter()
                 chapter.bookUrl = book.bookUrl
-                chapter.title = ref.title
+                chapter.title = ref.title.cleanEpubChapterTitle()
                 chapter.url = ref.completeHref
                 chapter.startFragmentId = ref.fragmentId
                 chapterList.lastOrNull()?.endFragmentId = chapter.startFragmentId
@@ -433,6 +576,47 @@ class EpubFile(var book: Book) {
                 parseMenu(chapterList, ref.children, level + 1)
             }
         }
+    }
+
+    /**
+     * 判断资源是否为可读内容资源（EPUB-B-02）。
+     *
+     * 借鉴 Archive `Resource.isReadableEpubResource`：过滤非内容资源（图片/CSS/字体等），
+     * 只保留 html/xhtml/htm 资源。用于 parseFirstPage 遍历时跳过非内容资源。
+     *
+     * 关联任务：EPUB-B-02（P0）1.10.1 非内容资源过滤。
+     */
+    private fun Resource.isReadableEpubResource(): Boolean {
+        val lowerHref = href.lowercase()
+        if (!mediaType.toString().contains("htm") &&
+            !lowerHref.endsWith(".html") &&
+            !lowerHref.endsWith(".xhtml") &&
+            !lowerHref.endsWith(".htm")
+        ) {
+            return false
+        }
+        return true
+    }
+
+    /**
+     * 章节标题归一化（EPUB-B-02）。
+     *
+     * 借鉴 Archive `cleanEpubChapterTitle` 精简版：
+     * - 去除 HTML 标签（防止 title 标签内容带标签）
+     * - 合并多余空白为单个空格
+     * - 去除常见前缀/后缀符号（-、—、–、_、空格、全角空格）
+     * - 清理后为空则保留原始 title（避免覆盖默认值如"封面"/"--卷首--"）
+     *
+     * 关联任务：EPUB-B-02（P0）1.10.2 标题归一化。
+     */
+    private fun String?.cleanEpubChapterTitle(): String {
+        if (isNullOrBlank()) return this.orEmpty()
+        val cleaned = this
+            .replace(Regex("<[^>]+>"), "")      // 去除 HTML 标签
+            .replace(Regex("\\s+"), " ")         // 合并多余空白
+            .trim('-', '—', '–', '_', ' ', '　') // 去除常见前缀/后缀符号
+            .trim()
+        return cleaned.ifBlank { this } // 清理后为空则保留原始 title
     }
 
 

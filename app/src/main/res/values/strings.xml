@@ -2,6 +2,8 @@
 <resources>
     <!--App-->
     <string name="app_name">阅读M</string>
+    <string name="app_name_debug">阅读M.D</string>
+    <string name="app_name_coexist">阅读M·共存</string>
     <string name="app_name_a">阅读M·A</string>
     <string name="app_name_s" translatable="false">LegadoPlus</string>
     <string name="receiving_shared_label">Legado·search</string>
@@ -84,6 +86,7 @@
     <string name="version">Version</string>
     <string name="local">Local</string>
     <string name="search">Search</string>
+    <string name="rss_search_hint">Search RSS source content</string>
     <string name="origin_format">Origin: %s</string>
     <string name="read_dur_progress">Origin: %s</string>
     <string name="book_name">Title</string>
@@ -825,6 +828,17 @@
     <string name="explore_empty">Empty now!</string>
     <string name="page_key_set_help">Focusing on the input box and pressing a physical key will automatically enter the value of the key, and multiple keys will be automatically separated by commas.</string>
     <string name="theme_name">Theme name</string>
+    <!-- THEME-E-05 theme preview -->
+    <string name="theme_preview_apply">Apply theme</string>
+    <string name="theme_preview_day">Day</string>
+    <string name="theme_preview_night">Night</string>
+    <string name="theme_preview_bg">Background image</string>
+    <string name="theme_preview_primary">Primary</string>
+    <string name="theme_preview_accent">Accent</string>
+    <string name="theme_preview_background">Background</string>
+    <string name="theme_preview_bottom">Bottom bar</string>
+    <string name="theme_preview_font_ui">UI font: %1$s</string>
+    <string name="theme_preview_font_title">Title font: %1$s</string>
     <string name="auto_clear_expired">"Clear expired search histories automatically "</string>
     <string name="auto_clear_expired_summary">Search histories more than one day</string>
     <string name="re_segment">Re-segment</string>
@@ -1365,6 +1379,8 @@
     <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
     <string name="r_preloadJs">预注入Js（preloadJs）</string>
     <string name="cache_first">优先加载缓存</string>
+    <string name="rss_pure_search">纯搜索源（隐藏分类与源管理菜单）</string>
+    <string name="search_preview_origin_count">来源数：%d</string>
     <string name="rule_sub_content">副文规则（subContent）</string>
     <string name="system_auto">跟随系统</string>
     <string name="sys_image_picker">系统图片选择器</string>

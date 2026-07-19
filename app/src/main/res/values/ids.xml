@@ -17,4 +17,7 @@
     <item name="full_id" type="id" />
     <item name="text_watcher" type="id" />
 
+    <!-- DEPS-B-06: liquidglass 液态玻璃效果标记 -->
+    <item name="tag_liquidglass_applied" type="id" />
+
 </resources>

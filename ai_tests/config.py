@@ -19,9 +19,10 @@ MEMU_INSTANCE_ID = 0
 MEMU_ADB_HOST = "127.0.0.1:21513"
 
 # === Legado App ===
-# 简化说明：默认 debug 构建，与 build.gradle applicationId="io.legado.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.app.release + 改 APK_GLOB_DIR 到 release 路径 | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE（V4）
+# 简化说明：默认 debug 构建，与 build.gradle applicationId="io.legado.miss.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.miss.app.release + 改 APK_GLOB_DIR 到 release 路径 | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE（V4）
+# 2026-07-18 更新：包名从 io.legado.app 更新为 io.legado.miss.app（与原版legado-E共存）
 BUILD_TYPE = "debug"  # debug | release
-PACKAGE = f"io.legado.app.{BUILD_TYPE}"
+PACKAGE = f"io.legado.miss.app.{BUILD_TYPE}"
 # 主入口 Activity：源码 AndroidManifest.xml 中 .ui.welcome.WelcomeActivity
 # 注意：Activity 类名不受 applicationIdSuffix 影响，始终为 io.legado.app.ui.welcome.WelcomeActivity
 MAIN_ACTIVITY = "io.legado.app.ui.welcome.WelcomeActivity"

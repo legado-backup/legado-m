@@ -517,7 +517,29 @@ object ThemeConfig {
         var bottomBackground: String,
         var transparentNavBar: Boolean,
         var backgroundImgPath: String?,
-        var backgroundImgBlur: Int
+        var backgroundImgBlur: Int,
+        /**
+         * THEME-B-04 Config 字段扩展（P1 / ADR-010a）
+         * 字段名与 Archive 对齐，便于 THEME-E-04 主题包导入导出格式统一与跨项目兼容。
+         * 字段均可空，向后兼容现有 themeConfig.json 反序列化（缺失字段使用 null 默认值）。
+         */
+        var uiFontPath: String? = null,
+        var titleFontPath: String? = null,
+        var uiFontColor: String? = null,
+        var titleFontColor: String? = null,
+        /**
+         * THEME-E-04 主题包格式版本（P1 / ADR-010a）
+         *
+         * 仅用于 ZIP 主题包导入导出场景：
+         * - 导出时 ThemePackageManager.exportThemeZip 写入当前版本号（FORMAT_VERSION_CURRENT）。
+         * - 导入时 ThemePackageManager.importThemeZip 校验版本号，缺失或为 null 视为 v0（旧格式，向后兼容）。
+         * - 该字段不参与 themeConfig.json 序列化语义（默认 null，equals 不比对）。
+         *
+         * 版本演进：
+         * - v0（null）：未版本化的早期格式（仅 theme.json + bg_light/bg_night + fonts/）。
+         * - v1：THEME-E-04 引入，与 v0 文件结构一致，仅增加版本标识。
+         */
+        var formatVersion: Int? = null
     ) {
 
         override fun hashCode(): Int {
@@ -527,6 +549,7 @@ object ThemeConfig {
         override fun equals(other: Any?): Boolean {
             other ?: return false
             if (other is Config) {
+                // formatVersion 不参与业务比对，仅用于 ZIP 包元数据校验
                 return other.themeName == themeName
                         && other.isNightTheme == isNightTheme
                         && other.primaryColor == primaryColor
@@ -536,6 +559,10 @@ object ThemeConfig {
                         && other.transparentNavBar == transparentNavBar
                         && other.backgroundImgPath == backgroundImgPath
                         && other.backgroundImgBlur == backgroundImgBlur
+                        && other.uiFontPath == uiFontPath
+                        && other.titleFontPath == titleFontPath
+                        && other.uiFontColor == uiFontColor
+                        && other.titleFontColor == titleFontColor
             }
             return false
         }
@@ -549,7 +576,12 @@ object ThemeConfig {
             "bottomBackground" to bottomBackground,
             "transparentNavBar" to transparentNavBar,
             "backgroundImgPath" to backgroundImgPath,
-            "backgroundImgBlur" to backgroundImgBlur
+            "backgroundImgBlur" to backgroundImgBlur,
+            "uiFontPath" to uiFontPath,
+            "titleFontPath" to titleFontPath,
+            "uiFontColor" to uiFontColor,
+            "titleFontColor" to titleFontColor,
+            "formatVersion" to formatVersion
         )
 
     }

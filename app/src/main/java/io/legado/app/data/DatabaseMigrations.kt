@@ -23,7 +23,7 @@ object DatabaseMigrations {
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_89_90, migration_90_91, migration_91_92, migration_92_93,
             migration_93_94, migration_94_95, migration_95_96, migration_96_97,
-            migration_97_98
+            migration_97_98, migration_98_99, migration_99_100
         )
     }
 
@@ -659,6 +659,55 @@ object DatabaseMigrations {
             if (!exists) {
                 db.execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
                 AppLog.put("AppDatabase Migration 97→98: $table 补加 $column 字段")
+            }
+        }
+    }
+
+    /**
+     * VIDEO-E-01: 新增 readRecentBooks 表（最近阅读记录）。
+     *
+     * 设计决策（与 tasks.md §1.13.2 描述差异分析）：
+     * - tasks.md §1.13.2 描述"迁移范围需包含 pureSearch 字段"，但 ADR-013 Decision 2 明确
+     *   "VIDEO-E-01 ReadRecentBook 表创建：CREATE TABLE IF NOT EXISTS readRecentBook (...)"
+     * - pureSearch 字段属于 RSS-B-04 (P1) 任务，应在 P1 阶段单独 migration 99→100
+     * - 决策：严格按 ADR-013 Decision 2 执行，VIDEO-E-01 只创建 readRecentBooks 表
+     * - 理由：1) 单一职责原则 2) 避免 P0 任务涉及 P1 任务字段 3) ADR-013 Decision 2 更具体优先级更高
+     *
+     * CREATE TABLE IF NOT EXISTS 确保覆盖安装兼容（旧版本无此表时创建，已有则跳过）。
+     */
+    private val migration_98_99 = object : Migration(98, 99) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `readRecentBooks` (
+                    `bookUrl` TEXT NOT NULL,
+                    `lastRead` INTEGER NOT NULL,
+                    PRIMARY KEY(`bookUrl`)
+                )"""
+            )
+            AppLog.put("AppDatabase Migration 98→99: 创建 readRecentBooks 表成功")
+        }
+    }
+
+    /**
+     * RSS-B-04: rssSources 表新增 pureSearch 字段（ADR-013 / ADR-014）
+     *
+     * 设计要点：
+     * - 默认 false，仅在 RssSource 显式配置 pureSearch=true 时启用纯搜索模式
+     * - pureSearch=true 的源在浏览界面隐藏 sortUrl 分类 tab 和源管理菜单
+     * - 并发搜索复用本项目已有 Semaphore 限流（最大 5-10），单源超时 3s
+     *
+     * 使用 ALTER TABLE ADD COLUMN，所有现有源默认值 0（关闭），向后兼容。
+     * runCatching 兜底防止字段已存在时重复执行报错（与 migration_97_98 风格一致）。
+     */
+    private val migration_99_100 = object : Migration(99, 100) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            kotlin.runCatching {
+                db.execSQL(
+                    "ALTER TABLE rssSources ADD COLUMN pureSearch INTEGER NOT NULL DEFAULT 0"
+                )
+                AppLog.put("AppDatabase Migration 99→100: rssSources 新增 pureSearch 字段成功")
+            }.onFailure { e ->
+                AppLog.put("AppDatabase Migration 99→100: 新增 pureSearch 字段失败: ${e.message}")
             }
         }
     }
