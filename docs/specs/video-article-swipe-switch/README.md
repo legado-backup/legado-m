@@ -2,7 +2,7 @@
 
 > **状态**：🔄 设计中（待检查点1用户审查）
 > **创建日期**：2026-07-11
-> **所属项目**：Legado（阅读Sigma）
+> **所属项目**：Legado（阅读M）
 > **前置 spec**：[douyin-style-video-player](../douyin-style-video-player/)（R3 抖音风格播放器）
 
 ## 功能概述

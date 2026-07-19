@@ -318,14 +318,29 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 5. verify_rss_scenarios.py    4 场景真机验证
 ```
 
-### 6 大陷阱（详见 batch-optimization-patterns.md）
+### 24 大陷阱（详见 batch-optimization-patterns.md）
 
+> v5反哺新增陷阱16-24（2026-07-18 222源批量优化实战）
+
+**陷阱1-15（v4反哺，65源优化）**：
 1. **批量脚本字段填充错误值**（最高风险）：50/65 个 ruleNextPage 被错填为 "page"。**必修**：写入前合法性校验
 2. **成功率陷阱**：脚本判定"成功"未校验提取值合法性。**必修**：后置校验+自动清空
 3. **Playwright 站点可达性差异**：41/65 失败（模板 URL/IP失效/CF防护）。**应对**：失败不中断+保持原值
 4. **校验器字段级别动态调整**：ruleContent/ruleDescription 对视频源是 OPTIONAL。**已落实**：mandatory_fields.py
 5. **4 场景真机验证误判**：`.stui-page@li@href` 被判无效。**修复**：识别无前缀 CSS 选择器
 6. **Python None 序列化污染**：str(None)="None" 污染字段。**必修**：sanitize_source_json 过滤
+7-15. 详见 batch-optimization-patterns.md（诊断脚本脱敏/批量脚本修复/域名迁移/导入残留/subprocess传参/Playwright异常脱敏/失败源7种重试/反爬loginUrl/模拟器DNS/JSON boolean类型）
+
+**陷阱16-24（v5反哺，222源优化）**：
+16. **占位符源多字段交叉恢复**：sourceUrl长度<20的占位符源，通过 sourceIcon/injectJs/header 等多字段交叉提取 host，恢复率85.7%
+17. **Wayback Machine 是最有效的失败恢复手段**：56个失败源深度重试，Wayback 直接访问恢复24个（66.7%），远超其他策略。**必修**：Wayback 优先策略
+18. **Cloudflare 防护普遍存在**：26/33 源命中 CF 防护（79%命中率）。**应对**：反爬 jsRule 配置（页面就绪检测+弹框关闭）+ loginUrl + CookieJar
+19. **searchUrl 和 jsRule 是最大字段缺口**：searchUrl 仅30.6%覆盖率，jsRule 0%覆盖率。**必修**：双策略自动补全（GET/POST表单探测+弹框关闭JS）
+20. **图片源 ruleContent 4 模板选择**：已有参考源原样保留（模板C，47.4%），新设计用模板A（详情页主图，52.6%）。ruleContent 必须适配 PhotoDialog 调用链
+21. **视频源 ruleContent 优先嗅探器策略**：V1优先（script正则提取m3u8/mp4，66.7%）→ V3次选（iframe src）→ V2备用（sniffer留空）
+22. **子代理模式比批量脚本模式效果更好**：8个子代理并行处理222源，字段补全率70-90%（vs 批量脚本30-50%）。**必修**：子代理模式批量优化工作流
+23. **真机测试脚本校验过严误报**：verify_rss_scenarios.py scenario_4 仅校验3种前缀导致0%通过率。**已修复**：支持7种 legado 原生语法（class./text./page./标签./CSS选择器/属性提取/IIFE/正则兜底），通过率从0%→62.5%
+24. **Cronet 库缺失导致 HTTPS 源加载失败**：libcronet.so FileNotFoundException。**必修**：真机测试前启动App等待60秒自动下载 Cronet 库
 
 ### 实战数据（65 源）
 

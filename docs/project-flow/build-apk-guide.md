@@ -202,11 +202,11 @@ gradlew --version     # 应显示 Gradle 8.x
 
 ### 构建变体说明
 
-| 变体 | applicationId | 后缀 | 用途 |
-|------|--------------|------|------|
-| **appDebug** | `io.legado.miss.app.debug` | `.debug` | 开发调试，不混淆 |
-| **appRelease** | `io.legado.miss.app.release` | `.release` | 正式发布，混淆+收缩 |
-| **共存包** | `io.legado.app.debug` | `.debug` | 与原版legado-E共存 |
+| 变体 | applicationId | 桌面显示名 | 用途 |
+|------|--------------|----------|------|
+| **appDebug** | `io.legado.miss.app.debug` | 阅读M.D | 开发调试，不混淆 |
+| **appRelease** | `io.legado.miss.app.release` | 阅读M | 正式发布，混淆+收缩 |
+| **共存包** | `io.legado.app.debug` | 阅读M·共存 | 与原版legado-E共存 |
 
 > **注意**：debug 和 release 的 applicationId 不同（后缀不同），可以在同一设备上同时安装。
 
@@ -274,7 +274,7 @@ cd f:\myself\github\WeAgentChat\temp\legado
 .\gradlew assembleAppDebug
 
 # 输出位置
-# app\build\outputs\apk\app\debug\legado_app_3.版本号debug.apk
+# app\build\outputs\apk\app\debug\legado_miss_app_3.版本号.apk
 ```
 
 Debug 构建无需签名配置，使用默认 debug 签名。
@@ -286,7 +286,7 @@ Debug 构建无需签名配置，使用默认 debug 签名。
 .\gradlew assembleAppRelease
 
 # 输出位置
-# app\build\outputs\apk\app\release\legado_app_3.版本号.apk
+# app\build\outputs\apk\app\release\legado_miss_app_3.版本号.apk
 ```
 
 ### 4.3 构建所有变体
@@ -297,10 +297,20 @@ Debug 构建无需签名配置，使用默认 debug 签名。
 
 ### 4.4 输出 APK 命名规则
 
-APK 文件名格式：`legado_app_<flavor>_<version>.apk`
+APK 文件名格式：`legado_<包名标识>_<flavor>_<version>.apk`
 
+- 包名标识：`miss`（默认包名`io.legado.miss.app`）/ `legacy`（原版包名`io.legado.app`） / 其他自定义取最后一段
 - flavor = `app`（目前仅此一个 product flavor）
-- version = `3.yy.MMddHH`（如 `3.26.062819`）
+- version = `3.yy.MMddHH`（如 `3.26.071900`）
+
+示例：
+- 测试包：`legado_miss_app_3.26.071900.apk`
+- 正式包：`legado_miss_app_3.26.071900.apk`
+- 共存包：`legado_legacy_app_3.26.071900.apk`
+
+> **APK分类输出目录**：构建成功后APK会自动拷贝到分类目录，避免不同包名的APK互相覆盖：
+> - 默认包名 → `output/default/{debug|release}/`
+> - 自定义包名 → `output/custom/{debug|release}/`
 
 ### 4.5 常见构建问题
 
@@ -380,13 +390,12 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 **使用方法：**
 
-| 操作 | 命令 |
-|------|------|
-| 构建 Debug APK（默认包名） | 双击 `build-legado.bat` |
-| 构建 Release APK（默认包名） | `build-legado.bat release` |
-| 构建 Debug APK（自定义包名） | `build-legado.bat debug com.my.legado` |
-| 构建 Release APK（自定义包名） | `build-legado.bat release com.my.legado` |
-| 清理构建缓存 | `build-legado.bat clean` |
+| 操作 | 命令 | 最终包名 | APK位置 |
+|------|------|---------|---------|
+| 构建测试包（默认） | 双击 `build-legado.bat` | `io.legado.miss.app.debug` | `output/default/debug/` |
+| 构建正式包 | `build-legado.bat release` | `io.legado.miss.app.release` | `output/default/release/` |
+| 构建共存包 | `build-legado.bat debug io.legado.app` | `io.legado.app.debug` | `output/custom/debug/` |
+| 清理构建缓存 | `build-legado.bat clean` | — | — |
 
 **自定义包名说明：**
 
@@ -401,7 +410,7 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 > ```groovy
 > applicationId project.hasProperty("customAppId") ? project.property("customAppId") : "io.legado.miss.app"
 > ```
-> 不传 `-PcustomAppId` 时行为与原版完全一致，不会影响原版构建。
+> 不传 `-PcustomAppId` 时使用默认包名 `io.legado.miss.app`，debug后缀`.debug`，release后缀`.release`。
 
 **脚本自动做的事：**
 
@@ -412,7 +421,8 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 5. 停止残留的 Gradle daemon
 6. 使用 `--no-daemon` 构建（避免守护进程文件锁）
 7. 如有自定义包名，通过 `-PcustomAppId=xxx` 传入 Gradle
-8. 构建成功后列出 APK 文件路径和包名
+8. 构建成功后将APK拷贝到分类输出目录（`output/default/`或`output/custom/`）
+9. 列出 APK 文件路径和包名
 
 > **注意**：必须在**系统 CMD** 中运行，不能在 Trae CN 内置终端中运行（沙盒限制文件操作）。
 
@@ -472,11 +482,13 @@ npm run build
 
 ### 7.2 当前包名结构
 
-| 构建类型 | applicationId | 说明 |
-|---------|--------------|------|
-| Debug | `io.legado.miss.app.debug` | 默认 debug 后缀 |
-| Release | `io.legado.miss.app.release` | 默认 release 后缀 |
-| 共存包 | `io.legado.app.debug` | 与原版legado-E共存 |
+| 构建类型 | applicationId | 桌面显示名 | 说明 |
+|---------|--------------|----------|------|
+| Debug（默认） | `io.legado.miss.app.debug` | 阅读M.D | 开发调试，默认包名 |
+| Release（默认） | `io.legado.miss.app.release` | 阅读M | 正式发布，默认包名 |
+| 共存包（自定义） | `io.legado.app.debug` | 阅读M·共存 | 与原版legado-E共存 |
+
+> **注意**：debug 和 release 的 applicationId 不同（后缀不同），可以在同一设备上同时安装。详见 [包名规范](../project-rules/package-naming.md)。
 
 ### 7.3 修改方法
 
@@ -597,8 +609,8 @@ android {
 
 ### 8.3 产出物
 
-- `legado_app_<version>.apk`：标准 Release 版
-- `legado_google_<version>.apk`：Google Play 版（如配置了 SERVICE_ACCOUNT_JSON）
+- `legado_miss_app_<version>.apk`：标准 Release 版（miss=默认包名）
+- `legado_legacy_app_<version>.apk`：共存 Debug 版（legacy=原版包名）
 
 ---
 
@@ -611,15 +623,17 @@ java -version
 # 2. 设置 SDK 路径
 echo "sdk.dir=C:\\Users\\<你>\\AppData\\Local\\Android\\Sdk" > local.properties
 
-# 3. 构建 Debug APK（无需签名配置）
-.\gradlew assembleAppDebug
+# 3. 构建 Debug APK（无需签名配置，使用默认包名io.legado.miss.app）
+.\gradlew assembleAppDebug --no-daemon
 
-# 4. 找到 APK
-ls app\build\outputs\apk\app\debug\*.apk
+# 4. 找到 APK（文件名含包名标识miss）
+ls app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 
 # 5. 安装到设备
-adb install app\build\outputs\apk\app\debug\legado_app_app_*.apk
+adb install app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 ```
+
+> 也可直接双击 `build-legado.bat`，脚本自动处理环境变量和缓存。详见 [4.8 一键构建脚本](#48-一键构建脚本build-legadobat)。
 
 ---
 
@@ -661,7 +675,7 @@ cd F:\myself\github\WeAgentChat\temp\legado
 .\gradlew assembleAppDebug --no-daemon
 
 # 5. 构建成功后，APK 位于
-# app\build\outputs\apk\app\debug\legado_app_3.xx.xxxxxxdebug.apk
+# app\build\outputs\apk\app\debug\legado_miss_app_3.xx.xxxxxx.apk
 ```
 
 ### 10.3 使用一键构建脚本（推荐）

@@ -25,7 +25,7 @@
 
 - **ADB 路径**：`D:/Program Files/Microvirt/MEmu/adb.exe`
 - **设备序列号**：`127.0.0.1:21503`
-- **包名**：`io.legado.app.debug`
+- **包名**：`io.legado.miss.app.debug`
 - **Python 环境**：`ai_tests/venv/Scripts/python.exe`（禁止公共 Python）
 - **venv 激活**：`ai_tests\venv\Scripts\activate`
 
@@ -47,7 +47,7 @@
 
 ```python
 # 1. Pull DB（含WAL/SHM）
-adb -s 127.0.0.1:21503 shell su -c 'cp /data/data/io.legado.app.debug/databases/legado.db /sdcard/legado.db'
+adb -s 127.0.0.1:21503 shell su -c 'cp /data/data/io.legado.miss.app.debug/databases/legado.db /sdcard/legado.db'
 adb -s 127.0.0.1:21503 pull /sdcard/legado.db tmp.db
 
 # 2. Python sqlite3 查询
