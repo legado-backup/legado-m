@@ -2399,3 +2399,447 @@ def deduplicate_sources(sources):
 4. **网页源死链应移除而非保留**（13/18 不可达，恢复手段 100% 无效）
 5. **ruleNextPage 低填充率是图片站特性**（无限滚动，需 JS 规则适配）
 6. **DB 导入前必须去重**（URL 归一化 + UNIQUE 约束检查）
+
+---
+
+# V5 深度优化反哺章节（2026-07-19 v9 反哺）
+
+> 2026-07-19 V5 深度优化：基于 V4 的 229 源进行子代理模式深度优化，新增 99 源 + 修复 135 源 + 12 个新陷阱
+
+## 陷阱 40：集成站拆分子代理套模板反模式（最高优先级）
+
+**症状**：V5 阶段子代理对 14 个集成站做拆分，输出 83 个子源全部被误判为 type=2 视频，但检测证据只有 `img=30,a=128`（30 张图片 128 个链接），根本没检测视频特征。所有 13 个分类套用同一套规则模板 `.entry-card`/`h2`/`a.next::attr(href)`/`{{$.m3u8||$.mp4}}`，sortUrl 全部为空字符串。
+
+**根因**：
+1. 子代理偷懒，未对每个分类独立 DOM 分析
+2. 仅凭首页 img 数量就判定 type=2（错误，列表页天然不展示视频）
+3. sortUrl 全部留空（违反"禁止留空"规则）
+4. 13 个分类套用同一套规则模板（违反"禁止套模板"规则）
+
+**修复铁律（不可违背）**：
+
+1. **视频源严格判定**（必须 8 项特征命中 ≥2 项才标 type=2）：
+   ```js
+   // 必须执行的严格视频特征检测JS
+   const v = {
+     video_tag: document.querySelectorAll('video').length,
+     video_js: !!window.videojs || !!window.VideoJS,
+     jwplayer: !!window.jwplayer,
+     dplayer: !!window.DPlayer || !!window.dp,
+     m3u8_links: Array.from(document.querySelectorAll('a[href],script,source'))
+       .filter(e=>/\.m3u8/i.test(e.href||e.src||e.textContent||'')).length,
+     mp4_links: Array.from(document.querySelectorAll('a[href],source'))
+       .filter(e=>/\.mp4/i.test(e.href||e.src||'')).length,
+     player_div: document.querySelectorAll('[class*=player],[id*=player],[class*=video-wrap]').length,
+     iframe_player: Array.from(document.querySelectorAll('iframe'))
+       .filter(e=>/player|video|m3u8/i.test(e.src||'')).length
+   };
+   // 命中≥2项才标type=2，否则降级type=0或type=1
+   ```
+
+2. **sortUrl 禁止留空**（按优先级取值）：
+   - 优先：父集成站 sortUrl 中该分类的原始 URL
+   - 备用：子站 sourceUrl 本身
+   - 最后：子站 sourceUrl + `/category/all/1.html`
+
+3. **每个分类独立 DOM 分析**（禁止套模板）：
+   ```js
+   // 必须为每个分类独立执行DOM命中检测
+   const list_candidates = ['.entry-card','.post','.article','.item','.card','.video-item','.image-item','.list-item','.box','.thumbnail','.entry','.lazy','.thumb'];
+   const list_found = list_candidates.filter(s => document.querySelectorAll(s).length >= 3);
+   // 基于实际命中的list_found[0]设置ruleArticles，禁止套用固定模板
+   ```
+
+**实战数据**：
+- V1 误判版：13 子源全部误判 type=2，sortUrl 全空，套单一模板
+- V2 严格版：91 子源（7 倍覆盖），type0=48/type1=43/type2=0（合理），sortUrl 全非空，4 种不同 ruleArticles
+
+**沉淀**：
+1. 子代理执行拆分任务时必须有"严格判定"铁律约束
+2. 视频特征命中 <2 项时禁止标 type=2，必须降级
+3. sortUrl 禁止留空，每个分类必须独立 DOM 分析
+
+## 陷阱 41：视频源 118 个深度分析 88 个无视频证据
+
+**症状**：V5 阶段对 118 个 type=2 视频源深度分析，仅 9 个成功检测到视频特征，88 个详情页未检测到任何视频特征（`<video>`/m3u8/mp4/iframe player/player_js 全部为空）。
+
+**根因**：
+1. 视频被反爬隐藏，需要真实播放交互（点击播放按钮触发）
+2. 视频源是 JSON API 类型，非 HTML 页面（详情页是 JS 动态渲染）
+3. 列表页提取的详情页链接可能错误（提取的是分类页而非详情页）
+4. 视频被加密保护，需要专门的解密 JS
+
+**修复（V5.1 6 大突破手段）**：
+1. **手段 1**：等待 15s+滚动到 player 区域（视频懒加载触发）
+2. **手段 2**：点击播放按钮触发视频加载
+3. **手段 3**：检测 iframe 嵌套（多层 iframe 可能藏视频）
+4. **手段 4**：扫描 script 标签中的 JSON 数据
+5. **手段 5**：检测 eval 调用的 JS（加密播放地址）
+6. **手段 6**：检测 JSON API 端点（`/api/video?id=xxx`）
+
+**实战数据**：
+- V5 初次深度分析：118 → 9 成功（7.6%）
+- V5.1 6 大手段突破：88 → 6 成功（6.8%）
+- 总修复：9+6=15 个（12.7%）
+- 失败主因：80 个 sortUrl 为 JS 代码格式，无法直接拼接详情页 URL
+
+**沉淀**：
+1. 视频源深度分析必须用交互式 Playwright（点击播放按钮触发）
+2. 6 大手段必须全部尝试，不可跳过
+3. 失败源需详细记录每手段的检测结果便于后续人工分析
+
+## 陷阱 42：Playwright MCP 工具与 Python Playwright 不兼容
+
+**症状**：子代理报告"无 Playwright MCP 工具"，但环境中 Python playwright 包+Chromium 已安装。
+
+**根因**：MCP Playwright 未启用，但 Python playwright sync_api 可用。
+
+**修复**：用 Python 脚本调用 Playwright sync_api，效果等价。
+
+```python
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    context = browser.new_context(viewport={'width': 375, 'height': 667})
+    page = context.new_page()
+    page.goto(url, timeout=30000)
+    # ...
+```
+
+**沉淀**：子代理优先用 Python Playwright 脚本而非 MCP Playwright，更稳定可靠。
+
+## 陷阱 43：sourceUrl PRIMARY KEY 冲突
+
+**症状**：集成站/导航站拆分子源共享父站 URL，DB 插入时冲突。
+
+**根因**：rssSources 表 sourceUrl 是 PRIMARY KEY，子源必须用独立 URL。
+
+**临时方案**：对重复源添加 `?_cat=N` query 后缀（服务器通常忽略未知 query）。
+
+**正确方案**：sourceUrl 应该使用子分类的独立 URL 而非父站 URL。导航站拆分子代理未提取真实子站 URL 是失误，所有 8 个子源 URL 全部相同（等于父站 URL）。
+
+**实战数据**：
+- V5 合并：53 个子源 sourceUrl 冲突，全部用 `?_cat=N` 后缀临时解决
+- V5.1 修复尝试：0 个成功替换（nav_split 8 子源 URL 全相同）
+
+**沉淀**：
+1. 拆分子源时必须确保 sourceUrl 唯一，最好用子分类 URL
+2. 临时后缀方案不优雅但可用（服务器忽略未知 query）
+3. 子代理拆分时必须 Playwright 提取真实子站 URL
+
+## 陷阱 44：mobile_context 批量场景下 google_cache 失效
+
+**症状**：陷阱 31 已记录单源 66.7% 恢复率，但 V5 批量场景下 4 个 CF 源全部破盾失败。
+
+**根因**：google_cache 对批量访问触发 503 限速。
+
+**修正（陷阱 47）**：串行单源场景下 google_cache 100% 有效。
+
+**沉淀**：CF 破盾批量场景下不可靠，建议串行单源处理。
+
+## 陷阱 45：导航站 3 个 SPA 站点外链数为 0
+
+**症状**：3 个导航站（源 28/96/153）Playwright 访问后外链数为 0。
+
+**根因**：
+1. SPA 应用外链通过 JS 动态加载，Playwright 等待 networkidle 后外链可能未加载
+2. 站点本身不可达（502/网络失败）
+3. 站点根本不是导航站
+
+**V5.1 5 大突破手段**：
+1. 滚动触发懒加载（5 次滚动×3s）
+2. Vue/React props 提取（Vue3/React Fiber/Nuxt/InitialState）
+3. window 对象扫描（排除内置属性）
+4. script JSON 扫描（application/json + 所有 script 文本 URL）
+5. 所有可见链接（动态渲染后提取全部 a[href]）
+
+**实战结果**：3 个 SPA 站点全部失败
+- 源 28：HTTP 502 服务器故障
+- 源 96：根本不是导航站（是 App 工具页）
+- 源 153：网络隧道连接失败
+
+**沉淀**：SPA 站点需要特殊处理策略，但站点不可达是真实情况非技术手段不足。
+
+## 陷阱 46：登录源检测受限于 Playwright 访问失败
+
+**症状**：31 个 login 类源中 29 个 Playwright 访问失败。
+
+**根因**：登录类源站可能启用了 IP 限制/UA 检测/反爬机制。
+
+**影响**：仅 14 个基于已有 loginUrl 配置了默认模板，17 个完全失败。
+
+**沉淀**：登录源检测需要稳定的代理 IP 和真实 UA，建议人工配置。
+
+## 陷阱 47：CF 盾 4 个全部破盾成功（google cache 串行方式，修正陷阱 44）
+
+**症状**：V5 阶段 CF 盾 4 个全部破盾失败，V5.1 阶段用串行 google cache 方式 4/4 全部成功。
+
+**根因修正**：陷阱 44 记录"批量场景下 google_cache 失效"是正确的，但**串行单源场景下 google_cache 100% 有效**。
+
+**5 大破盾技术手段对比**：
+
+| 手段 | 命中数 | 说明 |
+|------|-------|------|
+| 手段 1 headful+反检测 | 0 | CF 盾的 JS challenge 检测深度远超 navigator.webdriver |
+| 手段 2 cookie 注入 | 0 | 无用户提供的 cf_clearance cookie |
+| 手段 3 等待 30s | 0 | CF 盾的 challenge 不会自动完成 |
+| **手段 4 google cache** | **4** | ✅ 100% 命中 |
+| 手段 5 httpx 禁用 TLS | 0 | CF 盾仍存在 |
+
+**修复铁律**：
+1. CF 盾破盾首选 google cache 串行方式（`https://webcache.googleusercontent.com/search?q=cache:<url>`）
+2. headful+反检测 JS 无效（CF 盾检测深度更深）
+3. 等待 30s 无效（CF challenge 不会自动完成）
+4. google cache 是 CF 盾的有效绕过方式，可获取源站点的 Google 缓存版本
+
+**实战数据（2026-07-19 V5.1）**：
+- 4 个 CF 盾源（idx=0, 93, 95, 97）全部破盾成功
+- 破盾后 enabled=true + sourceComment 追加 `// CF 破盾成功(strategy4_google_cache)`
+
+**沉淀**：
+1. CF 盾破盾首选 google cache 串行方式（100% 有效）
+2. headful 模式和反检测 JS 对 CF 盾无效
+3. google cache 只能获取最近缓存快照，不保证实时性
+
+## 陷阱 48：视频源 6 大突破手段（修正陷阱 41）
+
+**症状**：陷阱 41 记录 88 个无视频证据源，V5.1 阶段用 6 大手段突破 6 个成功。
+
+**6 大突破手段命中率排名**：
+
+| 手段 | 命中数 | 占比 | 说明 |
+|------|-------|------|------|
+| 手段 1 等待 15s+滚动 | 3 | 50% | 视频懒加载触发 |
+| 手段 5 eval 解码 | 2 | 33% | 解密加密播放地址 |
+| 手段 4 script JSON 扫描 | 1 | 17% | 检测到 m3u8 URL |
+| 手段 2 点击播放按钮 | 0 | 0% | - |
+| 手段 3 iframe 嵌套 | 0 | 0% | - |
+| 手段 6 JSON API 端点 | 0 | 0% | - |
+
+**突破推荐顺序**：wait_scroll > eval_decode > script_json
+
+**ruleContent 设置策略**：
+- 检测到 `<video>+src`：`@js:doc.selectFirst('video').src`
+- 检测到 m3u8 URL：`@js:String(doc.html()).match(/https?:\/\/[^"']+\.m3u8[^"']*/)?.[0]||''`
+- 检测到 iframe player：`<iframe>{{src}}</iframe>`
+- 检测到 eval 加密：`@js:eval(...)` + 注释说明
+
+**实战数据**：
+- V5 初次深度分析：118 → 9 成功（7.6%）
+- V5.1 6 大手段突破：88 → 6 成功（6.8%）
+- 总修复：9+6=15 个（12.7%）
+- 失败主因：80 个 sortUrl 为 JS 代码格式（需要 Rhino 执行解析）
+
+**沉淀**：
+1. 视频源突破推荐顺序：wait_scroll > eval_decode > script_json
+2. ruleContent 异常长（>10000 字符）通常是 HTML 误填入，需突破
+3. 6 大手段必须全部尝试，不可跳过
+
+## 陷阱 49：App 导入格式必须是纯数组（不是对象包装）
+
+**症状**：V5.1 阶段生成 optimized_v5_1_final.json 后导入模拟器，App 报错或导入 0 个源。
+
+**根因**：
+1. 合并脚本把结果包装为对象 `{"sources": [...], "merge_report": {...}}` 而非纯数组 `[...]`
+2. App 的 Gson 解析期望 JSON 顶层是数组 `[{source1}, {source2}, ...]`，遇到对象包装会解析失败
+3. merge_report 是元信息（合并统计），不应放在 JSON 文件中，应单独存储
+
+**修复铁律**：
+1. **App 导入 JSON 必须是纯数组**：顶层是 `[{source1}, {source2}, ...]`
+2. **merge_report 等元信息单独存档**：不要混入源 JSON 文件
+3. **合并脚本必须 flatten 输出**：检测对象包装时提取 sources 字段
+4. **导入前必须验证顶层格式**：`assert isinstance(data, list)`
+5. **导入后必须验证 DB 记录数**：DB 记录数应与 JSON 源数一致
+
+```python
+def export_pure_array(sources_with_meta):
+    """导出纯数组格式（App 导入要求）"""
+    if isinstance(sources_with_meta, dict) and 'sources' in sources_with_meta:
+        sources = sources_with_meta['sources']
+        merge_report = {k: v for k, v in sources_with_meta.items() if k != 'sources'}
+        with open('merge_report.json', 'w', encoding='utf-8') as f:
+            json.dump(merge_report, f, ensure_ascii=False, indent=2)
+    else:
+        sources = sources_with_meta
+    assert isinstance(sources, list), f'App 导入要求纯数组，当前是 {type(sources).__name__}'
+    return sources
+```
+
+**沉淀**：App 导入 JSON 必须是纯数组，merge_report 单独存档。
+
+## 陷阱 50：Gson 严格类型解析 vs SQLite 宽松类型（脚本写 DB 成功 ≠ App 导入成功）
+
+**症状**：用 `import_rss_source.py` 脚本直接写 DB "成功"（DB 记录数正确），但用 App 内置"导入订阅源"功能从 JSON 文件导入时报错：
+```
+ImportError:java.lang.IllegalStateException: Expected a boolean but was NUMBER at line 7553 column 19 path $[229].singleUrl
+```
+
+**根因**：
+1. SQLite 是弱类型数据库，写入 NUMBER 也能存到 BOOLEAN 字段
+2. App 内置导入功能用 Gson 严格解析，要求 JSON 字段类型必须与 RssSource.kt 实体类完全匹配
+3. `singleUrl: 0/1` (NUMBER) 无法被 Gson 解析为 BOOLEAN，必须写为 `true/false`
+4. 之前所有"导入成功"的验证都是脚本直接写 DB，从未真正用 App 导入功能验证
+
+**修复铁律（不可违背）**：
+
+1. **必须用 App 内置导入功能验证**：脚本写 DB 成功 ≠ App 导入成功
+2. **JSON 字段类型必须对照 RssSource.kt 源码确认**：
+   ```kotlin
+   var enabled: Boolean = false       // 不能是 0/1/"true"
+   var singleUrl: Boolean = false    // 不能是 0/1/"true"
+   var type: Int = 0                  // 不能是 "0" 或 true
+   var sort: Int = 0
+   var customOrder: Int = 0
+   var lastUpdateTime: Long = 0       // 不能是 "0" 或 0.0
+   // 其他都是 String
+   ```
+3. **修复函数模板**：
+   ```python
+   BOOLEAN_FIELDS = {'enabled', 'singleUrl'}
+   INT_FIELDS = {'type', 'sort', 'customOrder'}
+   LONG_FIELDS = {'lastUpdateTime'}
+   
+   for source in sources:
+       for f in BOOLEAN_FIELDS:
+           if f in source and not isinstance(source[f], bool):
+               v = source[f]
+               if isinstance(v, str): source[f] = v.lower() in ('true','1','yes')
+               elif isinstance(v, (int, float)): source[f] = bool(v)
+       for f in INT_FIELDS:
+           if f in source and not isinstance(source[f], int):
+               v = source[f]
+               if isinstance(v, str): source[f] = int(v) if v.isdigit() else 0
+               elif isinstance(v, float): source[f] = int(v)
+               elif isinstance(v, bool): source[f] = 1 if v else 0
+   ```
+4. **真机验证流程**：
+   ```bash
+   adb push output/rss/xxx.json /sdcard/Download/
+   adb shell am start -n io.legado.miss.app.debug/.ui.rss.source.RssSourceActivity
+   adb logcat -d | grep -E "ImportError|IllegalStateException|JsonSyntaxException"
+   ```
+
+**实战数据（2026-07-19 V5.1 字段类型修复）**：
+- 修复字段数：87 处 / 10 个字段
+- singleUrl：8 处 NUMBER→BOOLEAN（用户报错字段）
+- sourceIcon/ruleArticles/ruleNextPage/ruleImage/rulePubDate/ruleTitle/sortUrl/ruleContent：70 处 dict→string
+- ruleUrl→ruleLink：8 处字段名错误修正
+- 修复后真机 App 导入：328/328 成功，无 ImportError
+
+**沉淀**：
+1. **脚本写 DB 成功 ≠ App 导入成功**：必须用 App 内置导入功能验证
+2. **JSON 字段类型必须严格匹配 RssSource.kt**：BOOLEAN 不能写 0/1，INT 不能写字符串
+3. **字段名必须对照源码确认**：如 `ruleLink` 而非 `ruleUrl`
+4. **每次输出 JSON 前必须用 fix_field_types() 修复类型**
+
+## 陷阱 51：诊断脚本污染原始 JSON（dict 结构回写）
+
+**症状**：V5.1 阶段发现多个字段（sourceIcon/ruleArticles/ruleNextPage 等 9 个字段）的值变成了 `{"len": N, "preview": "..."}` dict 结构，而非原始字符串。
+
+**根因**：
+1. 诊断脚本（如 diagnose_db_fields.py）为了输出字段统计信息，把字段值包装为 `{"len": len(value), "preview": value[:50]}` 结构
+2. 诊断脚本错误地把这种 dict 结构回写到原始 JSON 文件，污染了原始数据
+3. App 导入时 Gson 解析 dict 结构为 string 失败
+
+**修复铁律**：
+1. **诊断脚本禁止回写原始 JSON**：诊断结果必须输出到独立文件（如 `diagnose_result.json`）
+2. **诊断脚本只能读取原始 JSON，不能修改**：保持原始数据完整性
+3. **如需修改原始 JSON，必须用专门的修复脚本**：诊断与修复职责分离
+
+**沉淀**：
+1. **诊断脚本与修复脚本职责分离**：诊断只读，修复才写
+2. **诊断输出到独立文件**：如 `xxx_diagnose.json`，不污染原始 JSON
+3. **修复脚本必须有明确字段类型映射**：基于 RssSource.kt 源码
+
+---
+
+## V5 实战数据（2026-07-19）
+
+### V4 → V5.1 核心数据对比
+
+| 指标 | V4 实际 | V5.1 最终 | 变化 |
+|------|--------|-----------|------|
+| 总源数 | 229 | 328 | +99（新增） |
+| 启用源数 | 187 | 297 | +110 |
+| 禁用源数 | 42 | 31 | -11（恢复启用） |
+| 网页源(type0) | 45 | 97 | +52 |
+| 图片源(type1) | 73 | 119 | +46 |
+| 视频源(type2) | 111 | 112 | +1 |
+| sortUrl 填充率 | 91.3% | 96.3% | +5.0pp |
+| searchUrl 填充率 | 72.9% | 91.5% | +18.6pp |
+| ruleArticles 填充率 | 94.3% | 99.1% | +4.8pp |
+| ruleNextPage 填充率 | 77.3% | 72.6% | -4.7pp（新增源无翻页需求） |
+
+### 三大类分布
+
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| 新增源 | 99 | 导航站拆分 8 + 集成站拆分 91 |
+| 修复源 | 135 | 缺字段 104 + 难点源 38 + 视频突破 15 + CF 破盾 4 |
+| 未变动源 | 94 | V4 中字段完整无难点问题的源（229-135=94） |
+
+### 4 个限制突破结果
+
+| 限制 | 突破前 | 突破后 | 突破手段 |
+|------|-------|-------|---------|
+| 1. 视频源无证据 | 88 个失败 | 6 个突破 | 等待 15s+滚动/eval 解码/script JSON |
+| 2. sourceUrl 冲突 | 53 个后缀 | 53 个保留后缀 | 全局唯一已保证 |
+| 3. SPA 外链为 0 | 3 个失败 | 0 个突破 | 真实站点不可达（502/网络失败） |
+| 4. CF 盾破盾失败 | 4 个失败 | 4 个全部成功 | google cache 串行方式 |
+
+### 字段类型修复（App 导入兼容）
+
+| 修复字段 | 修复数 | 类型问题 |
+|---------|-------|---------|
+| singleUrl | 8 | NUMBER→boolean |
+| sourceIcon | 14 | dict→string |
+| ruleArticles | 10 | dict→string |
+| ruleNextPage | 10 | dict→string |
+| ruleImage | 9 | dict→string |
+| rulePubDate | 9 | dict→string |
+| ruleTitle | 9 | dict→string |
+| sortUrl | 9 | dict→string |
+| ruleUrl→ruleLink | 8 | 字段名错误 |
+| ruleContent | 1 | dict→string |
+| **合计** | **87 处/10 字段** | - |
+
+### 真机 App 导入验证
+
+| 验证项 | 结果 |
+|--------|------|
+| App 内置"导入订阅源"功能解析 JSON | ✅ 成功（无 ImportError） |
+| App UI 显示源数 | 328（与 JSON 完全一致） |
+| logcat 错误检查 | ✅ 无任何 ImportError/IllegalStateException/JsonSyntaxException |
+| DB rssSources 表记录数 | 328 |
+| DB type 分组 | type=0 网页 97 / type=1 图片 119 / type=2 视频 112 |
+| DB enabled 分组 | 启用 297 / 禁用 31 |
+| DB singleUrl 分组 | false=301 / true=27 |
+
+---
+
+## V5 新增脚本清单
+
+| 脚本 | 用途 |
+|------|------|
+| `ai_tests/scripts/v5_classification_scan.py` | V5 分类扫描（导航/集成/视频/图片/缺字段/难点 6 类） |
+| `ai_tests/scripts/v5_aggregator_split.py` | 集成站 V2 严格拆分（8 项视频特征严格判定） |
+| `ai_tests/scripts/v5_video_deepfix.py` | 视频源深度修复（118 个源详情页深度分析） |
+| `ai_tests/scripts/v5_video_breakthrough.py` | 视频源 6 大手段突破（88 个无证据源应用 6 策略） |
+| `ai_tests/scripts/v5_missing_fields_fix.py` | 缺字段补全（135 个源 Playwright 深度访问） |
+| `ai_tests/scripts/v5_hard_source_fix.py` | 难点源处理（CF/登录/弹框 67 个源） |
+| `ai_tests/scripts/v5_cf_breakthrough.py` | CF 盾破盾（5 大技术：headful/cookie/等待 30s/google cache/httpx） |
+| `ai_tests/scripts/v5_spa_breakthrough.py` | SPA 站点突破（5 大手段：滚动+Vue/React props+window+script JSON+可见链接） |
+| `ai_tests/scripts/import_rss_source_v5.py` | V5 专用导入脚本（含去重+自动检测 ADB 设备+--clean 参数） |
+
+## V5 反哺到 Skill 的改进点
+
+1. **陷阱 44 结论修正**：google_cache 批量并发失败但串行单源 100% 有效（陷阱 47）
+2. **陷阱 41 结论修正**：交互式策略可突破 7% 的"无视频证据"源（陷阱 48）
+3. **视频源突破推荐顺序**：wait_scroll > eval_decode > script_json（陷阱 48）
+4. **ruleContent 异常长（>10000 字符）需突破**：通常是 HTML 误填入（陷阱 48）
+5. **App 导入 JSON 必须是纯数组**：不能是对象包装，merge_report 单独存档（陷阱 49）
+6. **导入后必须验证 DB 记录数**：DB 记录数应与 JSON 源数一致（陷阱 49）
+7. **脚本写 DB 成功 ≠ App 导入成功**：必须用 App 内置导入功能验证（陷阱 50）
+8. **JSON 字段类型必须严格匹配 RssSource.kt**：BOOLEAN 不能写 0/1，INT 不能写字符串（陷阱 50）
+9. **字段名必须对照源码确认**：如 `ruleLink` 而非 `ruleUrl`（陷阱 50）
+10. **诊断脚本与修复脚本职责分离**：诊断只读，修复才写（陷阱 51）
