@@ -52,15 +52,15 @@
 
 ## APK输出位置
 
-构建成功后APK会自动拷贝到分类目录，避免不同包名的APK互相覆盖：
+构建成功后APK会自动拷贝到`output/apk/`下对应子目录，文件名通过包名标识区分：
 
-| 包类型 | Gradle输出目录 | 分类拷贝目录 |
+| 包类型 | Gradle输出目录 | 最终拷贝位置 |
 |--------|--------------|------------|
-| 测试包 | `app/build/outputs/apk/app/debug/` | `output/default/debug/` |
-| 正式包 | `app/build/outputs/apk/app/release/` | `output/default/release/` |
-| 共存包 | `app/build/outputs/apk/app/debug/` | `output/custom/debug/` |
+| 测试包 | `app/build/outputs/apk/app/debug/` | `output/apk/test/legado_miss_app_<version>.apk` |
+| 正式包 | `app/build/outputs/apk/app/release/` | `output/apk/release/legado_miss_app_<version>.apk` |
+| 共存包 | `app/build/outputs/apk/app/debug/` | `output/apk/coexist/legado_legacy_app_<version>.apk` |
 
-> **为什么需要分类目录？** 测试包和共存包都输出到同一个`debug/`目录，后构建的会覆盖先构建的。分类拷贝目录确保三种包可以同时存在。
+> **注意**：测试包和共存包在Gradle中都输出到`debug/`目录，后构建的会覆盖先构建的。bat脚本会在构建完成后立即拷贝到`output/apk/{test|coexist|release}/`，通过子目录隔离，不会覆盖。
 
 ## APK文件名规则
 

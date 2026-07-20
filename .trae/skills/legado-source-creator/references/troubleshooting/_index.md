@@ -14,9 +14,9 @@
 ### html-fetch-traps.md
 > **一句话描述**：网站HTML获取失败的各种原因和解决方案
 
-- ✅ 包含：WebFetch限制、curl失败、HTTP/2协议错误、CDN白名单拦截、SPA站点获取、手机UA策略
+- ✅ 包含：WebFetch限制、curl失败、HTTP/2协议错误、CDN白名单拦截、SPA站点获取、手机UA策略、**Accept-Encoding乱码（§1.1h）**
 - ❌ 不包含：JS语法错误（→ rhino-js-traps.md）、加密解密失败（→ crypto-traps.md）
-- **触发关键词**：WebFetch, curl, HTTP/2, CDN, 白名单, SPA, Vue, 获取HTML, 无法访问, 连接失败, 手机UA
+- **触发关键词**：WebFetch, curl, HTTP/2, CDN, 白名单, SPA, Vue, 获取HTML, 无法访问, 连接失败, 手机UA, Accept-Encoding, 乱码, brotli, gzip
 - **自进化写入规则**：当发现新的网站获取方式或反爬绕过方法时追加
 
 ### crypto-traps.md
@@ -38,9 +38,9 @@
 ### source-type-traps.md
 > **一句话描述**：书源/订阅源类型选择和配置字段导致的运行时错误
 
-- ✅ 包含：RssSource搜索、type字段选择、视频源、loginCheckJs NPE、webView强制加载、搜索功能配置
+- ✅ 包含：RssSource搜索、type字段选择、视频源、loginCheckJs NPE、webView强制加载、搜索功能配置、**shouldOverrideUrlLoading变量绑定（#4.9）**、**Accept-Encoding乱码（#4.10）**、**CookieStore覆盖header（#4.11）**
 - ❌ 不包含：JS语法错误（→ rhino-js-traps.md）、网站分析流程（→ analysis-best-practices.md）
-- **触发关键词**：type, loginCheckJs, NPE, StrResponse, webView, enableJs, 搜索, searchUrl, RssSource, BookSource
+- **触发关键词**：type, loginCheckJs, NPE, StrResponse, webView, enableJs, 搜索, searchUrl, RssSource, BookSource, shouldOverrideUrlLoading, Accept-Encoding, CookieStore覆盖, 时好时不好
 - **自进化写入规则**：当发现新的源类型配置陷阱或运行时错误时追加
 
 ### analysis-best-practices.md

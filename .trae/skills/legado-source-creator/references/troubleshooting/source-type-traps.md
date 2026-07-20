@@ -318,7 +318,68 @@ result=resultStr;
 
 Legado的内置播放器会自动处理m3u8链接，无需自定义HTML播放器。
 
-## 4.9 Rhino正则不能含单引号（⚠️ 语法陷阱）
+## 4.9 shouldOverrideUrlLoading 仅绑定 java 和 url（⚠️ 高频陷阱）
+
+> 验证日期：2026-07-20
+> 源码依据：ReadRssActivity.kt L749-770
+
+**现象**：shouldOverrideUrlLoading 中使用了 `cookie`、`baseUrl`、`source` 等变量，运行时报 `ReferenceError` 或 JS 不执行。
+
+**根因**：shouldOverrideUrlLoading 的 JS 绑定**仅有 `java` 和 `url` 两个变量**，与 loginCheckJs 的完整绑定不同。
+
+**可用变量对比**：
+
+| 变量 | loginCheckJs | shouldOverrideUrlLoading | injectJs |
+|------|-------------|--------------------------|----------|
+| java | ✅ JsExtensions | ✅ RssJsExtensions | ❌ |
+| url | ❌ | ✅ 当前跳转URL | ❌ |
+| result | ✅ StrResponse | ❌ | ❌ |
+| cookie | ✅ CookieStore | ❌ | ❌ |
+| cache | ✅ CacheManager | ❌ | ❌ |
+| baseUrl | ✅ | ❌ | ❌ |
+| source | ✅ | ❌ | ❌ |
+| document | ❌ | ❌ | ✅ (WebView) |
+| window | ❌ | ❌ | ✅ (WebView) |
+
+**正确写法**：
+```javascript
+// ✅ 仅使用 java 和 url
+if(url.indexOf('/category/')>-1){java.open('sort',url);true}else{false}
+```
+
+**另外**：shouldOverrideUrlLoading 不经过 AnalyzeUrl，`{{}}` 模板语法不会被处理！
+
+## 4.10 header 中 Accept-Encoding 导致 OkHttp 响应乱码（⚠️ 高频陷阱）
+
+> 验证日期：2026-07-20
+> 详见 [html-fetch-traps.md §1.1h](html-fetch-traps.md)
+
+**现象**：配置了 `Accept-Encoding: gzip, deflate, br` 后，OkHttp 返回乱码，CSS 选择器匹配 0 元素。
+
+**根因**：OkHttp 没有 brotli 解码器，手动指定 `br` 后响应体直接透传压缩数据。
+
+**规则**：**永远不要在 header 中设置 `Accept-Encoding`、`Connection`、`Upgrade-Insecure-Requests`**。OkHttp 自动管理这些头。
+
+## 4.11 CookieStore 过期值覆盖 header Cookie（⚠️ "时好时不好"陷阱）
+
+> 验证日期：2026-07-20
+> 源码依据：CookieManager.kt L57-77、L103-109
+
+**现象**：header 中预置了正确的 Cookie，但列表加载时好时不好——有时正常返回数据，有时返回验证页面。
+
+**根因**：`CookieManager.loadRequest()` 合并 header Cookie 和 CookieStore Cookie 时，**CookieStore 的值覆盖 header 的值**（`acc.apply { putAll(cookieMap) }`）。如果 CookieStore 中存有旧/过期的 Cookie，合并后正确值被覆盖。
+
+**解决方案**：在 loginCheckJs 中先清除再重设：
+```javascript
+var src=result.body();
+if(src&&src.indexOf('VERIFICATION_KEYWORD')>-1){
+  cookie.removeCookie(baseUrl);  // 先清除过期值！
+  cookie.setCookie(baseUrl,'CORRECT_VALUE');
+}
+result
+```
+
+## 4.12 Rhino正则不能含单引号（⚠️ 语法陷阱）
 
 **现象**：Rhino报错 `在语句前面缺少 ";" (#1)`
 

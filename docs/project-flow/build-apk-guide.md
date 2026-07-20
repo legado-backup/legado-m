@@ -308,9 +308,7 @@ APK 文件名格式：`legado_<包名标识>_<flavor>_<version>.apk`
 - 正式包：`legado_miss_app_3.26.071900.apk`
 - 共存包：`legado_legacy_app_3.26.071900.apk`
 
-> **APK分类输出目录**：构建成功后APK会自动拷贝到分类目录，避免不同包名的APK互相覆盖：
-> - 默认包名 → `output/default/{debug|release}/`
-> - 自定义包名 → `output/custom/{debug|release}/`
+> **APK输出目录**：构建成功后APK会自动拷贝到`output/apk/{test|coexist|release}/`子目录，通过子目录隔离不同包类型。
 
 ### 4.5 常见构建问题
 
@@ -392,9 +390,9 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 | 操作 | 命令 | 最终包名 | APK位置 |
 |------|------|---------|---------|
-| 构建测试包（默认） | 双击 `build-legado.bat` | `io.legado.miss.app.debug` | `output/default/debug/` |
-| 构建正式包 | `build-legado.bat release` | `io.legado.miss.app.release` | `output/default/release/` |
-| 构建共存包 | `build-legado.bat debug io.legado.app` | `io.legado.app.debug` | `output/custom/debug/` |
+| 构建共存包（日常推荐） | `build-legado.bat debug io.legado.app` | `io.legado.app.debug` | `output/apk/coexist/` |
+| 构建测试包 | `build-legado.bat` | `io.legado.miss.app.debug` | `output/apk/test/` |
+| 构建正式包 | `build-legado.bat release` | `io.legado.miss.app.release` | `output/apk/release/` |
 | 清理构建缓存 | `build-legado.bat clean` | — | — |
 
 **自定义包名说明：**
@@ -421,7 +419,7 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 5. 停止残留的 Gradle daemon
 6. 使用 `--no-daemon` 构建（避免守护进程文件锁）
 7. 如有自定义包名，通过 `-PcustomAppId=xxx` 传入 Gradle
-8. 构建成功后将APK拷贝到分类输出目录（`output/default/`或`output/custom/`）
+8. 构建成功后将APK拷贝到`output/apk/{test|coexist|release}/`子目录
 9. 列出 APK 文件路径和包名
 
 > **注意**：必须在**系统 CMD** 中运行，不能在 Trae CN 内置终端中运行（沙盒限制文件操作）。

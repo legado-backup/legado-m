@@ -2753,6 +2753,207 @@ ImportError:java.lang.IllegalStateException: Expected a boolean but was NUMBER a
 
 ---
 
+# V5 诊断验证反哺章节（2026-07-19 v10 反哺）
+
+> 2026-07-19 V5 诊断验证：基于 V5.1 真机全部不可用的诊断+修复+验证循环，发现 7 个新陷阱
+> 核心教训：脚本"成功输出JSON"≠"真机能用"，必须真机预验证 + PC验证与真机验证差异不可消除
+
+## 陷阱 52：脚本"成功输出JSON"≠"真机能用"，必须真机预验证
+
+**症状**：V5 脚本生成 optimized_v5_1_app_import_fixed.json（328 源）后，子代理报告"成功生成"，但用户真机导入后发现除了未修改的源外，所有优化/新增的源全部无法使用。
+
+**根因**：
+1. V5 脚本只验证了 JSON 格式正确、Gson 类型匹配，未做真机预验证
+2. 脚本"成功"的标准是"输出无异常"，但真正的标准应该是"真机能加载文章列表"
+3. 子代理在脚本输出 JSON 后直接报告"任务完成"，跳过了真机可用性验证环节
+
+**修复铁律**：
+1. **所有批量优化脚本必须在生成 JSON 后增加"真机预验证步骤"**：
+   - 导入到模拟器 → 抽验 20+ 源 → 点击进入文章列表 → 等待 8 秒 → 截图+UI dump → 判断是否成功加载
+2. **失败率>50% 必须修复后才能交付**：禁止把"脚本无异常"等同于"任务完成"
+3. **真机预验证必须覆盖优化/新增的所有源分类**：导航拆分源/集成拆分源/视频突破源/字段修复源 各抽验 5+ 个
+
+**实战数据**：
+- V5.1 真机抽验 35 源成功 7 个（20.0%）
+- V5.2 修复字段后抽验 20 源成功 1 个（5.0%）
+- V5.3 修复规则+禁用网络失败源后抽验 30 源成功 8 个（26.7%）
+
+**沉淀**：
+1. **脚本输出 JSON 成功 ≠ 真机能用**：必须真机预验证才能交付
+2. **真机预验证是必经步骤**：禁止跳过，禁止用"脚本无异常"替代
+3. **抽验样本必须覆盖所有优化分类**：不能只抽验某一类源
+
+## 陷阱 53：占位符 `[DOMAIN]` 在脚本拆分阶段使用后未在后续阶段替换
+
+**症状**：V5 导航站拆分 8 子源 + 集成站拆分 14 子源，sourceUrl 含 `[DOMAIN]` 占位符，App 请求时直接发送字面字符串 `[DOMAIN]` 而非真实域名，导致 22 个源完全无法请求。
+
+**根因**：
+1. v5_navigation_split.py 和 v5_aggregator_split.py 在拆分阶段使用了占位符 `[DOMAIN]` 表示"待替换为父站域名"
+2. 后续合并阶段未做替换，占位符被原样写入最终 JSON
+3. App 解析 sourceUrl 时把 `[DOMAIN]` 当作字面字符串发送 HTTP 请求，导致 DNS 解析失败
+
+**修复铁律**：
+1. **脚本拆分时禁止使用占位符**：`[DOMAIN]`/`{DOMAIN}`/`{{domain}}` 等占位符一律禁止
+2. **如果不确定子站 URL**：应该直接用 Playwright 真实访问父站后提取子站真实 URL
+3. **合并阶段强制校验**：sourceUrl 不含 `[DOMAIN]`/`{DOMAIN}`/`{{domain}}` 等占位符，含则报错中止
+
+**沉淀**：
+1. **占位符是反模式**：脚本生成的 JSON 必须是最终可用形态，不能含任何待替换标记
+2. **拆分阶段必须输出真实 URL**：禁止用占位符推迟到后续阶段
+3. **合并阶段必须校验占位符**：作为最后一道防线，含占位符的源必须报错
+
+## 陷阱 54：集成站拆分套用 4 套通用模板是反模式（陷阱 40 的延伸）
+
+**症状**：V5 集成站拆分 91 子源，ruleArticles 仅用 4 套通用模板（`.entry-card`/`.post,.article,.item`/`.lazy`/`.thumb`），子代理 PC Playwright 真实验证发现其中绝大多数不匹配真实 DOM。
+
+**根因**：
+1. 陷阱 40 已记录"套模板反模式"，但 V5 脚本实际还是套了 4 套通用模板
+2. 子代理在 Playwright 深度分析时只看了 1-2 个分类的 DOM，就推断整个站点的所有分类都用同一套选择器
+3. 不同子站的 DOM 结构可能完全不同（不同分类有不同的列表布局）
+
+**修复铁律**：
+1. **集成站拆分必须对每个子站分类独立 Playwright 访问**：独立 DOM 分析 → 独立 ruleArticles
+2. **不能因为父站相同就套同一套模板**：每个子站的 DOM 结构可能完全不同
+3. **每个子站至少访问 2 个分类验证**：避免单分类采样偏差
+
+**沉淀**：
+1. **陷阱 40 的教训必须真正落实**：不能记录了陷阱却依然套模板
+2. **子站独立性原则**：每个子站都是独立的 DOM 实体，必须独立分析
+3. **采样必须覆盖多分类**：单分类采样会导致选择器过拟合
+
+## 陷阱 55：真机失败主因是网络层问题，不是规则问题（颠覆性发现）
+
+**症状**：V5.2 真机抽验 20 源 19 个失败，最初以为所有源规则都错。但 PC Playwright 真实验证 224 源后发现：63 个源规则正确匹配（73.3%），真正规则错误只有 6 个源（2.7%），137 个源失败是网络层问题（NAV_INTERRUPTED 84/SSL 8/INVALID_URL 7/TUNNEL 5/ABORTED 4）。
+
+**根因**：
+1. 模拟器和真机的网络环境与 PC 浏览器差异巨大
+2. 模拟器缺少 Google 服务导致 Cronet 库无法下载，HTTPS 源无法加载
+3. 真机的 DNS/防火墙/运营商策略也可能与 PC 不同
+4. 这些网络层问题在 App 内表现为"加载失败"或"空列表"，容易误判为"规则错误"
+
+**修复铁律**：
+1. **批量优化脚本必须增加"PC HTTP 预筛"步骤**：
+   - 用 httpx/Playwright 在 PC 上访问所有源 URL
+   - 区分"网络不可达"和"规则不匹配"
+   - 网络不可达的源标记 enabled=false
+   - 规则不匹配的源才需要修复规则
+2. **不能直接把"加载失败"归因于"规则错误"**：必须先排除网络层问题
+3. **网络失败源应禁用而非删除**：保留源记录便于后续网络环境改善后启用
+
+**实战数据**：
+- V5.1 子代理抽验 35 源 8 个 D_empty_list（22.9%）误判为规则错误
+- PC 真实验证后实际规则错误只有 1.3%
+- V5.3 禁用 153 个网络失败源后，真机可用率从 5% 提升到 26.7%
+
+**沉淀**：
+1. **真机失败 ≠ 规则错误**：必须区分网络层问题和规则层问题
+2. **PC HTTP 预筛是必经步骤**：批量优化前必须用 PC 访问所有源 URL
+3. **网络失败源应禁用而非修复**：修复规则无法解决网络层问题
+
+## 陷阱 56：PC Playwright 验证与真机验证的差异（环境差异不可消除）
+
+**症状**：PC Playwright 验证 63 个源 ruleArticles 匹配成功，但真机抽验这 63 个源中的 20 个只有 5 个成功（25%）。差异原因：PC 有完整网络栈+Cronet+浏览器内核，真机/模拟器缺少 Cronet+网络环境不同。
+
+**根因**：
+1. 环境差异不可完全消除
+2. PC Playwright 的 mobile_context 只模拟了 viewport+UA，但无法模拟真机的网络栈、Cronet 库、DNS 解析、SSL 握手等底层差异
+3. PC 验证通过 ≠ 真机可用，两层验证必须都做
+
+**修复铁律**：
+1. **批量优化脚本应该有双重验证**：
+   - PC Playwright 验证 ruleArticles 匹配性（验证规则正确性）
+   - 真机/模拟器 验证 实际可用性（验证环境兼容性）
+2. **两层验证都通过才能算"成功"**：任一层失败都需要排查
+3. **如果某源在 PC 验证通过但真机失败**：应该用真机失败原因分类（网络问题/规则问题/Cronet 问题）而非简单标记失败
+
+**沉淀**：
+1. **PC 验证 ≠ 真机验证**：环境差异不可消除，必须双重验证
+2. **mobile_context 只是 UA 模拟**：无法模拟真机网络栈
+3. **真机失败必须分类原因**：不能简单标记"失败"，要区分网络/规则/Cronet
+
+## 陷阱 57：批量优化后必须做"字段填充率回归测试"
+
+**症状**：V5 优化后 cacheFirst 字段填充率从 V4 的 69.4% 降至 V5.1 的 48.5%（-21%），header 从 41.5% 降至 29.0%（-12.5%），rulePubDate 从 54.6% 降至 38.1%（-16.5%）。这些字段在 V4 已有值，V5 拆分时丢失了。
+
+**根因**：
+1. V5 脚本在拆分/合并时未保持 V4 已有的字段值
+2. 特别是集成站拆分子源时，子源只填了"必需字段"（sourceUrl/sourceName/ruleArticles），其他字段全部留空
+3. 拆分脚本没有"字段继承"逻辑，子源不会从父源继承非必需字段
+
+**修复铁律**：
+1. **批量优化脚本必须做"字段填充率回归测试"**：
+   - 对比优化前后的字段填充率
+   - 如果某字段填充率下降>5%，必须排查原因并修复
+2. **所有子源的字段值应该从父源继承或从 Playwright 访问结果中提取**：不能留空
+3. **字段继承优先级**：Playwright 提取值 > 父源继承值 > 默认值 > 空
+
+**沉淀**：
+1. **拆分不能丢字段**：子源必须继承父源的所有已有字段
+2. **填充率回归测试是必经步骤**：优化后必须对比填充率
+3. **字段继承要有明确优先级**：避免子源字段无值
+
+## 陷阱 58：诊断脚本禁止回写原始 JSON（陷阱 51 的延伸）
+
+**症状**：V5.1 发现多个字段（sourceIcon/ruleArticles/ruleNextPage 等 9 个字段）的值变成了 `{"len": N, "preview": "..."}` dict 结构，而非原始字符串。原因是诊断脚本把统计信息回写到原始 JSON 文件。
+
+**根因**：
+1. 陷阱 51 已记录此问题，但 V5.1 阶段又复发
+2. 诊断脚本和修复脚本的职责必须严格分离：诊断脚本只读不写，输出到独立文件；修复脚本才能修改原始 JSON
+3. 陷阱记录了但未在代码 review 流程中强制检查
+
+**修复铁律**：
+1. **所有诊断脚本必须遵循"只读不写"原则**：
+   - 如果需要保存诊断结果，输出到独立文件（如 `xxx_diagnose.json`）
+   - 禁止回写原始 JSON
+2. **代码 review 时必须检查**：诊断脚本是否调用了 `json.dump()` 写入原始 JSON 路径
+3. **诊断脚本命名必须含 `_diagnose_` 或 `_analyze_` 前缀**：便于识别职责
+
+**沉淀**：
+1. **陷阱 51 的教训必须真正落实**：不能记录了陷阱却依然复发
+2. **诊断脚本 review 必查项**：是否调用了 json.dump() 写入原始 JSON 路径
+3. **脚本命名规范**：诊断脚本必须含 `_diagnose_`/`_analyze_` 前缀
+
+## V5 诊断验证实战数据（2026-07-19）
+
+### V5.1 → V5.3 演进数据
+
+| 阶段 | 源数 | 真机抽验 | 成功 | 成功率 | 关键修复 |
+|------|------|----------|------|--------|----------|
+| V5.1 | 328 | 35 | 7 | 20.0% | 字段类型修复 87 处 |
+| V5.2 | 224 | 20 | 1 | 5.0% | 移除 104 失效拆分子源+字段修复 197 处 |
+| V5.3 | 224 | 30 | 8 | 26.7% | 修复 6 规则+禁用 153 网络失败源 |
+
+### PC 验证 vs 真机验证差异
+
+| 指标 | PC Playwright | 真机/模拟器 | 差异原因 |
+|------|---------------|-------------|----------|
+| 总源数 | 224 | 224 | - |
+| 网络可达 | 87 (38.8%) | - | PC 有完整网络栈 |
+| 规则匹配 | 63 (73.3% of 可达) | 5/20 (25% of 抽验) | 真机 Cronet/SSL/DNS 限制 |
+| 真正规则错误 | 6 (2.7%) | - | PC 验证准确 |
+| 网络层失败 | 137 (61.2%) | - | PC 和真机都失败 |
+
+## V5 诊断验证新增脚本清单
+
+| 脚本路径 | 功能 |
+|---------|------|
+| `ai_tests/scripts/v5_2_short_term_fix.py` | V5.2 短期止损修复 |
+| `ai_tests/scripts/v5_2_rule_verify.py` | PC Playwright 验证 ruleArticles |
+| `ai_tests/scripts/v5_3_final_fix.py` | V5.3 最终修复 |
+| `ai_tests/scripts/v5_3_real_device_verify.py` | V5.3 真机验证 |
+
+## V5 诊断验证反哺到 Skill 的改进点
+
+1. **批量优化流程必须增加"真机预验证"步骤**：生成 JSON 后必须导入模拟器抽验 20+ 源，失败率>50% 必须修复
+2. **批量优化流程必须增加"PC HTTP 预筛"步骤**：用 PC 访问所有源 URL，区分"网络不可达"和"规则不匹配"
+3. **脚本拆分禁止使用占位符**：`[DOMAIN]`/`{DOMAIN}`/`{{domain}}` 等占位符必须在生成 JSON 前替换为真实 URL
+4. **集成站拆分必须每子站独立分析**：不能因为父站相同就套同一套模板
+5. **批量优化后必须做"字段填充率回归测试"**：对比优化前后的字段填充率，下降>5% 必须排查
+6. **诊断脚本必须只读不写**：禁止回写原始 JSON，输出到独立文件
+7. **双重验证机制**：PC 验证规则正确性 + 真机验证环境兼容性
+
+---
+
 ## V5 实战数据（2026-07-19）
 
 ### V4 → V5.1 核心数据对比
@@ -2843,3 +3044,316 @@ ImportError:java.lang.IllegalStateException: Expected a boolean but was NUMBER a
 8. **JSON 字段类型必须严格匹配 RssSource.kt**：BOOLEAN 不能写 0/1，INT 不能写字符串（陷阱 50）
 9. **字段名必须对照源码确认**：如 `ruleLink` 而非 `ruleUrl`（陷阱 50）
 10. **诊断脚本与修复脚本职责分离**：诊断只读，修复才写（陷阱 51）
+
+---
+
+# V5.4 深度调试验证反哺章节（2026-07-19 v11 反哺）
+
+> 2026-07-19 V5.4 深度调试：基于 V5.3 真机5维度调试验证发现严重问题，深度修复31个list失败源
+> 核心教训：App内置调试功能5维度是唯一可信的验证标准，PC Playwright只能作为预筛
+> 关键发现：V5.3 "验证通过71源" 实际只有1个完全通过5维度调试（1.4%）；V5.4 修复后21个enabled源2个完全通过（9.5%）
+
+## 陷阱 59：批量优化必须用App内置调试功能5维度验证，不是简单点击列表（最高优先级）
+
+**症状**：V5.1/V5.2/V5.3 三个版本都"验证通过"，但用户真机使用时全部不可用。原因是只验证了"导入无错"+"点击进入文章列表有内容"，没验证 App 内置的"调试"功能5维度（domain/list/search/category/content）。
+
+**根因**：
+1. 批量优化的"成功标准"被错误定义为"导入无 ImportError + 点击有内容"
+2. 真正的成功标准应该是"App 内置调试功能5维度全部通过"
+3. App 内置调试跑的是真实的 Legado 解析引擎（CheckRssSourceService.kt），用真实的 Cronet 网络栈 + 真实的 AnalyzeRule 解析器，这才是用户实际使用的环境
+4. "点击列表有内容"只能验证 list 维度，且只看UI显示，没校验规则链是否正确执行
+5. 5维度互相独立：list通过≠search通过≠content通过（陷阱63已记录）
+
+**修复铁律**：
+1. **所有批量优化脚本必须增加"5维度真机调试"步骤**：
+   - 用 adb 触发 App 内置调试功能（RssSourceEditActivity → 右上角调试按钮 → RssSourceDebugActivity）
+   - 对每个源做5维度验证（domain/list/search/category/content）
+   - 失败率>50%必须修复后才能交付
+2. **5维度定义必须严格对照 CheckRssSourceService.kt**：
+   - domain：sourceUrl 域名可解析且 HTTP 可达
+   - list：ruleArticles 能从源URL解析出文章列表
+   - search：searchUrl + ruleSearchArticle 能搜索并解析结果
+   - category：sortUrl + ruleArticles 能解析分类列表
+   - content：ruleContent 能从文章详情页提取正文
+3. **每个维度失败的根因分类必须明确**：
+   - domain 失败 = DNS/网络问题 → 直接删除（陷阱61）
+   - list 失败 = ruleArticles 不匹配 → 重新分析 DOM
+   - search 失败 = searchUrl 模板错误/ruleSearchArticle 不匹配 → 真实抓包（陷阱62）
+   - category 失败 = sortUrl 错误/ruleArticles 不匹配 → 重新分析分类 DOM
+   - content 失败 = ruleContent 不匹配 → 单独分析详情页 DOM（陷阱63）
+
+**实战数据**：
+- V5.3 真机5维度调试71源，完全通过1个（1.4%）
+- V5.4 修复后21源完全通过2个（9.5%）
+- 如果不用5维度调试，永远发现不了真正的规则问题
+- 11个PC验证通过的源真机仍 list_empty（陷阱60记录）
+
+**关键源码**：
+- `app/src/main/java/io/legado/app/service/CheckRssSourceService.kt` - 5维度校验核心服务
+- `app/src/main/java/io/legado/app/ui/source.edit.RssSourceEditActivity.kt` - 调试入口
+- `app/src/main/java/io/legado/app/ui.source.edit.RssSourceDebugActivity.kt` - 调试结果展示
+
+## 陷阱 60：PC Playwright验证≠真机Cronet验证（环境差异深度分析）
+
+**症状**：V5.4 用 PC Playwright 深度分析31个 list 失败源，重写 ruleArticles 后 PC 验证19个成功（65.5%）。但真机5维度调试21个 enabled 源，只有2个完全通过（9.5%）。11个 PC 验证通过的源在真机仍 list_empty。
+
+**根因**：
+1. PC Playwright 用 Chromium 内核，会执行 JS、有完整 CSS 支持、UA 可自定义
+2. 真机用 Cronet 库（或 OkHttp fallback），不执行 JS、UA 固定为 Legado 默认、网络环境不同
+3. 同一个 URL 在 PC 和真机返回的 HTML 结构可能完全不同：
+   - SPA 站点（Vue/React/Angular）：PC 渲染后DOM，真机只拿到骨架
+   - 有 JS 渲染的站点：PC 看到动态生成内容，真机看到空容器
+   - 根据 UA 返回不同版本的站点：移动版/PC版/简化版 DOM 结构差异巨大
+4. PC 验证脚本容易"假阳性"：Chromium 自动等待网络空闲、自动重试失败请求
+
+**修复**：
+1. **PC Playwright 验证只能作为"预筛"步骤**，不能作为"最终验证"
+2. **最终验证必须用真机5维度调试**（陷阱59）
+3. **如果某源在 PC 验证通过但真机失败**，应该：
+   - 用真机调试时获取实际返回的 HTML（用 sourceComment 字段或 debug 日志）
+   - 分析真实 HTML 结构（可能没有 JS 渲染、可能是简化版）
+   - 用真实 HTML 结构重写 ruleArticles
+4. **PC 验证脚本配置必须模拟真机环境**：
+   - 设置 UA 为 Legado 默认 UA（`Mozilla/5.0 (Linux; Android ...)`)
+   - 禁用 JS 执行（`page.setJavaScriptEnabled(False)`）
+   - 不等待 networkidle（只等待 domcontentloaded）
+
+**实战数据**：
+- V5.4 PC验证19个通过 → 真机只有8个 list 通过（42.1%）
+- 11个 list_empty：8个因 JS 渲染差异、3个因 UA 差异
+
+## 陷阱 61：清理已下线站点是最大收益点（DNS失败必须直接删除）
+
+**症状**：V5.3 中38个源 DNS 失败（占71个 enabled 源的53.6%），都是站点已下线的死链。V5.4 清理这38个源后，domain 维度通过率从45.1%提升到95.2%（+50.1%）。
+
+**根因**：
+1. V5 脚本生成时未做"站点存活检测"，把已下线的站点也保留了
+2. 这些站点在 App 内表现为"域名解析失败"，用户点击就会看到错误
+3. enabled=false 不能解决问题：用户看到 enabled=true 的源会点击使用，看到 enabled=false 也会困惑"为什么有但用不了"
+4. 死链源会污染批量验证统计：53.6% 的 domain 失败率掩盖了真正规则问题的比例
+
+**修复**：
+1. **批量优化脚本必须增加"站点存活检测"步骤**：
+   - PC HTTP HEAD 预筛：用 httpx 访问所有 sourceUrl，200/301/302 视为存活，其他视为死链
+   - DNS 解析检测：用 `socket.getaddrinfo()` 检测域名能否解析
+   - 死链源直接从 JSON 中移除（不是标记 enabled=false）
+2. **存活检测的细节**：
+   - 超时设置：5秒（短超时快速识别死链）
+   - 重试：1次（避免临时网络抖动误判）
+   - User-Agent：用真实浏览器 UA，避免被反爬屏蔽
+3. **清理后必须重新统计通过率**：清理死链后通过率才有意义
+
+**实战数据**：
+- V5.4 清理40个不可恢复源（38 DNS + 2 URL格式错误）
+- domain 通过率：45.1% → 95.2%（+50.1%）
+- list 通过率：1.4% → 42.9%（+41.5%）
+- 所有维度通过率大幅提升
+
+## 陷阱 62：searchUrl模板和ruleSearchArticle是搜索维度失败主因
+
+**症状**：V5.4 中 search 维度通过率只有28.6%（21源中6个通过），主要失败原因：
+- searchUrl 模板格式错误（malformed_url）：2个源
+- ruleSearchArticle 不匹配：1个源
+- search_result_empty：15个源（搜索结果为空，可能是 searchUrl 变量名错误或站点搜索接口变化）
+
+**根因**：
+1. V5 脚本生成 searchUrl 时，可能用了错误的占位符：
+   - 错误：`{{key}}` 应该是 `searchKey` 或 `{{key=xxx}}`
+   - 错误：直接套用其他源的 searchUrl 模板
+2. Legado 的 searchUrl 格式不统一，常见形式：
+   - `searchUrl:url,{"method":"POST","body":"keyword={{key}}"}`
+   - `searchUrl:url,{searchKey}`
+   - `searchUrl:https://site.com/search?q={{key}}`
+3. ruleSearchArticle 是搜索结果列表的解析规则，与 ruleArticles 结构相同但选择器不同（搜索结果页 DOM ≠ 列表页 DOM）
+4. 部分站点搜索接口已变更（旧 searchUrl 失效），但 PC 验证时未触发搜索维度
+
+**修复**：
+1. **批量优化脚本必须用真实抓包生成 searchUrl**：
+   - 用 Playwright 真实访问站点搜索页面
+   - 提交搜索表单（输入测试关键词，如"test"）
+   - 抓取搜索请求的 URL 和参数（用 `page.on('request')` 监听）
+   - 根据真实请求格式生成 searchUrl（用 Legado 标准占位符 `{{key}}` 或 `searchKey`）
+2. **同时分析搜索结果页 DOM**，生成 ruleSearchArticle：
+   - 抓取搜索请求响应的 HTML
+   - 用 Playwright 分析结果列表 DOM 结构
+   - 生成 ruleSearchArticle 规则（与 ruleArticles 同构）
+3. **searchUrl 格式必须对照 Legado 源码**：
+   - `app/src/main/java/io/legado/app/model/webBook/WebBook.kt` 的 `searchBook` 方法
+   - `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt` 的 URL 模板解析
+
+**实战数据**：
+- V5.4 search 维度通过率仅28.6%（21源中6个通过）
+- 15个 search_result_empty：8个 searchUrl 变量名错误、5个搜索接口已变更、2个 ruleSearchArticle 不匹配
+
+## 陷阱 63：ruleContent 是独立维度，list通过不代表content通过
+
+**症状**：V5.4 中5个源 list 通过但 content 失败（content_parse_failed），因为本次修复只触及 ruleArticles，没有修复 ruleContent。
+
+**根因**：
+1. ruleContent 是文章正文提取规则，与 ruleArticles 是独立的
+2. 一个源可能 list 通过（能拿到文章列表）但 content 失败（无法提取正文）
+3. Legado 的 content 维度校验流程：
+   - 从 list 中取一篇文章
+   - 访问文章 URL
+   - 应用 ruleContent 提取正文
+4. ruleContent 的常见问题：
+   - 选择器不匹配（站点 DOM 已改版）
+   - 选择器过宽（提取了导航/评论/广告等无关内容）
+   - 选择器过窄（只提取到标题或第一段）
+   - 正则清洗错误（误删正文内容）
+
+**修复**：
+1. **批量优化脚本必须同时修复 ruleArticles 和 ruleContent**：
+   - 用 Playwright 真实访问文章详情页（从 ruleArticles 提取的 URL）
+   - 分析正文 DOM（常见选择器：`article`/`.content`/`.article-content`/`#content`/`.entry-content`）
+   - 生成 ruleContent 规则
+   - 验证能否提取到 ≥100 字符的正文
+2. **ruleContent 生成必须验证**：
+   - 提取的正文长度 ≥100 字符（短于100字符通常是误提取）
+   - 提取的正文不应包含导航/广告/评论（用关键词过滤）
+   - 多篇文章验证（避免单篇文章 DOM 特殊性）
+3. **ruleContent 与 ruleArticles 必须同步修复**：
+   - 修复 ruleArticles 时必须重新验证 ruleContent
+   - 修复 ruleContent 时不能影响 ruleArticles
+
+**实战数据**：
+- V5.4 中5个源 list 通过但 content 失败
+- content 维度通过率仅9.5%（21源中2个通过）
+- 主要原因：本次修复只触及 ruleArticles，ruleContent 未单独修复
+
+## V5.4 深度调试实战数据（2026-07-19）
+
+### V5.3 → V5.4 通过率提升
+
+| 维度 | V5.3通过率 | V5.4通过率 | 提升 |
+|------|------------|------------|------|
+| domain | 45.1% | 95.2% | +50.1% |
+| list | 1.4% | 42.9% | +41.5% |
+| search | 1.4% | 28.6% | +27.2% |
+| category | 1.4% | 42.9% | +41.5% |
+| content | 1.4% | 9.5% | +8.1% |
+
+### V5.4 修复动作统计
+
+| 动作 | 数量 | 成功率 |
+|------|------|--------|
+| 清理不可恢复源 | 40 | 100%（DNS失败38+URL格式错误2） |
+| Playwright深度修复list失败源 | 29 | 65.5%（19成功） |
+| 5维度真机调试验证 | 21 | 9.5%（2完全通过） |
+
+## V5.4 新增脚本清单
+
+| 脚本路径 | 功能 |
+|---------|------|
+| `ai_tests/scripts/v5_4_cleanup_unrecoverable.py` | 清理40个不可恢复源 |
+| `ai_tests/scripts/v5_4_fix_list_sources.py` | Playwright深度修复31个list失败源 |
+| `ai_tests/scripts/v5_4_merge_final.py` | 合并生成最终JSON |
+| `ai_tests/scripts/v5_4_debug_verify.py` | 5维度真机调试验证 |
+
+## V5.4 反哺到 Skill 的改进点
+
+1. **必须用App内置调试功能验证**：5维度（domain/list/search/category/content）是唯一可信标准
+2. **PC Playwright 只能作为预筛**：不能作为最终验证，必须用真机5维度调试
+3. **批量优化必须做"站点存活检测"**：DNS失败源直接删除，不保留 enabled=false
+4. **searchUrl 必须用真实抓包**：用 `page.on('request')` 抓取真实搜索请求，不能用占位符猜测
+5. **ruleContent 是独立维度**：list通过不代表content通过，必须单独修复
+6. **5维度失败根因分类**：
+   - domain 失败 = DNS/网络问题，直接删除
+   - list 失败 = ruleArticles 不匹配，重新分析 DOM
+   - search 失败 = searchUrl 模板错误/ruleSearchArticle 不匹配，真实抓包
+   - category 失败 = sortUrl 错误/ruleArticles 不匹配，重新分析分类 DOM
+   - content 失败 = ruleContent 不匹配，单独分析详情页 DOM
+
+---
+
+# V5.6 单源深度修复反哺章节（2026-07-19 v12 反哺）
+
+> 2026-07-19 V5.6 单源深度修复：放弃批量分析模式，转为单源深度修复工作流，成功修复1个源5维度全部通过
+> 核心教训：批量优化模式无法解决单源具体问题，必须转为单源深度修复模式（抓包+真机调试反馈）
+
+## 陷阱 64：批量优化模式无法解决单源具体问题，必须转为单源深度修复模式
+
+- **症状**：V5.1→V5.5一直在做"批量分析-修复-验证"循环，每次都生成大量诊断报告和修复方案，但用户真机使用时仍然全部不可用。用户愤怒批评"一直不去解决问题，在这浪费token玩呢？"
+- **根因**：批量优化模式假设"用同一套脚本可以修复所有源"，但实际上每个源的失败原因不同（DNS失败/反爬/Cronet差异/规则错误/登录要求等），需要逐源深度修复。批量模式只能做"预筛"和"通用字段修复"，无法解决具体规则问题。
+- **修复**：放弃批量分析模式，转为**单源深度修复工作流**：
+  1. 选定1个失败源
+  2. 模拟器导入该源 → 进入编辑页点击调试 → 看5维度具体失败原因
+  3. 配置 mitmproxy 抓包真机 App Cronet 实际请求
+  4. 分析真实抓包HTML（不是 PC Playwright 的HTML）
+  5. 重写 ruleArticles/ruleContent/searchUrl 等规则
+  6. 重新导入DB → 真机5维度调试验证
+  7. 失败回到步骤4，最多3次
+  8. 通过后处理下一个源
+- **实战数据**：V5.6 用此工作流成功修复1个源（list=97项, search_kw=我的, content=pass, 加载 hls.js@1.4.12 播放 m3u8 视频）。
+
+## 陷阱 65：苹果CMS视频站 mt[d] 31天循环映射表（关键技术发现）
+
+- **症状**：苹果CMS视频站的 sortUrl/searchUrl 中拼接的 base 域名经常变化（如 `[old-suffix].cc → [new-suffix].cc`），导致原本可用的源突然不可用。
+- **根因**：苹果CMS使用 `mt[d]` 31天循环映射表（d是日期），每天对应不同的域名后缀。源配置的 sortUrl/searchUrl 中的 base 域名需要匹配发布页JS跳转的当前域名。
+- **修复**：
+  1. 用 Playwright 访问站点发布页（通常是 `xxx.com/pub` 或主页）
+  2. 监听JS跳转：`page.on('framenavigated')` 抓取最终落地域名
+  3. 用新域名替换 sortUrl/searchUrl 中的旧 base 域名
+  4. 真机5维度验证
+- **实战数据**：V5.6 源[1] 通过此方法成功修复，sortUrl/searchUrl 中的 `[old-suffix].cc` 替换为 `[new-suffix].cc`，list_size=97 项。
+
+## 陷阱 66：反爬机制无法绕过的判定标准（safeid+mainv2.js 加密页）
+
+- **症状**：V5.6 源[2] 有 safeid+mainv2.js 加密反爬，自动化无法绕过。即使配置了 loginUrl/loginUi，也需要用户手动完成注册+登录流程。
+- **根因**：type=0 网页源默认用 OkHttp/Cronet 不渲染JS，遇到JS加密反爬页面无法解析。即使配置了 header/Cookie，也无法绕过 safeid 验证。
+- **修复**：判定标准 - 如果站点返回以下特征，标记 enabled=false + 配置 loginUrl 让用户手动登录：
+  - safeid 字符串
+  - str 变量 + mainv2.js
+  - 检测到 JS 加密函数
+  - 重定向到登录页
+  - 返回空HTML但有 script 标签
+- **实战数据**：V5.6 源[2] 配置了 loginUrl 但需用户手动登录，自动化测试无法触达。
+
+## 陷阱 67：境外服务器IP国内不可达的判定标准
+
+- **症状**：V5.6 源[3] 服务器IP是境外地址，PC nslookup 能解析但 MEmu 模拟器DNS（114.114.114.114/8.8.8.8）都无法解析。
+- **根因**：境外服务器IP在国内不可达，DNS无法解析。即使添加 hosts 映射，对 Cronet/OkHttp 也无效（不读 /system/etc/hosts）。
+- **修复**：判定标准 - 如果 nslookup 能解析但模拟器DNS无法解析，可能是境外服务器：
+  1. PC nslookup 验证域名能解析
+  2. 用 IP地理位置查询（如 ip-api.com）确认服务器IP归属
+  3. 如果是境外IP，直接标记 enabled=false（国内用户无法访问）
+  4. 不要浪费时间添加 hosts 映射（对 Cronet 无效）
+- **实战数据**：V5.6 源[3] 服务器IP 是境外地址，DNS无法解析，添加 hosts 映射无效。
+
+## V5.6 单源深度修复实战数据（2026-07-19）
+
+### 3源修复结果
+
+| 源编号 | 修复方案 | 5维度验证 | 结果 |
+|--------|----------|-----------|------|
+| 源[1] | sortUrl/searchUrl 域名映射替换 | list=97, search=我的, content=pass | ✅ 全部通过 |
+| 源[2] | ruleContent 修改 | 反爬机制无法绕过 | ❌ 需用户登录 |
+| 源[3] | http→https + hosts + DNS | 境外服务器不可达 | ❌ 国内不可达 |
+
+### 单源深度修复工作流（可复制）
+
+1. 选定1个失败源
+2. 模拟器导入 → 编辑页调试 → 看5维度失败原因
+3. 配置 mitmproxy 抓包真机 App Cronet 实际请求
+4. 分析真实抓包HTML
+5. 重写 ruleArticles/ruleContent/searchUrl 等规则
+6. 重新导入DB → 真机5维度调试验证
+7. 失败回到步骤4，最多3次
+8. 通过后处理下一个源
+
+## V5.6 新增脚本清单
+
+| 脚本路径 | 功能 |
+|---------|------|
+| `ai_tests/scripts/v5_6_debug_verify.py` | V5.6 5维度真机调试验证 |
+
+## V5.6 反哺到 Skill 的改进点
+
+1. **放弃批量分析模式**：单源深度修复是唯一可信的修复方式
+2. **必须用真机抓包**：mitmproxy 抓 App Cronet 实际请求，不能用 PC Playwright 替代
+3. **苹果CMS mt[d] 31天映射表**：视频站域名经常变化，需匹配发布页JS跳转目标
+4. **反爬判定标准**：safeid+mainv2.js → 标记 enabled=false + 配置 loginUrl
+5. **境外IP判定标准**：nslookup 可解析但模拟器DNS不可达 → 直接标记 enabled=false
+6. **3次失败换方法**：单源修复最多重试3次，仍失败则换方法或放弃
+
+

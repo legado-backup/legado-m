@@ -109,6 +109,8 @@
 |------|------|
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面板+功能状态 |
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
+| [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
@@ -156,6 +158,8 @@
 | [specs/rss-parse-optimization/](./specs/rss-parse-optimization/) | 订阅源解析全流程性能优化（5维度22个优化点：5个P1+17个P2，核心6项分三批实施：Pattern缓存+RssArticle索引/scriptCache全局共享+HTTP响应缓存/解密缓存扩容+预连接） ✅ 全部完成（检查点3验收通过，4文件+106行变更，APK legado_app_3.26.071419.apk） |
 | [specs/source-layout-bookshelf-style/](./specs/source-layout-bookshelf-style/) | Issue-6 书源/订阅源布局参考书架重构（方案D：3个XML重构+SourceExt.kt新建+4个Adapter适配+订阅源upSourceHost链路改造+RssSourceActivity异常输入修复，21个ADR） ✅ 实施完成（编译通过+真机启动无崩溃，APK legado_app_3.26.071720.apk） |
 | [specs/forks-archive-comparison/](./specs/forks-archive-comparison/) | 阅读 Archive 私仓深度对比与借鉴分析（克隆 Rimchars/legado-private-armv8-release 到 temp/forks-comparison/legado-archive，7 大维度子代理并行对比：主题/EPUB/AI/发现页/视频/构建/依赖，输出三态借鉴决策表 12借鉴/8不借鉴/9待评估，不修改本项目源码） 🔄 待验收 |
+| [specs/rss-unified-search/](./specs/rss-unified-search/) | 订阅源统一搜索（对标书架搜索：新建 RssSearchActivity+RssSearchModel 并发调度所有带 searchUrl 的订阅源，title+pubDate 去重聚合多源，支持换源，复用 SearchKeyword 表加 type 字段） 🔄 设计中 |
+| [specs/rss-v5_7-deep-fix/](./specs/rss-v5_7-deep-fix/) | RSS 订阅源 V5.7 深度修复（13 启用源 12 必备字段规则修复 + 15 CF盾源破盾恢复 + 7 timeout 源重试 + 5维度真机验证 + 陷阱68-72沉淀 + ADR Y-Statement 5项决策） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |

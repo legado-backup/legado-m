@@ -103,58 +103,80 @@ def import_rss(json_path, db_path):
 
     # 读取JSON
     with open(json_path, 'r', encoding='utf-8') as f:
-        sources = json.load(f)
+        data = json.load(f)
 
-    if not isinstance(sources, list):
-        sources = [sources]
+    # 兼容两种格式：
+    # 1. 纯列表 [...]
+    # 2. 字典 {"version":..., "sources":[...]}
+    if isinstance(data, dict):
+        if 'sources' in data:
+            sources = data['sources']
+            meta = {k: v for k, v in data.items() if k != 'sources'}
+            print(f"  JSON元信息: {meta}")
+        else:
+            sources = [data]
+    elif isinstance(data, list):
+        sources = data
+    else:
+        print(f"❌ 不支持的JSON格式: {type(data)}")
+        return 0
 
     print(f"  JSON包含 {len(sources)} 个订阅源")
 
     # 连接数据库（WAL文件在同目录时sqlite3会自动加载）
     conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    # 关键：checkpoint WAL合并到主DB，避免WAL旧状态覆盖新数据
-    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    checkpoint_result = cursor.fetchone()
-    print(f"  WAL checkpoint: {checkpoint_result}")
+        # 关键：checkpoint WAL合并到主DB，避免WAL旧状态覆盖新数据
+        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        checkpoint_result = cursor.fetchone()
+        print(f"  WAL checkpoint: {checkpoint_result}")
 
-    # 获取 rssSources 表结构
-    cursor.execute("PRAGMA table_info(rssSources)")
-    columns = [row[1] for row in cursor.fetchall()]
-    print(f"  rssSources 表列: {len(columns)} 列")
+        # 获取 rssSources 表结构
+        cursor.execute("PRAGMA table_info(rssSources)")
+        columns = [row[1] for row in cursor.fetchall()]
+        print(f"  rssSources 表列: {len(columns)} 列")
 
-    imported = 0
-    for source in sources:
-        source_name = source.get('sourceName', 'unknown')
-        source_url = source.get('sourceUrl', '')
+        imported = 0
+        skipped = 0
+        for source in sources:
+            if not isinstance(source, dict):
+                skipped += 1
+                continue
+            source_name = source.get('sourceName', 'unknown')
+            source_url = source.get('sourceUrl', '')
 
-        # 删除同 sourceUrl 的旧记录
-        cursor.execute("DELETE FROM rssSources WHERE sourceUrl = ?", (source_url,))
+            # 删除同 sourceUrl 的旧记录
+            cursor.execute("DELETE FROM rssSources WHERE sourceUrl = ?", (source_url,))
 
-        # 构建INSERT（只插入表中存在的列）
-        valid_keys = [k for k in source.keys() if k in columns]
-        placeholders = ', '.join(['?'] * len(valid_keys))
-        col_names = ', '.join(valid_keys)
-        values = [str(source[k]) if not isinstance(source[k], (int, float, bool)) else source[k]
-                  for k in valid_keys]
+            # 构建INSERT（只插入表中存在的列）
+            valid_keys = [k for k in source.keys() if k in columns]
+            if not valid_keys:
+                print(f"  ⚠️ 跳过: {source_name}（无匹配列）")
+                skipped += 1
+                continue
+            placeholders = ', '.join(['?'] * len(valid_keys))
+            col_names = ', '.join(valid_keys)
+            values = [str(source[k]) if not isinstance(source[k], (int, float, bool)) else source[k]
+                      for k in valid_keys]
 
-        cursor.execute(
-            f"INSERT INTO rssSources ({col_names}) VALUES ({placeholders})",
-            values
-        )
-        imported += 1
-        print(f"  ✅ 导入: {source_name} | {source_url}")
+            cursor.execute(
+                f"INSERT INTO rssSources ({col_names}) VALUES ({placeholders})",
+                values
+            )
+            imported += 1
 
-    conn.commit()
+        conn.commit()
 
-    # 最终checkpoint：确保导入的数据写入主DB文件（而非留在新WAL中）
-    cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    print(f"  Final WAL checkpoint: {cursor.fetchone()}")
+        # 最终checkpoint：确保导入的数据写入主DB文件（而非留在新WAL中）
+        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        print(f"  Final WAL checkpoint: {cursor.fetchone()}")
 
-    conn.close()
-    print(f"  共导入 {imported} 个订阅源")
-    return imported
+        print(f"  共导入 {imported} 个订阅源, 跳过 {skipped} 个")
+        return imported
+    finally:
+        conn.close()
 
 
 def main():
