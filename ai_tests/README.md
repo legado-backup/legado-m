@@ -196,3 +196,51 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
 - [设计文档](../docs/specs/e2e-automated-testing/design.md)
 - [任务清单](../docs/specs/e2e-automated-testing/tasks.md)
 - [深度分析报告](../docs/specs/e2e-automated-testing/ai-testing-research-2026.md)
+
+## V5 订阅源批量优化脚本
+
+### V5 阶段脚本（ai_tests/scripts/）
+
+| 脚本 | 功能 |
+|------|------|
+| `v5_aggregator_split.py` | 集成站V2严格拆分（8项视频特征严格判定） |
+| `v5_inspect_sorturl.py` | sortUrl检查工具 |
+| `v5_video_deep_analyze.py` | 视频源深度分析 |
+| `v5_video_deepfix.py` | 视频源深度修复（118个源详情页深度分析） |
+| `v5_video_deepfix_mask.py` | 视频源脱敏 |
+| `v5_video_breakthrough.py` | 视频源6大突破手段（88个无证据源应用6策略） |
+| `v5_missing_fields_fix.py` | 135个缺字段源深度补全 |
+| `v5_hard_source_fix.py` | 67个难点源处理（CF盾/登录/弹框） |
+| `v5_cf_breakthrough.py` | CF盾4个破盾5大技术 |
+| `v5_spa_breakthrough.py` | 3个SPA站点5大技术突破 |
+| `v5_2_short_term_fix.py` | V5.2短期止损修复 |
+| `v5_2_rule_verify.py` | PC Playwright验证ruleArticles |
+| `v5_3_final_fix.py` | V5.3最终修复 |
+| `v5_3_real_device_verify.py` | V5.3真机验证 |
+
+### V5 工作流
+
+1. **V5阶段（深度优化）**：
+   - 分类扫描 → 导航站拆分 → 集成站V2严格拆分 → 视频源深度修复 → 视频源6大突破 → 缺字段补全 → 难点源处理 → CF盾破盾 → SPA突破
+2. **V5.1阶段（字段类型修复）**：
+   - 修复Gson严格类型解析错误 → 生成纯数组格式JSON
+3. **V5.2阶段（短期止损）**：
+   - 移除113个失效拆分子源 → 字段修复197处
+4. **V5.3阶段（最终修复）**：
+   - PC Playwright验证224源 → 修复6个规则问题源 → 标记153个网络层失败源enabled=false → 保留71个可用源
+
+### V5 输出JSON（output/rss/）
+
+| 文件 | 内容 |
+|------|------|
+| `optimized_v5_1_app_import_fixed.json` | V5.1最终版（328源，纯数组格式） |
+| `optimized_v5_2_stable.json` | V5.2短期止损版（224源） |
+| `optimized_v5_3_final.json` | V5.3最终版（224源，71启用+153禁用） |
+
+### V5 关键报告
+
+- `docs/specs/rss-batch-optimize-v2/v5_optimization_final_report.md` - V5优化最终成果报告
+- `output/rss/v5_1_real_device_verify_report.md` - V5.1真机验证报告
+- `output/rss/v5_1_field_diff_analysis.md` - V5.1字段差异分析
+- `output/rss/v5_2_rule_verify_report.md` - V5.2 PC Playwright验证报告
+- `output/rss/v5_3_final_verify_report.md` - V5.3最终验证报告

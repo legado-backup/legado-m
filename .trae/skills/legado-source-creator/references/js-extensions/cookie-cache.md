@@ -74,12 +74,63 @@ var page = java.get("lastPage");    // 读取变量，返回 String
 
 | 方向 | 机制 | 触发时机 |
 |------|------|---------|
-| WebView → OkHttp | CookieManager → CookieStore | onPageFinished 自动同步 |
+| WebView → OkHttp | CookieManager → CookieStore | onPageFinished 自动同步（仅 BackstageWebView） |
 | OkHttp → WebView | CookieStore → applyToWebView() | 需主动调用 |
+| ReadRssActivity WebView → CookieStore | **不同步！** | Set-Cookie 仅写入 WebView CookieManager |
+
+### ⚠️ ReadRssActivity 的 WebView Cookie 不同步问题
+
+> 验证日期：2026-07-20
+> 源码依据：ReadRssActivity.kt L678-693 shouldInterceptRequest
+
+ReadRssActivity 的 `CustomWebViewClient.shouldInterceptRequest()` 中，服务端返回的 `Set-Cookie` 仅写入 WebView 的 `CookieManager`，**不写入** OkHttp 的 `CookieStore`：
+
+```kotlin
+// ReadRssActivity.kt L678-693
+res.headers("Set-Cookie").forEach { setCookie ->
+    webCookieManager.setCookie(url, setCookie)  // 只同步到 WebView CookieManager
+    // 注意：没有 cookieStore.setCookie() 调用！
+}
+```
+
+**影响**：WebView 中确认年龄验证后获得的 Cookie 不会被 OkHttp 使用，后续 OkHttp 请求仍可能返回验证页面。
+
+**解决方案**：在 `loginCheckJs` 中主动操作 CookieStore：
+```javascript
+// loginCheckJs 中：检测验证页 → 清除过期 Cookie → 重设
+var src=result.body();
+if(src&&src.indexOf('VERIFICATION_KEYWORD')>-1){
+  cookie.removeCookie(baseUrl);
+  cookie.setCookie(baseUrl,'CORRECT_COOKIE_VALUE');
+}
+result
+```
+
+### ⚠️ CookieStore 过期值覆盖 header Cookie
+
+> 源码依据：CookieManager.kt L57-77、L103-109
+
+`CookieManager.loadRequest()` 合并 header Cookie 和 CookieStore Cookie 时，**CookieStore 的值会覆盖 header 的值**：
+
+```kotlin
+// CookieManager.kt L103-109
+fun mergeCookiesToMap(vararg cookies: String?): MutableMap<String, String> {
+    return cookies.filterNotNull().map {
+        CookieStore.cookieToMap(it)
+    }.reduce { acc, cookieMap ->
+        acc.apply { putAll(cookieMap) }  // ← 后者覆盖前者！CookieStore > header
+    }
+}
+```
+
+**影响**：如果 CookieStore 中存有过期/错误的 Cookie（如旧的验证 Cookie），即使 header 中预置了正确的 Cookie，合并后仍然被 CookieStore 的过期值覆盖，导致"时好时不好"。
+
+**解决方案**：在 loginCheckJs 中先 `cookie.removeCookie(baseUrl)` 清除过期值，再 `cookie.setCookie(baseUrl, 'VALUE')` 写入新值。
 
 ### 源码依据
 - BackstageWebView.kt L183-189: onPageFinished 中从 CookieManager 读取 Cookie 写入 CookieStore
 - CookieStore.kt: OkHttp 的 Cookie 持久化存储
+- ReadRssActivity.kt L678-693: Set-Cookie 仅同步到 WebView CookieManager
 
 ### CF 绕过场景
 webView() 通过 CF JS Challenge 后，cf_clearance Cookie 自动从 WebView CookieManager 同步到 OkHttp CookieStore，后续请求自动携带。

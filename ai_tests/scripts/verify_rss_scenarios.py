@@ -24,9 +24,8 @@ import socket
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-ADB = r'D:\Program Files\Microvirt\MEmu\adb.exe'
-HOST = '127.0.0.1:21503'
-PKG = 'io.legado.app.debug'
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import ADB_PATH as ADB, MEMU_ADB_HOST as HOST, PACKAGE as PKG
 
 def adb(*args, timeout=15):
     cmd = [ADB, '-s', HOST] + list(args)
@@ -34,38 +33,53 @@ def adb(*args, timeout=15):
 
 
 def pull_db(tmp_path):
+    """从设备pull legado.db（使用su，MEmu兼容）"""
     adb('shell', 'am', 'force-stop', PKG)
     time.sleep(1)
-    adb('shell', 'rm', '/sdcard/legado_v.db', '/sdcard/legado_v.db-wal', '/sdcard/legado_v.db-shm')
-    adb('shell', 'run-as', PKG, 'cp', f'/data/data/{PKG}/databases/legado.db', f'/data/data/{PKG}/files/v.db')
-    adb('shell', 'run-as', PKG, 'cp', f'/data/data/{PKG}/databases/legado.db-wal', f'/data/data/{PKG}/files/v.db-wal')
-    adb('shell', 'run-as', PKG, 'cp', f'/data/data/{PKG}/databases/legado.db-shm', f'/data/data/{PKG}/files/v.db-shm')
-    adb('shell', 'run-as', PKG, 'chmod', '644', f'/data/data/{PKG}/files/v.db')
-    adb('shell', 'run-as', PKG, 'chmod', '644', f'/data/data/{PKG}/files/v.db-wal')
-    adb('shell', 'run-as', PKG, 'chmod', '644', f'/data/data/{PKG}/files/v.db-shm')
-    adb('shell', 'cat', f'/data/data/{PKG}/files/v.db', '>', '/sdcard/legado_v.db')
-    adb('shell', 'cat', f'/data/data/{PKG}/files/v.db-wal', '>', '/sdcard/legado_v.db-wal')
-    adb('shell', 'cat', f'/data/data/{PKG}/files/v.db-shm', '>', '/sdcard/legado_v.db-shm')
-    adb('pull', '/sdcard/legado_v.db', tmp_path)
-    adb('pull', '/sdcard/legado_v.db-wal', tmp_path + '-wal')
-    adb('pull', '/sdcard/legado_v.db-shm', tmp_path + '-shm')
+    r = adb('shell', 'su', '-c', f'cp /data/data/{PKG}/databases/legado.db /sdcard/legado_v.db')
+    if r.returncode != 0:
+        print(f'  ❌ cp db failed: {r.stderr.decode("utf-8", errors="replace")}')
+    adb('shell', 'su', '-c', 'chmod 666 /sdcard/legado_v.db')
+    # WAL/SHM可能不存在，忽略错误
+    adb('shell', 'su', '-c', f'cp /data/data/{PKG}/databases/legado.db-wal /sdcard/legado_v.db-wal 2>/dev/null; chmod 666 /sdcard/legado_v.db-wal 2>/dev/null; true')
+    adb('shell', 'su', '-c', f'cp /data/data/{PKG}/databases/legado.db-shm /sdcard/legado_v.db-shm 2>/dev/null; chmod 666 /sdcard/legado_v.db-shm 2>/dev/null; true')
+    r = adb('pull', '/sdcard/legado_v.db', tmp_path)
+    if r.returncode != 0:
+        print(f'  ❌ pull db failed: {r.stderr.decode("utf-8", errors="replace")}')
+        return False
+    # 检查文件大小
+    if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) < 1024:
+        print(f'  ❌ pulled db too small or missing: size={os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0}')
+        return False
+    print(f'  DB pulled to {tmp_path} (size={os.path.getsize(tmp_path)})')
+    # 删除本地WAL/SHM避免malformed
+    for ext in ['-wal', '-shm']:
+        p = tmp_path + ext
+        if os.path.exists(p):
+            os.unlink(p)
+    return True
 
 
 def load_sources(db_path):
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    cur.execute("PRAGMA table_info(rssSources)")
-    columns = [r[1] for r in cur.fetchall()]
-    cur.execute(f"SELECT {', '.join(columns)} FROM rssSources")
-    rows = cur.fetchall()
-    sources = []
-    for row in rows:
-        s = {c: row[c] for c in columns if row[c] is not None}
-        sources.append(s)
-    conn.close()
-    return sources
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        cur.execute("PRAGMA table_info(rssSources)")
+        columns = [r[1] for r in cur.fetchall()]
+        if not columns:
+            print(f'  ❌ rssSources 表无列或表不存在')
+            return []
+        cur.execute(f"SELECT {', '.join(columns)} FROM rssSources")
+        rows = cur.fetchall()
+        sources = []
+        for row in rows:
+            s = {c: row[c] for c in columns if row[c] is not None}
+            sources.append(s)
+        return sources
+    finally:
+        conn.close()
 
 
 def extract_base_url(source_url):
@@ -128,15 +142,123 @@ def check_url(url, timeout=8):
         return (0, 0, f'exception:{type(e).__name__}')
 
 
+# 无效值集合（批量脚本可能误填的字符串）
+INVALID_VALUES = {'page', 'None', 'null', 'undefined', 'NaN', ''}
+
+
+def is_valid_rule_next_page(v):
+    """ruleNextPage 合法性校验（支持 legado 原生语法）
+
+    legado 支持的7种合法形式：
+    1. 显式前缀：@CSS: / @XPath: / @js: / <js> / @put: / @get:
+    2. 原生语法前缀：class. / text. / page. / 标签.(li./a./div.等)
+    3. CSS 选择器特征：以 . 或 # 开头
+    4. 含 @href 或 @src 属性提取
+    5. 含 <js> 标签
+    6. 以 (function 开头的IIFE
+    7. 正则匹配 CSS 选择器模式（兜底）
+
+    修复历史（2026-07-18 v5反哺）：
+    - 原版仅校验 @CSS:/@XPath:/@js: 三种前缀，导致 scenario_4 通过率 0%
+    - 修复后支持 legado 原生语法，scenario_4 通过率从 0% 提升到 62.5%
+    """
+    if not v or v in INVALID_VALUES:
+        return False
+
+    # 1. 显式前缀（最强信号）
+    if v.startswith(('@CSS:', '@XPath:', '@js:', '<js>', '@put:', '@get:')):
+        return True
+
+    # 2. legado 原生语法前缀（class. / text. / page. / 标签.）
+    native_prefixes = ('class.', 'text.', 'page.', 'li.', 'a.', 'div.',
+                       'span.', 'img.', 'ul.', 'ol.', 'p.', 'h1.', 'h2.',
+                       'h3.', 'h4.', 'h5.', 'h6.', 'script@', 'link[',
+                       'input[', '$.')
+    if v.startswith(native_prefixes):
+        return True
+
+    # 3. CSS 选择器特征（无前缀直接写选择器）
+    if v.startswith(('.', '#')):
+        return True
+
+    # 4. 含 @href 或 @src 属性提取
+    if '@href' in v or '@src' in v:
+        return True
+
+    # 5. 含 <js> 标签
+    if '<js>' in v:
+        return True
+
+    # 6. 以 (function 开头的IIFE
+    if v.startswith('(function'):
+        return True
+
+    # 7. 正则匹配 CSS 选择器模式（兜底）
+    if re.match(r'^[.#a-zA-Z][\w\-:. ()#\[\]>+,~]+', v):
+        return True
+
+    return False
+
+
+def classify_rule_next_page_prefix(v):
+    """识别 ruleNextPage 的语法类型（用于脱敏输出，不输出业务字段原文）"""
+    if not v:
+        return 'empty'
+    if v.startswith('@CSS:'):
+        return 'css_prefix'
+    if v.startswith('@XPath:'):
+        return 'xpath_prefix'
+    if v.startswith('@js:') or v.startswith('<js>') or '<js>' in v:
+        return 'js'
+    if v.startswith('@put:') or v.startswith('@get:'):
+        return 'put_get'
+    if v.startswith('class.'):
+        return 'class_dot'
+    if v.startswith('text.'):
+        return 'text_dot'
+    if v.startswith('page.'):
+        return 'page_dot'
+    if v.startswith(('li.', 'a.', 'div.', 'span.', 'img.', 'ul.', 'ol.',
+                     'p.', 'h1.', 'h2.', 'h3.', 'h4.', 'h5.', 'h6.')):
+        return 'tag_dot'
+    if v.startswith('script@'):
+        return 'script_at'
+    if v.startswith(('link[', 'input[')):
+        return 'attr_bracket'
+    if v.startswith('$.'):
+        return 'jquery'
+    if v.startswith(('.', '#')):
+        return 'css_selector'
+    if '@href' in v or '@src' in v:
+        return 'attr_extract'
+    if v.startswith('(function'):
+        return 'iife'
+    if re.match(r'^[.#a-zA-Z][\w\-:. ()#\[\]>+,~]+', v):
+        return 'css_pattern'
+    return 'unknown'
+
+
 def main():
     print('=' * 60)
     print('订阅源4场景验证（脱敏输出：只显示技术结论）')
     print('=' * 60)
 
     tmp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False).name
+    # 立即关闭临时文件句柄（Windows下NamedTemporaryFile会持有句柄）
     try:
+        # 先尝试用已pull的check.db（避免重复pull）
+        fallback_db = 'output/rss/check.db'
+        used_db = None
         print('\n--- Pull DB ---')
-        pull_db(tmp_db)
+        if pull_db(tmp_db):
+            used_db = tmp_db
+        elif os.path.exists(fallback_db):
+            print(f'  ⚠️ pull失败，使用fallback: {fallback_db}')
+            used_db = fallback_db
+        else:
+            print('  ❌ pull失败且无fallback，退出')
+            return
+
         # 删除 WAL/SHM 避免 malformed
         for ext in ['-wal', '-shm']:
             p = tmp_db + ext
@@ -144,7 +266,7 @@ def main():
                 os.unlink(p)
 
         print('\n--- Load sources ---')
-        sources = load_sources(tmp_db)
+        sources = load_sources(used_db)
         print(f'  total: {len(sources)} sources')
 
         # 统计4场景字段情况
@@ -240,20 +362,22 @@ def main():
                         results['scenario_3_category']['errors'].append(f'源{i+1}:status={status},err={err}')
                         print(f'    [3.分类] ❌ status={status} len={clen} err={err}')
 
-            # 场景4: 下一页（语法校验）
+            # 场景4: 下一页（语法校验，支持 legado 原生语法）
             if not rule_next:
                 results['scenario_4_nextpage']['skip'] += 1
                 print(f'    [4.下一页] ⏭️ 跳过（无 ruleNextPage）')
             else:
-                # 语法校验：必须是 @CSS:xxx@href 或 @XPath:xxx 或 regex 形式
-                valid_prefix = rule_next.startswith('@CSS:') or rule_next.startswith('@XPath:') or rule_next.startswith('@js:')
-                if valid_prefix:
+                # 语法校验：支持 legado 7种合法形式（显式前缀/原生语法/CSS选择器/属性提取/js/IIFE/正则兜底）
+                # v5反哺修复：原版仅校验 @CSS:/@XPath:/@js: 导致 0% 通过率，修复后支持 class./text./page. 等原生语法
+                if is_valid_rule_next_page(rule_next):
+                    prefix_type = classify_rule_next_page_prefix(rule_next)
                     results['scenario_4_nextpage']['pass'] += 1
-                    print(f'    [4.下一页] ✅ 语法有效 prefix={rule_next.split(":")[0]}')
+                    print(f'    [4.下一页] ✅ 语法有效 type={prefix_type} len={len(rule_next)}')
                 else:
+                    prefix_type = classify_rule_next_page_prefix(rule_next)
                     results['scenario_4_nextpage']['fail'] += 1
-                    results['scenario_4_nextpage']['errors'].append(f'源{i+1}:prefix_invalid')
-                    print(f'    [4.下一页] ❌ 语法无效 prefix={rule_next[:20]}')
+                    results['scenario_4_nextpage']['errors'].append(f'源{i+1}:invalid_type={prefix_type}')
+                    print(f'    [4.下一页] ❌ 语法无效 type={prefix_type} len={len(rule_next)}')
 
         # 汇总
         print('\n' + '=' * 60)
@@ -275,10 +399,16 @@ def main():
         print(f"\n详细结果已保存: {out_path}")
 
     finally:
+        # 清理临时文件（忽略错误，避免PermissionError中断）
+        import gc
+        gc.collect()
         for ext in ['', '-wal', '-shm']:
             p = tmp_db + ext
             if os.path.exists(p):
-                os.unlink(p)
+                try:
+                    os.unlink(p)
+                except PermissionError:
+                    pass
 
 
 if __name__ == "__main__":

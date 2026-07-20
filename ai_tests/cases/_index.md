@@ -9,7 +9,7 @@
 | 波次 | 范围 | 状态 | 用例数 | 说明 |
 |------|------|------|-------|------|
 | **第一波** | `docs/tests/*.md` 存量用例 | 🔄 字段补全中 | 208 | V3 源码溯源字段（关联源码/关联 Activity）补全 |
-| **第二波** | `ai_tests/cases/*/*.md` 核心模块矩阵 | ⏳ 待编写 | 35 | 调试工具 5 + 书架 8 + 书源管理 10 + 阅读 12 |
+| **第二波** | `ai_tests/cases/*/*.md` 核心模块矩阵 | ⏳ 待编写 | 59 | 调试工具 5 + 书架 8 + 书源管理 10 + 阅读 12 + 订阅源统一搜索 24 |
 | **第三波** | Bug 反向补充 | ⏳ 待启动 | 按需 | 基于 E5 实测发现的 Bug 反向补充用例 |
 
 ## 目录结构
@@ -25,6 +25,8 @@ ai_tests/cases/
 │   └── case.md
 ├── F-P0-7-reading/                    # 阅读用例（第二波）
 │   └── case.md
+├── F-P0-8-rss-unified-search/         # 订阅源统一搜索用例（第二波）
+│   └── case.md
 └── auto_*.py                          # B 轨 Python 用例（M9 生成 + AI 补全）
 ```
 
@@ -36,6 +38,7 @@ ai_tests/cases/
 | 书架管理 | P0 | 8 | F-P0-5 | BookshelfActivity / BookshelfManageActivity | ⏳ |
 | 书源管理 | P0 | 10 | F-P0-6 | BookSourceActivity / SourceEditActivity | ⏳ |
 | 阅读 | P0 | 12 | F-P0-7 | ReadBookActivity / ReadActivity | ⏳ |
+| 订阅源统一搜索 | P0 | 24 | F-P0-8 | RssSearchActivity / ChangeRssArticleSourceDialog | ⏳ |
 
 ## V3 双轨调度规则
 

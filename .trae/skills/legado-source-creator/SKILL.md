@@ -342,6 +342,12 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 23. **真机测试脚本校验过严误报**：verify_rss_scenarios.py scenario_4 仅校验3种前缀导致0%通过率。**已修复**：支持7种 legado 原生语法（class./text./page./标签./CSS选择器/属性提取/IIFE/正则兜底），通过率从0%→62.5%
 24. **Cronet 库缺失导致 HTTPS 源加载失败**：libcronet.so FileNotFoundException。**必修**：真机测试前启动App等待60秒自动下载 Cronet 库
 
+**陷阱25-28（v6反哺，订阅源年龄验证自动破除实战）**：
+25. **Accept-Encoding 头导致 OkHttp 响应乱码**：手动设置 `Accept-Encoding: gzip, deflate, br` 后 OkHttp 无法解码 brotli。**必修**：永远不在 header 中设置 Accept-Encoding/Connection/Upgrade-Insecure-Requests
+26. **CookieStore 过期值覆盖 header Cookie**：mergeCookies() 中 CookieStore > header，导致"时好时不好"。**必修**：loginCheckJs 中先 `cookie.removeCookie(baseUrl)` 再 `cookie.setCookie()`
+27. **shouldOverrideUrlLoading 仅绑定 java 和 url**：没有 cookie/baseUrl/source/result，`{{}}` 模板也不处理。**必修**：仅使用 java 和 url 变量
+28. **服务端 Cookie 年龄验证三层自动破除**：Layer1 header预置Cookie + Layer2 loginCheckJs检测+清除+重设 + Layer3 injectJs WebView自动点击。**必修**：三层防护配置
+
 ### 实战数据（65 源）
 
 | 指标 | 数据 |

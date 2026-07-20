@@ -188,6 +188,40 @@ m ? decodeURIComponent(m[1]) : ''
 - **WebFetch 能获取渲染后的内容**，但不能用来验证 OkHttp 获取的内容是否完整
 - **验证 OkHttp 获取内容是否完整的唯一方式**：用 Python requests 获取 HTML，搜索目标选择器的匹配数量
 
+## 1.1h Accept-Encoding 头导致 OkHttp 响应乱码（⚠️ 实战教训）
+
+**现象**：订阅源/书源配置了 `Accept-Encoding: gzip, deflate, br` 请求头后，OkHttp 返回的 HTML 内容全是乱码，CSS 选择器匹配 0 元素。
+
+**根因**：OkHttp 默认自动添加 `Accept-Encoding: gzip` 并在收到 gzip 响应后自动解码。但手动设置 `Accept-Encoding` 头后：
+
+1. **OkHttp 不再自动添加** `Accept-Encoding` 头，而是使用用户指定的值
+2. 如果指定了 `br`（brotli 编码），OkHttp **没有内置 brotli 解码器**，无法解码响应
+3. 服务器返回 brotli 编码的响应体，OkHttp 直接将压缩数据当作原始 HTML 传给解析器
+4. 解析器收到的是乱码字节流，CSS 选择器自然匹配不到任何元素
+
+**源码依据**：OkHttp 的 `BridgeInterceptor` 在用户未指定 `Accept-Encoding` 时自动添加 `gzip`，并在 `ResponseBody` 中自动解包 gzip。但用户手动指定后，`BridgeInterceptor` 不再干预，响应体直接透传。
+
+**解决方案**：
+
+```json
+// ❌ 错误：手动设置 Accept-Encoding（含 br）
+"header": "{\n\t\"Accept-Encoding\": \"gzip, deflate, br\"\n}"
+
+// ✅ 正确：不要设置 Accept-Encoding，让 OkHttp 自动管理
+"header": "{\n\t\"User-Agent\": \"...\",\n\t\"Accept-Language\": \"zh-CN,zh;q=0.9\"\n}"
+```
+
+**教训**：
+- **永远不要手动设置 `Accept-Encoding` 头** — OkHttp 会自动处理 gzip 编解码
+- **不要设置 `Connection: keep-alive`** — OkHttp 自动管理连接
+- **不要设置 `Upgrade-Insecure-Requests`** — 这是浏览器行为，App 网络请求不需要
+- 只设置对业务逻辑有意义的头（如 User-Agent、Cookie、Referer、Accept-Language）
+
+**诊断方法**：
+1. 检查 `sourceDebug` 日志：如果显示 `列表大小:0` 但 HTML 长度不为 0，可能是编码问题
+2. 检查响应内容：如果包含大量不可读字符（乱码），大概率是 Accept-Encoding 导致的
+3. 移除 Accept-Encoding 头后重新测试
+
 ## CF 保护网站获取方案
 
 当 curl 直接获取被 CF 拦截时，使用 html_fetcher.py 回退链：

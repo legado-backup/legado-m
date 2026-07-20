@@ -240,7 +240,102 @@ ruleImage: class.lazy-imgs.0@data-src||tag.img.0@data-src
 
 **ruleArticles 索引跳过问题**：列表页用 `class.tr3[!0:3]` 跳过置顶帖，但搜索结果页无置顶帖，`[!0:3]` 会误跳前3条正常结果。有 searchUrl 时建议去掉索引跳过。
 
-## 5. loginCheckJs 执行环境源码分析
+## 5. shouldOverrideUrlLoading 执行环境源码分析
+
+> 验证日期：2026-07-20
+> 源码文件：ReadRssActivity.kt L749-770
+
+### 执行环境
+
+shouldOverrideUrlLoading 在 **Rhino JS 引擎**中执行，不是 WebView！
+
+```kotlin
+// ReadRssActivity.kt L749-770
+private fun shouldOverrideUrlLoading(url: Uri): Boolean {
+    viewModel.rssSource?.let { source ->
+        source.shouldOverrideUrlLoading?.let { js ->
+            val result = runCatching {
+                runScriptWithContext(lifecycleScope.coroutineContext) {
+                    source.evalJS(js) {
+                        put("java", rssJsExtensions)
+                        put("url", url.toString())
+                    }.toString()
+                }
+            }.onFailure {
+                AppLog.put("${source.getTag()}: url跳转拦截js出错", it)
+            }.getOrNull()
+            if (result.isTrue()) return true
+        }
+    }
+    return handleCommonSchemes(url)
+}
+```
+
+### 关键约束
+
+1. **仅绑定 `java` 和 `url` 两个变量**：没有 `baseUrl`、`cookie`、`cache`、`result`、`source` 等
+2. **不能使用 `cookie.setCookie()`**：没有 `cookie` 绑定
+3. **不能使用 `{{}}` 模板语法**：shouldOverrideUrlLoading 不经过 AnalyzeUrl，`{{}}` 不会被处理
+4. **必须使用 ES5 语法**：Rhino 1.8.1 不支持 ES6+
+5. **返回值是 Boolean 字符串**：`"true"` 拦截跳转，`"false"` 不拦截
+
+### 正确写法
+
+```javascript
+// ✅ 正确：ES5 语法，仅使用 java 和 url
+if(url.indexOf('/chinese_category/')>-1){java.open('sort',url);true}else{false}
+
+// ❌ 错误：使用 ES6 模板字符串
+if(url.includes('/chinese_category/')){java.open('sort',url);true}else{false}
+
+// ❌ 错误：使用 {{}} 模板（不会被处理）
+if(url.indexOf('{{source.sourceUrl}}')>-1){...}
+
+// ❌ 错误：使用 cookie 变量（未绑定）
+cookie.setCookie(baseUrl, '...')
+```
+
+## 6. injectJs 执行环境源码分析
+
+> 验证日期：2026-07-20
+> 源码文件：ReadRssActivity.kt L723-741
+
+### 执行环境
+
+injectJs 在 **WebView 的 JavaScript 引擎**中执行，不是 Rhino！
+
+```kotlin
+// ReadRssActivity.kt L723-741
+override fun onPageFinished(view: WebView, url: String) {
+    super.onPageFinished(view, url)
+    viewModel.rssSource?.injectJs?.let {
+        if (it.isNotBlank()) { view.evaluateJavascript(it, null) }
+    }
+}
+```
+
+### 关键约束
+
+1. **在 WebView 的 JS 引擎中执行**：可以使用 `document`、`window`、`localStorage` 等浏览器 API
+2. **可以使用 ES6+ 语法**（取决于 WebView 的 V8 引擎版本），但建议使用 ES5 兼容写法以最大化兼容性
+3. **每次页面加载完成后执行**：包括页面导航、刷新、重定向
+4. **不能直接访问 Legado 的 Java 对象**：没有 `java`、`cookie`、`cache` 绑定
+5. **适合自动化 DOM 操作**：自动点击按钮、关闭弹框、注入样式等
+
+### 典型用法
+
+```javascript
+// 自动点击年龄确认按钮
+(function(){var btn=document.getElementById('confirm_btn');if(btn){btn.click()}})()
+
+// 自动关闭弹框
+(function(){var modal=document.querySelector('.modal-overlay');if(modal){modal.remove()}})()
+
+// 注入自定义样式
+(function(){var s=document.createElement('style');s.textContent='.ad-banner{display:none}';document.head.appendChild(s)})()
+```
+
+## 7. loginCheckJs 执行环境源码分析
 
 > 验证日期：2026-06-05
 > 源码文件：Rss.kt L53-77、AnalyzeUrl.kt L364-388
