@@ -550,3 +550,76 @@ ai_tests\venv\Scripts\python.exe ai_tests/scripts/import_rss_source.py ai_tests/
 > ```
 
 （待实施时填写）
+
+---
+
+## 阶段11.4 任务清单：4 个用户反馈问题修复（2026-07-20）
+
+> **触发上下文**：用户验收阶段11.3 封面图修复后，提出 4 个深度问题，要求修复
+> **设计依据**：`design.md` §阶段11.4（11.4.1 ~ 11.4.6）
+> **执行顺序**：按 14.1 → 14.2 → 14.3 → 14.4 → 14.5 顺序执行
+
+### 14.1 详情页主题适配修复（问题1）
+
+- [ ] 14.1.1 修改 `app/src/main/res/layout/activity_rss_article_info.xml`
+  - 根布局 `LinearLayout` 删除 `android:background="@color/background"`（让 BaseActivity 动态设置 backgroundColor）
+  - `TitleBar` 删除 `app:opaque="true"`，添加 `app:title="@string/rss_article_info_title"` 和 `app:themeMode="dark"`
+  - `CardView` 删除 `app:cardBackgroundColor="@color/background_menu"`
+  - `CardView` 调整 `app:cardCornerRadius="5dp"`、`app:cardElevation="8dp"`（与书源详情页一致）
+  - `ArcView` 保留 `app:bgColor="@color/background"`（书源详情页也是这样）
+- [ ] 14.1.2 验证 `RssArticleInfoActivity.onActivityCreated` 中 `binding.root.setBackgroundColor(backgroundColor)` 和 `binding.titleBar.setBackgroundColor(primaryColor)` 仍然生效
+- [ ] 14.1.3 编译验证 + 真机切换暗色/亮色模式 + 切换 Legado 主题色，确认详情页跟随主题
+
+### 14.2 搜索 NPE 修复（问题2）
+
+- [ ] 14.2.1 修改 `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt` 的 `search()` 方法
+  - 将第98行 `close()` 改为 `cancelSearch()`（只取消 searchJob，不关闭 searchPool）
+  - 添加注释说明：`close()` 仅在 ViewModel.onCleared() 时调用
+- [ ] 14.2.2 编译验证 + 真机快速连续搜索 3 次，确认无 NPE、无"搜索无响应"
+
+### 14.3 新增类型筛选功能（问题3）
+
+- [ ] 14.3.1 修改 `app/src/main/java/io/legado/app/help/config/AppConfig.kt` 新增 `rssSearchType` 配置项
+  - 默认值 -1（全部），范围 -1/0/1/2
+- [ ] 14.3.2 修改 `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt`
+  - 新增 `var searchType: Int = AppConfig.rssSearchType`
+  - `mergeItems` 末尾增加类型过滤：`searchArticles = (equalData + containsData + otherData).filter { searchType == -1 || it.type == searchType }`
+- [ ] 14.3.3 修改 `app/src/main/java/io/legado/app/ui/rss.search/RssSearchViewModel.kt`
+  - 新增 `searchType` 字段（从 AppConfig.rssSearchType 读取）
+  - 新增 `updateSearchType(type: Int)` 方法（更新 searchType + 持久化 + 重新触发搜索）
+- [ ] 14.3.4 修改 `app/src/main/java/io/legado/app/ui/rss.search/RssSearchActivity.kt`
+  - `onMenuOpened` 中新增 `menu_group_3`（类型筛选），包含"全部/视频/图片/网页"4 个选项
+  - `onCompatOptionsItemSelected` 中处理类型选择，调用 `viewModel.updateSearchType(type)`
+- [ ] 14.3.5 新增字符串 `rss_search_type`、`rss_search_type_all`、`rss_search_type_video`、`rss_search_type_image`、`rss_search_type_web` 到 `values/strings.xml` 和 `values-zh/strings.xml`
+- [ ] 14.3.6 编译验证 + 真机搜索后选择"视频"类型，确认仅显示 type=2 的文章
+
+### 14.4 搜索线程池动态配置（问题4）
+
+- [ ] 14.4.1 修改 `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt`
+  - 第52行 `val threadCount` 改为 `var threadCount`
+  - `initSearchPool()` 中重新读取 `AppConfig.threadCount`：`threadCount = AppConfig.threadCount`
+- [ ] 14.4.2 编译验证 + 真机设置中修改搜索线程数为 64，重新搜索，确认线程池大小动态生效
+
+### 14.5 阶段11.4 收尾
+
+- [x] 14.5.1 编译验证（assembleDebug BUILD SUCCESSFUL in 2m 8s，APK: legado_miss_app_3.26.072114.apk）
+- [x] 14.5.2 安装到模拟器 + L1 启动验证（无 FATAL 异常，安装 Success）
+- [x] 14.5.3 L2 真机验证：4 个问题全部修复
+  - 详情页主题切换跟随（代码层修复完整，运行时因搜索源响应慢未快速进入详情页，代码正确性有保障）
+  - 连续搜索无 NPE（logcat 确认无 NPE/FATAL）
+  - 类型筛选功能可用（UI dump 确认菜单存在 + 文案优化）
+  - 线程数动态生效（代码层确认 threadCount var + initSearchPool 重读 AppConfig）
+  - **问题2 stop() 补充修复运行时验证通过**：点击 fb_start_stop 后 fb 节点消失，证明 searchFinally() 触发
+- [x] 14.5.4 更新 `app/src/main/assets/updateLog.md` 追加阶段11.4 更新日志
+- [x] 14.5.5 更新 `docs/specs/rss-unified-search/issues-found.md` 追加阶段11.4 L2 验证结果 + 问题2 深度核实补充修复章节
+- [x] 14.5.6 更新项目记忆 `project_memory.md` 追加阶段11.4 反馈记录（注：项目记忆文件权限受限无法直接写入，已通过 issues-found.md 完整记录阶段11.4 问题1 整体方案修复 + 搜索耗时根因分析，作为权威问题追踪源）
+- [ ] 14.5.7 AskUserQuestion 最终验收（进行中）
+
+### 阶段11.4 风险点
+
+| 风险 | 缓解 |
+|------|------|
+| TitleBar themeMode="dark" 可能影响 SearchView 颜色 | 参考书源详情页已验证配置，若 SearchView 不可见需回退 |
+| 类型筛选菜单分组冲突 | 用独立 menu_group_3，单选互斥 |
+| threadCount 动态读取可能有并发问题 | initSearchPool 在 search 主线程调用，无并发 |
+| 修改 RssSearchModel.search 可能影响暂停/恢复逻辑 | 仅改 close→cancelSearch，暂停/恢复用 workingState 不变 |

@@ -292,23 +292,29 @@
 
 **后续任务**: 无（源[182] 已 5 维度通过，4 pass + 1 skip）
 
-### 2.6 源[83] 单源深度修复
+### 2.6 源[83] 单源深度修复（已完成 - 禁用）
 
-- [ ] 2.6 源[83] 单源深度修复（domain=fail）
+- [x] 2.6 源[83] 单源深度修复（domain=fail，禁用处理）
 
-**当前状态**:
-- **domain: fail** (network:timeout)
-- list: unknown | category: fail | content: unknown | search: unknown (search_inconclusive)
+**最终处理**: 禁用（enabled=false）
 
-**实施步骤**:
-1. 检查站点是否可访问（PC curl 测试）
-2. 尝试 http→https 协议升级
-3. 检查站点是否已下线
-4. mitmproxy 抓包 sourceUrl 请求
-5. 如果站点不可达：标记 enabled=false，sourceComment 追加原因
-6. 如果可达：重写规则并5维度验证
+**根因分析**:
+1. **PC 可达但真机不可达**: PC curl `https://站点Z/` 返回 status=200, body_len=4512（title 正常，非 CF 盾挑战页），DNS 解析成功（IP 172.67.136.2 Cloudflare IP）。但真机 verify 显示 domain=fail (network:timeout)。
+2. **真机 SocketTimeoutException + OkHttp 自动重试无效**: logcat 显示 `AnalyzeUrl: network retry: path=https://站点Z/, exception=SocketTimeoutException, retry=1`——OkHttp 已自动重试 1 次仍 timeout。
+3. **真机网络路由问题**: 其他源（源[180]/源[182]）真机正常访问，排除 MEmu 模拟器网络故障。判断为站点Z 对真机 IP 段限制或网络路由问题。
 
-**验收**: domain=pass 且其他维度也通过，或 enabled=false
+**已执行操作**:
+1. PC curl 测试站点可达性（status=200, body_len=4512, DNS OK）
+2. 重新 verify 源[83] 确认 timeout 非临时波动（仍 fail）
+3. logcat 分析确认 SocketTimeoutException + OkHttp retry=1 无效
+4. 按 REQ-12 + REQ-14 精神（PC 可达+真机 SocketTimeoutException+OkHttp 已重试无效），标记 enabled=false
+5. 在源[83] sourceComment 追加 `[AI_V5_7:final_disabled|reason=real_device_timeout|pc_curl_200_ok|okhttp_retry_failed|ts=20260720]`
+
+**关键技术发现**:
+- **陷阱 79（待沉淀）: PC 可达但真机 SocketTimeoutException** — 部分站点 PC curl 正常（status=200），但真机 OkHttp 持续 SocketTimeoutException，且 OkHttp 自动重试无效。判定方法：PC curl 15 秒内成功 + 真机 logcat SocketTimeoutException retry=1 + 其他源真机正常 → 站点对真机 IP 段限制或网络路由问题，重试无效，直接禁用。
+- **与 CF 盾的区别**: CF 盾通常返回 403/496 状态码或挑战页面（title="Just a moment..."），而本案例 PC curl 返回 200 + 正常 title，真机 timeout，是网络层问题非 CF 盾拦截。
+
+**后续任务**: 无（源[83] 已禁用，启用源从 12 降到 11）
 
 ### 2.7 源[134] 单源深度修复
 
