@@ -832,3 +832,181 @@ lifecycleScope.launch {
     }
 }
 ```
+
+---
+
+## 阶段11.4 设计：4 个用户反馈问题修复（2026-07-20）
+
+> **触发上下文**：用户验收阶段11.3 封面图修复后，提出 4 个深度问题：
+> 1. 详情页整体风格和系统主题不搭 + 不跟随主题切换
+> 2. 搜索时好时坏（有时候能搜索，有时候等半天没响应）
+> 3. 右上角缺少按类型筛选搜索（视频/图片/网页）
+> 4. 搜索线程池是写死的还是复用书源配置？期望和书源搜索线程大小配置一致
+
+### 11.4.1 问题1：详情页主题适配修复
+
+**根因分析**：
+- `activity_rss_article_info.xml` 根布局 `LinearLayout` 设置了 `android:background="@color/background"`，覆盖了 `BaseActivity.onCreateView` 第73行 `(parent.parent as View).setBackgroundColor(backgroundColor)` 的动态背景色设置
+- TitleBar 用 `app:opaque="true"`，缺少 `app:title` 和 `app:themeMode="dark"`（书源详情页 `activity_book_info.xml#L29` 有 `app:themeMode="dark"` + `app:title="@string/book_info"`）
+- CardView 多了 `app:cardBackgroundColor="@color/background_menu"`（书源详情页无此属性，用默认主题）
+- CardView 的 `cardElevation=4dp`、`cardCornerRadius=8dp` 与书源详情页 `cardElevation=8dp`、`cardCornerRadius=5dp` 不一致
+- 布局中所有 `@color/background`、`@color/primaryText`、`@color/tv_text_summary` 等是静态颜色，在 `values/colors.xml` 与 `values-night/colors.xml` 中有重定义（暗色模式可切换），但不跟随 Legado 应用内主题色（primaryColor/accentColor/backgroundColor）切换
+
+**修复方案**：
+1. **根布局**：删除 `android:background="@color/background"`，让 `BaseActivity` 动态设置 `backgroundColor`
+2. **TitleBar**：
+   - 添加 `app:title="@string/rss_article_info_title"`
+   - 删除 `app:opaque="true"`，改用 `app:themeMode="dark"`（与书源详情页一致）
+3. **CardView**：
+   - 删除 `app:cardBackgroundColor="@color/background_menu"`（用默认主题）
+   - 调整 `cardCornerRadius="5dp"`、`cardElevation="8dp"`（与书源详情页一致）
+4. **ArcView**：保留 `app:bgColor="@color/background"`（书源详情页也是这样，暗色模式可切换）
+5. **Activity 代码**：`RssArticleInfoActivity.onActivityCreated` 中保留 `binding.root.setBackgroundColor(backgroundColor)` 和 `binding.titleBar.setBackgroundColor(primaryColor)`，新增动态设置 TextView/ImageView 颜色（可选，因书源详情页未做也用静态颜色）
+
+**影响文件**：
+- `app/src/main/res/layout/activity_rss_article_info.xml`
+
+### 11.4.2 问题2：搜索时好时坏（NPE 根因）
+
+**根因分析**（`RssSearchModel.kt#L83-L105`）：
+```kotlin
+fun search(searchId: Long, key: String) {
+    val rssSources = callBack.getSearchScope().getRssSources()
+    if (rssSources.isEmpty()) {
+        callBack.onSearchCancel(NoStackTraceException("启用订阅源为空或无 searchUrl"))
+        return
+    }
+    initSearchPool()  // 第90行：初始化线程池
+    if (searchId != mSearchId) {  // 第92行
+        if (key.isEmpty()) {
+            return
+        }
+        searchKey = key
+        if (mSearchId != 0L) {
+            close()  // 第98行：close() 会 searchPool?.close() + searchPool = null
+        }
+        searchArticlesMap.clear()
+        searchArticles = emptyList()
+        mSearchId = searchId
+    }
+    startSearch(rssSources)  // 第104行：scope.launch(searchPool!!) 此时 searchPool=null → NPE
+}
+```
+
+**问题流程**：
+- 第一次搜索：`mSearchId=0L`，进入 if 块但不调用 `close()`，`searchPool` 非 null，搜索成功
+- 第二次搜索：`mSearchId=上次的currentTimeMillis（非0L）`，进入 if 块调用 `close()` → `searchPool=null`，第104行 `searchPool!!` 抛 NPE
+- NPE 在 `scope.launch(searchPool!!)` 处抛出（不在协程内部），被 `BaseViewModel.execute` 的 catch 捕获，可能只记录日志不 toast，用户感知是"搜索无响应"
+
+**修复方案**：
+- 将第98行 `close()` 改为 `cancelSearch()`（只取消 `searchJob`，不关闭 `searchPool`）
+- `close()` 仅在 `ViewModel.onCleared()` 时调用（清理资源）
+
+**修复后代码**：
+```kotlin
+fun search(searchId: Long, key: String) {
+    val rssSources = callBack.getSearchScope().getRssSources()
+    if (rssSources.isEmpty()) {
+        callBack.onSearchCancel(NoStackTraceException("启用订阅源为空或无 searchUrl"))
+        return
+    }
+    initSearchPool()  // 每次搜索重新初始化线程池（含线程数动态读取）
+    if (searchId != mSearchId) {
+        if (key.isEmpty()) {
+            return
+        }
+        searchKey = key
+        if (mSearchId != 0L) {
+            cancelSearch()  // 修复：只取消旧搜索 Job，不关闭线程池
+        }
+        searchArticlesMap.clear()
+        searchArticles = emptyList()
+        mSearchId = searchId
+    }
+    startSearch(rssSources)
+}
+```
+
+**影响文件**：
+- `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt`
+
+### 11.4.3 问题3：新增类型筛选功能
+
+**需求**：右上角菜单支持按文章类型筛选搜索结果（视频/图片/网页/全部）
+
+**设计**：
+1. **新增菜单分组** `menu_group_3`（类型筛选），与现有 `menu_group_1`/`menu_group_2`（分组筛选）隔离
+2. **类型枚举**：
+   - 全部（默认）
+   - 视频（type=2）
+   - 图片（type=1）
+   - 网页（type=0）
+3. **筛选逻辑**：在 `RssSearchModel.mergeItems` 中根据当前类型筛选过滤 `searchArticles`，而不是在搜索时过滤源（因为一个源可能返回多种类型的文章）
+4. **持久化**：类型筛选状态保存到 `AppConfig.rssSearchType`（新增配置项）
+
+**实现方案**：
+1. **RssSearchModel** 新增 `var searchType: Int = -1`（-1=全部，0=网页，1=图片，2=视频）
+2. **RssSearchModel.mergeItems** 末尾增加类型过滤：
+   ```kotlin
+   searchArticles = (equalData + containsData + otherData).filter {
+       searchType == -1 || it.type == searchType
+   }
+   ```
+3. **RssSearchActivity** 菜单新增类型筛选选项：
+   - `onMenuOpened` 中新增 `menu_group_3`，包含"全部/视频/图片/网页"4 个选项
+   - `onCompatOptionsItemSelected` 中处理类型选择，更新 `viewModel.searchType` 并重新触发搜索
+4. **RssSearchViewModel** 新增 `searchType` 字段 + `updateSearchType(type: Int)` 方法
+5. **strings.xml** 新增字符串：`rss_search_type_all`、`rss_search_type_video`、`rss_search_type_image`、`rss_search_type_web`、`rss_search_type`
+6. **AppConfig** 新增 `rssSearchType` 配置项
+
+**影响文件**：
+- `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt`
+- `app/src/main/java/io/legado/app/ui/rss.search/RssSearchActivity.kt`（实际路径 `ui/rss/search`）
+- `app/src/main/java/io/legado/app/ui/rss.search/RssSearchViewModel.kt`
+- `app/src/main/java/io/legado/app/help/config/AppConfig.kt`
+- `app/src/main/res/values/strings.xml` + `values-zh/strings.xml`
+
+### 11.4.4 问题4：搜索线程池动态配置
+
+**根因分析**（`RssSearchModel.kt#L52`）：
+```kotlin
+val threadCount = AppConfig.threadCount  // val 成员变量，初始化后不再变化
+```
+
+**现状**：
+- 已复用书源搜索线程配置 `AppConfig.threadCount`（默认 32，最大 `AppConst.MAX_THREAD`）
+- 但 `val` 初始化后不再读取最新值，用户在"其他设置"修改线程数后不立即生效
+- 书源 `SearchModel.kt#L35` 也是 `val threadCount = AppConfig.threadCount`，但书源每次搜索可能重新创建 Model 实例，问题不明显
+
+**修复方案**：
+1. 将 `val threadCount` 改为 `var threadCount = AppConfig.threadCount`
+2. 在 `initSearchPool()` 中重新读取 `AppConfig.threadCount`：
+   ```kotlin
+   private fun initSearchPool() {
+       searchPool?.close()
+       threadCount = AppConfig.threadCount  // 动态读取最新配置
+       searchPool = Executors
+           .newFixedThreadPool(min(threadCount, AppConst.MAX_THREAD)).asCoroutineDispatcher()
+   }
+   ```
+
+**影响文件**：
+- `app/src/main/java/io/legado/app/model/rss/RssSearchModel.kt`
+
+### 11.4.5 阶段11.4 验证方案
+
+| 场景 | 验证方法 | 预期结果 |
+|------|---------|---------|
+| 详情页主题切换 | 切换系统暗色/亮色模式 + Legado 主题色 | 详情页跟随主题切换，TitleBar/背景/卡片样式与书源详情页一致 |
+| 连续搜索 | 快速连续搜索 3 次 | 每次都能正常搜索，无 NPE、无"搜索无响应" |
+| 类型筛选 | 搜索后选择"视频"类型 | 仅显示 type=2 的文章；选择"图片"仅显示 type=1；选择"全部"显示所有 |
+| 线程数动态生效 | 设置中修改搜索线程数为 64，重新搜索 | 日志显示线程池大小为 64（受 MAX_THREAD 限制） |
+
+### 11.4.6 阶段11.4 风险评估
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 类型筛选误过滤 | 可能漏掉某些文章 | 默认"全部"不过滤，仅在用户主动选择时过滤 |
+| threadCount 动态读取性能 | 每次搜索读一次 SharedPreferences | 影响极小，可忽略 |
+| TitleBar themeMode 切换 | 可能影响 TitleBar 内 SearchView 的颜色 | 参考 `activity_book_info.xml` 已验证的配置 |
+| 类型筛选菜单分组冲突 | 与分组筛选菜单混淆 | 用独立 `menu_group_3`，单选互斥 |
