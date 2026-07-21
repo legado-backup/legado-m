@@ -86,6 +86,7 @@
 | [project-flow/modules/source-management.md](./project-flow/modules/source-management.md) | 导入/导出/校验/调试/登录/18+过滤/排序全链路 |
 | [project-flow/modules/model-layer.md](./project-flow/modules/model-layer.md) | ReadAloud/VideoPlay/BookCover/CheckSource/Debug/RuleUpdate/SharedJsScope |
 | [project-flow/modules/rss-subsystem.md](./project-flow/modules/rss-subsystem.md) | Rss调度+RssParserByRule规则解析+RssParserDefault标准解析+文章流UI |
+| [project-flow/modules/rss-image-type-analysis.md](./project-flow/modules/rss-image-type-analysis.md) | 图片类型订阅源（type=1）内容规则加载图片完整链路+ruleContent适配方式+coverDecodeJs解密+与BookSource差距分析 |
 | [project-flow/modules/tools-infrastructure.md](./project-flow/modules/tools-infrastructure.md) | utils工具类+协程封装+加密+广播接收器 |
 | [project-flow/modules/custom-libraries.md](./project-flow/modules/custom-libraries.md) | MOBI解析引擎+WebDAV客户端+主题引擎+阿里云TTS |
 
