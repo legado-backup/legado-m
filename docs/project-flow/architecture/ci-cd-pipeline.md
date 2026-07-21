@@ -308,11 +308,13 @@ on:
 
 | 命令 | 说明 |
 |------|------|
-| `./gradlew assembleApprelease` | 构建原包名Release版 |
-| `./gradlew assembleAppreleaseS` | 构建共存版ReleaseS |
-| `./gradlew assembleGooglerelease` | 构建Google Play版 |
-| `./gradlew assembleAppdebug` | 构建Debug版 |
+| `./gradlew assembleAppRelease` | 构建原包名Release版（App 首字母大写，Gradle 任务名大小写敏感） |
+| `./gradlew assembleAppReleaseS` | 构建共存版ReleaseS |
+| `./gradlew assembleGoogleRelease` | 构建Google Play版 |
+| `./gradlew assembleAppDebug` | 构建Debug版 |
 | `./gradlew --build-cache --parallel --daemon` | 启用缓存/并行/守护进程 |
+
+> **原版 CI/CD 与本项目差异**：本文档描述的是原版 legado-E 的 GitHub Actions CI/CD 流程（使用 GitHub Secrets 注入签名）。本项目（阅读M）的本地打包流程、签名配置（local.properties 方式）、构建后验证（签名/桌面显示名/安装/启动）详见 [build-apk-guide.md](../build-apk-guide.md)。
 
 ---
 

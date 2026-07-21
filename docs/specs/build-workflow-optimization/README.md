@@ -1,5 +1,7 @@
 # 打包流程规整
 
+> ⚠️ **历史 spec 文档提示（2026-07-21 更新）**：本 spec 文档创建时项目包名为 `io.legado.missapp`（无点），后续已重命名为 `io.legado.miss.app`（有点）。本文档中所有 `io.legado.missapp` 均为历史值，**实际打包请以 [build-apk-guide.md](../../project-flow/build-apk-guide.md) 为准**（包名 `io.legado.miss.app`、任务名 `assembleAppDebug`/`assembleAppRelease`、签名用 local.properties 方式）。
+
 > 统一 Legado 项目的包名规范与打包流程，提供面向 AI 执行的标准化操作指南，解决当前脚本与构建配置不一致的问题。
 
 ## 背景与问题

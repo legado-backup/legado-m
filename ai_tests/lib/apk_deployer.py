@@ -141,7 +141,7 @@ class ApkDeployer:
     def wait_for_first_frame(self, timeout: int = TIMEOUT_FIRST_FRAME) -> bool:
         """等待 App 首屏渲染
 
-        抓 logcat "Displayed io.legado.app" 关键字
+        抓 logcat "Displayed {PACKAGE}" 关键字（PACKAGE 见 config.py，默认 io.legado.miss.app.debug）
         """
         # 先清空 logcat 缓冲
         self.memu.adb("logcat", "-c")

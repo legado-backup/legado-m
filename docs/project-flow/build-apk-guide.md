@@ -210,45 +210,101 @@ gradlew --version     # 应显示 Gradle 8.x
 
 > **注意**：debug 和 release 的 applicationId 不同（后缀不同），可以在同一设备上同时安装。
 
+### 桌面显示名配置（app_name）
+
+桌面显示名由 `AndroidManifest.xml` 的 `android:label="${app_name}"` 占位符决定，`app/build.gradle` 的 buildTypes 根据 applicationIdSuffix 选择不同的 strings.xml 字段：
+
+```groovy
+buildTypes {
+    release {
+        if (getApplicationIdSuffix() == '.releaseA') {
+            manifestPlaceholders.put("app_name", "@string/app_name_a")  // 阅读M·A
+        } else if (getApplicationIdSuffix() == '.releaseS') {
+            manifestPlaceholders.put("app_name", "@string/app_name_s")  // LegadoPlus
+        } else {
+            manifestPlaceholders.put("app_name", "@string/app_name")    // 阅读M
+        }
+    }
+    debug {
+        manifestPlaceholders.put("app_name", "@string/app_name")        // 阅读M
+    }
+}
+```
+
+**app_name 字段在 4 个 strings.xml 中配置**（必须同步修改，否则中文系统下显示名会缺"M"）：
+
+| 文件 | app_name | app_name_a | app_name_s | 适用语言 |
+|------|---------|-----------|-----------|---------|
+| `values/strings.xml` | 阅读M | 阅读M·A | LegadoPlus | 默认（英语等） |
+| `values-zh/strings.xml` | 阅读M | 阅读M·A | 阅读Plus | 中文（简体） |
+| `values-zh-rTW/strings.xml` | 閱讀M | 閱讀M·A | — | 中文（台湾繁体） |
+| `values-zh-rHK/strings.xml` | 閲讀M | 閲讀M·A | — | 中文（香港繁体） |
+
+> **踩坑警告**：Android 资源限定符优先级——中文系统（zh-CN）优先匹配 `values-zh/`，而非默认 `values/`。如果只改 `values/strings.xml` 的 app_name 为"阅读M"，而 `values-zh/strings.xml` 仍是"阅读"，中文系统下桌面显示名仍是"阅读"（缺 M）。**4 个文件必须同步修改**。
+
+> **resConfigs 限制**：`app/build.gradle` 的 `resConfigs 'zh', 'zh-rHK', 'zh-rTW', 'en', ...` 限制了打包的语言资源，只有这些语言的 strings.xml 会被打包进 APK。
+
 ---
 
 ## 三、签名配置（Release 构建）
 
+> **重要**：Release 构建必须配置签名，否则生成的 APK 未签名无法安装（报 `INSTALL_PARSE_FAILED_NO_CERTIFICATES`）。Debug 构建使用默认 debug 签名，无需配置。
+
 ### 3.1 生成签名密钥
 
+在项目根目录执行（生成的 `legado.jks` 放项目根目录）：
+
 ```powershell
-keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 10000 -alias legado
+keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 10000 -alias legado -storepass legado -keypass legado -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
 ```
 
-按提示输入密码、姓名、组织等信息。生成的 `legado.jks` 文件请妥善保管。
+参数说明：
+- `-keystore legado.jks`：密钥库文件名（放项目根目录）
+- `-keyalg RSA -keysize 2048`：RSA 2048 位密钥
+- `-validity 10000`：有效期 10000 天（约 27 年）
+- `-alias legado`：密钥别名
+- `-storepass legado -keypass legado`：密钥库密码和密钥密码（可改为自己的）
+- `-dname`：证书持有者信息
 
-### 3.2 配置签名信息
+> **密钥保管**：`legado.jks` 是签名密钥，丢失后无法发布同名应用的更新版本。已添加到 `.gitignore`（`*.jks` + `*.keystore`），不会提交到 git。
 
-在 `gradle.properties` 文件末尾追加（此文件含敏感信息，确保不提交到公开仓库）：
+### 3.2 配置签名信息（local.properties 方式，推荐）
+
+签名配置存放在 `local.properties`（已在 `.gitignore` 中，不入 git），不存放在 `gradle.properties`（避免敏感信息误提交）。
+
+在项目根目录 `local.properties` 文件末尾追加：
 
 ```properties
-RELEASE_STORE_FILE=./legado.jks
-RELEASE_STORE_PASSWORD=你的密钥库密码
+# 签名配置（不入 git，仅本地使用）
+# keystore 文件放在项目根目录 legado.jks
+RELEASE_STORE_FILE=legado.jks
+RELEASE_STORE_PASSWORD=legado
 RELEASE_KEY_ALIAS=legado
-RELEASE_KEY_PASSWORD=你的密钥密码
+RELEASE_KEY_PASSWORD=legado
 ```
 
-将 `legado.jks` 文件复制到 `app/` 目录下。
+> **CI/CD 场景**：如需在 CI/CD 中使用，可改用 `gradle.properties` 或命令行 `-P` 参数传入（优先级：命令行 -P > gradle.properties > local.properties）。
 
-> **项目内置签名文件**：`.github/workflows/legado.jks` 是 CI/CD 使用的签名文件（base64 编码在 GitHub Secrets 中），本地构建需自行生成。
+### 3.3 签名配置原理（build.gradle 读取逻辑）
 
-### 3.3 签名配置原理
-
-`app/build.gradle` 中的签名逻辑：
+`app/build.gradle` 中的签名配置读取逻辑（支持 local.properties fallback）：
 
 ```groovy
+// 签名配置读取顺序：gradle.properties / 命令行 -P → local.properties（不入 git）
+// local.properties 用于本地开发，gradle.properties 用于 CI/CD
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localProps.load(new FileInputStream(localPropsFile))
+}
+def storeFilePath = project.findProperty("RELEASE_STORE_FILE") ?: localProps.getProperty("RELEASE_STORE_FILE")
 signingConfigs {
-    if (project.hasProperty("RELEASE_STORE_FILE")) {
+    if (storeFilePath != null) {
         myConfig {
-            storeFile file(RELEASE_STORE_FILE)
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
+            storeFile rootProject.file(storeFilePath)
+            storePassword project.findProperty("RELEASE_STORE_PASSWORD") ?: localProps.getProperty("RELEASE_STORE_PASSWORD")
+            keyAlias project.findProperty("RELEASE_KEY_ALIAS") ?: localProps.getProperty("RELEASE_KEY_ALIAS")
+            keyPassword project.findProperty("RELEASE_KEY_PASSWORD") ?: localProps.getProperty("RELEASE_KEY_PASSWORD")
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
@@ -258,7 +314,38 @@ signingConfigs {
 }
 ```
 
-如果 `gradle.properties` 中没有 `RELEASE_STORE_FILE` 属性，Release 构建将不签名（生成未签名 APK）。
+**buildTypes 中关联签名配置**（关键：必须用 `storeFilePath != null` 判断，不能用 `project.hasProperty`）：
+
+```groovy
+buildTypes {
+    release {
+        if (storeFilePath != null) {
+            signingConfig signingConfigs.myConfig
+        }
+        // ...
+    }
+    debug {
+        if (storeFilePath != null) {
+            signingConfig signingConfigs.myConfig
+        }
+        // ...
+    }
+}
+```
+
+> **踩坑警告**：如果 buildTypes 用 `project.hasProperty("RELEASE_STORE_FILE")` 判断，只检查命令行 -P 参数和 gradle.properties，**不检查 local.properties**，导致只用 local.properties 配置时 Release APK 未签名。必须用 `storeFilePath != null` 判断。
+
+### 3.4 签名方案说明
+
+| 签名方案 | 版本要求 | 说明 |
+|---------|---------|------|
+| v1 (JAR signing) | Android 7.0 以下 | 基于 META-INF/MANIFEST.MF，兼容旧设备 |
+| v2 (APK Signature Scheme v2) | Android 7.0+ | APK Signing Block，完整 APK 校验 |
+| v3 (APK Signature Scheme v3) | Android 9.0+ | 支持密钥轮换 |
+| v3.1 | Android 11+ | v3 的改良版（可选） |
+| v4 (APK Signature Scheme v4) | Android 11+ | 需要 `.idsig` 文件，用于增量安装 |
+
+> **本地构建**：enableV1Signing + enableV2Signing + enableV3Signing 设为 true 即可（v4 需要 `.idsig` 文件，本地安装可不用）。
 
 ---
 
@@ -289,6 +376,37 @@ Debug 构建无需签名配置，使用默认 debug 签名。
 # app\build\outputs\apk\app\release\legado_miss_app_3.版本号.apk
 ```
 
+**修改签名配置或 strings.xml 后必须用 --rerun-tasks 强制重新打包**：
+
+```powershell
+# Gradle 可能因缓存判断 signingConfigs 未变化而 UP-TO-DATE 跳过打包
+# 修改 build.gradle 签名配置或 strings.xml 后，用 --rerun-tasks 强制重新执行所有任务
+.\gradlew assembleAppRelease --rerun-tasks
+```
+
+> **踩坑警告**：修改 build.gradle 的 signingConfigs 块后，Gradle 可能仍显示 `:app:packageAppRelease UP-TO-DATE`，生成的 APK 未签名。必须用 `--rerun-tasks` 强制重新打包。
+
+**PowerShell / Git Bash 路径转义注意**：
+
+```powershell
+# ❌ 错误：PowerShell 会把 = 后的值拆分为独立参数
+.\gradlew assembleAppRelease -PRELEASE_STORE_FILE=legado.jks
+# 报错：Task '.jks' not found
+
+# ✅ 正确：用引号包裹 -P 参数
+.\gradlew assembleAppRelease "-PRELEASE_STORE_FILE=legado.jks"
+
+# ❌ 错误：Git Bash 把 Windows 反斜杠路径当转义字符
+f:\path\to\adb.exe devices
+# 报错：command not found
+
+# ✅ 正确：用 cmd //c 执行 Windows 路径命令
+cmd //c "f:\path\to\adb.exe devices"
+
+# ✅ 正确：或者用正斜杠路径
+/f/path/to/adb.exe devices
+```
+
 ### 4.3 构建所有变体
 
 ```powershell
@@ -310,7 +428,81 @@ APK 文件名格式：`legado_<包名标识>_<flavor>_<version>.apk`
 
 > **APK输出目录**：构建成功后APK会自动拷贝到`output/apk/{test|coexist|release}/`子目录，通过子目录隔离不同包类型。
 
-### 4.5 常见构建问题
+### 4.5 构建后验证（重要）
+
+Release APK 构建完成后，必须逐项验证签名、app_name、安装、启动，缺一不可。
+
+#### 4.5.1 签名验证（apksigner verify）
+
+```powershell
+# 用 apksigner 验证 APK 签名（aapt 无法验证签名）
+f:\myself\github\WeAgentChat\temp\legado\temp\android-sdk\build-tools\36.0.0\apksigner.bat verify --verbose <APK路径>
+```
+
+**期望输出**：
+
+```
+Verifies
+Verified using v1 scheme (JAR signing): true
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Number of signers: 1
+```
+
+> **失败排查**：如果输出 `DOES NOT VERIFY` 或 `Missing META-INF/MANIFEST.MF`，说明 APK 未签名。检查 build.gradle 的 buildTypes 是否用 `storeFilePath != null` 判断签名配置（不是 `project.hasProperty`），并用 `--rerun-tasks` 重新打包。
+
+#### 4.5.2 桌面显示名验证（aapt dump badging）
+
+```powershell
+# 用 aapt 查询 APK 的 application-label（必须用 PowerShell + UTF-8 输出中文）
+powershell -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & '<SDK路径>\build-tools\36.0.0\aapt.exe' dump badging '<APK路径>' | Select-String 'application-label'"
+```
+
+**期望输出**（中文系统需确认 zh/zh-HK/zh-TW 都带"M"）：
+
+```
+application-label:'阅读M'
+application-label-zh:'阅读M'
+application-label-zh-HK:'閲讀M'
+application-label-zh-TW:'閱讀M'
+```
+
+> **失败排查**：如果 `application-label-zh` 是"阅读"（缺 M），说明 `values-zh/strings.xml` 的 app_name 未同步修改。4 个 strings.xml 必须同步修改（见"桌面显示名配置"小节）。
+
+> **编码注意**：cmd 控制台用 GBK 编码，中文会显示为乱码（如"闃呰M"）。必须用 PowerShell + `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` 输出 UTF-8。
+
+#### 4.5.3 安装验证（adb install）
+
+```powershell
+# 卸载旧版本（避免签名冲突）
+adb uninstall io.legado.miss.app.release
+
+# 安装新 APK
+adb install -r <APK路径>
+
+# 期望输出：Success
+```
+
+> **失败排查**：
+> - `INSTALL_PARSE_FAILED_NO_CERTIFICATES`：APK 未签名，见 4.5.1
+> - `INSTALL_FAILED_UPDATE_INCOMPATIBLE`：签名不一致，先卸载旧版本再安装
+> - `INSTALL_FAILED_NO_MATCHING_ABIS`：ABI 不匹配，APK 不含设备 CPU 架构（当前仅打包 arm64-v8a/armeabi-v7a，x86 模拟器需 ARM 兼容层如 MEmu 的 Houdini）
+
+#### 4.5.4 启动验证（am start + dumpsys）
+
+```powershell
+# 启动 App
+adb shell am start -n io.legado.miss.app.release/io.legado.app.ui.main.MainActivity
+
+# 等待 5 秒后检查是否崩溃
+adb shell dumpsys activity activities | findstr mResumedActivity
+
+# 期望输出：mResumedActivity: ActivityRecord{... io.legado.miss.app.release/io.legado.app.ui.main.MainActivity ...}
+```
+
+> **失败排查**：如果 `mResumedActivity` 不是 `io.legado.miss.app.release/...`，说明 App 启动后崩溃。用 `adb logcat | findstr AndroidRuntime` 查看崩溃日志。
+
+### 4.6 常见构建问题
 
 | 问题 | 原因 | 解决方案 |
 |------|------|---------|
@@ -319,12 +511,29 @@ APK 文件名格式：`legado_<包名标识>_<flavor>_<version>.apk`
 | Cronet 下载失败 | 网络问题 | 配置代理或手动下载 Cronet JAR |
 | `Execution failed for ':app:kspDebugKotlin'` | Room schema 冲突 | `.\gradlew clean` 后重新构建 |
 | 编译 OOM | JVM 内存不足 | 在 `gradle.properties` 中调大 `-Xmx` |
-| **卡在 3%/下载慢** | 国内网络直连 Google/Maven 慢 | **启用国内镜像**（见 4.6） |
+| **卡在 3%/下载慢** | 国内网络直连 Google/Maven 慢 | **启用国内镜像**（见 4.7） |
 | **Kotlin daemon AccessDeniedException** | 残留的 Kotlin daemon 临时文件 | 删除 `%LOCALAPPDATA%\kotlin\daemon` 后重试 |
-| **KSP 跨盘符路径错误** | Gradle 缓存和项目不在同一盘 | 设置 `GRADLE_USER_HOME` 到项目同盘（见 4.7） |
+| **KSP 跨盘符路径错误** | Gradle 缓存和项目不在同一盘 | 设置 `GRADLE_USER_HOME` 到项目同盘（见 4.8） |
 | **transforms move 失败** | Windows 长路径限制(260字符) | 将 `GRADLE_USER_HOME` 设为极短路径如 `F:\gh` |
+| **Release APK 未签名**（`INSTALL_PARSE_FAILED_NO_CERTIFICATES`） | buildTypes 用 `project.hasProperty` 判断签名配置，不读 local.properties | buildTypes 改用 `storeFilePath != null` 判断（见 3.3） |
+| **修改 signingConfigs 后 APK 仍未签名**（`UP-TO-DATE`） | Gradle 缓存判断未变化跳过打包 | 用 `--rerun-tasks` 强制重新打包（见 4.2） |
+| **PowerShell `-P` 参数被拆分**（`Task '.jks' not found`） | PowerShell 把 `=值` 拆分为独立参数 | 用引号包裹：`"-PRELEASE_STORE_FILE=legado.jks"` |
+| **Git Bash 执行 Windows 路径命令失败**（`command not found`） | Git Bash 把反斜杠当转义字符 | 用 `cmd //c "命令"` 或正斜杠路径（见 4.2） |
+| **中文系统桌面显示名缺"M"** | values-zh 的 app_name 未同步修改 | 4 个 strings.xml 必须同步修改（见"桌面显示名配置"） |
+| **aapt 输出中文乱码**（`闃呰M`） | cmd 控制台用 GBK 编码 | 用 PowerShell + `[Console]::OutputEncoding = UTF8` |
+| **历史 spec 文档命令/包名过时**（`io.legado.missapp`/`assembleRelease`） | docs/specs/ 下历史 spec 文档创建时包名为 `io.legado.missapp`（无点），后续重命名为 `io.legado.miss.app`（有点）；部分 spec 文档用 `assembleRelease`/`assembleDebug` 缺 App 前缀 | **以本文档为准**：包名 `io.legado.miss.app`、任务名 `assembleAppDebug`/`assembleAppRelease`。查阅 docs/specs/ 时注意历史值 |
 
-### 4.6 国内 Gradle 镜像加速（重要！）
+### 4.6.1 历史 spec 文档过时内容警告
+
+> ⚠️ **AI 打包时注意**：`docs/specs/` 目录下的历史 spec 文档（特别是 `build-workflow-optimization/`、`apk-size-optimization/`、`p0-bugfix-round1/`、`rss-unified-search/`、`source-layout-redesign/` 等）中可能存在以下过时内容：
+>
+> 1. **包名过时**：使用 `io.legado.missapp`（无点），实际应为 `io.legado.miss.app`（有点）
+> 2. **Gradle 任务名缺 App 前缀**：使用 `assembleDebug`/`assembleRelease`，实际应为 `assembleAppDebug`/`assembleAppRelease`（本项目 productFlavors 仅 `app` 一个，任务名首字母大写敏感）
+> 3. **签名配置过时**：部分 spec 文档描述用 `project.hasProperty` 判断签名，实际应用 `storeFilePath != null` 判断（见 3.3）
+>
+> **打包时一律以本指南（build-apk-guide.md）为准**，spec 文档仅作历史参考。
+
+### 4.7 国内 Gradle 镜像加速（重要！）
 
 > 国内直连 Google Maven / Maven Central 极慢，首次构建会卡住。**必须启用国内镜像**。
 
@@ -363,7 +572,7 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 构建完成后可改回原始地址。
 
-### 4.7 GRADLE_USER_HOME 配置（解决跨盘符和长路径问题）
+### 4.8 GRADLE_USER_HOME 配置（解决跨盘符和长路径问题）
 
 如果项目在 F 盘，Gradle 默认将缓存放在 `C:\Users\用户名\.gradle\`，会导致两个问题：
 1. **KSP 跨盘符错误**：`this and base files have different roots`
@@ -382,7 +591,7 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 > 路径越短越好：`F:\gh` 比 `F:\myself\...\temp\gradle-home` 好得多，避免嵌套路径过长。
 
-### 4.8 一键构建脚本（build-legado.bat）
+### 4.9 一键构建脚本（build-legado.bat）
 
 项目根目录已内置 `build-legado.bat`，自动处理环境变量、清理缓存、构建。
 
@@ -614,6 +823,8 @@ android {
 
 ## 九、快速开始（5 分钟上手）
 
+### 9.1 Debug 构建快速流程（无需签名）
+
 ```powershell
 # 1. 确认 JDK 17
 java -version
@@ -631,7 +842,39 @@ ls app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 adb install app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 ```
 
-> 也可直接双击 `build-legado.bat`，脚本自动处理环境变量和缓存。详见 [4.8 一键构建脚本](#48-一键构建脚本build-legadobat)。
+> 也可直接双击 `build-legado.bat`，脚本自动处理环境变量和缓存。详见 [4.9 一键构建脚本](#49-一键构建脚本build-legadobat)。
+
+### 9.2 Release 构建快速流程（需签名配置）
+
+```powershell
+# 1. 生成签名密钥（仅首次，放项目根目录，已 gitignore 不入 git）
+keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 10000 -alias legado -storepass legado -keypass legado -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
+
+# 2. 在 local.properties 追加签名配置（不入 git）
+# RELEASE_STORE_FILE=legado.jks
+# RELEASE_STORE_PASSWORD=legado
+# RELEASE_KEY_ALIAS=legado
+# RELEASE_KEY_PASSWORD=legado
+
+# 3. 构建 Release APK
+.\gradlew assembleAppRelease
+
+# 4. 验证签名（必须显示 v1/v2/v3 全部 true）
+<SDK路径>\build-tools\36.0.0\apksigner.bat verify --verbose app\build\outputs\apk\app\release\legado_miss_app_*.apk
+
+# 5. 验证桌面显示名（必须显示 application-label-zh:'阅读M'）
+powershell -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & '<SDK路径>\build-tools\36.0.0\aapt.exe' dump badging app\build\outputs\apk\app\release\legado_miss_app_*.apk | Select-String application-label"
+
+# 6. 卸载旧版本 + 安装新 APK
+adb uninstall io.legado.miss.app.release
+adb install -r app\build\outputs\apk\app\release\legado_miss_app_*.apk
+
+# 7. 启动验证（必须显示 mResumedActivity 是 io.legado.miss.app.release）
+adb shell am start -n io.legado.miss.app.release/io.legado.app.ui.main.MainActivity
+adb shell dumpsys activity activities | findstr mResumedActivity
+```
+
+> **修改 build.gradle 签名配置或 strings.xml 后**，必须用 `.\gradlew assembleAppRelease --rerun-tasks` 强制重新打包，否则 Gradle 可能因缓存跳过打包导致 APK 未签名。
 
 ---
 
@@ -651,7 +894,7 @@ adb install app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 | **platforms** | android-36 (Android 15) |
 | **build-tools** | 36.0.0 + 35.0.0（Gradle 自动补装） |
 | **platform-tools** | adb.exe 等 |
-| **国内镜像** | 阿里云+华为云已启用（见 4.6） |
+| **国内镜像** | 阿里云+华为云已启用（见 4.7） |
 
 ### 10.2 在系统 PowerShell 中手动构建
 
@@ -678,7 +921,7 @@ cd F:\myself\github\WeAgentChat\temp\legado
 
 ### 10.3 使用一键构建脚本（推荐）
 
-直接在系统 CMD 中双击 `build-legado.bat` 即可，脚本自动设置所有环境变量。详见 4.8 节。
+直接在系统 CMD 中双击 `build-legado.bat` 即可，脚本自动设置所有环境变量。详见 4.9 节。
 
 ### 10.4 已修复的构建问题
 
@@ -689,7 +932,7 @@ cd F:\myself\github\WeAgentChat\temp\legado
 | KSP 跨盘符路径错误 | Gradle 缓存(C:) 和项目(F:) 在不同盘 | 设置 `GRADLE_USER_HOME=F:\gh` |
 | 长路径 transforms 失败 | Windows 260 字符限制 | `GRADLE_USER_HOME` 用极短路径 `F:\gh` |
 | Kotlin daemon AccessDeniedException | 残留临时文件锁 | 构建前删除 `%LOCALAPPDATA%\kotlin\daemon` |
-| 首次构建卡在 3% | 国内网络直连 Google/Maven 慢 | 启用阿里云/华为云镜像（见 4.6） |
+| 首次构建卡在 3% | 国内网络直连 Google/Maven 慢 | 启用阿里云/华为云镜像（见 4.7） |
 
 ---
 

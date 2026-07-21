@@ -18,13 +18,15 @@
 | 配置项 | 测试包 | 共存包 | 正式包 |
 |--------|--------|--------|--------|
 | 桌面显示名 | 阅读M.D | 阅读M·共存 | 阅读M |
-| `manifestPlaceholders.app_name` | `@string/app_name_debug` | `@string/app_name_coexist` | `@string/app_name` |
+| `manifestPlaceholders.app_name` | `@string/app_name` | `@string/app_name` | `@string/app_name`（默认）/ `@string/app_name_a`（releaseA）/ `@string/app_name_s`（releaseS） |
 | `minifyEnabled` | `false` | 由构建类型决定 | `true` |
 | `shrinkResources` | `false` | 由构建类型决定 | `true` |
 | `applicationIdSuffix` | `.debug` | `.debug` | `.release` |
-| `versionNameSuffix` | `.D` | `.D` | 无 |
+| `versionNameSuffix` | `debug` | `debug` | 无 |
 | 构建速度 | 快 | 中 | 慢 |
 | APK体积 | 大 | 中 | 小 |
+
+> **app_name 字段说明**：buildTypes 按 `applicationIdSuffix` 选择不同 strings.xml 字段（详见 [build-apk-guide.md](../project-flow/build-apk-guide.md) 第二章"桌面显示名配置"）。`@string/app_name`/`@string/app_name_a`/`@string/app_name_s` 在 4 个 strings.xml 中同步配置（values/values-zh/values-zh-rTW/values-zh-rHK），中文系统下取 values-zh 的值，必须 4 个文件同步修改。
 
 ## 日常开发打包策略
 

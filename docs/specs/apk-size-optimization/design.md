@@ -43,7 +43,7 @@ resConfigs ✅ / .so auto-strip ✅（无.debug段）
 | Read | 读取 AndroidManifest/App.kt/ProGuard/build.gradle | ✅ 已完成 |
 | PowerShell | 统计目录体积、列出大文件 | ✅ 已完成 |
 | `cwebp` | JPG→WebP 转换 | 待用 |
-| `./gradlew assembleRelease` | 构建 release APK 对比体积 | 待用 |
+| `./gradlew assembleAppRelease` | 构建 release APK 对比体积（App 首字母大写，本项目 productFlavors 仅 app 一个） | 待用 |
 | 逍遥模拟器 + ADB | 安装回归测试 | 待用 |
 
 ### 深度核查方法论
