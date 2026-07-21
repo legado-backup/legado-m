@@ -4,14 +4,21 @@
 
 | 操作 | 命令 |
 |------|------|
-| 构建 Debug | `./gradlew assembleDebug` |
-| 构建 Release | `./gradlew assembleRelease` |
+| 构建 Debug（测试包） | `./gradlew assembleAppDebug` |
+| 构建 Release（正式包） | `./gradlew assembleAppRelease` |
+| 强制重新打包（修改签名/strings.xml 后必用） | `./gradlew assembleAppRelease --rerun-tasks` |
+| 构建共存包（原版包名） | `build-legado.bat debug io.legado.app` |
+| 一键脚本打包（自动配置环境） | `build-legado.bat [debug\|release] [package_name]` |
 | 运行测试 | `./gradlew test` |
 | Lint 检查 | `./gradlew lint` |
 | 清理构建 | `./gradlew clean` |
 | Vue3 开发 | `npm run dev`（legado-web 目录下） |
 | Vue3 构建 | `npm run build`（legado-web 目录下，含 type-check + sync.js） |
 | Vue3 类型检查 | `npm run type-check`（legado-web 目录下） |
+
+> **打包完整流程**：环境搭建、签名配置、构建后验证（签名/桌面显示名/安装/启动）详见 [build-apk-guide.md](./build-apk-guide.md)。
+
+> **Gradle 任务名注意**：本项目 productFlavors 仅 `app` 一个，所以任务名是 `assembleAppDebug`/`assembleAppRelease`（App 首字母大写），不是 `assembleDebug`/`assembleRelease`。
 
 ## 关键文件速查
 

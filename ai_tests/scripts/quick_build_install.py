@@ -43,7 +43,7 @@ def run_cmd(cmd, cwd=None, timeout=300, check=False):
 def step1_build():
     """步骤1: 编译APK"""
     print("\n=== 步骤1: 编译APK ===")
-    result = run_cmd(".\\gradlew.bat assembleDebug", cwd=str(PROJECT_ROOT), timeout=600)
+    result = run_cmd(".\\gradlew.bat assembleAppDebug", cwd=str(PROJECT_ROOT), timeout=600)
     if result.returncode != 0:
         print("❌ 编译失败")
         return None

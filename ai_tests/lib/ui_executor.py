@@ -628,7 +628,7 @@ class UiExecutor:
             return "not_running"
         pkg = app.get("package", "")
         activity = app.get("activity", "")
-        # 简化说明：PACKAGE 是 io.legado.app.debug，崩溃后回桌面 package 是 launcher | 已知上限：release 构建需切换 PACKAGE | 升级路径：基于 applicationId 动态判断（V4）
+        # 简化说明：PACKAGE 是 io.legado.miss.app.debug（config.py 中 BUILD_TYPE=debug），崩溃后回桌面 package 是 launcher | 已知上限：release 构建需切换 PACKAGE 为 io.legado.miss.app.release | 升级路径：基于 applicationId 动态判断（V4）
         if pkg == PACKAGE or "io.legado.app" in activity:
             return "normal"
         logger.warning(f"_detect_app_state: App 不在前台, package={pkg}, activity={activity}")

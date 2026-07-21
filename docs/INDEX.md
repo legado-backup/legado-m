@@ -129,6 +129,7 @@
 | [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构） ✅ 实施完成（P0+P1），待真机验证 |
 | [specs/ssl-handshake-investigation/](./specs/ssl-handshake-investigation/) | SSL握手失败根因排查（net_error -101）：OkHttp升级路径审计+WebView链路审计，结论"非升级导致" ✅ 调查完成 |
 | [specs/e2e-automated-testing/](./specs/e2e-automated-testing/) | APK 端到端自动化测试验证系统（MEmu+uiautomator2+AI 日志分析，一键打包→装包→跑用例→出报告） 🔄 设计中 |
+| [specs/ai-tests-deep-audit/](./specs/ai-tests-deep-audit/) | ai_tests 深度审计与补全完善（15优点+14缺点+12缺失项，短期6+中期8+长期5任务） ✅ 审计完成 |
 | [specs/e2e-ui-executor-hardening/](./specs/e2e-ui-executor-hardening/) | E2E UI 执行器加固（scroll_find 滚动查找/自愈重构/失败跳过/dismiss_dialogs 误判修复/规则分析器 uiautomator2 崩溃排除/证据收集路径修复/测试用例对齐 Compose UI） ✅ 实施完成，单用例 pass_rate=100% |
 | [specs/apk-size-optimization/](./specs/apk-size-optimization/) | APK 体积审核与精简优化（v3：debug APK解压分析+打包技术手段全量评估，已用所有稳定优化，零功能影响预估-2.5~3.5MB，附折中选项） 🔄 设计中 |
 | [specs/folder-view-welcome-refactor/](./specs/folder-view-welcome-refactor/) | 书源/订阅源文件夹视图重构 + 欢迎页增强 + 前端样式审计 ✅ 实施完成，待真机验证 |
