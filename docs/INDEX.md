@@ -110,6 +110,8 @@
 |------|------|
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面板+功能状态 |
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
+| [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
