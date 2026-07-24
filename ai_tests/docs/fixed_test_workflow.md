@@ -22,6 +22,7 @@
 | 5. 修复点覆盖度分析 | `fix_coverage_check.py` | 检查每个修复点的正向日志是否触发（10个修复点） | `python ai_tests/scripts/fix_coverage_check.py` |
 | 6. 批量源遍历 | `batch_source_test.py` | 自动遍历多个RSS源检测修复点触发（全程脱敏） | `python ai_tests/scripts/batch_source_test.py [起始编号] [结束编号]` |
 | 7. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
+| 8. AppLog日志获取 | `collect_app_log.py` | 按模块Tag过滤logcat+拉取文件日志（logging-audit新增） | `python ai_tests/scripts/collect_app_log.py [--tag TAG\|--file\|--all]` |
 
 ### ⚠️ 重要：Room WAL 模式（2026-07-13 新增）
 

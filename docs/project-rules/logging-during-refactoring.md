@@ -192,3 +192,54 @@ Log.d("VideoPlay", "降级到WebView: url=${urlPathOnly}, title=${title}, reason
 - ❌ 只清理部分文件，遗漏其他文件
 - ❌ 清理后不重新编译验证
 - ❌ 清理后不移除未使用的TAG常量定义
+
+## catch 块日志补全检查项
+
+> **改造时必须检查 catch 块是否有日志调用，无日志的 catch 块必须补全。**
+
+### 补全原则
+
+1. **所有 catch 块必须有 `AppLog.putDebugWithTag` 调用**（除 CancellationException 重新抛出外）
+2. **使用 putDebugWithTag 而非 put**：确保 recordLog 关闭时零开销，不影响用户功能
+3. **不重复记录**：已有 AppLog.put/putError/putWarn 调用的 catch 块不重复添加
+4. **记录内容**：模块 Tag + 操作描述 + 异常对象（throwable 自动展开调用栈）
+5. **脱敏原则**：
+   - URL 只保留路径模式（`/path/{id}`），禁止输出完整 URL
+   - cookie/token/key/secret 隐藏为 `***`
+   - 源名称不记录，只记源 ID 编号
+6. **级别选择**：影响主流程用 `Level.ERROR`（默认），可降级用 `Level.WARN`，调试/成功信息用 `Level.INFO`
+7. **保留现有代码**：Debug.log / DebugLog.e / 已有 AppLog 调用全部保留，不删除
+
+### 三维度覆盖检查
+
+改造时除 catch 块（维度1）外，还需检查：
+
+- **维度2（关键操作成功/失败）**：方法入口/成功出口/失败分支是否有 `putDebugWithTag`（level=INFO/WARN）
+- **维度3（关键参数）**：URL构建/规则解析/响应状态码等关键参数传递点是否有 `putDebugWithTag`（level=INFO）
+
+### 模块 Tag 使用
+
+catch 块日志必须使用对应模块的 Tag 常量（见 `logging_rules.md` 模块 Tag 规范）：
+
+| 模块 | Tag 常量 |
+|------|---------|
+| WebBook（书源搜索/详情/目录/正文） | `AppLog.TAG_WEB_BOOK` |
+| 规则引擎（AnalyzeRule/AnalyzeUrl） | `AppLog.TAG_ANALYZE` |
+| 网络请求（HttpHelper/SSLHelper） | `AppLog.TAG_HTTP` |
+| RSS（Rss/RssParserByRule） | `AppLog.TAG_RSS` |
+| 内容处理（ContentProcessor/BookHelp） | `AppLog.TAG_CONTENT` |
+
+### 验证步骤
+
+改造完成后通过 `collect_app_log.py` 验证日志输出：
+
+```bash
+# 按模块 Tag 过滤 logcat
+ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --tag WebBook
+
+# 拉取文件日志
+ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --file
+
+# 全量获取
+ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --all
+```

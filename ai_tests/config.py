@@ -20,7 +20,7 @@ MEMU_ADB_HOST = "127.0.0.1:21503"
 
 # === Legado App ===
 # 简化说明：默认 miss flavor + debug 构建，与 build.gradle applicationId="io.legado.miss.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.miss.app.release + 改 APK_GLOB_DIR 到 release 路径；legacy flavor 为 io.legado.app.debug（通过 -PcustomAppId=io.legado.app 切换） | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE + flavor（V4）
-BUILD_TYPE = "debug"  # debug | release
+BUILD_TYPE = "debug"  # debug | release（用户要求用debug包测试，正式包别的AI任务在用）
 PACKAGE = f"io.legado.miss.app.{BUILD_TYPE}"
 # 主入口 Activity：源码 AndroidManifest.xml 中 .ui.welcome.WelcomeActivity
 # 注意：Activity 类名不受 applicationIdSuffix 影响，始终为 io.legado.app.ui.welcome.WelcomeActivity

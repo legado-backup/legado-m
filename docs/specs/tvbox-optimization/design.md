@@ -54,9 +54,9 @@ classDiagram
 4. 用户可在设置中锁定引擎模式
 
 **MPV 集成方式**：
-- 使用 `mpv-android` 的 libmpv.so（armeabi-v7a + arm64-v8a）
+- 使用 `libmpv.so`（armeabi-v7a + arm64-v8a），来源见下方"MPV so 库来源"说明
 - 通过 JNI 调用 mpv API（参考影视仓 `MpvEngine` 实现）
-- productFlavors 隔离：`fullFlavor` 含 MPV，`liteFlavor` 不含
+- AppConfig 开关控制：`AppConfig.isMpvEnabled` 控制是否加载 MPV 引擎，默认关闭
 
 #### 1.2 弹幕设置系统补全
 
@@ -150,12 +150,8 @@ classDiagram
     class QuickJsEngine {
         +getName() "quickjs"
     }
-    class PythonEngine {
-        +getName() "python"
-    }
     ScriptEngine <|.. RhinoEngine
     ScriptEngine <|.. QuickJsEngine
-    ScriptEngine <|.. PythonEngine
 ```
 
 #### 2.2 QuickJS 引擎引入
@@ -171,18 +167,6 @@ classDiagram
 - QuickJS 无 Java 互操作（Rhino 有），需通过 JSON 序列化传递对象
 - 部分 Rhino 专有 API（如 `JavaAdapter`）不支持，需规则适配
 - 自动回退：QuickJS 执行失败时记录日志，回退 Rhino
-
-#### 2.3 Python 嵌入评估（实验性）
-
-**库**：Chaquopy（`com.chaquo.python`）
-
-**风险**：
-- APK 体积 +5MB（解释器）+ 各规则所需的 pip 包
-- 商用授权问题（Chaquopy 商用需付费授权）
-- 内存占用高（Python 解释器 ~30MB）
-- 启动时间增加 ~500ms
-
-**决策**：仅作为实验性功能，通过 productFlavors `pythonFlavor` 隔离，默认不打包。需用户主动下载 Python 规则包才启用。
 
 ---
 
@@ -300,53 +284,122 @@ classDiagram
 
 ## Architecture Decisions（架构决策）
 
-> 使用 ADR Y-Statement 模板：Context · Decision · Consequences
+> 使用 ADR Y-Statement 模板：Context · Concern · Decision · Goal · Tradeoff · Status · Superseded-by
 
 ### ADR-1：双引擎架构（ExoPlayer + MPV）
 
 **Context（上下文）**：legado 当前仅有 ExoPlayer 单引擎，遇到硬解失败的视频无法播放。影视仓采用 ExoPlayer + MPV 双引擎，硬解失败可降级软解。需决定 legado 是否引入 MPV。
 
-**Decision（决策）**：引入 MPV 软解引擎作为 ExoPlayer 兜底，通过 `PlayerEngine` 接口抽象，工厂模式创建实例。MPV 通过 productFlavors 隔离，基础包不含。
+**Concern（关注点）**：硬解失败场景下用户无法播放视频，体验受损；同时需控制 APK 体积增量与维护成本，避免引入新引擎后稳定性下降。
 
-**Consequences（后果）**：
-- 正面：硬解失败的视频可播放，用户体验提升；接口抽象便于未来扩展其他引擎
-- 负面：APK 体积 +8MB（MPV so 库）；维护成本上升（双引擎 Bug 排查）；JNI 增加崩溃风险
+**Decision（决策）**：引入 MPV 软解引擎作为 ExoPlayer 兜底，通过 `PlayerEngine` 接口抽象，工厂模式创建实例。MPV so 库通过 AppConfig 开关控制启用，基础包默认不加载 MPV so 库。
+
+**Goal（目标）**：硬解失败的视频可自动切换软解播放，用户无感知；引擎切换在 1 秒内完成并恢复播放位置。
+
+**Tradeoff（权衡）**：
+- 得：硬解失败的视频可播放，用户体验提升；接口抽象便于未来扩展其他引擎
+- 失：APK 体积 +8MB（MPV so 库）；维护成本上升（双引擎 Bug 排查）；JNI 增加崩溃风险
 - 风险：MPV so 库兼容性需大量真机测试；引擎切换时机判断不当会导致频繁切换
+
+**Status（状态）**：Proposed（已提案，待实施验证）
+
+**Superseded-by（被替代）**：无
 
 ### ADR-2：QuickJS 作为 Rhino 补充（非替换）
 
 **Context（上下文）**：legado 现有 Rhino JS 引擎性能较差（ES5.1 + 无 JIT），部分复杂规则解析慢。影视仓支持 QuickJS。需决定是否替换 Rhino。
 
-**Decision（决策）**：引入 QuickJS 作为 Rhino 的**补充**而非替换。定义 `ScriptEngine` 接口统一调用，用户可选择引擎，QuickJS 失败自动回退 Rhino。
+**Concern（关注点）**：直接替换 Rhino 会破坏现有书源规则兼容性（Rhino 专有 API、Java 互操作），但仅用 Rhino 又无法满足复杂规则性能需求；需在兼容性与性能之间取得平衡。
 
-**Consequences（后果）**：
-- 正面：复杂规则解析速度提升 3-10 倍；ES2017 语法支持；向后兼容（Rhino 规则不受影响）
-- 负面：APK 体积 +2MB；两套引擎 API 差异需适配层；部分 Rhino 专有 API 在 QuickJS 不可用
+**Decision（决策）**：引入 QuickJS 作为 Rhino 的**补充**而非替换。定义 `ScriptEngine` 接口统一调用，用户可选择引擎，QuickJS 失败自动回退 Rhino。QuickJS 通过 AppConfig 开关控制启用，默认关闭。
+
+**Goal（目标）**：复杂规则解析速度提升 3-10 倍；ES2017 语法支持；现有 Rhino 规则完全不受影响；不兼容时自动回退 Rhino。
+
+**Tradeoff（权衡）**：
+- 得：复杂规则解析速度提升 3-10 倍；ES2017 语法支持；向后兼容（Rhino 规则不受影响）
+- 失：APK 体积 +2MB；两套引擎 API 差异需适配层；部分 Rhino 专有 API 在 QuickJS 不可用
 - 风险：规则兼容性需逐源测试；QuickJS JNI 崩溃需捕获
+
+**Status（状态）**：Proposed（已提案，待实施验证）
+
+**Superseded-by（被替代）**：无
 
 ### ADR-3：选用 jupnp 实现 DLNA
 
 **Context（上下文）**：legado 完全没有 DLNA 能力，需新建。市场有 cling（停更）、jupnp（cling fork，活跃）、CiaranDoherty/DLNA 等选项。
 
-**Decision（决策）**：选用 jupnp（`org.jupnp:jupnp`），实现 DMC + DMR 双角色。DMC 优先（投屏控制），DMR 次要（接收投屏）。
+**Concern（关注点）**：DLNA 协议复杂且设备兼容性差异大；DMR（渲染器）角色需常驻服务监听投屏请求，会增加电量消耗；需在功能完整性与功耗之间取得平衡。
 
-**Consequences（后果）**：
-- 正面：jupnp 活跃维护、Android 兼容性好、影视仓同款可参考；DMC + DMR 双角色功能完整
-- 负面：APK 体积 +3MB；DLNA 协议复杂，开发周期长；不同设备兼容性差异大
+**Decision（决策）**：选用 jupnp（`org.jupnp:jupnp`），实现 DMC + DMR 双角色。DMC 优先（投屏控制），DMR 次要（接收投屏）。DMR 通过 AppConfig 开关控制启用，默认关闭。
+
+**Goal（目标）**：可搜索到局域网 DLNA 设备并投屏控制；DMR 角色可接收外部投屏；投屏控制响应延迟 ≤ 500ms。
+
+**Tradeoff（权衡）**：
+- 得：jupnp 活跃维护、Android 兼容性好、影视仓同款可参考；DMC + DMR 双角色功能完整
+- 失：APK 体积 +3MB；DLNA 协议复杂，开发周期长；不同设备兼容性差异大
 - 风险：jupnp 组播在部分 WiFi 路由器被隔离；DMR 角色增加电量消耗
+
+**DMR 电量影响评估与缓解措施**：
+- 影响：DMR 需常驻 UpnpService 监听 SSDP 请求，持续占用网络socket与少量CPU，预计增加待机功耗约 2-5%
+- 缓解措施：
+  1. DMR 默认关闭，仅在用户主动启用时生效
+  2. 仅在设备充电时自动启用 DMR（检测 `ACTION_POWER_CONNECTED` 广播）
+  3. 非充电状态下 DMR 超过 30 分钟无投屏请求则自动休眠
+  4. 用户可在设置中配置 DMR 启用策略（始终/仅充电/手动）
+
+**Status（状态）**：Proposed（已提案，待实施验证）
+
+**Superseded-by（被替代）**：无
 
 ### ADR-4：本地服务器 API 扩展（非替换 NanoHTTPD）
 
 **Context（上下文）**：legado 现有 `HttpServer`（NanoHTTPD）仅支持书源/书籍 CRUD，缺少播放控制 API。影视仓 `Nano.java` 有完整远程控制 API。需决定是替换 NanoHTTPD 还是扩展。
 
-**Decision（决策）**：保留 NanoHTTPD，通过新增 `PlaybackController` + `PlaybackWebSocket` 扩展播放控制能力，不替换底层服务器。
+**Concern（关注点）**：替换 NanoHTTPD 会破坏现有书源/书籍 CRUD 接口兼容性，且引入新网络栈增加维护成本；但仅扩展而不重构 `HttpServer.serve` 会导致路由逻辑膨胀，可维护性下降。
 
-**Consequences（后果）**：
-- 正面：现有接口完全兼容；实施成本低；WebSocket 可复用 NanoHTTPD 原生支持
-- 负面：NanoHTTPD 性能不如 Netty/Vert.x，高并发场景受限（但 legado 单用户场景够用）
-- 风险：API 路由增多导致 `HttpServer.serve` 膨胀，需重构为 Controller 分发模式
+**Decision（决策）**：保留 NanoHTTPD，通过新增 `PlaybackController` + `PlaybackWebSocket` 扩展播放控制能力，不替换底层服务器。同时将 `HttpServer.serve` 重构为 Controller 分发模式，避免路由膨胀。
+
+**Goal（目标）**：现有接口完全兼容；新增播放控制 API 可用；`HttpServer.serve` 路由逻辑清晰可维护；WebSocket 状态推送延迟 ≤ 1 秒。
+
+**Tradeoff（权衡）**：
+- 得：现有接口完全兼容；实施成本低；WebSocket 可复用 NanoHTTPD 原生支持；Controller 分发模式便于扩展
+- 失：NanoHTTPD 性能不如 Netty/Vert.x，高并发场景受限（但 legado 单用户场景够用）；需额外重构 `HttpServer.serve`
+- 风险：Controller 分发重构需保证现有路由不受影响，需完整的回归测试
+
+**Status（状态）**：Proposed（已提案，待实施验证）
+
+**Superseded-by（被替代）**：无
 
 ## Data Flow（数据流）
+
+### 方向间依赖关系
+
+> 四个方向并非完全独立，存在以下依赖关系：
+
+```mermaid
+flowchart TD
+    PE[方向1: 播放器优化<br/>PlayerEngine 接口抽象] --> LS[方向4: 本地服务器<br/>播放控制 API 依赖 PlayerEngine]
+    PE --> DLNA[方向3: DLNA 投屏<br/>投屏控制依赖播放器状态查询]
+    QJS[方向2: 网络层优化<br/>QuickJS/ScriptEngine] -.->|独立| LS
+    QJS -.->|独立| DLNA
+
+    subgraph 前置任务
+        PE
+    end
+    subgraph 可并行实施
+        LS
+        DLNA
+    end
+    subgraph 独立实施
+        QJS
+    end
+```
+
+**依赖关系说明**：
+1. **本地服务器播放控制 API → 依赖播放器引擎抽象（PlayerEngine 接口）**：播放控制 API（play/pause/seek 等）需要通过 PlayerEngine 接口与底层播放器交互，因此 PlayerEngine 接口抽象必须先于本地服务器播放控制 API 实施。
+2. **DLNA 投屏控制 → 依赖播放器状态查询**：投屏控制（投屏、控制、状态上报）需要查询播放器当前状态（位置/时长/播放状态），因此 PlayerEngine 接口的状态查询方法必须先于 DLNA 投屏控制实施。
+3. **QuickJS/网络层优化 → 独立**：QuickJS 引擎和 ScriptEngine 抽象不依赖其他方向，可独立实施。
+4. **实施顺序建议**：先实施 PlayerEngine 接口抽象（作为前置任务），再并行实施 DLNA + 本地服务器，QuickJS 可随时独立实施。
 
 ### 播放器双引擎切换流程
 
@@ -430,15 +483,12 @@ flowchart TD
     R[书源规则] --> SE{ScriptEngine 选择}
     SE -->|默认/回退| RH[Rhino Engine]
     SE -->|用户选择| QJ[QuickJs Engine]
-    SE -->|实验性| PY[Python Engine]
 
     RH --> EVAL1[eval script]
     QJ --> EVAL2[eval script via JNI]
-    PY --> EVAL3[exec python via Chaquopy]
 
     EVAL1 --> RST{执行成功?}
     EVAL2 --> RST
-    EVAL3 --> RST
 
     RST -->|是| OUT[返回解析结果]
     RST -->|否| LOG[记录失败日志]
@@ -456,7 +506,7 @@ flowchart TD
 | `app/src/main/java/io/legado/app/help/player/PlayerEngine.kt` | 播放器 | 引擎接口定义 |
 | `app/src/main/java/io/legado/app/help/player/PlayerEngineFactory.kt` | 播放器 | 引擎工厂 |
 | `app/src/main/java/io/legado/app/help/player/ExoPlayerEngineImpl.kt` | 播放器 | ExoPlayer 引擎实现（重构自 ExoPlayerHelper） |
-| `app/src/main/java/io/legado/app/help/player/MpvEngine.kt` | 播放器 | MPV 软解引擎（productFlavors=full） |
+| `app/src/main/java/io/legado/app/help/player/MpvEngine.kt` | 播放器 | MPV 软解引擎（AppConfig.isMpvEnabled 控制启用） |
 | `app/src/main/java/io/legado/app/help/player/DanmakuSetting.kt` | 播放器 | 弹幕设置系统 |
 | `app/src/main/java/io/legado/app/help/player/Track.kt` | 播放器 | 字幕/音轨数据类 |
 | `app/src/main/java/io/legado/app/help/player/TrackUtil.kt` | 播放器 | 轨道管理工具 |
@@ -464,7 +514,6 @@ flowchart TD
 | `app/src/main/java/io/legado/app/help/script/ScriptEngine.kt` | 网络层 | 脚本引擎接口 |
 | `app/src/main/java/io/legado/app/help/script/RhinoEngine.kt` | 网络层 | Rhino 引擎实现（包装现有） |
 | `app/src/main/java/io/legado/app/help/script/QuickJsEngine.kt` | 网络层 | QuickJS 引擎实现 |
-| `app/src/main/java/io/legado/app/help/script/PythonEngine.kt` | 网络层 | Python 引擎（productFlavors=python，实验性） |
 | `app/src/main/java/io/legado/app/dlna/DlnaManager.kt` | DLNA | jupnp 服务管理 |
 | `app/src/main/java/io/legado/app/dlna/DlnaDevice.kt` | DLNA | 设备数据类 |
 | `app/src/main/java/io/legado/app/dlna/DlnaController.kt` | DLNA | DMC 投屏控制 |
@@ -478,7 +527,7 @@ flowchart TD
 
 | 路径 | 方向 | 修改内容 |
 |------|------|---------|
-| `app/build.gradle` | 全局 | 新增 productFlavors（full/lite/python）+ 依赖（jupnp/quickjs/mpv） |
+| `app/build.gradle` | 全局 | 新增依赖（jupnp/quickjs/mpv）+ AppConfig 开关配置 |
 | `app/src/main/java/io/legado/app/help/exoplayer/ExoPlayerHelper.kt` | 播放器 | 重构为实现 `PlayerEngine` 接口 |
 | `app/src/main/java/io/legado/app/help/gsyVideo/VideoPlayer.kt` | 播放器 | 接入 `PlayerEngineFactory` |
 | `app/src/main/java/io/legado/app/help/gsyVideo/DanmakuAdapter.kt` | 播放器 | 接入 `DanmakuSetting` |
@@ -492,40 +541,67 @@ flowchart TD
 
 ### 依赖变更（`app/build.gradle`）
 
+> **重要说明**：legado 现有 build.gradle 已有 `flavorDimensions = ['mode']` + `productFlavors { app { dimension "mode" } }`。**不能新增 `flavorDimensions "engine"`**（会导致多维 flavor 冲突，影响打包流程的包名、签名、资源、APK 命名）。改为在现有 `app` flavor 内通过统一 `implementation` 依赖引入，功能启用通过 `AppConfig` 开关控制。
+
 ```gradle
-// DLNA（必选，~3MB）
+// DLNA（~3MB，通过 AppConfig.isDlnaEnabled 控制启用）
 implementation "org.jupnp:jupnp:2.7.1"
 
-// QuickJS（必选，~2MB）
+// QuickJS（~2MB，通过 AppConfig.isQuickJsEnabled 控制启用）
 implementation "com.github.taoweiji.quickjs:quickjs-android:0.9.2"
 
-// MPV（仅 fullFlavor，~8MB）
-fullImplementation "com.github.jeffersonlicardona:mpv-android:0.1.4"
-
-// Chaquopy Python（仅 pythonFlavor，实验性，~5MB）
-pythonImplementation "com.chaquo.python:gradle:15.0.1"
+// MPV so 库（~8MB，通过 AppConfig.isMpvEnabled 控制启用）
+// 注意：不使用 Maven 仓库的 com.github.jeffersonlicardona:mpv-android:0.1.4（该库已不维护）
+// MPV so 库来源方案（见下方"MPV so 库来源"说明）
 ```
 
-### productFlavors 配置
+### MPV so 库来源
 
-```gradle
-flavorDimensions "engine"
-productFlavors {
-    lite {
-        // 基础版：不含 MPV/Python
-        dimension "engine"
-    }
-    full {
-        // 完整版：含 MPV 软解
-        dimension "engine"
-    }
-    python {
-        // 实验版：含 Python（基于 full）
-        dimension "engine"
-        applicationIdSuffix ".python"
-    }
+> **背景**：Maven 仓库的 `com.github.jeffersonlicardona:mpv-android:0.1.4` 已不维护，不可依赖。影视仓（FongMi/TV）使用自己编译的 `libmpv.so`，不是 Maven 依赖。
+
+**获取方案（按优先级）**：
+1. **从影视仓项目提取**：从 FongMi/TV 项目的 `app/libs/` 目录提取已编译的 `libmpv.so`（armeabi-v7a + arm64-v8a），放入 legado 的 `app/src/main/jniLibs/` 目录。需核实许可证兼容性。
+2. **自己编译**：基于 mpv-android 项目（`github.com/mpv-android/mpv-android`）自行编译 `libmpv.so`，可定制编译选项但成本较高。
+3. **暂不引入 MPV**：若上述方案均不可行，MPV 软解方向暂不实施，仅保留 ExoPlayer 单引擎 + 接口抽象（为未来引入预留 `PlayerEngine` 接口）。
+
+**决策**：优先采用方案 1（从影视仓提取），实施前需完成许可证兼容性评估。
+
+### 库版本调研说明
+
+> 实施前需调研以下库的最新版本与 Android 兼容性：
+
+| 库 | 当前指定版本 | 调研要点 |
+|----|------------|---------|
+| jupnp | 2.7.1 | 核实是否为最新版本；Android minSdk 23 兼容性；是否依赖 Java 8+ API |
+| quickjs-android | 0.9.2 | 核实维护状态；是否有 quickjs-ng 等替代库；JNI 稳定性；minSdk 23 兼容性 |
+| MPV so 库 | - | 从影视仓提取的 so 库对应的 mpv 版本；ABI 兼容性（armeabi-v7a/arm64-v8a） |
+
+### AppConfig 开关配置方案
+
+> 替代原 productFlavors 隔离方案。所有新功能通过 AppConfig 开关控制，默认关闭，用户按需开启。
+
+```kotlin
+object AppConfig {
+    // 播放器引擎开关
+    var isMpvEnabled: Boolean // MPV 软解引擎，默认 false
+    var isDualEngineEnabled: Boolean // 双引擎自动切换，默认 false
+
+    // 网络层开关
+    var isQuickJsEnabled: Boolean // QuickJS 引擎，默认 false
+    var defaultScriptEngine: String // 默认脚本引擎，默认 "rhino"
+
+    // DLNA 开关
+    var isDlnaEnabled: Boolean // DLNA 投屏功能，默认 false
+    var isDmrEnabled: Boolean // DMR 渲染器，默认 false
+    var dmrEnableStrategy: String // DMR 启用策略：always/charging/manual，默认 "manual"
+
+    // 本地服务器开关
+    var isPlaybackApiEnabled: Boolean // 播放控制 API，默认 false
+    var isPlaybackWebSocketEnabled: Boolean // WebSocket 状态推送，默认 false
 }
 ```
+
+**回退机制**：所有开关默认关闭，功能异常时用户可随时关闭对应开关回退到原有行为，无需重新安装 APK。
 
 ## 验证策略
 
