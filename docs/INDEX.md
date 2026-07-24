@@ -110,7 +110,9 @@
 |------|------|
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面板+功能状态 |
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
 | [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
+| [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager等10项集成设计） 🔄 设计中 |
 | [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
@@ -164,6 +166,7 @@
 | [specs/forks-archive-comparison/](./specs/forks-archive-comparison/) | 阅读 Archive 私仓深度对比与借鉴分析（克隆 Rimchars/legado-private-armv8-release 到 temp/forks-comparison/legado-archive，7 大维度子代理并行对比：主题/EPUB/AI/发现页/视频/构建/依赖，输出三态借鉴决策表 12借鉴/8不借鉴/9待评估，不修改本项目源码） 🔄 待验收 |
 | [specs/rss-unified-search/](./specs/rss-unified-search/) | 订阅源统一搜索（对标书架搜索：新建 RssSearchActivity+RssSearchModel 并发调度所有带 searchUrl 的订阅源，title+pubDate 去重聚合多源，支持换源，复用 SearchKeyword 表加 type 字段） 🔄 设计中 |
 | [specs/rss-v5_7-deep-fix/](./specs/rss-v5_7-deep-fix/) | RSS 订阅源 V5.7 深度修复（13 启用源 12 必备字段规则修复 + 15 CF盾源破盾恢复 + 7 timeout 源重试 + 5维度真机验证 + 陷阱68-72沉淀 + ADR Y-Statement 5项决策） 🔄 设计中 |
+| [specs/logging-audit-and-enhancement/](./specs/logging-audit-and-enhancement/) | 日志规范全面审查与补全完善（核心模块catch块日志覆盖：WebBook 90%缺失+规则引擎40%+网络层47%，统一模块Tag规范+ai_tests通用日志获取脚本+规范文档优化） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |

@@ -4,20 +4,39 @@
 > **创建日期**：2026-07-22
 > **格式说明**：使用 `- [ ] X.Y` 复选框格式，按四个方向分组
 
+## AOAdapt 日志格式
+
+> 实施过程中每个任务需记录 AOAdapt 日志，格式如下：
+
+```
+[AOAdapt] Task X.Y
+- Action: 执行的具体操作（如"引入 jupnp 依赖"、"实现 DlnaManager"）
+- Observation: 观察到的结果/现象（如"构建通过"、"设备搜索成功"、编译错误信息）
+- Adapt: 根据观察结果做的调整/适配（如"修正依赖版本"、"增加异常捕获"、"延后该任务"）
+```
+
+**记录要求**：
+- 每个任务完成后记录一条 AOAdapt 日志
+- Observation 需包含具体技术数据（编译结果/测试结果/性能数据）
+- Adapt 需说明是否偏离原计划及原因
+- 日志记录到 `issues-found.md` 或任务追踪系统中
+
 ## 1. 准备工作
 
 - [ ] 1.1 对比分析影视仓 `PlayerEngine`/`PlayerEngineFactory`/`ExoPlayerEngine` 源码
 - [ ] 1.2 对比分析影视仓 `Danmaku`/`DanmakuSetting`/`Track`/`TrackUtil` 源码
 - [ ] 1.3 对比分析影视仓 `Sniffer`/`PreloadSetting` 源码
-- [ ] 1.4 对比分析影视仓 catvod `Spider` 抽象 + QuickJS + Chaquopy 集成
+- [ ] 1.4 对比分析影视仓 catvod `Spider` 抽象 + QuickJS 集成
 - [ ] 1.5 对比分析影视仓 `dlna/` 模块（jupnp 用法）
 - [ ] 1.6 对比分析影视仓 `Nano.java` 本地服务器 API 设计
 - [ ] 1.7 分析 legado 现有 `ExoPlayerHelper`/`VideoPlayer`/`DanmakuAdapter` 架构
 - [ ] 1.8 分析 legado 现有 `HttpHelper`/`OkHttpUtils`/`Cronet` 网络层架构
 - [ ] 1.9 分析 legado 现有 `HttpServer`/`WebSocketServer` 本地服务器架构
-- [ ] 1.10 评估 APK 体积影响（MPV/QuickJS/jupnp/Chaquopy 各项体积）
-- [ ] 1.11 评估 minSdk 23 兼容性（jupnp/QuickJS/MPV 最低 API 要求）
-- [ ] 1.12 编写技术调研报告，确认每个方向可行性
+- [ ] 1.10 评估 APK 体积影响（MPV/QuickJS/jupnp 各项体积，计算增量比例）
+- [ ] 1.11 评估 minSdk 23 兼容性：jupnp（API 21+ 兼容）、QuickJS（API 21+ 兼容）、MPV libmpv.so（需核实编译时 minSdk 版本与 ABI 兼容性）
+- [ ] 1.12 调研 QuickJS/jupnp 最新版本与 Android 兼容性（是否有 quickjs-ng 等替代库）
+- [ ] 1.13 调研 MPV so 库获取方式（从影视仓提取 / 自行编译 / 许可证兼容性评估）
+- [ ] 1.14 编写技术调研报告，确认每个方向可行性
 
 ## 2. 播放器优化
 
@@ -26,7 +45,7 @@
 - [ ] 2.1.1 定义 `PlayerEngine` 接口（`help/player/PlayerEngine.kt`）
 - [ ] 2.1.2 实现 `PlayerEngineFactory`（`help/player/PlayerEngineFactory.kt`）
 - [ ] 2.1.3 重构 `ExoPlayerHelper` 为 `ExoPlayerEngineImpl`（实现 `PlayerEngine` 接口）
-- [ ] 2.1.4 引入 MPV so 库（productFlavors=full）
+- [ ] 2.1.4 引入 MPV so 库（从影视仓提取 libmpv.so 到 jniLibs，AppConfig.isMpvEnabled 控制启用）
 - [ ] 2.1.5 实现 `MpvEngine`（JNI 调用 libmpv）
 - [ ] 2.1.6 实现硬解失败自动切换软解逻辑（捕获 `RendererException`）
 - [ ] 2.1.7 实现引擎切换时位置保存与恢复（`seekTo` 恢复）
@@ -94,26 +113,17 @@
 - [ ] 3.2.5 兼容性测试：现有 Rhino 规则在 QuickJS 下执行
 - [ ] 3.2.6 实现不兼容 API 自动回退 Rhino
 
-### 3.3 Python 嵌入（实验性）
+### 3.3 反爬增强
 
-- [ ] 3.3.1 评估 Chaquopy 商用授权可行性
-- [ ] 3.3.2 引入 Chaquopy 依赖（productFlavors=python）
-- [ ] 3.3.3 实现 `PythonEngine : ScriptEngine`
-- [ ] 3.3.4 编写至少 1 个 Python 规则示例
-- [ ] 3.3.5 性能测试：Python 规则执行时间与内存占用
+- [ ] 3.3.1 新增 JS 加密解密算法支持（至少 3 种）
+- [ ] 3.3.2 评估 NewPipeExtractor 引入可行性（参考影视仓）
+- [ ] 3.3.3 增强 Cookie 管理（参考影视仓 CookieStore）
 
-### 3.4 反爬增强
+### 3.4 网络层验证
 
-- [ ] 3.4.1 新增 JS 加密解密算法支持（至少 3 种）
-- [ ] 3.4.2 评估 NewPipeExtractor 引入可行性（参考影视仓）
-- [ ] 3.4.3 增强 Cookie 管理（参考影视仓 CookieStore）
-
-### 3.5 网络层验证
-
-- [ ] 3.5.1 真机测试：QuickJS 下复杂规则解析速度 ≥ Rhino 2 倍
-- [ ] 3.5.2 真机测试：QuickJS 不兼容时自动回退 Rhino
-- [ ] 3.5.3 真机测试：Python 规则可执行（pythonFlavor）
-- [ ] 3.5.4 真机测试：单源引擎选择生效
+- [ ] 3.4.1 真机测试：QuickJS 下复杂规则解析速度 ≥ Rhino 2 倍
+- [ ] 3.4.2 真机测试：QuickJS 不兼容时自动回退 Rhino
+- [ ] 3.4.3 真机测试：单源引擎选择生效
 
 ## 4. DLNA 投屏
 
@@ -157,6 +167,9 @@
 - [ ] 4.5.3 真机测试：5 项控制（播放/暂停/进度/音量/停止）均生效
 - [ ] 4.5.4 真机测试：DMR 接收外部投屏
 - [ ] 4.5.5 真机测试：控制响应延迟 ≤ 500ms
+- [ ] 4.5.6 边界测试：DLNA 设备不可达时的错误处理与用户提示
+- [ ] 4.5.7 边界测试：投屏中 WiFi 断开后网络中断恢复（重连后可恢复控制或优雅退出）
+- [ ] 4.5.8 边界测试：并发投屏控制（多个设备同时投屏时的冲突处理）
 
 ## 5. 本地服务器
 
@@ -194,14 +207,22 @@
 - [ ] 5.4.3 真机测试：WebSocket 状态推送延迟 ≤ 1 秒
 - [ ] 5.4.4 真机测试：现有书源/书籍 CRUD 接口不受影响
 
+### 5.5 HttpServer Controller 分发重构
+
+> 对应 ADR-4：将 `HttpServer.serve` 从内联路由重构为 Controller 分发模式，避免路由膨胀。
+
+- [ ] 5.5.1 定义 `Controller` 接口与路由分发机制（按路径前缀分发到对应 Controller）
+- [ ] 5.5.2 将现有书源/书籍/RSS CRUD 路由迁移到对应 Controller（保持接口不变）
+- [ ] 5.5.3 将新增的播放控制 API 路由纳入 Controller 分发体系
+- [ ] 5.5.4 回归测试：现有所有 HTTP 接口行为不受影响
+
 ## 6. 集成验证
 
 ### 6.1 构建验证
 
-- [ ] 6.1.1 liteFlavor 构建通过（不含 MPV/Python）
-- [ ] 6.1.2 fullFlavor 构建通过（含 MPV）
-- [ ] 6.1.3 pythonFlavor 构建通过（含 MPV + Python）
-- [ ] 6.1.4 APK 体积测量（各 Flavor 对比）
+- [ ] 6.1.1 默认构建通过（AppConfig 开关全部关闭，功能不启用）
+- [ ] 6.1.2 开启全部 AppConfig 开关后构建通过（含 MPV/jupnp/QuickJS 依赖）
+- [ ] 6.1.3 APK 体积测量（默认关闭 vs 全部开启对比，计算增量比例）
 
 ### 6.2 端到端测试
 

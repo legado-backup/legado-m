@@ -10,7 +10,7 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 **为什么要优化？**
 
 1. **播放体验差距**：legado 用户遇到硬解失败的视频无法播放（无双引擎降级），弹幕/字幕体验不完整
-2. **网络能力局限**：legado 仅有 Rhino JS 引擎，部分站点反爬需要 Python/QuickJS，规则覆盖面窄
+2. **网络能力局限**：legado 仅有 Rhino JS 引擎（ES5.1 + 无 JIT），部分复杂规则解析慢，规则覆盖面受限
 3. **投屏缺失**：legado 完全没有 DLNA 投屏能力，用户无法投屏到电视
 4. **本地 API 受限**：现有 `HttpServer` 仅支持书源/书籍 CRUD，不支持播放控制、远程搜索等
 
@@ -36,14 +36,14 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 
 **做什么**：
 - 引入 QuickJS 引擎作为 Rhino 的补充（性能更好，部分场景替代）
-- 评估 Chaquopy Python 嵌入的可行性（Python 规则支持）
 - 抽象 `Spider` 接口（参考 catvod），统一不同脚本引擎的调用方式
-- 增强反爬能力（JS 加密解密、Python 算法支持）
+- 增强反爬能力（JS 加密解密算法支持）
 
 **不做什么**：
 - 不替换现有 Rhino 引擎（保持向后兼容）
 - 不引入 catvod 完整框架（仅借鉴 Spider 抽象设计）
 - 不改变 OkHttp + Cronet 主网络栈
+- 不嵌入 Python 解释器（Chaquopy 商用授权问题，见 Out of Scope）
 
 ### 3. DLNA 投屏
 
@@ -71,20 +71,51 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 - 不实现完整的 Web 播放器 UI（仅提供 API）
 - 不改变现有书源/书籍 CRUD 接口
 
+### 与现有视频播放器 spec 的关系
+
+> 本 spec 与项目已有的视频播放器相关 spec 是**扩展关系而非替代关系**。
+
+| 现有 spec | 关系 | 说明 |
+|-----------|------|------|
+| `douyin-style-video-player` | 扩展 | 本 spec 不改变其 UI 交互（抖音风格上下滑动），仅优化底层播放器引擎能力（双引擎/弹幕/字幕） |
+| `video-article-swipe-switch` | 扩展 | 本 spec 不改变其滑动切换逻辑，仅提供 PlayerEngine 接口供其调用 |
+| `video-control-visibility-enhancement` | 扩展 | 本 spec 不改变其控制栏显隐逻辑，PlayerEngine 接口的状态查询方法可供其使用 |
+
+**原则**：现有 spec 的 UI 交互保持不变，本 spec 仅优化底层引擎能力（PlayerEngine 接口抽象、双引擎切换、DLNA 投屏、本地服务器 API 扩展）。现有 spec 中的播放器调用代码可逐步迁移到 PlayerEngine 接口，但不强制一次性迁移。
+
+### Out of Scope（不在本次范围内）
+
+- **Python 嵌入**：因 Chaquopy 商用授权问题（开源项目商用需付费授权），Python 嵌入方向暂不实施。如未来有合适的开源 Python 嵌入方案，可重新评估。
+- **AirPlay/Google Cast 协议**：仅支持 DLNA 协议，不支持其他投屏协议
+- **DMS（媒体服务器）角色**：legado 不作为媒体库对外提供内容
+- **完整 Web 播放器 UI**：本地服务器仅提供 API，不实现 Web 端播放器界面
+- **视频下载**：已在其他模块处理
+
 ## Approach（方案）
 
 ### Selected Approach（选定方案）
 
 采用「渐进式四方向并行」方案：
 - 每个方向独立成模块，可独立实施和验证
-- 优先实施成本低、收益高的方向（建议顺序：DLNA → 本地服务器 → 播放器 → 网络层）
+- 优先实施成本低、收益高的方向（建议顺序：PlayerEngine 接口抽象（前置）→ DLNA + 本地服务器（并行）→ 播放器完整优化 → 网络层）
 - 每个方向完成后单独发版验证，避免大爆炸式集成
+
+**实施顺序调整说明**：
+- 原"DLNA → 本地服务器 → 播放器 → 网络层"顺序未考虑方向间依赖关系
+- 调整后：先实施 PlayerEngine 接口抽象（作为 DLNA 和本地服务器的前置任务），再并行实施 DLNA + 本地服务器（用户价值最高），最后实施播放器完整优化和网络层
+- QuickJS/网络层优化独立于其他方向，可随时穿插实施
+
+**方向间依赖关系**：
+1. 本地服务器播放控制 API → 依赖播放器引擎抽象（PlayerEngine 接口）
+2. DLNA 投屏控制 → 依赖播放器状态查询（PlayerEngine 接口）
+3. QuickJS/网络层优化 → 独立（不依赖其他方向）
+- 详见 design.md「方向间依赖关系」图
 
 **核心设计原则**：
 1. **接口抽象优先**：借鉴影视仓的 `PlayerEngine`/`Spider`/`Device` 抽象，先定义接口再实现
-2. **配置驱动**：新增能力通过 `AppConfig` 开关控制，默认关闭，用户按需开启
-3. **依赖隔离**：MPV/QuickJS/jupnp 等大依赖通过 productFlavors 隔离，基础包不包含
-4. **向后兼容**：所有现有接口和行为保持不变，新增能力不破坏旧规则
+2. **配置驱动**：新增能力通过 `AppConfig` 开关控制，默认关闭，用户按需开启（替代原 productFlavors 隔离方案，避免与现有 `flavorDimensions = ['mode']` 冲突）
+3. **向后兼容**：所有现有接口和行为保持不变，新增能力不破坏旧规则
+4. **可回退**：所有新功能通过 AppConfig 开关控制，功能异常时用户可随时关闭回退到原有行为
 
 ### Alternatives Considered（备选方案）
 
@@ -98,11 +129,11 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 
 ### Drawbacks（缺点）
 
-1. **APK 体积增加**：MPV（~8MB）+ jupnp（~3MB）+ QuickJS（~2MB）+ Chaquopy（~5MB）= 预计 +18MB，需通过 productFlavors 隔离
+1. **APK 体积增加**：MPV（~8MB）+ jupnp（~3MB）+ QuickJS（~2MB）= 预计 +13MB。当前 legado debug APK 约 60-70MB，增量比例约 18-22%，需通过 AppConfig 开关控制功能启用，用户按需开启。
 2. **维护复杂度上升**：双引擎/多脚本引擎增加 Bug 排查难度，需完善的引擎切换日志
-3. **Python 嵌入风险**：Chaquopy 商用授权问题、Python 解释器内存占用高（~30MB），可能只作为实验性功能
-4. **DLNA 兼容性**：不同电视设备 DLNA 实现差异大，需要大量真机测试
-5. **接口设计前置成本**：`PlayerEngine`/`Spider`/`Device` 抽象需要充分调研，设计不当会导致后续返工
+3. **DLNA 兼容性**：不同电视设备 DLNA 实现差异大，需要大量真机测试
+4. **接口设计前置成本**：`PlayerEngine`/`Spider`/`Device` 抽象需要充分调研，设计不当会导致后续返工
+5. **MPV so 库维护成本**：从影视仓提取的 libmpv.so 需跟随上游 mpv 版本更新，存在维护负担
 
 ### Prior Art（影视仓参考）
 
@@ -114,7 +145,7 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 | 嗅探 | `Sniffer` 智能嗅探 | `VideoUrlExtractor` 基础嗅探 | 增强 iframe/加密识别 |
 | 预加载 | `PreloadSetting` 完整策略 | `VideoPlay.kt` 简单配置 | 策略补全 |
 | 爬虫框架 | catvod `Spider` 抽象 | 自定义规则引擎 + Rhino | Spider 接口抽象 |
-| 脚本引擎 | Chaquopy Python + QuickJS | Rhino JS | 多引擎补充 |
+| 脚本引擎 | QuickJS | Rhino JS | 多引擎补充 |
 | DLNA | jupnp 完整实现 | 无 | 完整新建 |
 | 本地服务器 | `Nano.java` 远程控制 API | `HttpServer.kt` CRUD API | 播放控制 API 扩展 |
 
@@ -139,8 +170,7 @@ legado 当前视频播放能力相对薄弱：仅有 ExoPlayer 单引擎、弹�
 | N-001 | 引入 QuickJS 引擎，与 Rhino 并存 | P0 | 书源规则可在 QuickJS 下执行 |
 | N-002 | 抽象 `Spider` 接口，统一脚本引擎调用 | P0 | Rhino/QuickJS 实现同一接口 |
 | N-003 | 用户可选择脚本引擎（全局/单源） | P1 | 设置面板 + 单源配置均可选 |
-| N-004 | 评估并实验性引入 Chaquopy Python | P2 | 至少 1 个 Python 规则可执行 |
-| N-005 | 增强反爬（JS 加密/Python 算法） | P2 | 新增至少 3 种解密算法支持 |
+| N-004 | 增强反爬（JS 加密解密算法） | P2 | 新增至少 3 种解密算法支持 |
 
 ### DLNA 投屏需求
 

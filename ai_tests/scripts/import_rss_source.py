@@ -158,7 +158,7 @@ def import_rss(json_path, db_path):
                 continue
             placeholders = ', '.join(['?'] * len(valid_keys))
             col_names = ', '.join(valid_keys)
-            values = [str(source[k]) if not isinstance(source[k], (int, float, bool)) else source[k]
+            values = ["" if source[k] is None else (str(source[k]) if not isinstance(source[k], (int, float, bool)) else source[k])
                       for k in valid_keys]
 
             cursor.execute(
