@@ -7,7 +7,7 @@
 ### 前置条件
 
 1. MEmu 模拟器已安装（`D:\Program Files\Microvirt\MEmu\`）
-2. APK 已构建（`app/build/outputs/apk/app/debug/`）
+2. APK 已构建（`app/build/outputs/apk/app/debug/`），且已配置正式签名（`legado_release.jks` + `local.properties`，详见 [build-apk-guide.md](../docs/project-flow/build-apk-guide.md) 第三章）
 3. Python 3.12 + 虚拟环境（`ai_tests/venv/`）
 
 ### 快速开始

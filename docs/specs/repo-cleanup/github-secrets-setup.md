@@ -1,5 +1,9 @@
 # GitHub Secrets 配置教程 - 签名密钥安全化
 
+> **⚠️ 更新说明（2026-07-25）**：本文档为历史 spec 归档，记录仓库清理时的配置教程。
+> 当前签名证书已改名为 `legado_release.jks`（RSA 2048位，有效期100年，别名`legado`），配置流程详见 [build-apk-guide.md](../../project-flow/build-apk-guide.md) 第三章。
+> 下文中提到的 `legado.jks` 均为历史名称，实际使用时请替换为 `legado_release.jks`。
+
 ## 背景
 
 仓库中的签名密钥文件 `.github/workflows/legado.jks` 和 `test.yml` 中的明文密码已移除/改造，CI 构建时需要从 GitHub Secrets 读取签名信息。

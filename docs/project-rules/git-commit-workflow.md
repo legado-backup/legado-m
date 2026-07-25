@@ -138,7 +138,7 @@ git push private master-private
 | 文件/目录 | 原因 |
 |-----------|------|
 | `app/google-services.json` | Firebase配置（含项目ID、API Key） |
-| `legado.jks` | Android签名密钥（项目根目录，已加入 .gitignore） |
+| `legado_release.jks` | Android签名密钥（项目根目录，已加入 .gitignore） |
 | `app/逍遥-开源阅读1122.bat` | 可能含本地路径或敏感信息 |
 | `.github/scripts/tg_bot.py` | Telegram Bot脚本，可能含Token |
 | `local.properties` | 本地配置（已在.gitignore） |
@@ -196,7 +196,7 @@ SENSITIVE_FILES=(
     "ai_tests/"
     "AGENTS.md"
     "app/google-services.json"
-    "legado.jks"
+    "legado_release.jks"
     "*.jks"
     "*.keystore"
     "local.properties"
