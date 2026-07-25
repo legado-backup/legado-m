@@ -52,6 +52,68 @@
 | 构建测试包 | `build-legado.bat` | `io.legado.miss.app.debug` |
 | 构建正式包 | `build-legado.bat release` | `io.legado.miss.app.release` |
 
+## 正式包签名流程
+
+> **铁律**：正式签名证书和密码绝不提交 git，已在 `.gitignore` 排除（`*.jks`、`*.keystore`、`local.properties`）。
+> **不变签名铁律**：发布后不能更换签名，否则用户无法覆盖升级。证书丢失只能重新生成，但已安装用户无法升级到新签名版本，务必妥善备份证书。
+
+### 1. 生成签名证书（仅首次）
+
+```bash
+keytool -genkeypair -v \
+  -keystore legado_release.jks \
+  -alias legado \
+  -keyalg RSA -keysize 2048 \
+  -validity 36500 \
+  -storepass <你的密码> \
+  -keypass <你的密码> \
+  -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
+```
+
+- 有效期 100 年（36500 天）
+- RSA 2048 位密钥
+- 别名：`legado`
+- keystore 文件：`legado_release.jks`（项目根目录，不入 git）
+
+### 2. 配置 local.properties（不入 git）
+
+在项目根目录的 `local.properties` 中添加：
+
+```properties
+RELEASE_STORE_FILE=legado_release.jks
+RELEASE_STORE_PASSWORD=<你的密码>
+RELEASE_KEY_ALIAS=legado
+RELEASE_KEY_PASSWORD=<你的密码>
+```
+
+> **读取顺序**（见 `app/build.gradle`）：命令行 `-P` 参数 → `gradle.properties` → `local.properties`。`local.properties` 用于本地开发，`gradle.properties` 用于 CI/CD（也不入 git）。
+
+### 3. 构建正式包
+
+```bash
+./gradlew assembleAppRelease -x lint
+```
+
+构建时 `app/build.gradle` 会自动读取 `local.properties` 中的签名配置，应用到 release 包。`debug` 和 `release` 构建类型共用同一 `signingConfigs.myConfig`，确保三个包签名一致。
+
+### 4. 验证签名
+
+```bash
+apksigner verify --print-certs app/build/outputs/apk/app/release/<apk文件名>
+```
+
+正式签名应显示：
+- `Signer #1 certificate DN: CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN`
+- 不再显示 `CN=Android Debug`（debug 签名特征）
+
+### 5. 签名一致性原则
+
+| 原则 | 说明 |
+|------|------|
+| **三包统一签名** | debug/release/coexist 包均使用同一正式签名证书（`build.gradle` 中 debug/release 共用 `myConfig`） |
+| **不变签名铁律** | 发布后不能更换签名，否则用户无法覆盖升级 |
+| **证书丢失不可恢复** | 证书丢失只能重新生成，但已安装用户无法升级到新签名版本，务必妥善备份证书 |
+
 ## APK输出位置
 
 构建成功后APK会自动拷贝到`output/apk/`下对应子目录，文件名通过包名标识区分：

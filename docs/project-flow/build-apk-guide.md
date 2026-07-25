@@ -252,21 +252,22 @@ buildTypes {
 
 ### 3.1 生成签名密钥
 
-在项目根目录执行（生成的 `legado.jks` 放项目根目录）：
+在项目根目录执行（生成的 `legado_release.jks` 放项目根目录）：
 
 ```powershell
-keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 10000 -alias legado -storepass legado -keypass legado -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
+keytool -genkeypair -v -keystore legado_release.jks -alias legado -keyalg RSA -keysize 2048 -validity 36500 -storepass <你的密码> -keypass <你的密码> -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
 ```
 
 参数说明：
-- `-keystore legado.jks`：密钥库文件名（放项目根目录）
+- `-keystore legado_release.jks`：密钥库文件名（放项目根目录）
 - `-keyalg RSA -keysize 2048`：RSA 2048 位密钥
-- `-validity 10000`：有效期 10000 天（约 27 年）
+- `-validity 36500`：有效期 36500 天（约 100 年）
 - `-alias legado`：密钥别名
-- `-storepass legado -keypass legado`：密钥库密码和密钥密码（可改为自己的）
+- `-storepass <你的密码> -keypass <你的密码>`：密钥库密码和密钥密码（请替换为自己的强密码）
 - `-dname`：证书持有者信息
 
-> **密钥保管**：`legado.jks` 是签名密钥，丢失后无法发布同名应用的更新版本。已添加到 `.gitignore`（`*.jks` + `*.keystore`），不会提交到 git。
+> **密钥保管**：`legado_release.jks` 是签名密钥，丢失后无法发布同名应用的更新版本。已添加到 `.gitignore`（`*.jks` + `*.keystore` + `local.properties`），不会提交到 git。
+> **不变签名铁律**：发布后不能更换签名，否则用户无法覆盖升级。证书丢失只能重新生成，但已安装用户无法升级到新签名版本，务必妥善备份证书。
 
 ### 3.2 配置签名信息（local.properties 方式，推荐）
 
@@ -276,11 +277,11 @@ keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 1000
 
 ```properties
 # 签名配置（不入 git，仅本地使用）
-# keystore 文件放在项目根目录 legado.jks
-RELEASE_STORE_FILE=legado.jks
-RELEASE_STORE_PASSWORD=legado
+# keystore 文件放在项目根目录 legado_release.jks
+RELEASE_STORE_FILE=legado_release.jks
+RELEASE_STORE_PASSWORD=<你的密码>
 RELEASE_KEY_ALIAS=legado
-RELEASE_KEY_PASSWORD=legado
+RELEASE_KEY_PASSWORD=<你的密码>
 ```
 
 > **CI/CD 场景**：如需在 CI/CD 中使用，可改用 `gradle.properties` 或命令行 `-P` 参数传入（优先级：命令行 -P > gradle.properties > local.properties）。
@@ -364,7 +365,9 @@ cd f:\myself\github\WeAgentChat\temp\legado
 # app\build\outputs\apk\app\debug\legado_miss_app_3.版本号.apk
 ```
 
-Debug 构建无需签名配置，使用默认 debug 签名。
+Debug 构建签名说明：
+- 若 `local.properties` 已配置签名信息（`RELEASE_STORE_FILE` 等），Debug 包会使用与 Release 包相同的正式签名（`signingConfigs.myConfig`），确保三包签名一致
+- 若未配置签名信息，Debug 构建使用默认 debug 签名（`CN=Android Debug`）
 
 ### 4.2 Release 构建（正式发布）
 
@@ -390,11 +393,11 @@ Debug 构建无需签名配置，使用默认 debug 签名。
 
 ```powershell
 # ❌ 错误：PowerShell 会把 = 后的值拆分为独立参数
-.\gradlew assembleAppRelease -PRELEASE_STORE_FILE=legado.jks
+.\gradlew assembleAppRelease -PRELEASE_STORE_FILE=legado_release.jks
 # 报错：Task '.jks' not found
 
 # ✅ 正确：用引号包裹 -P 参数
-.\gradlew assembleAppRelease "-PRELEASE_STORE_FILE=legado.jks"
+.\gradlew assembleAppRelease "-PRELEASE_STORE_FILE=legado_release.jks"
 
 # ❌ 错误：Git Bash 把 Windows 反斜杠路径当转义字符
 f:\path\to\adb.exe devices
@@ -517,7 +520,7 @@ adb shell dumpsys activity activities | findstr mResumedActivity
 | **transforms move 失败** | Windows 长路径限制(260字符) | 将 `GRADLE_USER_HOME` 设为极短路径如 `F:\gh` |
 | **Release APK 未签名**（`INSTALL_PARSE_FAILED_NO_CERTIFICATES`） | buildTypes 用 `project.hasProperty` 判断签名配置，不读 local.properties | buildTypes 改用 `storeFilePath != null` 判断（见 3.3） |
 | **修改 signingConfigs 后 APK 仍未签名**（`UP-TO-DATE`） | Gradle 缓存判断未变化跳过打包 | 用 `--rerun-tasks` 强制重新打包（见 4.2） |
-| **PowerShell `-P` 参数被拆分**（`Task '.jks' not found`） | PowerShell 把 `=值` 拆分为独立参数 | 用引号包裹：`"-PRELEASE_STORE_FILE=legado.jks"` |
+| **PowerShell `-P` 参数被拆分**（`Task '.jks' not found`） | PowerShell 把 `=值` 拆分为独立参数 | 用引号包裹：`"-PRELEASE_STORE_FILE=legado_release.jks"` |
 | **Git Bash 执行 Windows 路径命令失败**（`command not found`） | Git Bash 把反斜杠当转义字符 | 用 `cmd //c "命令"` 或正斜杠路径（见 4.2） |
 | **中文系统桌面显示名缺"M"** | values-zh 的 app_name 未同步修改 | 4 个 strings.xml 必须同步修改（见"桌面显示名配置"） |
 | **aapt 输出中文乱码**（`闃呰M`） | cmd 控制台用 GBK 编码 | 用 PowerShell + `[Console]::OutputEncoding = UTF8` |
@@ -808,7 +811,7 @@ android {
 
 | Secret | 说明 |
 |--------|------|
-| `RELEASE_KEY_STORE` | JKS 签名文件的 base64 编码：`base64 -i legado.jks` |
+| `RELEASE_KEY_STORE` | JKS 签名文件的 base64 编码：`base64 -i legado_release.jks` |
 | `RELEASE_KEY_ALIAS` | 密钥别名 |
 | `RELEASE_KEY_PASSWORD` | 密钥密码 |
 | `RELEASE_STORE_PASSWORD` | 密钥库密码 |
@@ -848,13 +851,13 @@ adb install app\build\outputs\apk\app\debug\legado_miss_app_*.apk
 
 ```powershell
 # 1. 生成签名密钥（仅首次，放项目根目录，已 gitignore 不入 git）
-keytool -genkey -v -keystore legado.jks -keyalg RSA -keysize 2048 -validity 10000 -alias legado -storepass legado -keypass legado -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
+keytool -genkeypair -v -keystore legado_release.jks -alias legado -keyalg RSA -keysize 2048 -validity 36500 -storepass <你的密码> -keypass <你的密码> -dname "CN=Legado, OU=Dev, O=Miss, L=CN, ST=CN, C=CN"
 
 # 2. 在 local.properties 追加签名配置（不入 git）
-# RELEASE_STORE_FILE=legado.jks
-# RELEASE_STORE_PASSWORD=legado
+# RELEASE_STORE_FILE=legado_release.jks
+# RELEASE_STORE_PASSWORD=<你的密码>
 # RELEASE_KEY_ALIAS=legado
-# RELEASE_KEY_PASSWORD=legado
+# RELEASE_KEY_PASSWORD=<你的密码>
 
 # 3. 构建 Release APK
 .\gradlew assembleAppRelease

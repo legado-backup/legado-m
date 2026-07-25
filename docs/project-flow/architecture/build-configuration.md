@@ -50,7 +50,7 @@
 
 ## 4. 签名配置要点
 
-- **签名密钥**：`legado.jks`（项目根目录，已加入 `.gitignore`）
+- **签名密钥**：`legado_release.jks`（项目根目录，已加入 `.gitignore`，RSA 2048 位，有效期 100 年）
 - **配置文件**：`local.properties`（不入 git，含 `RELEASE_STORE_FILE`/`RELEASE_STORE_PASSWORD`/`RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD`）
 - **buildTypes 判断陷阱**：必须用 `storeFilePath != null` 判断，不能用 `project.hasProperty`（后者不检查 local.properties）
 - **签名方案**：v1 + v2 + v3 + v4 全启用

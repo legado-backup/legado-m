@@ -106,7 +106,7 @@ versionL=$(date -d "8 hour" -u +3.%y.%m%d%H%M) # 3.26.06301435
 **签名配置**（L169-178）：
 
 ```bash
-RELEASE_STORE_FILE=./legado.jks
+RELEASE_STORE_FILE=./legado_release.jks
 RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
 RELEASE_STORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}
 RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}

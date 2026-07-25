@@ -24,6 +24,23 @@
 | 7. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
 | 8. AppLog日志获取 | `collect_app_log.py` | 按模块Tag过滤logcat+拉取文件日志（logging-audit新增） | `python ai_tests/scripts/collect_app_log.py [--tag TAG\|--file\|--all]` |
 
+### ⚠️ 重要：签名配置（步骤1前置条件）
+
+步骤1的 `quick_build_install.py` 调用 `./gradlew assembleAppDebug` 编译APK。**打包前必须配置签名**，否则生成的APK使用debug签名（`CN=Android Debug`），无法覆盖升级正式版。
+
+**签名配置流程**（详见 [build-apk-guide.md](../../docs/project-flow/build-apk-guide.md) 第三章）：
+1. 项目根目录必须有签名证书 `legado_release.jks`（RSA 2048位，有效期100年）
+2. `local.properties` 必须配置签名参数（不入git）：
+   ```properties
+   RELEASE_STORE_FILE=legado_release.jks
+   RELEASE_STORE_PASSWORD=<密码>
+   RELEASE_KEY_ALIAS=legado
+   RELEASE_KEY_PASSWORD=<密码>
+   ```
+3. 配置后 debug/release/coexist 三个包均使用同一正式签名（`signingConfigs.myConfig`），确保签名一致性
+
+> **不变签名铁律**：发布后不能更换签名，否则用户无法覆盖升级。证书丢失不可恢复，务必妥善备份。
+
 ### ⚠️ 重要：Room WAL 模式（2026-07-13 新增）
 
 `import_rss_source.py` 已更新支持 Room WAL 模式：
