@@ -232,7 +232,7 @@ result = html;
 
 > 当订阅源 `type=2`（视频）且使用内置视频播放器时，`ruleContent` 的编写指南。
 > 内置播放器基于 GSY + ExoPlayer，支持 m3u8/HLS、mp4 等格式，无需 WebView。
-> 代码实现：`VideoPlay.kt` 的 `parseRssEpisodes()` / `parseRssRoutes()` / R5 分支。
+> 代码实现：`VideoPlay.kt` 的 `parseRssEpisodes()` / ruleRoutes+ruleEpisodes 按需采集 / R5 分支。
 
 ### 何时使用 type=2（内置播放器）vs type=0（WebView）
 
@@ -241,14 +241,14 @@ result = html;
 | 播放引擎 | ExoPlayer（原生） | HLS.js（WebView） |
 | ruleContent 返回 | 视频URL/JSON数组 | 完整HTML页面 |
 | 多集支持 | ✅ JSON数组/多行URL | ✅ JS数组 |
-| 多线路支持 | ✅ 嵌套JSON | ❌ 需自行实现 |
+| 多线路支持 | ✅ ruleRoutes字段(v3.26.072420+) | ❌ 需自行实现 |
 | 上下滑动切换文章 | ✅ ViewPager2 | ❌ |
 | 3秒自动隐藏控件 | ✅ 单击切换显隐 | ❌ |
 | 缓冲进度条 | ✅ 灰色缓冲+白色播放 | ✅ |
 | 倍速/快进快退 | ✅ | ✅ |
 | 适用场景 | 视频URL可直接提取 | 需自定义播放器界面/复杂JS |
 
-### ruleContent 四种格式
+### ruleContent 三种格式 + 多线路多集按需采集字段
 
 #### 格式①：单 URL（最简，100%向后兼容）
 
@@ -327,61 +327,66 @@ JSON.stringify([
 
 **适用**：需要自定义集数标题的多集视频。
 
-#### 格式④：嵌套 JSON（多线路多集）
+#### 格式④：多线路多集按需采集（v3.26.072420+ 新增）
 
-ruleContent 返回嵌套 JSON 数组，支持多条播放线路（不同CDN/不同清晰度）：
+> ⚠️ v3.26.072420+ 起，多线路多集改用 `ruleRoutes` + `ruleEpisodes` 两个字段实现**按需采集**，不再通过 ruleContent 返回嵌套 JSON 全量采集。
+
+**架构对比**：
+
+| 模式 | 字段 | 采集方式 | 线程压力 |
+|------|------|---------|---------|
+| 旧模式（已废弃） | ruleContent 嵌套JSON | 一次性全量采集所有线路所有集数的视频地址 | 大 |
+| 新模式（推荐） | ruleRoutes + ruleEpisodes | 用户切换线路/集数时按需采集视频地址 | 小 |
+
+**两个字段职责**：
+
+| 字段 | 作用 | 返回格式 | 示例 |
+|------|------|---------|------|
+| `ruleRoutes` | 从详情页采集线路列表（线路名） | 多行文本，每行一个线路名 | `线路1\n线路2\n线路3` |
+| `ruleEpisodes` | 从详情页采集集数列表（集数标题+播放页URL） | 多行文本，每行 `标题$URL` | `第1集$/v_play/xxx.html\n第2集$/v_play/yyy.html` |
+
+**关键区别**：`ruleEpisodes` 采集的是**播放页 URL**（非视频流地址），用户切换集数后由 `VideoUrlExtractor.extractVideoUrlForEpisode` 从播放页按需提取真实视频地址（三层降级：MacCMS播放页解析→DOM解析→WebView抓包）。
+
+**占位符支持**：
+
+| 占位符 | 含义 | 示例 |
+|--------|------|------|
+| `{routeIndex}` | 当前线路索引（0-based） | 用户选择"线路1"时，routeIndex=0 |
+| `{routeIndex+1}` | 当前线路索引（1-based） | 用户选择"线路1"时，routeIndex+1=1 |
+
+**MacCMS JSON API 模板标准写法**（vod_play_from / vod_play_url）：
 
 ```json
-[
-  {
-    "name": "线路1",
-    "episodes": [
-      {"url": "https://cdn1.example.com/ep1.m3u8", "title": "第1集"},
-      {"url": "https://cdn1.example.com/ep2.m3u8", "title": "第2集"}
-    ]
-  },
-  {
-    "name": "线路2",
-    "episodes": [
-      {"url": "https://cdn2.example.com/ep1.m3u8", "title": "第1集"},
-      {"url": "https://cdn2.example.com/ep2.m3u8", "title": "第2集"}
-    ]
-  }
-]
+{
+  "ruleRoutes": "@js:<JSON.parse(result).vod_play_from.split('$$$').map(function(name, i){return name||'线路'+(i+1)}).join('\\n')",
+  "ruleEpisodes": "@js:var d=JSON.parse(result).vod_play_url.split('$$$')[{routeIndex}];d.split('#').map(function(item){var p=item.split('$');return p[0]+'$'+p[1]}).join('\\n')"
+}
 ```
 
-JS 写法：
-```javascript
-<js>
-JSON.stringify([
-  {
-    name: '线路1',
-    episodes: [
-      {url: 'https://cdn1.example.com/ep1.m3u8', title: '第1集'},
-      {url: 'https://cdn1.example.com/ep2.m3u8', title: '第2集'}
-    ]
-  },
-  {
-    name: '线路2',
-    episodes: [
-      {url: 'https://cdn2.example.com/ep1.m3u8', title: '第1集'},
-      {url: 'https://cdn2.example.com/ep2.m3u8', title: '第2集'}
-    ]
-  }
-]);
-</js>
+**MacCMS HTML 模板标准写法**（CSS 选择器）：
+
+```json
+{
+  "ruleRoutes": ".module-player-list .module-player-tab-name@text",
+  "ruleEpisodes": ".module-player-list .module-player-list-content:eq({routeIndex}) a@text&&href"
+}
 ```
 
-**线路对象字段定义**：
+**使用规范**：
+1. 仅 type=2 视频源使用，其他类型源忽略
+2. 使用新字段后，`ruleContent` 回归单集视频 URL，不再支持返回嵌套 JSON
+3. 用户切换线路时，App 调用 `Rss.getEpisodesAwait(ruleEpisodes, routeIndex)` 重新采集新线路集数
+4. 视频地址由 `VideoUrlExtractor.extractVideoUrlForEpisode` 三层降级采集
+5. 老源兼容：未配置 `ruleRoutes`/`ruleEpisodes` 的源仍使用 `ruleContent` 模式
 
-| 字段 | 类型 | 必须 | 缺省值 | 说明 |
-|------|------|------|--------|------|
-| `name` | String | ❌ 可选 | "线路N" | 线路名称，显示在线路选择器 |
-| `episodes` | Array | ✅ 必须 | 无 | 集数列表，元素结构同格式③ |
+**反模式（禁止）**：
+- ❌ 在 `ruleContent` JS 中一次性采集所有线路所有集的播放页 URL
+- ❌ 在 `ruleEpisodes` 中直接采集视频流地址（m3u8/mp4），应只采集播放页 URL
+- ❌ 硬编码镜像站 URL 列表（应由 `ruleRoutes` 动态采集）
 
-**判定条件**：JSON 数组的第一个元素包含 `episodes` 字段时，判定为多线路格式。
+**适用**：同一视频有多条播放线路（不同CDN/不同清晰度/备用源），且希望按需采集减少网络消耗。
 
-**适用**：同一视频有多条播放线路（不同CDN/不同清晰度/备用源）。
+> 📖 完整字段规范详见 [SKILL.md](../../SKILL.md) "多线路多集按需采集标准写法"章节
 
 ### ruleContent 为空时：R5 自动抓取
 
@@ -424,7 +429,7 @@ JSON.stringify([
 ### 兼容性保证
 
 1. **现有单 URL 订阅源无需修改**：自动走格式①（100%向后兼容）
-2. **格式判定优先级**：JSON数组（`[`开头）→ 多行URL（每行合法URL）→ 单URL
+2. **格式判定优先级**：JSON数组（`[`开头）→ 多行URL（每行合法URL）→ 单URL（多线路多集改用 ruleRoutes/ruleEpisodes 独立字段，不再通过 ruleContent 嵌套JSON判定）
 3. **JSON 解析失败回退**：非合法JSON自动回退到多行URL或单URL模式
 4. **HTML含换行不会误判**：HTML标签不以 `http://`/`https://` 开头，不会误判为多行URL
 5. **相对路径自动拼接**：所有URL支持相对路径，自动拼接文章页面URL作为baseUrl

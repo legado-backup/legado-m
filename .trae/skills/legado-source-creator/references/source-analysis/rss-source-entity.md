@@ -4,7 +4,7 @@
 > 源码文件：`app/src/main/java/io/legado/app/data/entities/RssSource.kt`、`RssArticle.kt`、`BaseRssArticle.kt`
 > 解析流程：`app/src/main/java/io/legado/app/model/rss/RssParserByRule.kt`
 
-## 1. RssSource 实体完整字段（44个）
+## 1. RssSource 实体完整字段（46个）
 
 > 源码：RssSource.kt
 > Room表名：`rssSources`，索引：`sourceUrl`（非唯一）
@@ -50,9 +50,11 @@
 | 24 | ruleImage | String? | null | 图片规则 |
 | 25 | ruleLink | String? | null | 链接规则 |
 | 26 | ruleContent | String? | null | 正文规则 |
-| 27 | contentWhitelist | String? | null | 正文url白名单 |
-| 28 | contentBlacklist | String? | null | 正文url黑名单 |
-| 29 | coverDecodeJs | String? | null | 封面解密js |
+| 27 | ruleRoutes | String? | null | 多线路规则：从详情页采集线路列表（线路名），仅type=2视频源使用，支持CSS/JSONPath/XPath/JS（v3.26.072420+新增） |
+| 28 | ruleEpisodes | String? | null | 多集规则：从详情页采集集数列表（集数标题+播放页URL），仅type=2视频源使用，支持{routeIndex}/{routeIndex+1}占位符（v3.26.072420+新增） |
+| 29 | contentWhitelist | String? | null | 正文url白名单 |
+| 30 | contentBlacklist | String? | null | 正文url黑名单 |
+| 31 | coverDecodeJs | String? | null | 封面解密js |
 
 **与书源的关键区别**：
 - 书源 `ruleSearch` 是嵌套对象：`{"bookList":"...", "name":"...", "author":"..."}`
@@ -63,26 +65,26 @@
 
 | # | 字段 | 类型 | 默认值 | 说明 |
 |---|------|------|--------|------|
-| 30 | shouldOverrideUrlLoading | String? | null | 跳转url拦截，js返回true拦截，js变量url，可通过js打开url，比如调用阅读搜索、添加书架等，简化规则写法，不用webView js注入 |
-| 31 | style | String? | null | webView样式 |
-| 32 | enableJs | Boolean | true | 是否启用JS（@ColumnInfo defaultValue="1"） |
-| 33 | loadWithBaseUrl | Boolean | true | 是否用baseUrl加载（@ColumnInfo defaultValue="1"） |
-| 34 | injectJs | String? | null | 注入js |
-| 35 | preloadJs | String? | null | 提前预注入js |
-| 36 | startHtml | String? | null | web形式起始页 |
-| 37 | startStyle | String? | null | 起始页样式 |
-| 38 | startJs | String? | null | 起始页js |
-| 39 | showWebLog | Boolean | false | 是否输出web网页日志（@ColumnInfo defaultValue="0"） |
+| 32 | shouldOverrideUrlLoading | String? | null | 跳转url拦截，js返回true拦截，js变量url，可通过js打开url，比如调用阅读搜索、添加书架等，简化规则写法，不用webView js注入 |
+| 33 | style | String? | null | webView样式 |
+| 34 | enableJs | Boolean | true | 是否启用JS（@ColumnInfo defaultValue="1"） |
+| 35 | loadWithBaseUrl | Boolean | true | 是否用baseUrl加载（@ColumnInfo defaultValue="1"） |
+| 36 | injectJs | String? | null | 注入js |
+| 37 | preloadJs | String? | null | 提前预注入js |
+| 38 | startHtml | String? | null | web形式起始页 |
+| 39 | startStyle | String? | null | 起始页样式 |
+| 40 | startJs | String? | null | 起始页js |
+| 41 | showWebLog | Boolean | false | 是否输出web网页日志（@ColumnInfo defaultValue="0"） |
 
 ### 缓存与其他
 
 | # | 字段 | 类型 | 默认值 | 说明 |
 |---|------|------|--------|------|
-| 40 | jsLib | String? | null | js库（override BaseSource） |
-| 41 | lastUpdateTime | Long | 0 | 最后更新时间，用于排序（@ColumnInfo defaultValue="0"） |
-| 42 | customOrder | Int | 0 | 自定义排序（@ColumnInfo defaultValue="0"） |
-| 43 | preload | Boolean | false | 是否启用预加载（@ColumnInfo defaultValue="0"） |
-| 44 | cacheFirst | Boolean | false | 是否优先加载缓存（@ColumnInfo defaultValue="0"） |
+| 42 | jsLib | String? | null | js库（override BaseSource） |
+| 43 | lastUpdateTime | Long | 0 | 最后更新时间，用于排序（@ColumnInfo defaultValue="0"） |
+| 44 | customOrder | Int | 0 | 自定义排序（@ColumnInfo defaultValue="0"） |
+| 45 | preload | Boolean | false | 是否启用预加载（@ColumnInfo defaultValue="0"） |
+| 46 | cacheFirst | Boolean | false | 是否优先加载缓存（@ColumnInfo defaultValue="0"） |
 
 ### 修正记录
 
