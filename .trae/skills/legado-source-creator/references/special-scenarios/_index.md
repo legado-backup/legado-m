@@ -47,7 +47,7 @@
 ## video-audio.md — 视频/音频地址获取
 
 - **一句话描述**：视频播放地址提取（WebView+JS/嗅探）、**type=2 内置播放器内容规则编写指南（5.6节）**、内置播放器调用、m3u8/HLS 流处理、音频地址获取（bookSourceType=1）、**内置播放器404防盗链修复（5.6节常见问题）**
-- ✅ 包含：webView+webJs 提取视频、嗅探网络请求、openVideoPlayer、m3u8/HLS、ExoPlayer、audio@src、bookSourceType=1、**type=2 内置播放器 ruleContent 四种格式（单URL/多行URL/JSON数组/嵌套JSON多线路）、R5 自动抓取、多集/多线路解析、404防盗链Header注入、singleUrl不注入Referer、自定义Headers配置**
+- ✅ 包含：webView+webJs 提取视频、嗅探网络请求、openVideoPlayer、m3u8/HLS、ExoPlayer、audio@src、bookSourceType=1、**type=2 内置播放器 ruleContent 三种格式+多线路多集按需采集字段（ruleRoutes/ruleEpisodes）、R5 自动抓取、多集/多线路解析、404防盗链Header注入、singleUrl不注入Referer、自定义Headers配置**
 - ❌ 不包含：HLS.js 播放器 HTML 模板 → [rss-advanced.md](./rss-advanced.md)；加密图片 → [encrypted-images.md](./encrypted-images.md)；iframe 视频 → [rss-advanced.md](./rss-advanced.md)
 - **触发关键词**：视频、video、m3u8、HLS、音频、audio、openVideoPlayer、webView视频、嗅探、ExoPlayer、bookSourceType=1、**type=2、内置播放器、ruleContent、多集、多线路、RssEpisode、RssRoute、JSON数组、404防盗链、Referer、setDefaultHeaders、CDN防盗链、Header注入**
 
@@ -83,9 +83,9 @@
 ## rss-advanced.md — RSS 高级
 
 - **一句话描述**：@js: 动态分类（sortUrl）、年龄确认页处理、ruleContent 核心技术（<js>+webViewGetSource+HLS.js）、iframe 嵌入视频、搜索模式对比、多集视频站三方案对比（BookSource / RssSource+HTML播放页 / **RssSource type=2 内置播放器**）、三种视频网站类型总结与决策树
-- ✅ 包含：@js: sortUrl 动态加密分类、loginUrl 年龄确认（@js:java.ajax）、<js>标签格式、java.webViewGetSource()、HLS.js 播放器模板、iframe 提取、搜索加密对比决策树、多集视频 HTML 播放页、XHR 按需加载、BookSource 多集方案、三种视频类型决策树、**方案C type=2 内置播放器（7.10/7.11节：ruleContent JSON数组=多集 / 嵌套JSON=多线路 / R5自动抓取 / 上下滑动切换文章 / 3秒自动隐藏控件）**
+- ✅ 包含：@js: sortUrl 动态加密分类、loginUrl 年龄确认（@js:java.ajax）、<js>标签格式、java.webViewGetSource()、HLS.js 播放器模板、iframe 提取、搜索加密对比决策树、多集视频 HTML 播放页、XHR 按需加载、BookSource 多集方案、三种视频类型决策树、**方案C type=2 内置播放器（7.10/7.11节：ruleContent JSON数组=多集 / ruleRoutes+ruleEpisodes=多线路多集按需采集 / R5自动抓取 / 上下滑动切换文章 / 3秒自动隐藏控件）**
 - ❌ 不包含：RSS 基础字段 → [rss-basic.md](./rss-basic.md)；AES 加密 API → [encryption.md](./encryption.md)；反爬 Headers → [anti-crawl.md](./anti-crawl.md)；type=2 内置播放器 ruleContent 完整编写指南 → [video-audio.md](./video-audio.md) 5.6节
-- **触发关键词**：JS分类、年龄确认、webViewGetSource、HLS.js、iframe视频、多集视频、HTML播放页、XHR按需加载、<js>标签、player_aaaa、视频类型决策树、苹果CMS、**方案C、type=2、内置播放器、ruleContent JSON数组、嵌套JSON多线路、R5自动抓取**
+- **触发关键词**：JS分类、年龄确认、webViewGetSource、HLS.js、iframe视频、多集视频、HTML播放页、XHR按需加载、<js>标签、player_aaaa、视频类型决策树、苹果CMS、**方案C、type=2、内置播放器、ruleContent JSON数组、ruleRoutes/ruleEpisodes多线路多集、R5自动抓取**
 
 ---
 

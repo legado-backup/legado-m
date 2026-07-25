@@ -21,7 +21,7 @@
 | 文档 | 分析内容 | 验证日期 |
 |------|----------|----------|
 | [rss-source-entity.md](rss-source-entity.md) | RssSource 实体字段定义 + RssParserByRule 解析流程 + RssArticle 实体 + searchUrl搜索流程 + loginCheckJs执行环境 | 2026-06-05 |
-| [video-play-flow.md](video-play-flow.md) | type=2 视频播放完整链路：ReadRss → VideoPlayerActivity → VideoPlay → ExoPlayer；**R5 自动抓取（ruleContent为空时5种方法提取视频URL）+ R1 多集/多线路解析（parseRssEpisodes/parseRssRoutes）+ R3 抖音风格控件显隐（3秒自动隐藏+单击切换）** | 2026-07-12 |
+| [video-play-flow.md](video-play-flow.md) | type=2 视频播放完整链路：ReadRss → VideoPlayerActivity → VideoPlay → ExoPlayer；**R5 自动抓取（ruleContent为空时5种方法提取视频URL）+ 多线路多集按需采集（ruleRoutes/ruleEpisodes，v3.26.072420+）+ R1 多集解析（parseRssEpisodes）+ R3 抖音风格控件显隐（3秒自动隐藏+单击切换）** | 2026-07-24 |
 | [rhino-security.md](rhino-security.md) | Rhino 环境安全限制：RhinoClassShutter 禁止类列表 + 可用 Java 类 + JS 绑定对象 | 2026-06-02 |
 | [js-extensions-crypto.md](js-extensions-crypto.md) | JsExtensions/JsEncodeUtils 加密 API 完整清单 + 正确用法 + CryptoJS EVP_BytesToKey 差异 + **二进制内容解密流程（图片/视频）** + decrypt() vs decryptStr() + Base64 API选择 | 2026-06-09 |
 | [default-syntax.md](default-syntax.md) | Default 语法完整行为：规则前缀解析 + 关键字前缀 + 索引语法 + 提取类型 + 选择器兼容性 | 2026-06-03 |

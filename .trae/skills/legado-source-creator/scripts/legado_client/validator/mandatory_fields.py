@@ -163,6 +163,18 @@ RSS_SOURCE_FIELDS: Dict[str, Dict[str, Any]] = {
         "description": "正文规则（视频源 sniff 模式可不填，自动嗅探）",
         "empty_means": "正文规则缺失，视频源自动降级到 sniff 嗅探模式（功能仍可用，显式规则更稳定）",
     },
+    "ruleRoutes": {
+        "level": "OPTIONAL",
+        "type": str,
+        "description": "多线路规则：从详情页采集线路列表（线路名），仅type=2视频源使用（v3.26.072420+新增）",
+        "empty_means": "无多线路切换功能，视频源仅单线路播放",
+    },
+    "ruleEpisodes": {
+        "level": "OPTIONAL",
+        "type": str,
+        "description": "多集规则：从详情页采集集数列表（集数标题+播放页URL），仅type=2视频源使用，支持{routeIndex}/{routeIndex+1}占位符（v3.26.072420+新增）",
+        "empty_means": "无多集列表，视频源仅播放当前页面视频",
+    },
 
     # === RECOMMENDED（优秀好用，用户明确要求） ===
     "sourceIcon": {
