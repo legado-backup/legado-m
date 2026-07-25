@@ -1,0 +1,27 @@
+{
+  "bookSourceName": "JSONPath错误测试源",
+  "bookSourceUrl": "https://api.broken-jsonpath.com",
+  "bookSourceGroup": "测试,负面测试",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "https://api.broken-jsonpath.com/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": "@.data.books[*]",
+    "name": "@.title",
+    "author": "@.author",
+    "bookUrl": "@.url"
+  },
+  "ruleBookInfo": {
+    "name": "@.data.name",
+    "intro": "@.data.intro",
+    "tocUrl": "@.data.tocUrl"
+  },
+  "ruleToc": {
+    "chapterList": "@.chapters[*]",
+    "chapterName": "@.title",
+    "chapterUrl": "@.url"
+  },
+  "ruleContent": {
+    "content": "@.data.content"
+  }
+}

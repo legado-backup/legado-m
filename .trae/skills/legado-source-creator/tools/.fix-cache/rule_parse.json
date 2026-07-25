@@ -1,0 +1,82 @@
+[
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:17:03.981368"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:17:03.984856"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:19:49.492562"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:19:49.510496"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:24:36.123372"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T10:24:36.130177"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T12:30:19.310189"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T12:30:19.321204"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T12:30:57.528337"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-24T12:30:57.536424"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-26T21:55:45.678942"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-06-26T21:55:45.688398"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T09:14:44.218447"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T09:14:44.223996"
+  },
+  {
+    "solution": "ruleSearch.name: JSONPath 前缀 @.data.list → $.data.list",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T14:43:50.892263"
+  },
+  {
+    "solution": "ruleSearch.name → bookName",
+    "error_type": "rule_parse",
+    "timestamp": "2026-07-18T14:43:50.900993"
+  }
+]

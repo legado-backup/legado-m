@@ -1,0 +1,152 @@
+<!-- CMS Sample: maccms-v10 | Source: GitHub magicblack/maccms10 template/default/html/vod/search.html | Desensitized: 2026-06-14 -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>搜索结果 - 苹果CMS V10</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="/template/default/asset/css/vod-search.css">
+</head>
+<body>
+    <!-- 搜索页面容器（参考 GitHub search.html data 属性） -->
+    <div class="member-wrap" id="vodSearchPage" data-api-base="/api.php" data-search-wd="关键词" data-search-by="time" data-search-page="1">
+        <div class="container">
+            <div class="left_row fl">
+                <div class="pannel search_box clearfix">
+                    <div class="pannel_head clearfix">
+                        <h3 class="title">
+                            搜索到与"<em>关键词</em>"相关的
+                            <em class="mac_total">25</em> 条结果
+                        </h3>
+                    </div>
+
+                    <!-- 排序选项 -->
+                    <div class="wrapper_fl wrapper_tm">
+                        <ul class="screen_list sx_tz vod-search-sort clearfix">
+                            <li class="hl_fl">
+                                <a href="/vod/search/wd/关键词/by/time.html">按最新</a>
+                            </li>
+                            <li>
+                                <a href="/vod/search/wd/关键词/by/hits.html">按最热</a>
+                            </li>
+                            <li>
+                                <a href="/vod/search/wd/关键词/by/score.html">按评分</a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 搜索结果列表（关键结构） -->
+                    <ul class="vodlist clearfix">
+                        <li>
+                            <div class="stui-vodlist__box">
+                                <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/101.html" title="搜索结果1" data-original="https://example.com/spic1.jpg">
+                                    <span class="pic-text text-right">HD</span>
+                                </a>
+                                <div class="stui-vodlist__detail">
+                                    <h4 class="title text-overflow"><a href="/vod/detail/id/101.html" title="搜索结果1">搜索结果1</a></h4>
+                                    <p class="text text-overflow text-muted">导演: 张三 / 主演: 演员A</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="stui-vodlist__box">
+                                <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/102.html" title="搜索结果2" data-original="https://example.com/spic2.jpg">
+                                    <span class="pic-text text-right">TC</span>
+                                </a>
+                                <div class="stui-vodlist__detail">
+                                    <h4 class="title text-overflow"><a href="/vod/detail/id/102.html" title="搜索结果2">搜索结果2</a></h4>
+                                    <p class="text text-overflow text-muted">导演: 李四 / 主演: 演员B</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="stui-vodlist__box">
+                                <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/103.html" title="搜索结果3" data-original="https://example.com/spic3.jpg">
+                                    <span class="pic-text text-right">4K</span>
+                                </a>
+                                <div class="stui-vodlist__detail">
+                                    <h4 class="title text-overflow"><a href="/vod/detail/id/103.html" title="搜索结果3">搜索结果3</a></h4>
+                                    <p class="text text-overflow text-muted">导演: 王五 / 主演: 演员C</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="stui-vodlist__box">
+                                <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/104.html" title="搜索结果4" data-original="https://example.com/spic4.jpg">
+                                    <span class="pic-text text-right">BD</span>
+                                </a>
+                                <div class="stui-vodlist__detail">
+                                    <h4 class="title text-overflow"><a href="/vod/detail/id/104.html" title="搜索结果4">搜索结果4</a></h4>
+                                    <p class="text text-overflow text-muted">导演: 赵六 / 主演: 演员D</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="stui-vodlist__box">
+                                <a class="stui-vodlist__thumb lazyload" href="/vod/detail/id/105.html" title="搜索结果5" data-original="https://example.com/spic5.jpg">
+                                    <span class="pic-text text-right">HD</span>
+                                </a>
+                                <div class="stui-vodlist__detail">
+                                    <h4 class="title text-overflow"><a href="/vod/detail/id/105.html" title="搜索结果5">搜索结果5</a></h4>
+                                    <p class="text text-overflow text-muted">导演: 钱七 / 主演: 演员E</p>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <!-- 分页 -->
+                    <div id="vodSearchPagination">
+                        <div class="stui-page text-center clearfix">
+                            <a class="page-prev" href="javascript:;">上一页</a>
+                            <a class="active" href="/vod/search/wd/关键词/page/1.html">1</a>
+                            <a href="/vod/search/wd/关键词/page/2.html">2</a>
+                            <a href="/vod/search/wd/关键词/page/3.html">3</a>
+                            <a class="page-next" href="/vod/search/wd/关键词/page/2.html">下一页</a>
+                        </div>
+                    </div>
+
+                    <!-- 空结果提示 -->
+                    <div id="vodSearchEmpty" hidden>
+                        <div class="stui-empty">
+                            <p>没有找到相关结果</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜索无结果时的推荐 -->
+                <div class="pannel clearfix" id="vodSearchFallbackPanel" hidden>
+                    <div class="pannel_head clearfix">
+                        <a class="text_muted pull_right" href="/map/index.html">更多</a>
+                        <h3 class="title">最新</h3>
+                    </div>
+                    <ul class="vodlist clearfix">
+                        <li>
+                            <a class="vodlist_thumb lazyload" href="/vod/detail/id/301.html" title="推荐1" data-original="https://example.com/fb1.jpg">
+                                <span class="pic-text text-right">HD</span>
+                            </a>
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/301.html">推荐1</a></h4>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 右侧热播 -->
+            <div class="right_row fr pa_left hidden_xs hidden_mi">
+                <div class="pannel clearfix">
+                    <div class="pannel_head clearfix">
+                        <h3 class="title">热播影视</h3>
+                    </div>
+                    <ul class="ranklist_r clearfix">
+                        <li><em>1</em><a href="/vod/detail/id/401.html" title="热播1">热播1</a></li>
+                        <li><em>2</em><a href="/vod/detail/id/402.html" title="热播2">热播2</a></li>
+                        <li><em>3</em><a href="/vod/detail/id/403.html" title="热播3">热播3</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
