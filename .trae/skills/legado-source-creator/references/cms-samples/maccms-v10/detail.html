@@ -1,0 +1,142 @@
+<!-- CMS Sample: maccms-v10 | Source: GitHub magicblack/maccms10 template/default/html/vod/detail.html | Desensitized: 2026-06-14 -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>视频详情 - 苹果CMS V10</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="/template/default/asset/css/vod-detail.css">
+</head>
+<body class="detail-wrap" data-detail-module="vod" data-detail-id="101">
+
+    <!-- 详情头部：封面+基本信息 -->
+    <div class="hot_banner">
+        <div class="detail_list_box">
+            <div class="detail_list">
+                <div class="content_box vod-detail-hero-box">
+                    <!-- 封面图 -->
+                    <div class="content_thumb vod-detail-hero__thumb">
+                        <a class="vodlist_thumb lazyload" href="javascript:;" title="电影标题1" data-original="https://example.com/pic1.jpg">
+                            <span class="mac_badge_top_right"></span>
+                            <span class="mac_badge_bottom_right"></span>
+                            <span class="play hidden_xs"></span>
+                        </a>
+                    </div>
+                    <!-- 基本信息 -->
+                    <div class="vod-detail-hero__main-col">
+                        <div class="content_detail content_top vod-detail-hero__top">
+                            <div class="pannel_head clearfix detail-mobile-head">
+                                <h1 class="title js-vod-name">电影标题1</h1>
+                            </div>
+                            <div id="detail_rating" class="fn-clear show-mobile detail-rating-mobile-inline"></div>
+                        </div>
+                        <div class="content_detail content_min vod-detail-hero__main">
+                            <ul>
+                                <li class="data js-vod-meta-line">类型：动作 / 科幻</li>
+                                <li class="data js-vod-status-line">状态：HD</li>
+                                <li class="data js-vod-actor-line">主演：演员A / 演员B / 演员C</li>
+                                <li class="data js-vod-director-line">导演：张三</li>
+                                <li class="desc hidden_xs">
+                                    <span class="left text_muted">简介：</span>
+                                    <span class="js-vod-blurb">这是一部精彩的动作科幻电影，讲述了英雄拯救世界的故事。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 剧情介绍 -->
+    <div class="member-wrap">
+        <div class="container">
+            <div class="left_row">
+                <div class="pannel clearfix">
+                    <div class="tabs">
+                        <ul class="title_nav">
+                            <li class="tab-det" title="剧情介绍"><span>剧情介绍</span></li>
+                        </ul>
+                        <div class="content">
+                            <section>
+                                <h2>剧情介绍</h2>
+                                <div class="content_desc context clearfix">
+                                    <span class="js-vod-content-short">这是一部精彩的动作科幻电影，讲述了英雄拯救世界的故事。剧情跌宕起伏，特效震撼人心。</span>
+                                </div>
+                                <div class="content_desc full_text clearfix" style="display:none;">
+                                    <span class="js-vod-content-full">这是一部精彩的动作科幻电影，讲述了英雄拯救世界的故事。剧情跌宕起伏，特效震撼人心。完整剧情介绍内容...</span>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 播放列表（关键结构） -->
+                <div class="pannel" id="bofy">
+                    <div class="pannel_head pannel_head--vod-playlist">
+                        <h3 class="title">播放列表</h3>
+                        <div class="text_muted vod-playlist-head-sort">
+                            <a href="javascript:;" class="sort_btn">排序</a>
+                        </div>
+                    </div>
+                    <div class="play_source">
+                        <!-- 播放源标签页 -->
+                        <div class="play_source_tab list_scroll clearfix" id="NumTab">
+                            <a href="javascript:;" class="active" data-sid="1">播放源1</a>
+                            <a href="javascript:;" data-sid="2">播放源2</a>
+                        </div>
+                        <!-- stui 风格播放列表（常见于旧版模板） -->
+                        <div class="stui-content__playlist clearfix">
+                            <div class="stui-content__playlist1" style="display:block;">
+                                <a href="/vod/play/id/101/sid/1/nid/1.html">第1集</a>
+                                <a href="/vod/play/id/101/sid/1/nid/2.html">第2集</a>
+                                <a href="/vod/play/id/101/sid/1/nid/3.html">第3集</a>
+                                <a href="/vod/play/id/101/sid/1/nid/4.html">第4集</a>
+                                <a href="/vod/play/id/101/sid/1/nid/5.html">第5集</a>
+                            </div>
+                            <div class="stui-content__playlist1" style="display:none;">
+                                <a href="/vod/play/id/101/sid/2/nid/1.html">第1集</a>
+                                <a href="/vod/play/id/101/sid/2/nid/2.html">第2集</a>
+                                <a href="/vod/play/id/101/sid/2/nid/3.html">第3集</a>
+                                <a href="/vod/play/id/101/sid/2/nid/4.html">第4集</a>
+                                <a href="/vod/play/id/101/sid/2/nid/5.html">第5集</a>
+                            </div>
+                        </div>
+                        <!-- 新版模板 AJAX 渲染（参考 GitHub detail.html） -->
+                        <!--
+                        <div class="js-vod-play-source-body"></div>
+                        -->
+                    </div>
+                </div>
+
+                <!-- 猜你喜欢 -->
+                <div class="pannel clearfix">
+                    <div class="pannel_head clearfix">
+                        <h3 class="title">猜你喜欢</h3>
+                    </div>
+                    <ul class="vodlist vodlist_wi">
+                        <li>
+                            <a class="vodlist_thumb lazyload" href="/vod/detail/id/201.html" title="推荐电影1" data-original="https://example.com/rec1.jpg">
+                                <span class="pic-text text-right">HD</span>
+                            </a>
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/201.html">推荐电影1</a></h4>
+                        </li>
+                        <li>
+                            <a class="vodlist_thumb lazyload" href="/vod/detail/id/202.html" title="推荐电影2" data-original="https://example.com/rec2.jpg">
+                                <span class="pic-text text-right">4K</span>
+                            </a>
+                            <h4 class="title text-overflow"><a href="/vod/detail/id/202.html">推荐电影2</a></h4>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户行为日志标记（参考 GitHub detail.html） -->
+    <span style="display:none" class="mac_ulog_set" data-type="1" data-mid="1" data-id="101" data-sid="0" data-nid="0"></span>
+
+</body>
+</html>

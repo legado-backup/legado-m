@@ -1,0 +1,1 @@
+import{_ as t}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{o as c,c as n,a as o}from"./index-CRfxPgQE.js";const s={},r={class:"collection-page"};function a(l,e){return c(),n("div",r,[...e[0]||(e[0]=[o("h2",null,"源合集",-1),o("p",null,"合集管理页面（由其他子代理实现）",-1)])])}const f=t(s,[["render",a]]);export{f as default};
