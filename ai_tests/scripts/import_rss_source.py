@@ -27,9 +27,20 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import ADB_PATH, MEMU_ADB_HOST, PACKAGE
 
-# legado.db 路径（设备端）
-DB_DEVICE_PATH = f"/data/data/{PACKAGE}/databases/legado.db"
-DB_DIR = f"/data/data/{PACKAGE}/databases/"
+# legado.db 路径（设备端）— 支持 --package 参数覆盖默认包名
+_DEFAULT_PACKAGE = PACKAGE
+_active_package = _DEFAULT_PACKAGE
+DB_DEVICE_PATH = f"/data/data/{_active_package}/databases/legado.db"
+DB_DIR = f"/data/data/{_active_package}/databases/"
+
+
+def set_active_package(pkg: str):
+    """切换目标包名（用于支持共存包/正式包等不同 flavor）"""
+    global _active_package, DB_DEVICE_PATH, DB_DIR
+    _active_package = pkg
+    DB_DEVICE_PATH = f"/data/data/{_active_package}/databases/legado.db"
+    DB_DIR = f"/data/data/{_active_package}/databases/"
+    print(f"  目标包名切换为: {_active_package}")
 
 
 def run_adb(cmd, timeout=30):
@@ -90,11 +101,29 @@ def push_db(tmp_path):
         return False
     # 复制回原位置
     run_adb(f"shell su -c 'cp /sdcard/legado.db {DB_DEVICE_PATH}'")
+    # 关键：chown 为 App 用户（否则 cp 后 owner=root 导致 SQLITE_CANTOPEN）
+    # 铁证：2026-07-25 共存包导入后 App 启动崩溃 SQLITE_CANTOPEN，原因是 db 文件 owner=root
+    run_adb(f"shell su -c 'chown u0_a{{UID}}:u0_a{{UID}} {DB_DEVICE_PATH}'".replace(
+        "{UID}", _get_app_uid()))
     run_adb(f"shell su -c 'chmod 660 {DB_DEVICE_PATH}'")
     # 删除设备端WAL/SHM文件（关键！否则旧WAL覆盖新数据）
     run_adb(f"shell su -c 'rm -f {DB_DEVICE_PATH}-wal {DB_DEVICE_PATH}-shm'")
-    print(f"✅ DB pushed back (WAL/SHM已清理)")
+    print(f"✅ DB pushed back (WAL/SHM已清理, owner已修复)")
     return True
+
+
+def _get_app_uid():
+    """获取 App 进程的 UID（用于 chown 修复 db 文件 owner）
+    铁证：不同 flavor 包名对应不同 UID，硬编码 UID 会在切换包后失效
+    """
+    # 通过 stat 命令获取 databases 目录的 owner（App 进程的 UID）
+    result = run_adb(f"shell su -c 'stat -c %u {DB_DIR}'")
+    uid = result.stdout.strip()
+    if uid.isdigit():
+        return uid
+    # fallback: 默认 legado.app.debug 的 UID（需手动确认）
+    print(f"  ⚠️ 无法获取 App UID（stat 返回: {result.stdout}），使用默认 1020")
+    return "1020"
 
 
 def import_rss(json_path, db_path):
@@ -180,18 +209,24 @@ def import_rss(json_path, db_path):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("用法: python import_rss_source.py <json_path>")
-        print("示例: python import_rss_source.py .trae/skills/legado-source-creator/output/rss/rssSource_xxx.json")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="导入订阅源到legado.db")
+    parser.add_argument('json_path', help='JSON文件路径')
+    parser.add_argument('--package', default=_DEFAULT_PACKAGE,
+                        help=f'目标包名（默认: {_DEFAULT_PACKAGE}，共存包: io.legado.app.debug）')
+    args = parser.parse_args()
 
-    json_path = sys.argv[1]
+    json_path = args.json_path
     if not os.path.exists(json_path):
         print(f"❌ JSON文件不存在: {json_path}")
         sys.exit(1)
 
+    # 切换目标包名
+    if args.package != _DEFAULT_PACKAGE:
+        set_active_package(args.package)
+
     print("=" * 60)
-    print("Legado 订阅源导入工具")
+    print(f"Legado 订阅源导入工具（目标包: {_active_package}）")
     print("=" * 60)
 
     # 创建临时文件
