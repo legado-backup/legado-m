@@ -210,8 +210,8 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 22. **新模拟器实例DB迁移**：新装App首次启动前 rssSources 表只有48列（无 ruleRoutes/ruleEpisodes），导入含这两字段的源JSON报 "table rssSources has no column named ruleRoutes"。必须先 `am start` App 触发数据库迁移到49列，再 pull db 导入源
 23. **模拟器多AI并发冲突**：同一模拟器上共存包(io.legado.app.debug)/测试包(io.legado.miss.app.debug)/正式包(io.legado.miss.app.release) 被不同AI操作会抢占前台。测试时必须用 `am start -W` 确认 ResumedActivity 是目标包；推荐用独立MEmu实例（`memuc start -i 1`，adb端口21513）
 24. **新MEmu实例网络DNS问题**：新启动实例可能缺默认路由+DNS解析失败（ping IP通但ping域名报unknown host）。修复：`su -c 'ip route add default via 192.168.232.1 dev wlan0'` + `settings put global dns1 8.8.8.8`。若仍失败需重启实例
-25. **ExoPlayer HLS MIME检测（动态URL）**：play.php 等动态URL不以 .m3u8 结尾时，DefaultMediaSourceFactory 的 URL 后缀检测失败，误用 ProgressiveMediaSource 报 UnrecognizedInputFormatException(3003)。修复：ruleContent 提取m3u8 URL后追加 `format=m3u8` 参数，ExoPlayerHelper.getMimeType 检测该参数返回 APPLICATION_M3U8，setMimeType 让 factory 正确创建 HlsMediaSource
-26. **ruleContent 提取 HLS URL 模式**：内联JS的 `hls.loadSource('xxx')` 提取模式：`@js:var m=result.match(/hls\\.loadSource\\(['"]([^'"]+)['"]\\)/);var u=m?m[1]:'';if(u){u+(u.indexOf('?')>=0?'&':'?')+'format=m3u8'}else{''}`。追加 format=m3u8 触发陷阱25的 MIME 检测
+25. **ExoPlayer HLS MIME检测（动态URL）**：play.php 等动态URL不以 .m3u8 结尾时，DefaultMediaSourceFactory 的 URL 后缀检测失败，误用 ProgressiveMediaSource 报 UnrecognizedInputFormatException(3003)。修复：ruleContent 提取m3u8 URL后追加 `format=m3u8` 参数，ExoPlayerHelper.getMimeType 检测该参数返回 APPLICATION_M3U8，setMimeType 让 factory 正确创建 HlsMediaSource。**v3.26.0725+ 优化**：getMimeType 已新增支持 `m3u8=1` 参数和 `index.m3u8` 路径识别，这两种情况下无需追加 format=m3u8 也能自动识别；兼容旧版本仍建议追加
+26. **ruleContent 提取 HLS URL 模式**：内联JS的 `hls.loadSource('xxx')` 提取模式：`@js:var m=result.match(/hls\\.loadSource\\(['"]([^'"]+)['"]\\)/);var u=m?m[1]:'';if(u){u+(u.indexOf('?')>=0?'&':'?')+'format=m3u8'}else{''}`。追加 format=m3u8 触发陷阱25的 MIME 检测。**v3.26.0725+ 简化版**：若 URL 已含 `m3u8=1` 或路径含 `index.m3u8`，可省略 format=m3u8 追加，直接返回视频地址即可
 27. **违禁词安全防线（2026-07-25）**：Playwright分析/logcat调试/JSON字段输出时，禁止原样输出真实URL/源名称/分类名/cookie。脚本可获取真实数据用于技术分析（如选择器提取、JS执行），但AI思考链和最终输出必须用代号替代。**铁证**：summary原样引用站点完整URL和分类名，违反双闭口约束。**修复**：(1)Playwright evaluate结果在AI输出前先用脚本过滤为编号（源[1]/源[2]/分类[N]）；(2)logcat用Grep过滤技术关键词（Exception/Error/FATAL/自定义tag），head_limit≤20，原始日志行不输出；(3)JSON字段值在输出时只展示技术结构（选择器/JS模式），不展示业务值；(4)站点URL一律用站点A/B/C+路径模式，如 `/list/{分类}/index.html`
 
 ### 批量源完善陷阱（2026-07-25 rssSource 完善任务反哺）
@@ -227,6 +227,10 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 32. **站点失效判断标准与分层处理**：批量源完善时区分3类不可修复源：(1)**站点失效**（HTTP 500/超时/DNS解析失败）→ `enabled=false` 禁用；(2)**站点正常但搜索被禁用**（API返回"搜索功能已关闭"或空结果）→ 保留启用+`sourceComment='[注:站点搜索不可用]'`；(3)**Cloudflare挑战**（页面含 `Just a moment` 或 `cf-challenge` cookie）→ 标记 unverifiable + 启用。**判断流程**：先curl首页确认站点可达→再curl搜索接口确认搜索可用→最后Playwright验证DOM结构
 
 33. **批量源修复启用/禁用/标注三层策略**：批量完善N个源时按3层处理：(1)**可修复层**（规则错误/字段缺失）→ 修复并启用；(2)**不可修复层**（站点失效）→ `enabled=false` 禁用避免用户看到错误；(3)**部分可用层**（站点正常但搜索/某功能不可用）→ 保留启用+`sourceComment` 标注已知问题。**铁证**：直接删除不可用源会丢失可能恢复的站点，禁用+标注是更优策略。每层处理完立即用 batch_test_all.py 验证通过率提升
+
+34. **多参数搜索URL适配（u= / t= 等分类参数）**：部分站点搜索URL带分类参数（如 `?m=search&u=分类X&k={{key}}`），写死分类会限制搜索范围。**适配策略**：(1)优先验证无分类参数时是否全局搜索可用（如 `?m=search&k={{key}}`），可用则去掉分类参数实现全量搜索；(2)若必须带分类参数且分类固定，将搜索范围写入 sourceComment 说明；(3)若用户希望多分类搜索，可在 sortUrl 中按分类列出，每个分类作为独立搜索入口
+
+35. **正式包日志不可见陷阱**：`AppLog.kt` 的日志输出被 `if (BuildConfig.DEBUG)` 包裹，release 正式包中 AppLog.put 输出完全不可见。**调试策略**：(1)优先用 debug 包调试规则问题；(2)若必须用正式包验证，关注系统级日志（ActivityManager/ExoPlayer/AndroidRuntime 等 tag）；(3)ExoPlayer 播放问题看 `ExoPlayerImpl` / `MediaSource` / `OMX` 等系统 tag，不依赖 AppLog
 
 ## 工具脚本
 

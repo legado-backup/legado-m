@@ -167,6 +167,7 @@
 | [specs/rss-unified-search/](./specs/rss-unified-search/) | 订阅源统一搜索（对标书架搜索：新建 RssSearchActivity+RssSearchModel 并发调度所有带 searchUrl 的订阅源，title+pubDate 去重聚合多源，支持换源，复用 SearchKeyword 表加 type 字段） 🔄 设计中 |
 | [specs/rss-v5_7-deep-fix/](./specs/rss-v5_7-deep-fix/) | RSS 订阅源 V5.7 深度修复（13 启用源 12 必备字段规则修复 + 15 CF盾源破盾恢复 + 7 timeout 源重试 + 5维度真机验证 + 陷阱68-72沉淀 + ADR Y-Statement 5项决策） 🔄 设计中 |
 | [specs/logging-audit-and-enhancement/](./specs/logging-audit-and-enhancement/) | 日志规范全面审查与补全完善（核心模块catch块日志覆盖：WebBook 90%缺失+规则引擎40%+网络层47%，统一模块Tag规范+ai_tests通用日志获取脚本+规范文档优化） 🔄 设计中 |
+| [specs/thread-pool-split-config/](./specs/thread-pool-split-config/) | 书源线程池拆分与自定义配置（共用 threadCount 拆分为 searchThreadCount + updateCacheThreadCount 两个独立配置，30+ 业务点归类替换，UI 自定义入口，老用户自动迁移） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |
