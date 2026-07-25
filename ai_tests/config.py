@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MEMUC_PATH = r"D:\Program Files\Microvirt\MEmu\memuc.exe"
 ADB_PATH = r"D:\Program Files\Microvirt\MEmu\adb.exe"
 MEMU_INSTANCE_ID = 0
-MEMU_ADB_HOST = "127.0.0.1:21513"  # 临时指向实例1（站点B测试），导入后改回21503
+MEMU_ADB_HOST = "127.0.0.1:21503"  # 实例0（实例1卡死，临时切回21503）
 
 # === Legado App ===
 # 简化说明：默认 miss flavor + debug 构建，与 build.gradle applicationId="io.legado.miss.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.miss.app.release + 改 APK_GLOB_DIR 到 release 路径；legacy flavor 为 io.legado.app.debug（通过 -PcustomAppId=io.legado.app 切换） | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE + flavor（V4）

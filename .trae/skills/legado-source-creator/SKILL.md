@@ -171,7 +171,7 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 - 功能层面通过 `isNullOrBlank` 判断动态降级（MANDATORY 缺失时功能降级而非崩溃）
 - v4 校验器在"功能必填"基础上加上用户要求的"优秀好用"标准（RECOMMENDED 强制）
 
-## 核心陷阱速查（Top 33）
+## 核心陷阱速查（Top 39）
 
 > 完整陷阱库见 [references/troubleshooting/](./references/troubleshooting/)
 
@@ -231,6 +231,14 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 34. **多参数搜索URL适配（u= / t= 等分类参数）**：部分站点搜索URL带分类参数（如 `?m=search&u=分类X&k={{key}}`），写死分类会限制搜索范围。**适配策略**：(1)优先验证无分类参数时是否全局搜索可用（如 `?m=search&k={{key}}`），可用则去掉分类参数实现全量搜索；(2)若必须带分类参数且分类固定，将搜索范围写入 sourceComment 说明；(3)若用户希望多分类搜索，可在 sortUrl 中按分类列出，每个分类作为独立搜索入口
 
 35. **正式包日志不可见陷阱**：`AppLog.kt` 的日志输出被 `if (BuildConfig.DEBUG)` 包裹，release 正式包中 AppLog.put 输出完全不可见。**调试策略**：(1)优先用 debug 包调试规则问题；(2)若必须用正式包验证，关注系统级日志（ActivityManager/ExoPlayer/AndroidRuntime 等 tag）；(3)ExoPlayer 播放问题看 `ExoPlayerImpl` / `MediaSource` / `OMX` 等系统 tag，不依赖 AppLog
+
+36. **RSS列表图片不显示（布局+加载失败双因素）**：RSS文章列表图片不显示有两个原因：(1)布局因素——默认列表样式（articleStyle=0）的 imageView 默认 GONE，只有 Glide 加载成功才 VISIBLE，加载失败则完全不可见；网格布局（articleStyle=2）有 placeholder 始终可见。(2)图片加载失败——CDN防盗链/Cloudflare拦截返回403。**解决方案**：(1)视频/图片类RSS源设置 `articleStyle=2`（网格布局），即使图片加载失败也有占位框；(2)配置 `header` 字段添加 User-Agent 和 Referer；(3)启用 `enabledCookieJar=true` 让cookie自动传递；(4)图片CDN有独立Cloudflare防护时，OkHttp请求可能被拦截，需用WebView模式或代理
+
+37. **RSS源文章列表不加载（Cloudflare拦截OkHttp）**：站点有Cloudflare保护时，Legado的OkHttp直接请求会被拦截（返回503/403验证页），导致文章列表解析为空。**诊断方法**：(1)清空rssArticles表后重新进入源，如果文章数仍为0则确认是网络拦截；(2)旧文章数据是缓存，修改ruleImage后看不到效果是因为文章未重新加载。**解决方案**：(1)配置header伪装浏览器；(2)启用cookieJar传递验证cookie；(3)Cloudflare JS Challenge无法通过OkHttp绕过时，考虑用WebView模式（enableJs=true + loadWithBaseUrl=true）或等待IP被放行
+
+38. **RSS文章image字段为null的调试方法**：调试ruleImage规则时，image字段为null有三种可能：(1)JS规则返回空字符串（提取失败）；(2)文章未重新加载（用了旧缓存，旧数据image本身为null）；(3)网络请求被拦截（文章列表为空）。**调试步骤**：(1)先用 `@js:result.tagName()` 验证JS执行环境和result对象类型；(2)用 `@js:var e=result.selectFirst('.css');e?'found':'not-found'` 验证选择器；(3)停止App后pull数据库（含WAL），用SQLite查看image字段实际值；(4)NetworkUtils.getAbsoluteURL会把非URL字符串转为绝对路径（如"div"→"https://domain/div"），可用于间接观察JS返回值
+
+39. **数据库直接修改后App不生效（WAL+缓存）**：直接修改legado.db后push回模拟器，App可能不生效：(1)App运行时数据库被WAL锁定，push前必须force-stop；(2)需删除 `-wal` 和 `-shm` 文件避免WAL冲突；(3)文件权限必须设置 `chmod 660` + `chown u0_a20:u0_a20`（UID从dumpsys package获取）；(4)RSS文章有缓存机制，修改ruleImage后需切换分类或下拉刷新触发重新加载
 
 ## 工具脚本
 

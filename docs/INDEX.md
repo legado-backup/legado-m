@@ -116,6 +116,7 @@
 | [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
+| [specs/image-gallery-activity/](./specs/image-gallery-activity/) | 图片浏览器 Activity 化改造（PhotoDialog 单图弹出→ImageGalleryActivity 多图浏览，参考 VideoPlayerActivity 架构，ViewPager2 双层嵌套+跨文章切换+长按保存） 🔄 设计中 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
@@ -167,7 +168,8 @@
 | [specs/rss-unified-search/](./specs/rss-unified-search/) | 订阅源统一搜索（对标书架搜索：新建 RssSearchActivity+RssSearchModel 并发调度所有带 searchUrl 的订阅源，title+pubDate 去重聚合多源，支持换源，复用 SearchKeyword 表加 type 字段） 🔄 设计中 |
 | [specs/rss-v5_7-deep-fix/](./specs/rss-v5_7-deep-fix/) | RSS 订阅源 V5.7 深度修复（13 启用源 12 必备字段规则修复 + 15 CF盾源破盾恢复 + 7 timeout 源重试 + 5维度真机验证 + 陷阱68-72沉淀 + ADR Y-Statement 5项决策） 🔄 设计中 |
 | [specs/logging-audit-and-enhancement/](./specs/logging-audit-and-enhancement/) | 日志规范全面审查与补全完善（核心模块catch块日志覆盖：WebBook 90%缺失+规则引擎40%+网络层47%，统一模块Tag规范+ai_tests通用日志获取脚本+规范文档优化） 🔄 设计中 |
-| [specs/thread-pool-split-config/](./specs/thread-pool-split-config/) | 书源线程池拆分与自定义配置（共用 threadCount 拆分为 searchThreadCount + updateCacheThreadCount 两个独立配置，30+ 业务点归类替换，UI 自定义入口，老用户自动迁移） 🔄 设计中 |
+| [specs/thread-pool-split-config/](./specs/thread-pool-split-config/) | 书源线程池拆分与自定义配置（共用 threadCount 拆分为 searchThreadCount + updateCacheThreadCount 两个独立配置，30+ 业务点归类替换，UI 自定义入口，老用户自动迁移） ✅ 实施完成（仅本地commit+验收通过）
+| [specs/thread-pool-audit/](./specs/thread-pool-audit/) | 线程池配置全面审查（13项配置点静态审查：8个FixedThreadPool+globalExecutor+DispatchersMonitor+OkHttp连接池+Dispatchers.IO+Coroutine.kt，识别泄漏风险/性能瓶颈/默认值合理性，输出P0/P1/P2优化建议） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |
