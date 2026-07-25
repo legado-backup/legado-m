@@ -10,6 +10,12 @@
 3. **JSON 输出合规**：所有 None 字段必须经 `sanitize_source_json` 过滤为空字符串
 4. **真机验证为最终标准**：JVM 仿真仅覆盖规则引擎层，真机测试集成是验收门禁
 5. **自动修复闭环**：生成 → 测试 → 失败 → 自动诊断 → 修复 → 重测
+6. **输出安全防线（2026-07-25 强化）**：脚本可获取真实数据用于技术分析，但**思考链和输出内容双闭口禁止违禁词**。域名→站点代号（站点A/B/C）、源名称→源[N]、URL→路径模式（/path/{id}）、分类名→分类[N]、cookie/token→***。Grep只搜技术字段（id/type/ruleImage/函数名）不搜业务字段（sourceName/sourceUrl/title）。logcat只输出错误码/异常类型/调用栈，源名称/域名/URL全部代号化
+7. **导出目录规范（2026-07-25 强化）**：所有新生成或优化的源 JSON **必须导出到 `output/ai_source/` 目录**，禁止散落在 temp/ 或其他目录。
+   - **订阅源**：`output/ai_source/rss/`（如 `rssSource_video_fixed_20260725.json`）
+   - **书源**：`output/ai_source/book/`
+   - **命名规范**：`{类型}_{描述}_{日期YYYYMMDD}.json`（如 `rssSource_video_xxxsite_20260725.json`、`bookSource_novel_xxx_20260725.json`）
+   - **唯一导出目录**：`output/ai_source/` 是 AI 生成/优化源的唯一交付目录，便于统一管理和后续导入
 
 ## 4 阶段闭环工作流（v4）
 
@@ -165,7 +171,7 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 - 功能层面通过 `isNullOrBlank` 判断动态降级（MANDATORY 缺失时功能降级而非崩溃）
 - v4 校验器在"功能必填"基础上加上用户要求的"优秀好用"标准（RECOMMENDED 强制）
 
-## 核心陷阱速查（Top 20）
+## 核心陷阱速查（Top 33）
 
 > 完整陷阱库见 [references/troubleshooting/](./references/troubleshooting/)
 
@@ -200,6 +206,27 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 18. **WebView 生命周期**：destroy/setLayoutParams 必须在 UI 线程
 19. **JS 引擎返回值**：类型不可信，必须类型容错（is ByteArray / is InputStream）
 20. **ExoPlayer cacheDataSourceFactory**：上游 OkHttpDataSource 不支持 file://
+21. **import_rss_source.py chown uid bug**：脚本硬编码 `u0_a0:u0_a0`，但不同包/不同实例 uid 不同（正式包实例0=10065, 实例1=10020, 测试包=10064）。导入后必须手动 `chown <实际uid>:<实际uid> /data/data/<pkg>/databases/legado.db` 修复权限，否则抛 SQLiteCantOpenDatabaseException + FATAL EXCEPTION arch_disk_io_0 崩溃。查 uid：`adb shell dumpsys package <pkg> | grep userId=`
+22. **新模拟器实例DB迁移**：新装App首次启动前 rssSources 表只有48列（无 ruleRoutes/ruleEpisodes），导入含这两字段的源JSON报 "table rssSources has no column named ruleRoutes"。必须先 `am start` App 触发数据库迁移到49列，再 pull db 导入源
+23. **模拟器多AI并发冲突**：同一模拟器上共存包(io.legado.app.debug)/测试包(io.legado.miss.app.debug)/正式包(io.legado.miss.app.release) 被不同AI操作会抢占前台。测试时必须用 `am start -W` 确认 ResumedActivity 是目标包；推荐用独立MEmu实例（`memuc start -i 1`，adb端口21513）
+24. **新MEmu实例网络DNS问题**：新启动实例可能缺默认路由+DNS解析失败（ping IP通但ping域名报unknown host）。修复：`su -c 'ip route add default via 192.168.232.1 dev wlan0'` + `settings put global dns1 8.8.8.8`。若仍失败需重启实例
+25. **ExoPlayer HLS MIME检测（动态URL）**：play.php 等动态URL不以 .m3u8 结尾时，DefaultMediaSourceFactory 的 URL 后缀检测失败，误用 ProgressiveMediaSource 报 UnrecognizedInputFormatException(3003)。修复：ruleContent 提取m3u8 URL后追加 `format=m3u8` 参数，ExoPlayerHelper.getMimeType 检测该参数返回 APPLICATION_M3U8，setMimeType 让 factory 正确创建 HlsMediaSource
+26. **ruleContent 提取 HLS URL 模式**：内联JS的 `hls.loadSource('xxx')` 提取模式：`@js:var m=result.match(/hls\\.loadSource\\(['"]([^'"]+)['"]\\)/);var u=m?m[1]:'';if(u){u+(u.indexOf('?')>=0?'&':'?')+'format=m3u8'}else{''}`。追加 format=m3u8 触发陷阱25的 MIME 检测
+27. **违禁词安全防线（2026-07-25）**：Playwright分析/logcat调试/JSON字段输出时，禁止原样输出真实URL/源名称/分类名/cookie。脚本可获取真实数据用于技术分析（如选择器提取、JS执行），但AI思考链和最终输出必须用代号替代。**铁证**：summary原样引用站点完整URL和分类名，违反双闭口约束。**修复**：(1)Playwright evaluate结果在AI输出前先用脚本过滤为编号（源[1]/源[2]/分类[N]）；(2)logcat用Grep过滤技术关键词（Exception/Error/FATAL/自定义tag），head_limit≤20，原始日志行不输出；(3)JSON字段值在输出时只展示技术结构（选择器/JS模式），不展示业务值；(4)站点URL一律用站点A/B/C+路径模式，如 `/list/{分类}/index.html`
+
+### 批量源完善陷阱（2026-07-25 rssSource 完善任务反哺）
+
+28. **MacCMS searchUrl 接口混淆**：searchUrl 必须用 `ac=list`（搜索接口），不能用 `ac=detail`（详情接口）。**铁证**：批量源修复时发现大量源误用 `ac=detail` 导致搜索无结果或JSON解析错误，搜索通过率从 28/41 提升至 33/41。**区分**：`ac=list` 返回列表JSON用于搜索/分类；`ac=detail&ids={id}` 返回详情JSON用于ruleLink跳转后解析线路和集数。**修复**：批量将 searchUrl 中的 `ac=detail` 替换为 `ac=list`
+
+29. **HTML搜索模式适配（API禁用时）**：部分MacCMS站点禁用API搜索接口，此时切换HTML搜索模式：`searchUrl=/index.php/vod/search/page/{{page}}/wd/{{key}}.html`。ruleArticles选择器按站点模板：模板A用 `ul.videoContent li` + `a.videoName@text`，模板B用 `div.xing_vb ul li:has(span.xing_vb4)` + `span.xing_vb4 a@text`。**关键**：`div.xing_vb ul li` 不加 `:has()` 过滤会包含分类标题li（无vod_id），导致ruleLink提取失败
+
+30. **ruleLink JS拼接API详情URL模式**：HTML搜索结果li中只有 `/vod/detail/id/123.html` 形式的相对链接，但 ruleContent/ruleRoutes/ruleEpisodes 需要 MacCMS 详情JSON。**修复**：ruleLink 用 JS 从HTML提取 vod_id 后拼接 API URL：`<js>var m=result.match(/detail\/id\/(\d+)/);if(!m)return '';var id=m[1];var base=baseUrl||(source&&source.sourceUrl)||'';var api=base.split('?')[0];if(api.charAt(api.length-1)==='/')api=api.slice(0,-1);api+'?ac=detail&ids='+id;</js>`。**禁止**直接用相对链接作为link（会请求HTML页面而非JSON）
+
+31. **ruleRoutes/ruleEpisodes MacCMS标准解析模式**：详情JSON通过 `vod_play_from` 解析线路（`$$$`分隔），`vod_play_url` 解析集数（`$$$`分隔线路 + `#`分隔集数 + `$`分隔标题和URL）。**铁证**：纯数字link（如 "123"）作为URL请求会失败，必须用JS拼接有效API URL。规则模板：ruleRoutes=`<js>(function(){var d=JSON.parse(result);var f=(d.list&&d.list[0]&&d.list[0].vod_play_from)||'';return f.split('$$$').filter(function(s){return s&&s.trim();}).map(function(n,i){return n||('线路'+(i+1));}).join('\\n');})()</js>`，ruleEpisodes=`<js>(function(){var ri={routeIndex};var d=JSON.parse(result);var u=(d.list&&d.list[0]&&d.list[0].vod_play_url)||'';var r=u.split('$$$');if(ri>=r.length)return JSON.stringify([]);var eps=[];r[ri].split('#').forEach(function(item,i){if(!item)return;var p=item.split('$');eps.push({title:p[0]||('第'+(i+1)+'集'),url:p[1]||p[0]});});return JSON.stringify(eps);})()</js>`
+
+32. **站点失效判断标准与分层处理**：批量源完善时区分3类不可修复源：(1)**站点失效**（HTTP 500/超时/DNS解析失败）→ `enabled=false` 禁用；(2)**站点正常但搜索被禁用**（API返回"搜索功能已关闭"或空结果）→ 保留启用+`sourceComment='[注:站点搜索不可用]'`；(3)**Cloudflare挑战**（页面含 `Just a moment` 或 `cf-challenge` cookie）→ 标记 unverifiable + 启用。**判断流程**：先curl首页确认站点可达→再curl搜索接口确认搜索可用→最后Playwright验证DOM结构
+
+33. **批量源修复启用/禁用/标注三层策略**：批量完善N个源时按3层处理：(1)**可修复层**（规则错误/字段缺失）→ 修复并启用；(2)**不可修复层**（站点失效）→ `enabled=false` 禁用避免用户看到错误；(3)**部分可用层**（站点正常但搜索/某功能不可用）→ 保留启用+`sourceComment` 标注已知问题。**铁证**：直接删除不可用源会丢失可能恢复的站点，禁用+标注是更优策略。每层处理完立即用 batch_test_all.py 验证通过率提升
 
 ## 工具脚本
 
