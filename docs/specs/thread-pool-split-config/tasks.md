@@ -173,8 +173,8 @@
 - [ ] 13.1 清理 `.bak` 备份目录（验证通过后）
 - [x] 13.2 全局搜索审查：`Grep "threadCount"` 确认无遗漏替换点（5处均为兼容性代码）
 - [x] 13.3 清理临时日志：删除 SearchModel.initSearchPool 和 CacheBookService 中的临时日志（Grep 验证无残留）
-- [ ] 13.4 提交 git commit（feat: 拆分书源线程池配置为搜索类和更新+缓存类）—— 待用户确认
-- [ ] 13.5 更新 README.md 状态为 "✅ 已完成"
+- [x] 13.4 提交 git commit（feat: 拆分书源线程池配置为搜索类和更新+缓存类）—— commit 57e1483c3，38 files changed, 1653 insertions
+- [x] 13.5 用户验收通过（2026-07-26，仅本地commit不推送远端）
 - [x] 13.6 更新 tasks.md 全部标记完成状态（本次更新）
 
 ## AOAdapt 日志（实施过程记录）
