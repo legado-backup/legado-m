@@ -202,6 +202,15 @@
 | OkHttpStreamFetcher 图片加载 | help/glide/OkHttpStreamFetcher.kt | - |
 | ImageLoader 统一入口 | help/glide/ImageLoader.kt | - |
 | VideoPlayer 主播放器 | ui/video/VideoPlayer.kt | - |
+| ExoPlayerHelper ExoPlayer 工具（嗅探+MediaItem 创建） | help/exoplayer/ExoPlayerHelper.kt | exoplayer-resilience |
+| MimeSniffer magic number 检测（MP4/M3U8/FLV/TS/MKV/MPD） | help/exoplayer/MimeSniffer.kt | exoplayer-resilience |
+| MimeSnifferCache 嗅探结果 LRU 缓存（100 容量+1h TTL） | help/exoplayer/MimeSnifferCache.kt | exoplayer-resilience |
+| Exo2MediaPlayer ExoPlayer 实现（协程嗅探+不可恢复错误累计+WebView 降级） | help/gsyVideo/Exo2MediaPlayer.kt | exoplayer-resilience |
+| ImageGalleryActivity 图片浏览器 | ui/image/ImageGalleryActivity.kt | - |
+| ImagePlay 状态单例（跨文章切换） | ui/image/ImagePlay.kt | - |
+| ImageGalleryViewModel 图片加载 | ui/image/ImageGalleryViewModel.kt | - |
+| ImageArticlePagerAdapter 外层适配器 | ui/image/ImageArticlePagerAdapter.kt | - |
+| ImagePageAdapter 内层适配器（旋转/缩放） | ui/image/ImagePageAdapter.kt | - |
 | FloatingPlayer 浮窗播放 | ui/video/FloatingPlayer.kt | - |
 | 弹幕系统 | ui/video/DanmakuAdapter.kt | - |
 | WebViewPool 对象池 | help/http/WebViewPool.kt | - |
