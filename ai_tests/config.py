@@ -8,6 +8,7 @@ V3 固化层：路径常量、超时、崩溃模式、DB 查询模板
 - DB_QUERIES：基于源码 Dao 扩展
 """
 from pathlib import Path
+import os
 
 # === 项目根目录（自动推断：ai_tests/ 的父目录）===
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -16,7 +17,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MEMUC_PATH = r"D:\Program Files\Microvirt\MEmu\memuc.exe"
 ADB_PATH = r"D:\Program Files\Microvirt\MEmu\adb.exe"
 MEMU_INSTANCE_ID = 0
-MEMU_ADB_HOST = "127.0.0.1:21503"  # 实例0（实例1卡死，临时切回21503）
+MEMU_ADB_HOST = os.environ.get("MEMU_ADB_HOST", "127.0.0.1:21503")  # 实例0（实例1卡死，临时切回21503；支持环境变量覆盖）
 
 # === Legado App ===
 # 简化说明：默认 miss flavor + debug 构建，与 build.gradle applicationId="io.legado.miss.app" + applicationIdSuffix=".debug" 对齐 | 已知上限：release 测试需切换为 io.legado.miss.app.release + 改 APK_GLOB_DIR 到 release 路径；legacy flavor 为 io.legado.app.debug（通过 -PcustomAppId=io.legado.app 切换） | 升级路径：基于 APK_GLOB_DIR 自动推断 BUILD_TYPE + flavor（V4）

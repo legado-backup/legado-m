@@ -116,7 +116,9 @@
 | [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
-| [specs/image-gallery-activity/](./specs/image-gallery-activity/) | 图片浏览器 Activity 化改造（PhotoDialog 单图弹出→ImageGalleryActivity 多图浏览，参考 VideoPlayerActivity 架构，ViewPager2 双层嵌套+跨文章切换+长按保存） 🔄 设计中 |
+| [specs/image-gallery-activity/](./specs/image-gallery-activity/) | 图片浏览器 Activity 化改造（PhotoDialog 单图弹出→ImageGalleryActivity 多图浏览，参考 VideoPlayerActivity 架构，ViewPager2 双层嵌套+跨文章切换+旋转/缩放/长按保存） 🔄 实施完成待L2真机验证 |
+| [specs/player-review-and-optimization/](./specs/player-review-and-optimization/) | 视频/图片播放器审查与优化整合（基于8份审查报告+1份多维度审查整合报告，共32 ERROR+44 WARN+32 INFO=108项，含12个ADR决策；R2修订完成：AD-01保留L4不缓存/AD-06 centerCrop替代fitXY/AD-10补充22类硬编码颜色/AD-12 PlayerControlsHelper替代BasePlayerActivity） 🔄 设计中（R2 修订完成，待实施；**图片部分已废弃，由 image-player-vertical-canvas-optimization 取代**） |
+| [specs/image-player-vertical-canvas-optimization/](./specs/image-player-vertical-canvas-optimization/) | 内置图片播放器垂直画布优化方案（单 RecyclerView 垂直长画布+点击进入 ViewPager2 大图+滚动到底部自动加载下一篇，取代 player-review-and-optimization 图片部分，含 13 个 ADR + 17 个验证场景 + 48 项任务） ✅ V4 设计审查通过+全部任务实施完成（Phase 0-8 共 48 项），待编译验证+L2 真机测试 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
@@ -142,6 +144,9 @@
 | [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表页 DiffUtil 增量更新 + WebView cacheFirst 默认 true） ✅ 已实施，待真机验证 |
 | [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静音 + 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮） ✅ 已实施，待真机验证 |
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
+| [specs/exoplayer-resilience/](./specs/exoplayer-resilience/) | ExoPlayer 韧性优化（预嗅探+LRU缓存+自动WebView降级，解决3002错误码和浏览器能播放但内置播放器失败痛点） 🔄 实施中 |
+| [specs/video-playback-failure-fix-20260726/](./specs/video-playback-failure-fix-20260726/) | 视频播放失败修复（基于2026-07-26真机日志深度分析：27个Bug清单+38项任务，解决视频地址获取8.5秒+嗅探超时3000ms+降级链使用过期嗅探结果+onPlayerError未记录AppLog+协程生命周期错位等核心问题，预期视频地址获取时间<3秒/嗅探成功率≥90%/播放失败可追溯率100%） ✅ Phase 1+2 代码改造完成（27项任务全部完成）+Phase 6 真机日志分析修复2个Bug（ImageGalleryActivity Glide销毁崩溃+VideoUrlExtractor .m3u8快速路径回归）+编译验证通过，待L2真机测试 |
+| [specs/memory-mechanism-redesign/](./specs/memory-mechanism-redesign/) | 项目记忆机制改造（双轨制存储：官方位置轻量索引+项目目录重量主记忆，对话级唯一ID隔离多任务并发冲突，解决C盘路径Edit/Write受限痛点） 🔄 设计中 |
 | [specs/sub-agent-budget-optimization/](./specs/sub-agent-budget-optimization/) | 子代理编排与思考预算优化（强制子代理规避GLM-5.2思考上限，同对话内虚拟拆分任务不增加成本，监控+质量保证+规范冲突处理） ✅ 已完成 |
 | [specs/yesterday-changes-deep-audit/](./specs/yesterday-changes-deep-audit/) | 昨日改动（2026-07-08）深度自我审查（书源订阅源布局+视频播放器，6 Agent 并行审查发现 29 项 bug + 7 阻塞点 + 1 需求偏差） ✅ 审查完成 |
 | [specs/context-compression-feedback-preservation/](./specs/context-compression-feedback-preservation/) | 上下文压缩用户反馈保全 + 主线任务完成质量三层审查 + 打包功能差距三层修复（Part A 反馈持久化+四件套 + Part B B0openspec偏差/B1代码/B2交付 + Part C C1偏差归属/C2 F1-F10核查/C3 E2E+L2） ✅ 已完成（D1偏差已修正，7类细节不符需新建spec） |
