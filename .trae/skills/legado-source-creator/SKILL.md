@@ -11,7 +11,7 @@
 4. **真机验证为最终标准**：JVM 仿真仅覆盖规则引擎层，真机测试集成是验收门禁
 5. **自动修复闭环**：生成 → 测试 → 失败 → 自动诊断 → 修复 → 重测
 6. **输出安全防线（2026-07-25 强化）**：脚本可获取真实数据用于技术分析，但**思考链和输出内容双闭口禁止违禁词**。域名→站点代号（站点A/B/C）、源名称→源[N]、URL→路径模式（/path/{id}）、分类名→分类[N]、cookie/token→***。Grep只搜技术字段（id/type/ruleImage/函数名）不搜业务字段（sourceName/sourceUrl/title）。logcat只输出错误码/异常类型/调用栈，源名称/域名/URL全部代号化
-7. **导出目录规范（2026-07-25 强化）**：所有新生成或优化的源 JSON **必须导出到 `output/ai_source/` 目录**，禁止散落在 temp/ 或其他目录。
+7. **导出目录规范（2026-07-25 强化）**：所有新生成或优化的源 JSON **必须导出到 项目`output/ai_source/` 目录**，禁止散落在 temp/ 或其他目录。
    - **订阅源**：`output/ai_source/rss/`（如 `rssSource_video_fixed_20260725.json`）
    - **书源**：`output/ai_source/book/`
    - **命名规范**：`{类型}_{描述}_{日期YYYYMMDD}.json`（如 `rssSource_video_xxxsite_20260725.json`、`bookSource_novel_xxx_20260725.json`）
@@ -30,7 +30,8 @@
 2. **必经 JavaScript 提取**：用 `playwright_evaluate` 执行 IIFE 提取4字段技术结构（favicon/searchForm/categoryLinks/pagination）
 3. 搜索 `basic-memory`（project=legado）找同类经验
 4. 识别触发字段：CF/登录/验证码 → 必须先源码验证再写规则
-5. 把提取结果记录到 `source_ref` metadata（`verified_against_source=true`）
+5. **必经播放页链路验证（视频源，2026-07-28 反哺）**：视频网站常见三层结构"列表页→详情页→播放页"，**必须用 Playwright 点击列表项验证落地页是否直接含视频**：(1)点击列表项，检查落地页是否含 `<video>` 标签或 m3u8 流；(2)若落地页是详情页（无视频），分析"详情页→播放页"跳转规律（URL模式差异如 `/info/` → `/play/`、按钮选择器、href 属性）；(3)优先用 `##` 操作符转换 URL（如 `a@href##info##play`），次选 JS 提取播放页 URL。**禁止**假设列表链接直接是播放页
+6. 把提取结果记录到 `source_ref` metadata（`verified_against_source=true`）
 
 ```python
 # Playwright 提取结果 → 源 JSON 字段映射（v4 反哺辅助函数）
@@ -156,6 +157,53 @@ else:
 | **RECOMMENDED** | `sourceIcon`/`searchUrl`/`sortUrl`/`sourceGroup`/`sourceComment` | 用户要求必填（优秀好用标准） |
 | **OPTIONAL** | `ruleRoutes`/`ruleEpisodes` | 仅 type=2 视频源使用，多线路多集按需采集（v3.26.072420+新增，详见"多线路多集按需采集标准写法"章节） |
 
+#### 🔴 sourceComment 字段强制规范（2026-07-28 反哺）
+
+> **sourceComment 不是写技术说明，而是写网站恢复信息！** 目的：网站丢失时能快速找到网站并修复完善。
+
+**必须包含的信息**（用 Playwright 从目标站点获取）：
+1. **回家域名/永久导航域名**：站点顶部横幅/页脚常含"回家域名:xxx.xyz"或"永久地址:xxx.com"，这是最重要的恢复信息
+2. **联系邮箱**：页脚或"关于我们"页面的邮箱（如 `xxx@gmail.com`）
+3. **当前域名**：sourceUrl 中的域名
+4. **备用域名**（如有）：站点公告的镜像/备用域名
+5. **发布页地址**（如有）：专门的发布页链接
+
+**获取方式**（Phase 1 必经步骤）：
+```javascript
+// Playwright JS 提取网站恢复信息
+(function(){
+  var result = {domainHints:[], contactInfo:[]};
+  // 1. 查找顶部横幅/页脚的"回家域名"/"永久地址"
+  var bodyText = document.body.innerText || '';
+  var keywords = ['回家域名','永久地址','官网地址','备用域名','发布页','联系站长'];
+  for(var i=0;i<keywords.length;i++){
+    var idx = bodyText.indexOf(keywords[i]);
+    if(idx>=0) result.domainHints.push(bodyText.substring(idx, idx+50));
+  }
+  // 2. 查找邮箱
+  var emailMatch = bodyText.match(/[\w.]+@[\w.]+\.\w+/);
+  if(emailMatch) result.contactInfo.push('邮箱:'+emailMatch[0]);
+  // 3. 查找 Telegram/微信/QQ 群
+  var allLinks = document.querySelectorAll('a');
+  for(var j=0;j<allLinks.length;j++){
+    var h = allLinks[j].getAttribute('href')||'';
+    if(h.indexOf('t.me')>=0) result.contactInfo.push('TG:'+h);
+  }
+  return JSON.stringify(result);
+})()
+```
+
+**sourceComment 格式**：
+```
+[网站恢复]回家域名:xxx.xyz | 邮箱:xxx@gmail.com | 当前域名:xxx.buzz [技术]简短技术说明
+```
+
+**反模式**（禁止）：
+- ❌ sourceComment 只写技术说明（如"列表页已验证;ruleLink用##操作符"）
+- ❌ sourceComment 写空或写"无"
+- ❌ 不获取网站恢复信息就随便写
+- ❌ 技术说明过长淹没恢复信息
+
 ### BookSource 字段级别
 
 | 级别 | 字段 | 不填后果 |
@@ -230,7 +278,7 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 
 34. **多参数搜索URL适配（u= / t= 等分类参数）**：部分站点搜索URL带分类参数（如 `?m=search&u=分类X&k={{key}}`），写死分类会限制搜索范围。**适配策略**：(1)优先验证无分类参数时是否全局搜索可用（如 `?m=search&k={{key}}`），可用则去掉分类参数实现全量搜索；(2)若必须带分类参数且分类固定，将搜索范围写入 sourceComment 说明；(3)若用户希望多分类搜索，可在 sortUrl 中按分类列出，每个分类作为独立搜索入口
 
-35. **正式包日志不可见陷阱**：`AppLog.kt` 的日志输出被 `if (BuildConfig.DEBUG)` 包裹，release 正式包中 AppLog.put 输出完全不可见。**调试策略**：(1)优先用 debug 包调试规则问题；(2)若必须用正式包验证，关注系统级日志（ActivityManager/ExoPlayer/AndroidRuntime 等 tag）；(3)ExoPlayer 播放问题看 `ExoPlayerImpl` / `MediaSource` / `OMX` 等系统 tag，不依赖 AppLog
+35. **正式包日志不可见陷阱（双重拦截）**：release 正式包中日志被双重机制拦截，logcat 几乎为空。**拦截层1**：`AppLog.kt` 所有日志方法（put/e/d/i/w）被 `if (BuildConfig.DEBUG)` 包裹，release 包 DEBUG=false → 业务日志不输出。**拦截层2**：`app/proguard-rules.pro` 配置 `-assumenosideeffects class android.util.Log` → ProGuard 移除所有 `Log.x()` 调用。**铁证**：2026-07-28 站点A任务，release 包运行时 `adb logcat -d` 只返回1行无关日志（`NetworkManagementSocketTagger`），AppLog.put 输出的规则解析/网络请求/播放器日志全部不可见。**调试策略**：(1)优先用 debug 包调试规则问题（AppLog 可见）；(2)若必须用正式包验证，只能看系统级日志（ActivityManager/ExoPlayer/AndroidRuntime 等 tag）；(3)ExoPlayer 播放问题看 `ExoPlayerImpl` / `MediaSource` / `OMX` 等系统 tag；(4)用后台持续 logcat（`adb logcat -v time > file`）捕获用户点击测试期间的系统日志；(5)logcat -d 缓冲区可能为空（App 运行时无系统级日志输出），需用持续监听模式
 
 36. **RSS列表图片不显示（布局+加载失败双因素）**：RSS文章列表图片不显示有两个原因：(1)布局因素——默认列表样式（articleStyle=0）的 imageView 默认 GONE，只有 Glide 加载成功才 VISIBLE，加载失败则完全不可见；网格布局（articleStyle=2）有 placeholder 始终可见。(2)图片加载失败——CDN防盗链/Cloudflare拦截返回403。**解决方案**：(1)视频/图片类RSS源设置 `articleStyle=2`（网格布局），即使图片加载失败也有占位框；(2)配置 `header` 字段添加 User-Agent 和 Referer；(3)启用 `enabledCookieJar=true` 让cookie自动传递；(4)图片CDN有独立Cloudflare防护时，OkHttp请求可能被拦截，需用WebView模式或代理
 
@@ -239,6 +287,16 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 38. **RSS文章image字段为null的调试方法**：调试ruleImage规则时，image字段为null有三种可能：(1)JS规则返回空字符串（提取失败）；(2)文章未重新加载（用了旧缓存，旧数据image本身为null）；(3)网络请求被拦截（文章列表为空）。**调试步骤**：(1)先用 `@js:result.tagName()` 验证JS执行环境和result对象类型；(2)用 `@js:var e=result.selectFirst('.css');e?'found':'not-found'` 验证选择器；(3)停止App后pull数据库（含WAL），用SQLite查看image字段实际值；(4)NetworkUtils.getAbsoluteURL会把非URL字符串转为绝对路径（如"div"→"https://domain/div"），可用于间接观察JS返回值
 
 39. **数据库直接修改后App不生效（WAL+缓存）**：直接修改legado.db后push回模拟器，App可能不生效：(1)App运行时数据库被WAL锁定，push前必须force-stop；(2)需删除 `-wal` 和 `-shm` 文件避免WAL冲突；(3)文件权限必须设置 `chmod 660` + `chown u0_a20:u0_a20`（UID从dumpsys package获取）；(4)RSS文章有缓存机制，修改ruleImage后需切换分类或下拉刷新触发重新加载
+
+### 视频订阅源专项陷阱（2026-07-28 站点A任务反哺）
+
+40. **`##` 字符串替换操作符（视频源URL转换利器）**：Legado 规则引擎支持 `##` 操作符对提取的字符串进行替换，语法 `规则##旧字符串##新字符串`。**铁证**：站点A列表链接是 `/info/{id}.html`（详情页无视频），真正播放页是 `/play/{id}.html`，用 `ruleLink = "a@href##info##play"` 将 `/info/` 替换为 `/play/`，比 JS 方案（`@js:var m=result.match(...)）` 简单且正确。**适用场景**：(1)列表链接是详情页，需要转换为播放页URL模式；(2)URL 路径段替换（如 `/detail/` → `/play/`）；(3)去掉 URL 后缀（如 `##.html##` 去掉 .html）。**优势**：比 JS 方案更稳定（不依赖 Rhino 引擎），更简单（无需正则匹配），更正确（直接字符串替换）
+
+41. **嗅探模式（ruleContent 为空）**：视频订阅源中 `ruleContent` 设为空字符串 `""` 时，Legado 内置播放器会自动嗅探播放页的视频地址（m3u8/mp4）。**铁证**：站点A用 `ruleContent = ""` + `ruleLink = "a@href##info##play"` 将列表链接转为播放页URL，内置播放器直接嗅探到 m3u8 成功播放。**适用场景**：(1)播放页是标准 HTML 含 `<video>` 或 m3u8 流；(2)视频地址通过 JS 动态加载（`playUrl = 'xxx.m3u8'`）。**不适用**：(1)视频地址需要复杂 JS 解密；(2)播放页需要登录或 cookie。**优先级**：视频源优先尝试嗅探模式，失败后再用 JS 提取
+
+42. **播放页链路验证（列表链接≠播放页）**：视频网站常见三层结构"列表页→详情页→播放页"，列表链接往往指向详情页（无视频），需要点击触发才到播放页。**铁证**：站点A列表链接 `/info/{id}.html` 是详情页（含视频信息但无视频流），真正播放页 `/play/{id}.html` 需点击播放按钮才到达。**Phase 1 必经验证**：(1)用 Playwright 点击列表项，落地页是否直接含 `<video>` 或 m3u8 流；(2)若落地页是详情页，分析"详情页→播放页"跳转规律（URL模式差异/按钮选择器/href 属性）；(3)优先用 `##` 操作符转换 URL（如 `/info/` → `/play/`），次选 JS 提取播放页 URL。**禁止**：假设列表链接直接是播放页，必须验证
+
+43. **导入源后必须验证写入（DELETE+INSERT 不可靠）**：`import_rss_source.py` 用 DELETE + INSERT 方式更新源，但 WAL 模式下可能被旧 WAL 覆盖导致更新失败。**铁证**：2026-07-28 站点A任务，脚本执行后数据库中仍是旧版源（ruleLink 是 `@js:...` 而非 `a@href##info##play`），用户测试失败。**强制验证流程**：(1)导入后用 `SELECT ruleLink, ruleContent FROM rssSources WHERE sourceUrl = ?` 确认字段值是最新版；(2)若仍是旧版，直接用 Python sqlite3 操作：DELETE + INSERT OR REPLACE + COMMIT + PRAGMA wal_checkpoint(TRUNCATE)；(3)push 回设备前必须 force-stop App + 删除设备端 WAL/SHM；(4)push 后必须 `chown <uid>:<uid>` + `chmod 660`（uid 从 `adb shell dumpsys package <pkg> | grep userId=` 获取）。**反模式**：信任脚本返回的"导入成功"而不验证实际字段值
 
 ## 工具脚本
 
@@ -323,16 +381,6 @@ Legado 源码采用"**最小必填 + 渐进增强**"模式：
 - `legado_client/` 包内核心模块（analyzer/client/delegate/experience/utils）
 - `references/` 知识库（85 文档，T6 待合并到 ≤25）
 
-### v3 归档模块（不可用）
-
-以下模块已归档到 `.trae/skills/legado-source-creator-archive/`：
-- `legado_client/web/`（Vue3 前端）
-- `legado_client/storage/`（MySQL ORM）
-- `legado_client/server/`（FastAPI）
-- `legado_client/device/`（设备管理）
-- `legado_client/fetcher/`（source_parser）
-- `scripts/alembic/`（DB 迁移）
-- 45 个一次性脚本
 
 ## 完整参考
 
