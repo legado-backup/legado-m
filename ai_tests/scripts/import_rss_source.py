@@ -103,8 +103,11 @@ def push_db(tmp_path):
     run_adb(f"shell su -c 'cp /sdcard/legado.db {DB_DEVICE_PATH}'")
     # 关键：chown 为 App 用户（否则 cp 后 owner=root 导致 SQLITE_CANTOPEN）
     # 铁证：2026-07-25 共存包导入后 App 启动崩溃 SQLITE_CANTOPEN，原因是 db 文件 owner=root
-    run_adb(f"shell su -c 'chown u0_a{{UID}}:u0_a{{UID}} {DB_DEVICE_PATH}'".replace(
-        "{UID}", _get_app_uid()))
+    # Bug-fix 2026-07-26: 原代码 chown u0_a{UID}:u0_a{UID} 错误（UID=10072 → u0_a10072 不存在）
+    # Android UID 命名规则：UID=10072 → 用户名 u0_a72（去掉 "10000" 偏移）
+    # 正确做法：_get_app_uid() 返回用户名（如 u0_a72），直接用 username:username 格式
+    _app_user = _get_app_uid()
+    run_adb(f"shell su -c 'chown {_app_user}:{_app_user} {DB_DEVICE_PATH}'")
     run_adb(f"shell su -c 'chmod 660 {DB_DEVICE_PATH}'")
     # 删除设备端WAL/SHM文件（关键！否则旧WAL覆盖新数据）
     run_adb(f"shell su -c 'rm -f {DB_DEVICE_PATH}-wal {DB_DEVICE_PATH}-shm'")
@@ -115,15 +118,26 @@ def push_db(tmp_path):
 def _get_app_uid():
     """获取 App 进程的 UID（用于 chown 修复 db 文件 owner）
     铁证：不同 flavor 包名对应不同 UID，硬编码 UID 会在切换包后失效
+    Bug-fix 2026-07-26: 原代码返回数字 UID（如 10072），chown 拼成 u0_a10072 错误
+    Android UID 命名规则：UID=10072 → 用户名 u0_a72（去掉 "10000" 偏移，剩余 "72"）
+    正确做法：用 stat -c %U 直接获取用户名（如 u0_a72），避免 UID→用户名转换
     """
-    # 通过 stat 命令获取 databases 目录的 owner（App 进程的 UID）
-    result = run_adb(f"shell su -c 'stat -c %u {DB_DIR}'")
-    uid = result.stdout.strip()
-    if uid.isdigit():
-        return uid
-    # fallback: 默认 legado.app.debug 的 UID（需手动确认）
-    print(f"  ⚠️ 无法获取 App UID（stat 返回: {result.stdout}），使用默认 1020")
-    return "1020"
+    # 通过 stat 命令获取 databases 目录的 owner 用户名（如 u0_a72）
+    result = run_adb(f"shell su -c 'stat -c %U {DB_DIR}'")
+    username = result.stdout.strip()
+    if username and username != "?":
+        return username
+    # fallback: 用数字 UID 转换为用户名（UID=10072 → u0_a72）
+    result_uid = run_adb(f"shell su -c 'stat -c %u {DB_DIR}'")
+    uid_str = result_uid.stdout.strip()
+    if uid_str.isdigit():
+        uid_int = int(uid_str)
+        if uid_int >= 10000:
+            return f"u0_a{uid_int - 10000}"
+        return uid_str
+    # 最终 fallback: 默认 legado.app.debug 的 UID（需手动确认）
+    print(f"  ⚠️ 无法获取 App UID（stat 返回: {result.stdout}），使用默认 u0_a72")
+    return "u0_a72"
 
 
 def import_rss(json_path, db_path):
@@ -191,10 +205,32 @@ def import_rss(json_path, db_path):
                       for k in valid_keys]
 
             cursor.execute(
-                f"INSERT INTO rssSources ({col_names}) VALUES ({placeholders})",
+                f"INSERT OR REPLACE INTO rssSources ({col_names}) VALUES ({placeholders})",
                 values
             )
             imported += 1
+
+            # 验证写入（2026-07-28 反哺：DELETE+INSERT 可能被 WAL 覆盖导致旧数据残留）
+            verify_keys = ['ruleLink', 'ruleContent', 'ruleRoutes', 'ruleEpisodes']
+            verify_cols = [k for k in verify_keys if k in valid_keys]
+            if verify_cols:
+                placeholders_v = ', '.join(['?'] * len(verify_cols))
+                cursor.execute(
+                    f"SELECT {', '.join(verify_cols)} FROM rssSources WHERE sourceUrl = ?",
+                    (source_url,)
+                )
+                actual = cursor.fetchone()
+                if actual:
+                    for i, k in enumerate(verify_cols):
+                        expected = source.get(k, '')
+                        if actual[i] != expected:
+                            print(f"  ⚠️ 验证失败 {source_name}: {k} 期望={expected!r} 实际={actual[i]!r}")
+                            # 重试：强制 UPDATE
+                            cursor.execute(
+                                f"UPDATE rssSources SET {k} = ? WHERE sourceUrl = ?",
+                                (expected, source_url)
+                            )
+                        # else: 验证通过
 
         conn.commit()
 

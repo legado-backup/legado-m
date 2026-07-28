@@ -108,7 +108,7 @@ git diff <first_commit>..<last_commit> -- "*.kt" "*.java"
 | issues-found.md | Issue状态是否最新（待修复→已修复） | Bug修复任务 |
 | tasks.md | Phase是否勾选完成 | OpenSpec任务 |
 | INDEX.md | 是否引用新增子规范 | 新增子规范 |
-| project_memory.md | 是否记录用户反馈和决策 | 任何用户反馈 |
+| project_memory.md / ai_memory_main.md | 是否记录用户反馈和决策（本项目用 .trae/memory/ai_memory_main.md） | 任何用户反馈 |
 
 ### 检查时机
 
