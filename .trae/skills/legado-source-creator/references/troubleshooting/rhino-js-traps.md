@@ -344,7 +344,7 @@ fun unwrapRhinoResult(result: Any?): Any? {
 1. `AnalyzeRule.evalJS()` — 规则执行（核心入口）
 2. `AnalyzeUrl.evalJS()` — URL 构建
 3. `BaseSourceInterface.evalJS()` — 源接口
-4. `RuleEngineServer.evalJS()` — JAR 独立命令
+4. 规则引擎 evalJS — 通过 AnalyzeRule 执行
 5. `AnalyzeRule.getString()` — NativeObject key 值访问
 6. `AnalyzeRule.getStringList()` — NativeObject key 值访问
 
@@ -354,3 +354,213 @@ fun unwrapRhinoResult(result: Any?): Any? {
 - JAR 仿真器已自动解包，无需手动处理
 - 真机不存在此问题
 - 如果在 JAR 测试中仍看到 `NativeJavaObject@hash`，说明 `unwrapRhinoResult()` 未覆盖到新的 evalJS 调用点，需检查源码
+
+## 陷阱55: Rhino引擎类型转换陷阱（java.ajax返回Java String非JS String）
+
+ruleContent JS中调用 `java.ajax(url)` 获取HTML后，直接对返回值使用 `.length` / `.charAt(i)` / `.indexOf()` 等 JS 字符串方法会得到错误结果，导致后续算法失效。
+
+**现象**：
+- `.length` 返回 `'function length() {/*'`（方法引用的字符串形式，非数字）
+- `.charAt(i)` 返回 Java char 类型，字符 `===` 比较始终失败
+- 平衡括号算法 `depth` 始终=0、`endIdx` 始终=-1，JSON 提取返回空
+
+**根因**：`java.ajax()` 返回的是 `java.lang.String` 对象（Java 字符串），而非 JS 原生字符串。Rhino 引擎下 Java String 的 `.length` 是方法引用（不是属性，需 `.length()` 调用），`.charAt(i)` 返回 Java char 类型（不是 JS string），导致 `===` 严格比较失败（类型不同）。
+
+**修复**：必须用 `String(java.ajax(url) || '')` 显式转换为 JS 原生字符串后再使用字符串方法。
+
+**通用规则**：在 Rhino JS 中调用任何返回 `java.lang.String` 的 Java 方法（`java.ajax` / `java.base64Decode` / `java.encodeDecode` 等）后，必须用 `String()` 显式转换为 JS 原生字符串，再使用 `.length` / `.charAt` / `.indexOf` / `.substring` / `.match` 等字符串方法或属性。
+
+**反模式**：
+- ❌ 直接对 `java.ajax()` 返回值用 `.length`（得到方法引用字符串）
+- ❌ 用 `==` 而非 `===` 比较 char（掩盖类型问题）
+- ❌ 假设 Rhino 自动转换 Java String 为 JS String（Rhino 对方法引用不会自动转换）
+
+**经验来源**：`[经验来源:Rhino类型转换范式]`
+
+## 陷阱56: player_data JSON提取的平衡括号算法（避免正则过度匹配）
+
+maccms 视频站点播放页 HTML 中，`player_data` 变量存储视频 URL，格式为 `var player_data={"url":"...","encrypt":0,...};</script>` 或 `var player_data={...}</script>`（注意分号可选）。
+
+**问题**：原正则 `/player_data\s*=\s*({.*?})\s*;\s*<\/script>/` 在格式为 `}</script>`（无分号）时会过度匹配——`.*?` 非贪婪也会匹配到下一个 `}`，可能匹配错误内容；若放宽为 `({.*})` 又会匹配不足（只到第一个 `}`）。
+
+**修复**：用平衡括号算法精确提取 JSON：
+1. 找到 `var player_data` 起始位置
+2. 找到第一个 `{` 作为 JSON 起始
+3. 遍历字符，遇到 `{` 则 `depth++`，遇到 `}` 则 `depth--`，`depth=0` 时找到 JSON 结束位置
+4. `substring(start, end+1)` 提取后 `JSON.parse`
+
+**完整代码模板**：
+```javascript
+<js>(function(){
+  var html = String(java.ajax(url) || '');
+  var key = 'var player_data';
+  var start = html.indexOf(key);
+  if (start < 0) return '';
+  var braceStart = html.indexOf('{', start);
+  if (braceStart < 0) return '';
+  var depth = 0, endIdx = -1;
+  for (var i = braceStart; i < html.length; i++) {
+    var ch = html.charAt(i);
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+  }
+  if (endIdx < 0) return '';
+  var jsonStr = html.substring(braceStart, endIdx + 1);
+  try { var pd = JSON.parse(jsonStr); return pd.url || ''; } catch(e) { return ''; }
+})()</js>
+```
+
+**通用规则**：从 HTML 中提取嵌套 JSON 结构（player_data / config / playlist 等）时，优先用平衡括号算法而非正则，避免过度匹配或匹配不足。
+
+**适用场景**：
+1. maccms 播放页 player_data 提取
+2. 任意 HTML 内联 JSON 变量提取
+3. JSON 内含嵌套对象/数组导致正则 `.*?` 失效的场景
+
+**前置依赖**：必须先应用陷阱55（`String()` 转换），否则 `.charAt(i)` 返回 Java char，`===` 比较失败，`depth` 始终=0
+
+**经验来源**：`[经验来源:平衡括号算法范式]`
+
+## 陷阱58: 协程IO线程死锁（含java.ajax()的JS不能在Dispatchers.IO执行）
+
+Rhino JS引擎在Kotlin协程IO线程（`Dispatchers.IO`）执行含 `java.ajax()` 的JS代码时会导致死锁。JS等待网络请求完成，但IO线程被JS占用，网络请求无法执行。
+
+**现象**：
+- 订阅源分类列表加载完全无响应（loading 永不结束）
+- 搜索功能无响应（输入关键词后无任何结果返回）
+- Logcat 无异常堆栈，但功能卡死
+
+**根因**：
+- `java.ajax()` 内部通过 OkHttp 发起网络请求，OkHttp 默认使用 `Dispatchers.IO` 调度
+- 当 JS 代码本身在 `Dispatchers.IO` 线程执行时，JS 持有 IO 线程等待 ajax 返回
+- 但 ajax 需要的 IO 线程被 JS 占用，形成循环等待 → 死锁
+- 协程 IO 线程池默认 64 个线程，多个源同时执行此类 JS 时会耗尽
+
+**影响范围**：
+- 订阅源 `sortUrl` 字段如果是 JS 代码且包含 `java.ajax()`（如动态获取域名）
+- 订阅源 `searchUrl` 字段如果是 JS 代码且包含 `java.ajax()`（如动态获取搜索接口）
+- 上述场景在协程 IO 线程执行会死锁，导致分类加载和搜索功能完全无响应
+
+**解决方案**：使用独立线程执行器（`Executors.newSingleThreadExecutor`）执行含网络请求的 JS 代码，避免在协程 IO 线程执行 `runScriptWithContext`。
+
+**参考实现**：`RssSourceExtensions.kt` 中的 `sortUrlJsExecutor` 和 `getSearchUrl()` 方法：
+- 定义单线程执行器：`private val sortUrlJsExecutor = Executors.newSingleThreadExecutor()`
+- 提交 JS 执行任务到独立线程：`Future { runScriptWithContext(jsCode) }`
+- 通过 `Future.get()` 获取结果，阻塞当前协程但不占用 IO 线程
+
+**通用范式**：
+- 任何在协程中执行含 `java.ajax()` / `java.ajaxAll()` 的 JS 代码，都必须用独立线程执行器
+- 不能直接在 `Dispatchers.IO` 中执行 `runScriptWithContext`
+- 单线程执行器确保 JS 执行和网络请求不会争抢同一线程池
+
+**反模式**：
+- ❌ 在 `withContext(Dispatchers.IO) { runScriptWithContext(jsWithAjax) }` 中直接执行含 `java.ajax()` 的 JS
+- ❌ 假设协程 IO 线程池足够大（64线程）不会死锁（多个源并发时会耗尽）
+- ❌ 用 `runBlocking` 替代独立线程执行器（仍可能占用协程线程）
+
+**经验来源**：`[经验来源:协程IO线程死锁范式]`
+
+## 陷阱59: Rhino中Java String的length是属性不是方法（length vs length()）
+
+Rhino引擎中，Java String的`length`是属性（通过`getString().length()`的getter暴露），不是JS的`string.length`。在JS代码中调用`str.length()`会触发`EvaluatorException: 无法将function length()转换为java.lang.Integer`。
+
+**现象**：
+- ruleArticles/ruleNextPage的@js规则中用`str.length()`获取字符串长度，解析失败
+- logcat显示"RSS使用默认规则解析"（规则执行异常后退化）
+- Exception中含`NoSuchMethodException`（但非根因，是rebase方法）
+
+**根因**：
+- Rhino中Java String通过`java.lang.String`代理，`length`被解析为`String.length()`方法（函数对象）
+- JS中`str.length()`调用该方法返回的是函数对象，不是数字
+- 用`parseInt()`或数学运算时，函数对象无法转换为Integer
+
+**解决方案**：
+- JS中获取Java String长度用`str.length`（属性访问，非方法调用）
+- 或用`new String(str).length`（先转为JS String）
+
+**铁证**：7个订阅源ruleNextPage中`u.length()`导致分页规则执行异常，改为`u.length`后分页正常（p=2/3/4参数出现）
+
+## 陷阱60: Rhino中java.ajax(url, timeout)的Long参数类型转换失败
+
+Rhino引擎中调用`java.ajax(url, callTimeout)`时，JavaScript数字无法自动转换为Java的`Long?`类型，导致`NoSuchMethodException`（找不到匹配的方法签名）。
+
+**现象**：
+- searchUrl的JS中调用`java.ajax(u, 3000)`设置3秒超时，JS静默失败（try/catch捕获）
+- 12个子源的串行请求全部跳过，没有HTTP请求日志
+- logcat中无EvaluatorException（异常被try/catch静默吞掉）
+
+**根因**：
+- `JsExtensions.kt`中`fun ajax(url: Any, callTimeout: Long?): String?`，第二个参数是`Long?`
+- Rhino中JavaScript数字默认是double，无法自动转换为Java的`Long`类型
+- Rhino查找方法签名时，`ajax(String, double)`不匹配`ajax(Any, Long?)`
+- try/catch捕获异常后继续执行，导致所有请求跳过
+
+**解决方案**：
+- 用单参数版本`java.ajax(url)`（使用默认超时）
+- 或用`new java.lang.Long(3000)`显式创建Long对象（代码复杂，不推荐）
+- 最佳实践：不在JS中设置超时，依赖App默认超时（9秒）
+
+**铁证**：7个订阅源searchUrl中`java.ajax(u, 3000)`导致12子源串行请求全部跳过，改为`java.ajax(u)`后请求正常执行
+
+## 陷阱61: java.ajax()自动跟随301重定向导致动态域名提取失败
+
+`java.ajax()`会自动跟随HTTP 301/302重定向，返回重定向后的页面内容。如果JS代码在HTML内容中搜索punycode域名（`xn--`前缀），但重定向后的页面内容中不包含该字符串，动态域名提取失败。
+
+**现象**：
+- sortUrl/searchUrl的JS中`java.ajax(url)`获取主页HTML，正则搜索`xn--`提取punycode域名
+- 主页301重定向到punycode域名的页面，返回的HTML中不含`xn--`字符串
+- 动态域名提取失败，sortUrl/searchUrl返回空字符串
+- 分类列表为空，搜索退化为请求主页URL（返回主页视频列表，非按关键词搜索）
+
+**根因**：
+- `java.ajax()`内部通过OkHttp请求，OkHttp默认跟随重定向
+- 301重定向后，OkHttp请求重定向后的URL，返回重定向后页面的HTML内容
+- 重定向后的页面是正常页面（不含`xn--`字符串），JS正则提取失败
+- `xn--`字符串只在重定向过程中的Location头中出现，不在HTML内容中
+
+**影响范围**：
+- 使用punycode动态域名的站点（域名按日期变化，如含日期后缀）
+- sortUrl/searchUrl的JS通过`java.ajax()`获取主页HTML+正则提取`xn--`域名的方案
+
+**解决方案**：
+- 方案1（推荐）：用`java.connect(url)`获取StrResponse，从`resp.raw.request.url`获取重定向后的URL
+- 方案2：在请求URL中添加`&mod=jump`参数绕过安全检测页面，直接获取正常页面
+- 方案3：缓存punycode域名（cache.put，6小时有效），减少动态域名提取次数
+
+**铁证**：7个订阅源sortUrl的JS中`java.ajax()`获取主页，301重定向后HTML中不含`xn--`，动态域名提取失败。之前测试成功是因为缓存了动态域名（6小时有效），缓存过期后失败。添加`&mod=jump`参数后正常。
+
+## 陷阱65: JSON中`\\n`被双重转义为字面量字符串（sortUrl分类分隔符失效）
+
+**现象**：sortUrl的JS中用`r.join('\\n')`拼接分类列表，Legado解析后分类标签消失或合并为一个长字符串。日志显示返回值含字面量`\n`字符（反斜杠+n），而非换行符。
+
+**根因**：JSON字符串中`\\n`在JSON解析时被还原为`\n`（两字符：反斜杠+n），而非JS的换行符（LF, 0x0A）。当JS代码`r.join('\\n')`写入JSON文件时，经过JSON.dump自动转义，`\\n`变为`\\\\n`，JS运行时收到的是`\\n`（字面量两字符），作为分隔符无法分割。
+
+**JSON转义链路**：
+```
+源代码意图: r.join('\n')           → JS中得到换行符
+JSON.dump后: "r.join('\\n')"       → JSON字符串中是\\n
+JSON.parse后: r.join('\n')         → JS中得到\n（两字符字面量，非换行符）
+```
+
+**解决方案**：用`String.fromCharCode(10)`显式生成换行符，避免JSON转义链路破坏：
+```javascript
+// ❌ 错误：JSON中\\n被解析为字面量\n（反斜杠+n），无法分割
+var result=r.join('\\n');
+
+// ✅ 正确：用String.fromCharCode(10)生成真正的换行符
+var LF=String.fromCharCode(10);
+var result=r.join(LF);
+
+// ✅ 也可用String.fromCharCode(10)+String.fromCharCode(10)生成空行
+```
+
+**通用规则**：JS中需要换行符（LF, 0x0A）、回车符（CR, 0x0D）、制表符（Tab, 0x09）等控制字符时，如果JS代码经过JSON序列化（如订阅源JSON文件），必须用`String.fromCharCode(code)`显式生成，禁止用`'\n'`/`'\r'`/`'\t'`字面量。
+
+**适用场景**：
+- sortUrl的JS返回分类列表（用`\n`分隔分类项）
+- 任何JS返回多行文本的场景
+- ruleContent的JS返回多段内容
+
+**铁证**：7源sortUrl的JS用`r.join('\\n')`拼接12个分类，Legado解析后分类标签消失（实际是合并为一个含`\n`字面量的字符串）。改为`r.join(String.fromCharCode(10))`后12个分类正常显示。
+
+**经验来源**：`[经验来源:JSON双重转义换行符范式]`

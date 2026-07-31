@@ -190,8 +190,8 @@ def import_rss(json_path, db_path):
             source_name = source.get('sourceName', 'unknown')
             source_url = source.get('sourceUrl', '')
 
-            # 删除同 sourceUrl 的旧记录
-            cursor.execute("DELETE FROM rssSources WHERE sourceUrl = ?", (source_url,))
+            # 删除同 sourceName 的旧记录（2026-07-28 修复：sourceUrl变更时旧记录不会被删除）
+            cursor.execute("DELETE FROM rssSources WHERE sourceName = ?", (source_name,))
 
             # 构建INSERT（只插入表中存在的列）
             valid_keys = [k for k in source.keys() if k in columns]
@@ -216,8 +216,8 @@ def import_rss(json_path, db_path):
             if verify_cols:
                 placeholders_v = ', '.join(['?'] * len(verify_cols))
                 cursor.execute(
-                    f"SELECT {', '.join(verify_cols)} FROM rssSources WHERE sourceUrl = ?",
-                    (source_url,)
+                    f"SELECT {', '.join(verify_cols)} FROM rssSources WHERE sourceName = ?",
+                    (source_name,)
                 )
                 actual = cursor.fetchone()
                 if actual:
@@ -227,8 +227,8 @@ def import_rss(json_path, db_path):
                             print(f"  ⚠️ 验证失败 {source_name}: {k} 期望={expected!r} 实际={actual[i]!r}")
                             # 重试：强制 UPDATE
                             cursor.execute(
-                                f"UPDATE rssSources SET {k} = ? WHERE sourceUrl = ?",
-                                (expected, source_url)
+                                f"UPDATE rssSources SET {k} = ? WHERE sourceName = ?",
+                                (expected, source_name)
                             )
                         # else: 验证通过
 

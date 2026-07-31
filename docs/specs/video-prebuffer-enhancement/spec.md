@@ -1,9 +1,10 @@
 # spec.md - 视频播放器分段预缓冲机制深度分析与优化
 
-> **状态**：🔄 设计中（R3 修订版）
+> **状态**：🚧 P0 已实施完成（2026-07-28），P1/P2 待实施（R3 修订版）
 > **创建日期**：2026-07-28
 > **R2 修订日期**：2026-07-28
 > **R3 修订日期**：2026-07-28
+> **P0 实施完成日期**：2026-07-28
 
 ---
 
@@ -417,25 +418,38 @@ object AppLog {
 
 ### 4.1 功能需求
 
-| 编号 | 需求 | 优先级 | 验收标准 |
-|------|------|--------|---------|
-| R1 | 修复 FirstFramePreloader.preloadUrl 的 readBytes 无限制 + 未写入 SimpleCache | P0 | 1. 读取字节数 ≤ PRELOAD_BYTES<br>2. 预加载数据写入 SimpleCache<br>3. 二次播放命中缓存 |
-| R2 | 修复 VideoPreloader.preloadUrl 同样问题 | P0 | 同 R1 |
-| R3 | 确认 HLS 依赖实际状态 + 修复 build.gradle 与代码不一致 | P0 | 1. 用 gradle dependencies 确认依赖来源<br>2. build.gradle 与代码状态一致 |
-| R4 | **新增 DeviceInfoHelper 检测设备档位（R3 修订——移除 LOW）** | P0 | 1. 检测内存/CPU/磁盘空间<br>2. 返回 MID/HIGH 两档（无 LOW）<br>3. 默认 HIGH<br>4. 检测失败降级到 MID |
-| R5 | **激进 LoadControl（HIGH+GOOD=120s/10个/10MB）** | P1 | 1. HIGH+GOOD maxBuffer=120s<br>2. MID+GOOD maxBuffer=90s<br>3. 不再有 LOW 档位 |
-| R6 | **LoadControl prepare 前设置（R3 修订——放弃热切换）** | P1 | 1. ExoPlayer 创建时根据当前网络档位+设备档位设置 LoadControl<br>2. 播放过程中不热切换 LoadControl<br>3. 仅调整预加载策略 |
-| R7 | **全格式统一激进策略** | P1 | 1. HLS/DASH/MP4/FLV/SS 统一激进 LoadControl<br>2. 预加载字节数统一 5-10MB<br>3. 不区分格式 |
-| R8 | 启用 HLS `setAllowChunklessPreparation(true)` | P1 | 1. HLS 首屏耗时降低 30%+<br>2. 不破坏现有降级链 |
-| R9 | 解析 `#EXT-X-PLAYLIST-TYPE`，VOD 类型全量缓存 | P1 | 1. VOD 类型 m3u8 全量缓存<br>2. EVENT 类型预加载后续分片 |
-| R10 | NetworkCallback 监听网络切换，动态调整预加载策略 | P1 | 1. WiFi→4G 时减少预加载数量<br>2. 4G→WiFi 时增加预加载数量<br>3. 不再触发 LoadControl 热切换（R3 修订） |
-| R11 | 缓存命中率/失败率/首帧命中率埋点 | P1 | 1. AppLog 输出命中率统计<br>2. 不影响主线程性能 |
-| R12 | 评估 DefaultPreloadManager 与 GSY 兼容性 | P2 | 1. 输出兼容性评估报告<br>2. 决定是否引入 |
-| R13 | **用户可配置参数（R3 新增，S11）** | P1 | 1. AppConfig 暴露 maxBuffer/预加载数量/预加载字节/磁盘缓存上限/触发进度<br>2. 用户配置值优先级高于自动检测值<br>3. 配置项有上下界校验<br>4. 提供"恢复默认值"按钮<br>5. 用户可手动降级设备档位（HIGH→MID） |
-| R14 | **cacheKey 策略统一（R3 新增，阻塞点6，S12）** | P1 | 1. 预加载器与播放器使用统一 cacheKey 生成逻辑<br>2. 预加载后立即播放同 URL 命中率 100%<br>3. cacheKey 规则：规范化 URL + MD5 |
-| R15 | **预加载触发时机+去重（R3 新增，阻塞点7，S13）** | P1 | 1. 触发时机从 50% 调整为可配置默认 10%<br>2. 同一 URL 不会被重复预加载<br>3. 已预加载 URL 集合由 VideoPreloader 维护 |
-| R16 | **内部播放列表管理（R3 新增，阻塞点8，S14）** | P1 | 1. VideoPreloader 内部维护播放列表<br>2. 提供 setPlaylist/setCurrentIndex 方法<br>3. 自动推断下一集（currentIndex + 1）<br>4. 无需外部调用方传入下一集 URL |
-| R17 | **AppLog 正式包日志修复（R3 新增，阻塞点10，S15）** | P1 | 1. release 包输出 WARN/ERROR 级别日志<br>2. ProGuard 规则保留 AppLog 相关类<br>3. INFO/DEBUG 在 release 包可关闭 |
+> **实施状态说明**：P0 已于 2026-07-28 实施完成（含原 P1 中的 R4/R13/R14/R17 提前到 P0 实施），P1/P2 待实施。
+
+| 编号 | 需求 | 优先级 | 验收标准 | 实施状态 |
+|------|------|--------|---------|---------|
+| R1 | 修复 FirstFramePreloader.preloadUrl 的 readBytes 无限制 + 未写入 SimpleCache | P0 | 1. 读取字节数 ≤ PRELOAD_BYTES<br>2. 预加载数据写入 SimpleCache<br>3. 二次播放命中缓存 | ✅ 已完成（2026-07-28） |
+| R2 | 修复 VideoPreloader.preloadUrl 同样问题 | P0 | 同 R1 | ✅ 已完成（2026-07-28） |
+| R3 | 确认 HLS 依赖实际状态 + 修复 build.gradle 与代码不一致 | P0 | 1. 用 gradle dependencies 确认依赖来源<br>2. build.gradle 与代码状态一致 | ✅ 已完成（2026-07-28） |
+| R4 | **新增 DeviceInfoHelper 检测设备档位（R3 修订——移除 LOW）** | P0 | 1. 检测内存/CPU/磁盘空间<br>2. 返回 MID/HIGH 两档（无 LOW）<br>3. 默认 HIGH<br>4. 检测失败降级到 HIGH（R3 调整：用户要求默认中高端机参数） | ✅ 已完成（2026-07-28） |
+| R5 | **激进 LoadControl（HIGH+GOOD=120s/10个/10MB）** | P1 | 1. HIGH+GOOD maxBuffer=120s<br>2. MID+GOOD maxBuffer=90s<br>3. 不再有 LOW 档位 | ⏳ 待实施 |
+| R6 | **LoadControl prepare 前设置（R3 修订——放弃热切换）** | P1 | 1. ExoPlayer 创建时根据当前网络档位+设备档位设置 LoadControl<br>2. 播放过程中不热切换 LoadControl<br>3. 仅调整预加载策略 | ⏳ 待实施 |
+| R7 | **全格式统一激进策略** | P1 | 1. HLS/DASH/MP4/FLV/SS 统一激进 LoadControl<br>2. 预加载字节数统一 5-10MB<br>3. 不区分格式 | ⏳ 待实施 |
+| R8 | 启用 HLS `setAllowChunklessPreparation(true)` | P1 | 1. HLS 首屏耗时降低 30%+<br>2. 不破坏现有降级链 | ⏳ 待实施 |
+| R9 | 解析 `#EXT-X-PLAYLIST-TYPE`，VOD 类型全量缓存 | P1 | 1. VOD 类型 m3u8 全量缓存<br>2. EVENT 类型预加载后续分片 | ⏳ 待实施 |
+| R10 | NetworkCallback 监听网络切换，动态调整预加载策略 | P1 | 1. WiFi→4G 时减少预加载数量<br>2. 4G→WiFi 时增加预加载数量<br>3. 不再触发 LoadControl 热切换（R3 修订） | ⏳ 待实施 |
+| R11 | 缓存命中率/失败率/首帧命中率埋点 | P1 | 1. AppLog 输出命中率统计<br>2. 不影响主线程性能 | ⏳ 待实施 |
+| R12 | 评估 DefaultPreloadManager 与 GSY 兼容性 | P2 | 1. 输出兼容性评估报告<br>2. 决定是否引入 | ⏳ 待实施 |
+| R13 | **用户可配置参数（R3 新增，S11）** | P1 → P0（提前实施） | 1. AppConfig 暴露 maxBuffer/预加载数量/预加载字节/磁盘缓存上限/触发进度<br>2. 用户配置值优先级高于自动检测值<br>3. 配置项有上下界校验<br>4. 提供"恢复默认值"按钮<br>5. 用户可手动降级设备档位（HIGH→MID） | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+| R14 | **cacheKey 策略统一（R3 新增，阻塞点6，S12）** | P1 → P0（提前实施） | 1. 预加载器与播放器使用统一 cacheKey 生成逻辑<br>2. 预加载后立即播放同 URL 命中率 100%<br>3. cacheKey 规则：纯 URL（R3 实施调整：不做 MD5，与播放器 resolvingDataSource 解析后一致） | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+| R15 | **预加载触发时机+去重（R3 新增，阻塞点7，S13）** | P1 | 1. 触发时机从 50% 调整为可配置默认 10%<br>2. 同一 URL 不会被重复预加载<br>3. 已预加载 URL 集合由 VideoPreloader 维护 | ⏳ 待实施 |
+| R16 | **内部播放列表管理（R3 新增，阻塞点8，S14）** | P1 | 1. VideoPreloader 内部维护播放列表<br>2. 提供 setPlaylist/setCurrentIndex 方法<br>3. 自动推断下一集（currentIndex + 1）<br>4. 无需外部调用方传入下一集 URL | ⏳ 待实施 |
+| R17 | **AppLog 正式包日志修复（R3 新增，阻塞点10，S15）** | P1 → P0（提前实施） | 1. release 包输出 WARN/ERROR 级别日志<br>2. ProGuard 规则保留 AppLog 相关类<br>3. INFO/DEBUG 在 release 包可关闭 | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+
+### 4.1.1 P0 实施范围扩展说明
+
+P0 实施时将原 R3 设计中标记为 P1 的以下 4 项需求提前到 P0 实施，为后续 P1 激进策略提供基础：
+
+| 需求编号 | 原优先级 | 实施优先级 | 提前实施原因 |
+|---------|---------|-----------|------------|
+| R4 | P0 | P0 | 设备档位检测是激进策略的基础，需先实施 |
+| R13 | P1 | P0 | 用户可配置参数需与预加载器修改同步实施，避免后续重构 |
+| R14 | P1 | P0 | cacheKey 统一需与预加载器 BUG 修复同步实施，否则修复后仍无法命中缓存 |
+| R17 | P1 | P0 | AppLog 修复需与预加载器修改同步实施，便于真机测试时观测预加载效果 |
 
 ### 4.2 非功能需求
 

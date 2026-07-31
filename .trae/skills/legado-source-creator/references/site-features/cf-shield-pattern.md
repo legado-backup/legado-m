@@ -4,7 +4,7 @@
 
 ## 模式特征
 
-Cloudflare 返回 JS challenge 页面，JVM 仿真端无法执行 JS，导致请求被拦截。
+Cloudflare 返回 JS challenge 页面，OkHttp 不执行 JS，导致请求被拦截。
 
 ## 检测特征
 
@@ -22,7 +22,7 @@ Cloudflare 返回 JS challenge 页面，JVM 仿真端无法执行 JS，导致请
 
 当检测到 CF 盾时，输出以下建议：
 ```
-[需用户介入] CF 盾检测到，JVM 无法模拟 JS challenge
+[需用户介入] CF 盾检测到，OkHttp 无法模拟 JS challenge
 建议操作：
 1. 在手机端 Legado App 中导入该源
 2. 使用 webView 模式访问目标网站
@@ -32,7 +32,7 @@ Cloudflare 返回 JS challenge 页面，JVM 仿真端无法执行 JS，导致请
 
 ## 仿真端局限性
 
-JVM 仿真端使用 jsoup 发送 HTTP 请求，无法执行 JavaScript：
+Legado 使用 OkHttp 发送 HTTP 请求，无法执行 JavaScript：
 - ❌ 无法执行 CF 的 JS challenge
 - ❌ 无法模拟浏览器指纹
 - ✅ 可以检测 CF 盾并输出降级建议

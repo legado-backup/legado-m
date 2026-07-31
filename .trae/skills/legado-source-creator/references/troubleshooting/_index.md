@@ -30,9 +30,9 @@
 ### rhino-js-traps.md
 > **一句话描述**：Rhino JS引擎的语法限制和兼容性陷阱
 
-- ✅ 包含：ES6不可用、正则兼容性、byte数组、字符串转字节、内置方法优先、RSS @js result对象、广告排除、加密图片处理、**NativeJavaObject toString哈希（#79）**、**unwrapRhinoResult 6种类型解包**
-- ❌ 不包含：源类型选择问题（→ source-type-traps.md）、JS技巧模式（→ ../js-patterns/）
-- **触发关键词**：Rhino, ES6, let, const, 箭头函数, 正则, byte, 字节, result, Element, 广告排除, NativeJavaObject, unwrap, 仿真器哈希
+- ✅ 包含：ES6不可用、正则兼容性、byte数组、字符串转字节、内置方法优先、RSS @js result对象、广告排除、加密图片处理、**NativeJavaObject toString哈希（#79）**、**unwrapRhinoResult 6种类型解包**、**Rhino类型转换陷阱（java.ajax返回Java String，陷阱55）**、**player_data JSON提取平衡括号算法（陷阱56）**、**协程IO线程死锁陷阱（陷阱58，含java.ajax()的JS不能在Dispatchers.IO执行）**
+- ❌ 不包含：源类型选择问题（→ source-type-traps.md）、JS技巧模式（→ ../js-patterns/）、视频源URL转换/嗅探（→ video-source-traps.md）、动态域名解析（→ dynamic-domain-traps.md）
+- **触发关键词**：Rhino, ES6, let, const, 箭头函数, 正则, byte, 字节, result, Element, 广告排除, NativeJavaObject, unwrap, 仿真器哈希, Java String, 类型转换, 平衡括号, player_data, JSON提取, charAt, length, 协程, 死锁, Dispatchers.IO, ajax死锁, 线程执行器, Executors
 - **自进化写入规则**：当发现新的Rhino语法限制或JS兼容性问题时追加
 
 ### source-type-traps.md
@@ -58,6 +58,22 @@
 - ❌ 不包含：通用分析流程（→ analysis-best-practices.md）、源类型配置陷阱（→ source-type-traps.md）、WebSocket调试问题（→ ../special-scenarios/websocket-debug.md）
 - **触发关键词**：修复, 403, CSS选择器, JSON路径, Cookie, 反爬, JS源, 验证, missing, 缺失规则
 - **自进化写入规则**：当完成新的源修复案例或发现新的问题分类时追加
+
+### video-source-traps.md
+> **一句话描述**：视频订阅源（type=2）特有陷阱，含URL转换/嗅探/播放页链路/导入验证/MacCMS解析
+
+- ✅ 包含：`##`字符串替换操作符（陷阱40）、ruleContent为空嗅探模式（陷阱41）、播放页链路验证（陷阱42）、导入源后字段验证（陷阱43）、视频播放URL转换完整链路（陷阱49）
+- ❌ 不包含：JS语法错误（→ rhino-js-traps.md）、动态域名解析（→ dynamic-domain-traps.md）、源类型配置陷阱（→ source-type-traps.md）
+- **触发关键词**：视频源, type=2, ##, URL转换, 嗅探, ruleContent为空, 播放页, 列表链接, 详情页, 导入验证, DELETE+INSERT, WAL, MacCMS, player_data, m3u8, ExoPlayer
+- **自进化写入规则**：当发现新的视频订阅源特有陷阱或播放页解析问题时追加
+
+### dynamic-domain-traps.md
+> **一句话描述**：动态域名站点（入口域名固定但实际内容域名动态变化）的陷阱和解决方案
+
+- ✅ 包含：Rhino ES5兼容性（陷阱44）、searchUrl支持`<js>`标签（陷阱45）、多分类搜索实现（陷阱46）、ruleArticles JS影响列表页（陷阱47）、导入脚本DELETE条件（陷阱48）、入口域名+meta refresh跳转（陷阱50）、punycode域名含日期+随机数字（陷阱51）、sortUrl JS动态域名模板（陷阱52）、searchUrl和sortUrl共用cache key（陷阱53）、Phase 3真机验证三步流程（陷阱54）、seededRandom动态域名解析（陷阱57）
+- ❌ 不包含：JS语法错误细节（→ rhino-js-traps.md）、视频源URL转换/嗅探（→ video-source-traps.md）、通用网站获取失败（→ html-fetch-traps.md）
+- **触发关键词**：动态域名, meta refresh, punycode, seededRandom, sortUrl, searchUrl, cache key, 多分类搜索, ruleArticles, 导入脚本, sourceName, 真机验证, ExoPlayer, 跨日域名, 刷新分类
+- **自进化写入规则**：当发现新的动态域名解析模式或域名跳转陷阱时追加
 
 ### WebSocket/真机调试排查
 

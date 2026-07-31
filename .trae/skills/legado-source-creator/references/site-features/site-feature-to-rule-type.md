@@ -88,7 +88,7 @@
 2. 检查是否需要登录
    ├── 是 → 设置 loginUrl + loginUi + enabledCookieJar
    └── 否 → 继续
-3. 编写规则 → 用 JVM 仿真端测试
+3. 编写规则 → 用真机测试
    ├── success=true → 规则正确
    ├── needsWebView=true → 配置 WebView，用 Selenium 测试
    ├── needsUserIntervention=true → 需要用户手动登录

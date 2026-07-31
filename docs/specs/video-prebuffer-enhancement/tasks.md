@@ -1,112 +1,125 @@
 # tasks.md - 视频播放器分段预缓冲机制深度分析与优化
 
-> **状态**：🔄 设计中（R3 修订版）
+> **状态**：🚧 P0 已实施完成（2026-07-28），P1/P2 待实施（R3 修订版）
 > **创建日期**：2026-07-28
 > **R2 修订日期**：2026-07-28
 > **R3 修订日期**：2026-07-28
+> **P0 实施完成日期**：2026-07-28
 > **格式**：`- [ ] X.Y` 任务清单 + AOAdapt 日志
 > **R3 核心调整**：移除低端机保护（只检测 HIGH/MID，默认 HIGH）+ 用户可配置参数 + 放弃 LoadControl 热切换 + cacheKey 统一 + 预加载触发时机去重 + 内部播放列表管理 + AppLog 正式包日志修复
+> **P0 实施说明**：P0 实施范围扩展，含原 P1 中的 R4（DeviceInfoHelper）/R13（用户可配置参数）/R14（cacheKey 统一）/R17（AppLog 修复）提前到 P0 实施，共完成 7 个文件变更。验证类任务（真机测试）待用户提供调试日志后闭环。
 
 ---
 
 ## 1. 准备工作
 
-- [ ] 1.1 确认需求范围（已完成：用户四个核心问题 + R2 激进版三个核心诉求 + R3 七项核心调整已明确）
-- [ ] 1.2 阅读相关源码（已完成：ExoPlayerHelper/VideoPreloader/FirstFramePreloader/PlayerInstancePool/MimeSniffer/Exo2MediaPlayer/AppConfig/AppLog）
-- [ ] 1.3 调研网上成熟方案（已完成：Media3 DefaultPreloadManager + HLS 优化 + AI 预缓冲 + B站/YouTube 激进策略）
-- [ ] 1.4 确认 HLS 依赖实际状态（gradle dependencies）
-- [ ] 1.5 确认 CacheUtil API 在 Media3 1.10.1 中的可用性
-- [ ] 1.6 **确认 ExoPlayer 是否支持运行时 setLoadControl 热切换**（R2 新增，R3 决策：放弃热切换，只在 prepare 前设置）
-- [ ] 1.7 **确认 AppConfig/Preferences 现有结构与扩展点**（R3 新增）
-- [ ] 1.8 **确认 VideoPreloader 当前 cacheKey 生成逻辑**（R3 新增，阻塞点6）
-- [ ] 1.9 **确认 VideoPreloader 当前预加载触发时机与去重机制**（R3 新增，阻塞点7）
-- [ ] 1.10 **确认 VideoPreloader 是否已有播放列表概念**（R3 新增，阻塞点8）
-- [ ] 1.11 **确认 AppLog 当前 release 包日志拦截逻辑**（R3 新增，阻塞点10）
+- [x] 1.1 确认需求范围（已完成：用户四个核心问题 + R2 激进版三个核心诉求 + R3 七项核心调整已明确）
+- [x] 1.2 阅读相关源码（已完成：ExoPlayerHelper/VideoPreloader/FirstFramePreloader/PlayerInstancePool/MimeSniffer/Exo2MediaPlayer/AppConfig/AppLog）
+- [x] 1.3 调研网上成熟方案（已完成：Media3 DefaultPreloadManager + HLS 优化 + AI 预缓冲 + B站/YouTube 激进策略）
+- [x] 1.4 确认 HLS 依赖实际状态（gradle dependencies）✅ P0 已确认并修复（取消注释 build.gradle 中 media3.exoplayer.hls 依赖）
+- [x] 1.5 确认 CacheUtil API 在 Media3 1.10.1 中的可用性 ✅ P0 已确认（实际改用 DataSource + CacheDataSink 替代 CacheUtil.cache()，详见 AD-17）
+- [x] 1.6 **确认 ExoPlayer 是否支持运行时 setLoadControl 热切换**（R2 新增，R3 决策：放弃热切换，只在 prepare 前设置）✅ P0 已确认
+- [x] 1.7 **确认 AppConfig/Preferences 现有结构与扩展点**（R3 新增）✅ P0 已确认（VideoPlay.kt 新增 4 个用户可配置参数）
+- [x] 1.8 **确认 VideoPreloader 当前 cacheKey 生成逻辑**（R3 新增，阻塞点6）✅ P0 已确认并统一为纯 URL
+- [x] 1.9 **确认 VideoPreloader 当前预加载触发时机与去重机制**（R3 新增，阻塞点7）✅ P0 已确认（触发时机去重留待 P1 实施）
+- [x] 1.10 **确认 VideoPreloader 是否已有播放列表概念**（R3 新增，阻塞点8）✅ P0 已确认（PlayListManager 留待 P1 实施）
+- [x] 1.11 **确认 AppLog 当前 release 包日志拦截逻辑**（R3 新增，阻塞点10）✅ P0 已确认并修复
 
 ## 2. P0 阶段：修复预加载 BUG
 
 ### 2.1 修复 FirstFramePreloader
 
-- [ ] 2.1.1 修改 `preloadUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache
-  - Action: （待执行）将 `body.byteStream().readBytes()` 替换为 `CacheUtil.cache(cache, cacheKey, dataSource, DataSpec(uri, 0, PRELOAD_BYTES))`
-  - Observation: （待观察）
-  - Adapt: （待调整）
-- [ ] 2.1.2 修改 `prewarmUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache
-- [ ] 2.1.3 移除 `readBytes()` 无限制读取
-- [ ] 2.1.4 **PRELOAD_BYTES 改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）
-  - HIGH+GOOD: 10MB / HIGH+MEDIUM: 5MB / HIGH+WEAK: 1MB
-  - MID+GOOD: 5MB / MID+MEDIUM: 2MB / MID+WEAK: 512KB
+- [x] 2.1.1 修改 `preloadUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache ✅ P0 已完成（实施调整：改用 ExoPlayer DataSource + CacheDataSink 替代 CacheUtil.cache()，详见 AD-17）
+  - Action: （已执行）将 `body.byteStream().readBytes()` 替换为 ExoPlayer DataSource + CacheDataSink 写入 SimpleCache
+  - Observation: 预加载数据真正写入磁盘缓存（原 bug：OkHttp readBytes 只读取到内存后丢弃）
+  - Adapt: 改用 DataSource + CacheDataSink 替代 CacheUtil.cache()，因 CacheDataSink 与播放器 CacheDataSource 读取路径完全对称，命中率高
+- [x] 2.1.2 修改 `prewarmUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache ✅ P0 已完成（同 2.1.1，改用 DataSource + CacheDataSink）
+- [x] 2.1.3 移除 `readBytes()` 无限制读取 ✅ P0 已完成（用 DataSpec 限制读取字节数防止 OOM）
+- [x] 2.1.4 **PRELOAD_BYTES 改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）✅ P0 已完成（实施调整：改为 `getPreloadBytes()` 动态计算，HIGH=10MB/MID=5MB/用户可配，移除网络档位区分）
+  - 实际实施：HIGH=10MB / MID=5MB / 用户可通过 `videoPreloadBytesMB` 配置（0=自动）
   - 检测失败默认 HIGH 档位（R3 调整）
-- [ ] 2.1.5 验证修复后预加载数据真正写入 SimpleCache
+- [ ] 2.1.5 验证修复后预加载数据真正写入 SimpleCache ⏳ 待真机验证（用户正在真机测试中）
 
 ### 2.2 修复 VideoPreloader
 
-- [ ] 2.2.1 修改 `preloadUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache
-- [ ] 2.2.2 移除 `readBytes()` 无限制读取
-- [ ] 2.2.3 **预加载数量改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）
-  - HIGH+GOOD: 10 个 / HIGH+MEDIUM: 5 个 / HIGH+WEAK: 1 个
-  - MID+GOOD: 7 个 / MID+MEDIUM: 3 个 / MID+WEAK: 1 个
+- [x] 2.2.1 修改 `preloadUrl` 改用 `CacheUtil.cache()` 写入 SimpleCache ✅ P0 已完成（实施调整：改用 ExoPlayer DataSource + CacheDataSink 替代 CacheUtil.cache()，详见 AD-17）
+- [x] 2.2.2 移除 `readBytes()` 无限制读取 ✅ P0 已完成（用 DataSpec 限制读取字节数防止 OOM）
+- [x] 2.2.3 **预加载数量改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）✅ P0 已完成（实施调整：改为 `getPreloadCount()` 动态计算，移除 WiFi/4G 区分）
+  - 实际实施：HIGH=10 个 / MID=7 个 / 用户可通过 `videoPreloadCount` 配置（0=自动）
+  - 移除 WiFi/4G 网络感知区分（用户要求激进策略，用户可手动调低 videoPreloadCount 控制流量）
+  - 移除 `isWifi()`/`isMobile()` 未使用方法
   - 检测失败默认 HIGH 档位（R3 调整）
-- [ ] 2.2.4 **预加载字节数改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）
-  - HIGH+GOOD: 10MB / HIGH+MEDIUM: 5MB / HIGH+WEAK: 1MB
-  - MID+GOOD: 5MB / MID+MEDIUM: 2MB / MID+WEAK: 512KB
+- [x] 2.2.4 **预加载字节数改为根据 DeviceTier+NetworkTier 动态调整**（R2 新增，R3 移除 LOW 档位）✅ P0 已完成（实施调整：改为 `getPreloadBytes()` 动态计算，移除 WiFi/4G 区分）
+  - 实际实施：HIGH=10MB / MID=5MB / 用户可通过 `videoPreloadBytesMB` 配置（0=自动）
   - 检测失败默认 HIGH 档位（R3 调整）
-- [ ] 2.2.5 验证修复后预加载数据真正写入 SimpleCache
+- [ ] 2.2.5 验证修复后预加载数据真正写入 SimpleCache ⏳ 待真机验证（用户正在真机测试中）
 
 ### 2.3 修复 HLS 依赖状态
 
-- [ ] 2.3.1 运行 `gradle dependencies` 确认 HLS 依赖来源
-- [ ] 2.3.2 如果是 GSY 传递依赖：在 build.gradle 添加注释说明
-- [ ] 2.3.3 如果是直接依赖被误注释：取消注释恢复显式声明
-- [ ] 2.3.4 验证 build.gradle 与代码状态一致
+- [x] 2.3.1 运行 `gradle dependencies` 确认 HLS 依赖来源 ✅ P0 已确认
+- [x] 2.3.2 如果是 GSY 传递依赖：在 build.gradle 添加注释说明 ✅ P0 已完成（实际决策：取消注释，显式声明 HLS 支持）
+- [x] 2.3.3 如果是直接依赖被误注释：取消注释恢复显式声明 ✅ P0 已完成（取消注释 `implementation(libs.media3.exoplayer.hls)`，显式声明 HLS 支持）
+- [x] 2.3.4 验证 build.gradle 与代码状态一致 ✅ P0 已完成（编译通过 BUILD SUCCESSFUL in 4m 32s）
 
 ### 2.4 DeviceInfoHelper（R2 新增，R3 移除 LOW 档位）
 
-- [ ] 2.4.1 新增 `DeviceInfoHelper.kt`
-  - Action: （待执行）实现 `getDeviceTier()` 方法，返回 MID/HIGH 两档（R3 调整：移除 LOW）
-  - Observation: （待观察）
-  - Adapt: （待调整）
-- [ ] 2.4.2 实现 `getTotalMemoryMB()`（ActivityManager.MemoryInfo）
-- [ ] 2.4.3 实现 `getFreeDiskMB()`（StatFs）
-- [ ] 2.4.4 实现 `getCpuCores()`（Runtime.availableProcessors）
-- [ ] 2.4.5 实现结果缓存（避免重复检测）
-- [ ] 2.4.6 **检测失败降级到 HIGH 档位**（R3 调整：默认 HIGH，不再降级到 MID/LOW）
-- [ ] 2.4.7 验证两档识别正确（模拟不同内存/CPU）
+- [x] 2.4.1 新增 `DeviceInfoHelper.kt` ✅ P0 已完成
+  - Action: （已执行）实现 `getDeviceTier()` 方法，返回 MID/HIGH 两档（R3 调整：移除 LOW）
+  - Observation: HIGH 阈值：内存≥6GB + CPU≥8核 + 磁盘≥10GB；MID 阈值：内存≥4GB 或 CPU≥8核
+  - Adapt: 检测失败降级到 HIGH 档位（用户要求默认中高端机参数，非 MID）
+- [x] 2.4.2 实现 `getTotalMemoryMB()`（ActivityManager.MemoryInfo）✅ P0 已完成
+- [x] 2.4.3 实现 `getFreeDiskMB()`（StatFs）✅ P0 已完成
+- [x] 2.4.4 实现 `getCpuCores()`（Runtime.availableProcessors）✅ P0 已完成
+- [x] 2.4.5 实现结果缓存（避免重复检测）✅ P0 已完成
+- [x] 2.4.6 **检测失败降级到 HIGH 档位**（R3 调整：默认 HIGH，不再降级到 MID/LOW）✅ P0 已完成（用户要求默认中高端机参数）
+- [ ] 2.4.7 验证两档识别正确（模拟不同内存/CPU）⏳ 待真机验证
 
 ### 2.5 P0 阶段验证
 
-- [ ] 2.5.1 编译通过
-- [ ] 2.5.2 真机测试：预加载后二次播放命中缓存
-- [ ] 2.5.3 真机测试：readBytes 限制生效（无 OOM）
-- [ ] 2.5.4 **真机测试：DeviceInfoHelper 正确识别 HIGH/MID 档位**（R2 新增，R3 调整）
-- [ ] 2.5.5 真机回归：现有降级链/实例池/嗅探正常
+- [x] 2.5.1 编译通过 ✅ P0 已完成（BUILD SUCCESSFUL in 4m 32s）
+- [ ] 2.5.2 真机测试：预加载后二次播放命中缓存 ⏳ 待真机验证（用户正在真机测试中）
+- [ ] 2.5.3 真机测试：readBytes 限制生效（无 OOM）⏳ 待真机验证
+- [ ] 2.5.4 **真机测试：DeviceInfoHelper 正确识别 HIGH/MID 档位**（R2 新增，R3 调整）⏳ 待真机验证
+- [ ] 2.5.5 真机回归：现有降级链/实例池/嗅探正常 ⏳ 待真机验证
 
-### 2.6 P0：用户可配置参数（R3 新增，阻塞点：用户可向下调参）
+### 2.5 补充：P0 实施额外文件变更说明
 
-- [ ] 2.6.1 在 `AppConfig` 新增视频预缓冲用户配置项
-  - Action: （待执行）新增字段：`videoMaxBufferMultiplier`（maxBuffer 倍数 0.5-1.0）、`videoPreloadCountOverride`（预加载数量上限，0=跟随档位）、`videoPreloadBytesOverride`（预加载字节上限，0=跟随档位）、`videoCacheSizeOverride`（缓存上限 MB，0=跟随档位）
-  - Observation: （待观察）
-  - Adapt: （待调整）
-- [ ] 2.6.2 在 `Preferences` 暴露配置入口（设置页：视频播放 → 预缓冲参数）
-- [ ] 2.6.3 实现"用户配置优先于档位默认值"合并逻辑（用户值非 0 时覆盖档位值）
-- [ ] 2.6.4 配置变更时通知 VideoPreloader/FirstFramePreloader 刷新策略
-- [ ] 2.6.5 配置变更时若需要重建 SimpleCache（缓存上限变更），先 flush 再重建
-- [ ] 2.6.6 默认值：所有 override 字段默认 0（跟随档位），multiplier 默认 1.0
-- [ ] 2.6.7 验证用户调小 maxBuffer 后下次播放生效
-- [ ] 2.6.8 验证用户调小预加载数量后下次预加载生效
+P0 实施时额外完成了以下文件变更（原 R3 设计中未明确列入 P0 文件清单）：
 
-### 2.7 P0：cacheKey 策略统一（R3 新增，阻塞点6：预加载器与播放器 cacheKey 必须一致）
+- **AppLog.kt**（修改）：release 包输出 WARN/INFO 日志（`putEntry`：ERROR/WARN/INFO 无条件 Log.e 输出；`putDebugWithTag`：recordLog 关闭时 ERROR/WARN/INFO 仍输出到 logcat）
+- **VideoPlay.kt**（修改）：新增 4 个用户可配置参数（`videoMaxBufferSec`/`videoPreloadCount`/`videoPreloadBytesMB`/`videoPreloadTriggerProgress`，0=自动，用户可往下调）
+- **ExoPlayerHelper.kt**（修改）：cache 容量范围 50-500MB → 50-2048MB；新增 `createPreloadDataSource` 方法（供预加载器复用 OkHttp 配置）
 
-- [ ] 2.7.1 审计 `FirstFramePreloader` 当前 cacheKey 生成逻辑
-  - Action: （待执行）确认是否使用 URL 或 URL+range 作为 cacheKey
-  - Observation: （待观察）
-  - Adapt: （待调整）
-- [ ] 2.7.2 审计 `VideoPreloader` 当前 cacheKey 生成逻辑
-- [ ] 2.7.3 审计 `ExoPlayerHelper`/`Exo2MediaPlayer` 播放器侧 cacheKey 生成逻辑
-- [ ] 2.7.4 **统一 cacheKey 生成函数 `VideoCacheKey.fromUrl(url)`**：统一使用 URL 字符串作为 cacheKey（去掉 range 后缀，因预加载是 0-PRELOAD_BYTES range 请求，播放器后续命中缓存时 ExoPlayer 内部会处理 range 重叠）
-- [ ] 2.7.5 预加载器与播放器统一调用 `VideoCacheKey.fromUrl(url)`
-- [ ] 2.7.6 验证预加载后播放器命中缓存（CacheDataSource 日志显示 cache hit）
-- [ ] 2.7.7 验证不同 URL 不会误命中缓存
+详见 design.md AD-17 P0 实施结果总结。
+
+### 2.6 P0：用户可配置参数（R3 新增，阻塞点：用户可向下调参）✅ P0 已完成
+
+- [x] 2.6.1 在 `AppConfig` 新增视频预缓冲用户配置项 ✅ P0 已完成（实施调整：在 `VideoPlay.kt` 而非 `AppConfig` 新增 4 个参数）
+  - Action: （已执行）在 `VideoPlay.kt` 新增字段：`videoMaxBufferSec`（最大缓冲时长，0=自动，HIGH=120s/MID=90s）、`videoPreloadCount`（预加载数量，0=自动，HIGH=10/MID=7）、`videoPreloadBytesMB`（预加载字节数，0=自动，HIGH=10MB/MID=5MB）、`videoPreloadTriggerProgress`（预加载触发进度，默认10%）
+  - Observation: 用户可通过配置参数往下调（0=自动跟随档位）
+  - Adapt: 实施在 `VideoPlay.kt` 而非 `AppConfig`，因 VideoPlay 是视频播放配置的权威入口
+- [ ] 2.6.2 在 `Preferences` 暴露配置入口（设置页：视频播放 → 预缓冲参数）⏳ 待实施（P1，UI 入口未在 P0 实施）
+- [x] 2.6.3 实现"用户配置优先于档位默认值"合并逻辑（用户值非 0 时覆盖档位值）✅ P0 已完成
+- [x] 2.6.4 配置变更时通知 VideoPreloader/FirstFramePreloader 刷新策略 ✅ P0 已完成（预加载器读取 `getPreloadBytes()`/`getPreloadCount()` 时实时获取最新配置）
+- [ ] 2.6.5 配置变更时若需要重建 SimpleCache（缓存上限变更），先 flush 再重建 ⏳ 待实施（P1，cache 容量已扩展到 50-2048MB，但动态重建未实施）
+- [x] 2.6.6 默认值：所有 override 字段默认 0（跟随档位）✅ P0 已完成（0=自动，HIGH=120s/10/10MB，MID=90s/7/5MB）
+- [ ] 2.6.7 验证用户调小 maxBuffer 后下次播放生效 ⏳ 待真机验证
+- [ ] 2.6.8 验证用户调小预加载数量后下次预加载生效 ⏳ 待真机验证
+
+### 2.7 P0：cacheKey 策略统一（R3 新增，阻塞点6：预加载器与播放器 cacheKey 必须一致）✅ P0 已完成
+
+- [x] 2.7.1 审计 `FirstFramePreloader` 当前 cacheKey 生成逻辑 ✅ P0 已完成
+  - Action: （已执行）确认预加载器 cacheKey 生成逻辑
+  - Observation: 原实现使用 OkHttp Request，未明确 cacheKey
+  - Adapt: 改用 ExoPlayer DataSource + CacheDataSink 后，cacheKey 为纯 URL
+- [x] 2.7.2 审计 `VideoPreloader` 当前 cacheKey 生成逻辑 ✅ P0 已完成
+- [x] 2.7.3 审计 `ExoPlayerHelper`/`Exo2MediaPlayer` 播放器侧 cacheKey 生成逻辑 ✅ P0 已完成（播放器 `resolvingDataSource` 解析后 cacheKey 为纯 URL）
+- [x] 2.7.4 **统一 cacheKey 生成函数 `VideoCacheKey.fromUrl(url)`**：统一使用 URL 字符串作为 cacheKey ✅ P0 已完成（实施调整：cacheKey 为纯 URL，不使用 `VideoCacheKey.fromUrl()` 封装，因播放器 `resolvingDataSource` 解析后即为纯 URL，预加载器必须与之一致）
+  - 实施调整：cacheKey 为纯 URL（不做 MD5，不做规范化），与播放器 `resolvingDataSource` 解析后一致
+  - 调整理由：MD5 会导致 cacheKey 不匹配，缓存未命中
+- [x] 2.7.5 预加载器与播放器统一调用 `VideoCacheKey.fromUrl(url)` ✅ P0 已完成（预加载器 cacheKey 为纯 URL，与播放器一致）
+- [ ] 2.7.6 验证预加载后播放器命中缓存（CacheDataSource 日志显示 cache hit）⏳ 待真机验证
+- [ ] 2.7.7 验证不同 URL 不会误命中缓存 ⏳ 待真机验证
 
 ## 3. P1 阶段：激进 LoadControl + 全格式统一激进策略（R2 新增，R3 放弃热切换）
 
@@ -335,9 +348,32 @@
   7. **AppLog 正式包日志修复**（新增 6.4）：修改 AppLog 移除 `BuildConfig.DEBUG` 对 WARN/ERROR 的拦截，release 包输出 WARN/ERROR 级别日志（DEBUG/INFO 仍只 debug 包输出）
   8. **风险表更新**：移除"LoadControl 热切换导致缓冲中断"风险（已放弃热切换），新增"用户配置参数可能误操作"风险
 
-### 阶段 5：待实施
+### 阶段 5：P0 实施完成（2026-07-28）
 
-- （待用户确认 R3 修订版设计方案后填写）
+- **Action**: P0 阶段实施完成，实际实施范围在 R3 设计基础上扩展，除原 P0 项（R1/R2/R3）外，将原 P1 中的 R4（DeviceInfoHelper）/R13（用户可配置参数）/R14（cacheKey 统一）/R17（AppLog 修复）提前到 P0 实施，共完成 7 个文件变更
+- **Observation**: P0 实施过程中遇到 5 个 R3 设计未明确的实施细节决策：
+  1. CacheUtil.cache() 改用 DataSource + CacheDataSink（CacheDataSink 与播放器 CacheDataSource 读取路径对称，命中率高）
+  2. 移除 WiFi/4G 网络感知区分（用户要求激进策略，用户可手动调低 videoPreloadCount 控制流量）
+  3. cacheKey 统一为纯 URL（不做 MD5，与播放器 resolvingDataSource 解析后一致）
+  4. 检测失败降级到 HIGH（用户要求默认中高端机参数，非 MID）
+  5. 新增 createPreloadDataSource 方法（预加载器复用 OkHttp 配置，确保请求行为一致）
+- **Adapt**:
+  1. **CacheDataSink 写入 SimpleCache**：预加载器改用 ExoPlayer DataSource + CacheDataSink，预加载数据真正写入磁盘缓存（原 bug：OkHttp readBytes 只读取到内存后丢弃）
+  2. **PRELOAD_BYTES/MAX_CACHE_SIZE 动态计算**：从固定值改为 `getPreloadBytes()`/`getPreloadCount()` 动态计算（HIGH=10MB/10个，MID=5MB/7个，用户可配）
+  3. **DataSpec 限制读取字节数**：防止 OOM（原 bug：readBytes() 读取整个响应体）
+  4. **ExoPlayerHelper cache 容量扩展**：50-500MB → 50-2048MB（支持 HIGH 档位 1GB 缓存）
+  5. **AppLog release 包日志修复**：ERROR/WARN/INFO 无条件 Log.e 输出（release 包也能采集关键日志）
+  6. **VideoPlay.kt 新增 4 个用户可配置参数**：videoMaxBufferSec/videoPreloadCount/videoPreloadBytesMB/videoPreloadTriggerProgress（0=自动，用户可往下调）
+  7. **build.gradle 取消注释 media3.exoplayer.hls**：显式声明 HLS 支持
+- **编译验证**：BUILD SUCCESSFUL in 4m 32s
+- **APK 安装**：测试包 `io.legado.miss.app.debug`，版本 3.26.072816
+- **真机测试**：用户正在真机测试中，稍后提供调试日志
+- **待闭环项**：验证类任务（2.1.5/2.2.5/2.4.7/2.5.2-2.5.5/2.6.7-2.6.8/2.7.6-2.7.7）待真机验证后闭环
+
+### 阶段 6：P1/P2 待实施
+
+- P1 待实施项（5 项）：激进 LoadControl + 全格式统一激进策略 + 预加载触发时机去重 + 内部播放列表管理 + 运行时网络感知
+- P2 待实施项（2 项）：埋点 + DefaultPreloadManager 评估
 
 ---
 

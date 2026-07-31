@@ -110,22 +110,29 @@
 |------|------|
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面板+功能状态 |
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/bugfix-20260730-batch1/](./specs/bugfix-20260730-batch1/) | 真机测试Bug修复批次1（8个BUG：图片头部遮挡+播放器UI入口缺失+CDN缓存清除+"未找到订阅"提示+ExoPlayer LoadControl共享线程错误+DoH DNS冷启动+Cronet降级+InsetsSource警告） 🔄 设计中 |
+| [specs/cronet-proguard-fix-20260731/](./specs/cronet-proguard-fix-20260731/) | release包Cronet ProGuard规则修复（R8混淆移除org.chromium.net.Cronet入口类导致libcronet.so JNI_OnLoad SIGABRT崩溃9次，嗅探能力减弱；精准补全keep规则保留API入口类） 🔄 设计中 |
+| [specs/cronet-so-download-fix-20260731/](./specs/cronet-so-download-fix-20260731/) | Cronet SO下载修复+嗅探能力恢复（真机日志铁证：DoH 3服务器全失败+HTTP/2协议错误降级OkHttp+SO下载源Google Storage国内不稳定；修复DoH服务器配置增加阿里腾讯+切换SO下载源到GitHub Releases+修复下载逻辑+优化HTTP/2降级时长+恢复嗅探超时5s） 🔄 设计中 |
+| [specs/cronet-global-enable-20260731/](./specs/cronet-global-enable-20260731/) | Cronet 全局启用深度分析与优化方案（深度分析4大已用模块OkHttp/ExoPlayer/DoH/AnalyzeUrl+3大未用模块WebView/Glide/HttpURLConnection；识别isCronet开关不一致问题：ExoPlayer+DoH不受开关控制；统一开关逻辑+日志诊断增强+ProGuard规则完善） 🔄 设计中 |
 | [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
 | [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
 | [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager等10项集成设计） 🔄 设计中 |
 | [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
+| [specs/apk-release-publish-20260729/](./specs/apk-release-publish-20260729/) | APK 发布到 Gitee+GitHub Release（Python 脚本一键发布三包到双平台 Release，版本号从文件名提取，updateLog 自动作为 body，token 配置不入 git） 🔄 设计中 |
 | [specs/image-gallery-activity/](./specs/image-gallery-activity/) | 图片浏览器 Activity 化改造（PhotoDialog 单图弹出→ImageGalleryActivity 多图浏览，参考 VideoPlayerActivity 架构，ViewPager2 双层嵌套+跨文章切换+旋转/缩放/长按保存） 🔄 实施完成待L2真机验证 |
 | [specs/image-canvas-thread-fix-20260728/](./specs/image-canvas-thread-fix-20260728/) | 图片画廊图片不显示根因修复（Glide downloadOnly 回调在 glide-disk-cache-thread 触发，SSIV.recycle() 创建 GestureDetector 抛 Handler 异常，被 CallbackException 吞掉不触发 onLoadFailed；修复：onResourceReady/onLoadFailed 用 itemView.post 切主线程） 🔄 设计中 |
 | [specs/player-review-and-optimization/](./specs/player-review-and-optimization/) | 视频/图片播放器审查与优化整合（基于8份审查报告+1份多维度审查整合报告，共32 ERROR+44 WARN+32 INFO=108项，含12个ADR决策；R2修订完成：AD-01保留L4不缓存/AD-06 centerCrop替代fitXY/AD-10补充22类硬编码颜色/AD-12 PlayerControlsHelper替代BasePlayerActivity） 🔄 设计中（R2 修订完成，待实施；**图片部分已废弃，由 image-player-vertical-canvas-optimization 取代**） |
 | [specs/video-prebuffer-enhancement/](./specs/video-prebuffer-enhancement/) | 视频播放器分段预缓冲机制深度分析与优化（源码深度分析+对标Media3 DefaultPreloadManager；发现P0 BUG：FirstFramePreloader/VideoPreloader的readBytes无限制+未写入SimpleCache导致预加载完全无效；P0修复+P1 HLS setAllowChunklessPreparation+运行时NetworkCallback+P2埋点评估） 🔄 设计中 |
+| [specs/video-buffer-speed-optimization/](./specs/video-buffer-speed-optimization/) | 当前播放视频缓冲速度优化（聚焦当前视频非预加载；7层联合优化：LoadControl深度调优 setTargetBufferBytes(-1)+setPrioritizeTimeOverSizeThresholds / HLS LL-HLS targetOffsetMs+超时配置 / OkHttp EventListener+Dispatcher / CacheDataSource FLAG_IGNORE_CACHE_ON_ERROR / 自适应码率 / 解码器异步队列 / AnalyticsListener 性能监控埋点；12个ADR决策；15个需求项R1-R15；10个验证场景） 🔄 设计中 |
 | [specs/image-player-vertical-canvas-optimization/](./specs/image-player-vertical-canvas-optimization/) | 内置图片播放器垂直画布优化方案（单 RecyclerView 垂直长画布+点击进入 ViewPager2 大图+滚动到底部自动加载下一篇，取代 player-review-and-optimization 图片部分，含 13 个 ADR + 17 个验证场景 + 48 项任务） ✅ V4 设计审查通过+全部任务实施完成（Phase 0-8 共 48 项），待编译验证+L2 真机测试 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
 | [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
 | [specs/legado-skill-optimization-v2/](./specs/legado-skill-optimization-v2/) | Legado Skill V2 优化（聚焦修复错误知识+门禁强化+架构瘦身，避免历次"声称完成≠实际生效"陷阱） 🔄 设计中 |
+| [specs/skill-optimization/](./specs/skill-optimization/) | Legado Source Creator Skill 优化（v6：删孤岛+废弃JVM仿真器+确立Playwright MCP唯一地位+新增网站分析报告中间产物+删除legado_client Python客户端+AI手动操作工作流+移除basic-memory引用+新增经验检索三源+视频源核心要求速查+快速入门+源码阅读步骤+SKILL.md≤220行+references≤25文档） 🔄 设计中 |
 | [specs/rss-batch-optimize-v2/](./specs/rss-batch-optimize-v2/) | RSS 订阅源批量优化 v2（222源，复用v1工作流+占位符/模板源处理+域名迁移+反爬配置+skill反哺） 🔄 设计中 |
 | [specs/legado-skill-v2-rebuild/](./specs/legado-skill-v2-rebuild/) | Legado Skill V2 重建 |
 | [specs/skill-core-capability-rebuild/](./specs/skill-core-capability-rebuild/) | Skill 核心能力重建 |
@@ -178,6 +185,9 @@
 | [specs/logging-audit-and-enhancement/](./specs/logging-audit-and-enhancement/) | 日志规范全面审查与补全完善（核心模块catch块日志覆盖：WebBook 90%缺失+规则引擎40%+网络层47%，统一模块Tag规范+ai_tests通用日志获取脚本+规范文档优化） 🔄 设计中 |
 | [specs/thread-pool-split-config/](./specs/thread-pool-split-config/) | 书源线程池拆分与自定义配置（共用 threadCount 拆分为 searchThreadCount + updateCacheThreadCount 两个独立配置，30+ 业务点归类替换，UI 自定义入口，老用户自动迁移） ✅ 实施完成（仅本地commit+验收通过）
 | [specs/thread-pool-audit/](./specs/thread-pool-audit/) | 线程池配置全面审查（13项配置点静态审查：8个FixedThreadPool+globalExecutor+DispatchersMonitor+OkHttp连接池+Dispatchers.IO+Coroutine.kt，识别泄漏风险/性能瓶颈/默认值合理性，输出P0/P1/P2优化建议） 🔄 设计中 |
+| [specs/highlight-rule-fix-20260727/](./specs/highlight-rule-fix-20260727/) | 阅读高亮规则系统修复（isRegex 修正+首启播种+upsert+即时生效+fill 快绘补画，6 项根因修复） ✅ 已实施（核心修复完成，回归由 highlight-rule-restore-default-20260729 修复） |
+| [specs/highlight-rule-restore-default-20260729/](./specs/highlight-rule-restore-default-20260729/) | 高亮规则丢失修复 + 恢复默认规则（修复愈合逻辑覆盖用户 pattern 的 BUG + 新增"恢复默认规则"菜单支持合并/覆盖模式，解决用户清空后无法恢复内置常规规则痛点） 🔄 实施中（Phase A/B 完成，待编译+真机验收） |
+| [specs/video-player-m3u8-fix/](./specs/video-player-m3u8-fix/) | 内置视频播放器 m3u8 播放失败深度分析与优化（m3u8 URL 短路嗅探+HLS fallback 链去重+分片重试策略增强+Cache-Control 请求头移除） 🔄 设计中 |
 ### 归档 Specs
 
 | 文档 | 说明 |

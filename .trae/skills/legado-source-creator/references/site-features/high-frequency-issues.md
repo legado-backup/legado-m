@@ -6,7 +6,7 @@
 
 **影响范围**：3/7 源（51cg/acgfta/mjv006）
 **严重级别**：P0（导致 sort/content 阶段全部失败）
-**根因**：RSS 源的 sortUrl 或文章 URL 为相对路径（如 `/list/1.html`），JVM 仿真端未自动拼接 bookSourceUrl
+**根因**：RSS 源的 sortUrl 或文章 URL 为相对路径（如 `/list/1.html`），OkHttp 未自动拼接 bookSourceUrl
 
 **特征识别**：
 - 错误信息包含 `UnknownHostException` 或 `scheme` 或 `URL缺`
@@ -55,8 +55,8 @@ return when (it) {
 ## 问题 3：CF 盾 JS 挑战拦截
 
 **影响范围**：1/7 源（1080zyk 优质资源）
-**严重级别**：预期不可绕过（JVM 无法执行 JS challenge）
-**根因**：Cloudflare 返回 JS challenge 页面，JVM 仿真端无法执行 JS
+**严重级别**：预期不可绕过（OkHttp 无法执行 JS challenge）
+**根因**：Cloudflare 返回 JS challenge 页面，OkHttp 无法执行 JS
 
 **特征识别**：
 - HTTP 响应包含 `challenge` 或 `cf-` 或 `__cf_bm`
@@ -64,7 +64,7 @@ return when (it) {
 
 **处理方案**：标记为 `unverifiable`，输出用户操作建议：
 ```
-[需用户介入] CF 盾检测到，JVM 无法模拟 JS challenge
+[需用户介入] CF 盾检测到，OkHttp 无法模拟 JS challenge
 建议：在手机端 Legado App 中使用 webView 验证，或手动获取 Cookie 后导入
 ```
 
@@ -128,7 +128,7 @@ return when (it) {
 
 **特征识别**：
 - 错误信息包含 `Connect timed out` 或 `connect timed out`
-- 独立 Java OkHttp 测试能成功连接，但 RuleEngineServer 中的 OkHttp 失败
+- 独立 Java OkHttp 测试能成功连接，但 App 中的 OkHttp 失败
 - Java 系统代理属性（`http.proxyHost` 等）全部为 null
 - Windows 注册表 `ProxyEnable=1, ProxyServer=https=http://127.0.0.1:PORT`
 

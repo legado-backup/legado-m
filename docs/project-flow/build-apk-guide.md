@@ -634,7 +634,7 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 8. 构建成功后将APK拷贝到`output/apk/{test|coexist|release}/`子目录
 9. 列出 APK 文件路径和包名
 
-> **注意**：必须在**系统 CMD** 中运行，不能在 Trae CN 内置终端中运行（沙盒限制文件操作）。
+> **注意**：可在**系统 CMD** 或 **Trae CN 终端 PowerShell** 中运行。沙盒限制已解除（需用户开通沙箱外权限，铁证：2026-07-29 三包在 Trae CN PowerShell 构建成功）。若遇 transforms move 失败，见 [10.4 已修复的构建问题](#104-已修复的构建问题) 和 [常见问题排查](#常见问题排查)。
 
 ---
 
@@ -891,36 +891,46 @@ adb shell dumpsys activity activities | findstr mResumedActivity
 |------|--------|
 | **项目目录** | `F:\myself\github\WeAgentChat\temp\legado` |
 | **JDK 17** | `C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot` |
-| **Android SDK** | `F:\myself\github\WeAgentChat\temp\legado\temp\android-sdk` |
-| **local.properties** | `sdk.dir=F:\\myself\\github\\WeAgentChat\\temp\\legado\\temp\\android-sdk` |
+| **Android SDK** | `C:\Android\Sdk` |
+| **local.properties** | `sdk.dir=C:\\Android\\Sdk` |
 | **GRADLE_USER_HOME** | `F:\gh`（短路径，解决跨盘符和长路径问题） |
 | **platforms** | android-36 (Android 15) |
 | **build-tools** | 36.0.0 + 35.0.0（Gradle 自动补装） |
 | **platform-tools** | adb.exe 等 |
 | **国内镜像** | 阿里云+华为云已启用（见 4.7） |
 
-### 10.2 在系统 PowerShell 中手动构建
+### 10.2 在 PowerShell 中手动构建（系统终端或 Trae CN 终端均可）
 
-> **重要**：不能在 Trae CN 内置终端中构建！Gradle 的 transforms 缓存需要目录 move/rename 操作，被沙盒环境阻止。必须用系统原生终端。
+> **沙盒限制已解除**：用户开通沙箱外权限后，可在 Trae CN 终端 PowerShell 直接构建（铁证：2026-07-29 三包在 Trae CN PowerShell 构建成功）。若遇 transforms move 失败，见 [10.4 已修复的构建问题](#104-已修复的构建问题)。
 
 ```powershell
-# 1. 打开系统 PowerShell（不是 Trae CN 终端）
-# Win+R → powershell → 回车
+# 1. 打开 PowerShell（系统终端 Win+R→powershell，或 Trae CN 内置终端均可）
 
 # 2. 设置环境变量
 $env:JAVA_HOME = "C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot"
-$env:ANDROID_HOME = "F:\myself\github\WeAgentChat\temp\legado\temp\android-sdk"
+$env:ANDROID_HOME = "C:\Android\Sdk"
 $env:GRADLE_USER_HOME = "F:\gh"
 
 # 3. 进入项目目录
 cd F:\myself\github\WeAgentChat\temp\legado
 
-# 4. 构建 Debug APK
+# 4. 构建 Debug APK（测试包）
 .\gradlew assembleAppDebug --no-daemon
 
-# 5. 构建成功后，APK 位于
-# app\build\outputs\apk\app\debug\legado_miss_app_3.xx.xxxxxx.apk
+# 5. 构建 Release APK（正式包，需签名配置）
+.\gradlew assembleAppRelease --no-daemon
+
+# 6. 构建共存包（自定义包名，⚠️ 必须用参数数组方式传递，见下方陷阱）
+$args = @("assembleAppDebug","--no-daemon","-PcustomAppId=io.legado.app")
+& .\gradlew.bat @args
+
+# 7. 构建成功后，APK 位于
+# 测试包：app\build\outputs\apk\app\debug\legado_miss_app_3.xx.xxxxxx.apk
+# 正式包：app\build\outputs\apk\app\release\legado_miss_app_3.xx.xxxxxx.apk
+# 共存包：app\build\outputs\apk\app\debug\legado_legacy_app_3.xx.xxxxxx.apk
 ```
+
+> **PowerShell 参数传递陷阱**：直接传 `.\gradlew.bat assembleAppDebug -PcustomAppId=io.legado.app` 会被 PowerShell 截断为 `-PcustomAppId=io`（点号被解释为分隔符），导致 `Task '.legado.app' not found` 错误。**必须用参数数组方式**：`$args=@("assembleAppDebug","--no-daemon","-PcustomAppId=io.legado.app"); & .\gradlew.bat @args`（铁证：2026-07-29 共存包首次构建失败）。
 
 ### 10.3 使用一键构建脚本（推荐）
 
@@ -931,15 +941,118 @@ cd F:\myself\github\WeAgentChat\temp\legado
 | 问题 | 原因 | 修复 |
 |------|------|------|
 | `For input string: ""` | `git rev-list HEAD --count` 返回空（无 Git 提交历史） | `app/build.gradle` 第 24 行改为 try-catch，默认 gitCommits=1 |
-| Gradle transforms move 失败 | Trae CN 沙盒限制目录 rename 操作 | 使用系统原生 CMD/PowerShell 构建 |
+| Gradle transforms move 失败 | 多重因素：①杀毒软件锁定文件 ②沙盒限制 rename（已解除） ③transforms 缓存损坏 | 见下方[常见问题排查](#常见问题排查)章节 |
 | KSP 跨盘符路径错误 | Gradle 缓存(C:) 和项目(F:) 在不同盘 | 设置 `GRADLE_USER_HOME=F:\gh` |
 | 长路径 transforms 失败 | Windows 260 字符限制 | `GRADLE_USER_HOME` 用极短路径 `F:\gh` |
 | Kotlin daemon AccessDeniedException | 残留临时文件锁 | 构建前删除 `%LOCALAPPDATA%\kotlin\daemon` |
 | 首次构建卡在 3% | 国内网络直连 Google/Maven 慢 | 启用阿里云/华为云镜像（见 4.7） |
+| PowerShell `-PcustomAppId=io.legado.app` 被截断 | PowerShell 把点号解释为分隔符，参数被拆分 | 用参数数组：`$args=@("assembleAppDebug","--no-daemon","-PcustomAppId=io.legado.app"); & .\gradlew.bat @args` |
 
 ---
 
-## 十一、参考链接
+## 十一、常见问题排查（2026-07-29 打包实战经验整理）
+
+> **来源**：2026-07-29 APK 三包构建（测试包+正式包+共存包）实战中遇到的问题与解决方案。
+
+### 11.1 Gradle transforms move 失败
+
+**症状**：
+```
+Could not move temporary workspace (F:\gh\caches\8.14.4\transforms\xxx-yyy) to immutable location (F:\gh\caches\8.14.4\transforms\xxx)
+```
+
+**根因（多重因素）**：
+1. **杀毒软件锁定文件**：360 安全卫士/Windows Defender 实时扫描锁定 transforms 临时 workspace 文件，导致 rename 时 AccessDeniedException
+2. **沙盒限制 rename**：Trae CN 沙盒环境限制目录 rename 操作（**已解除**：用户开通沙箱外权限后可在 Trae CN 终端构建）
+3. **transforms 缓存损坏**：缓存被中断后残留不完整文件，后续构建无法 rename
+
+**解决方案（按优先级）**：
+```powershell
+# 1. 杀所有 java 进程（避免文件锁）
+Get-Process -Name java -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# 2. 清理 transforms 缓存（F盘和C盘都要清）
+Remove-Item -Path "F:\gh\caches\8.14.4\transforms" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$env:USERPROFILE\.gradle\caches\8.14.4\transforms" -Recurse -Force -ErrorAction SilentlyContinue
+
+# 3. 清理 Kotlin daemon 缓存
+Remove-Item -Path "$env:LOCALAPPDATA\kotlin\daemon" -Recurse -Force -ErrorAction SilentlyContinue
+
+# 4. 将 F:\gh 和项目目录添加到杀毒软件白名单（长期方案）
+
+# 5. 重新构建
+$env:JAVA_HOME = "C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot"
+$env:ANDROID_HOME = "C:\Android\Sdk"
+$env:GRADLE_USER_HOME = "F:\gh"
+& .\gradlew.bat assembleAppDebug --no-daemon
+```
+
+**铁证**：2026-07-28 打包失败 2 小时（沙盒限制+杀毒软件锁定），2026-07-29 用户开通沙箱外权限+清除 F:\gh 缓存后三包构建全部成功。
+
+### 11.2 PowerShell 参数传递陷阱（共存包构建）
+
+**症状**：
+```
+Task '.legado.app' not found in root project 'legado' and its subprojects.
+```
+且日志显示 `Base applicationId: io`（被截断为 io，丢失 .legado.app）。
+
+**根因**：PowerShell 调用原生命令（gradlew.bat）时，把 `-PcustomAppId=io.legado.app` 中的点号解释为分隔符，参数被拆分为 `-PcustomAppId=io` + `.legado.app`（后者被当成任务名）。
+
+**解决方案**：用参数数组方式传递（PowerShell splatting）：
+```powershell
+# ❌ 错误：直接传递，参数被截断
+& .\gradlew.bat assembleAppDebug --no-daemon -PcustomAppId=io.legado.app
+
+# ✅ 正确：用参数数组
+$args = @("assembleAppDebug","--no-daemon","-PcustomAppId=io.legado.app")
+& .\gradlew.bat @args
+```
+
+**铁证**：2026-07-29 共存包首次构建失败（45秒后 Task not found），改用参数数组后 5m37s 构建成功。
+
+### 11.3 沙盒限制解除说明
+
+**历史铁律（已失效）**：
+> "不能在 Trae CN 内置终端中构建！Gradle 的 transforms 缓存需要目录 move/rename 操作，被沙盒环境阻止。必须用系统原生终端。"
+
+**当前状态**：用户开通沙箱外权限后，沙盒限制已解除，可在 Trae CN 终端 PowerShell 直接构建。
+
+**验证铁证**：2026-07-29 三包在 Trae CN 终端 PowerShell 构建成功：
+- 测试包：21m31s（assembleAppDebug）
+- 正式包：19m34s（assembleAppRelease，含 R8 混淆）
+- 共存包：5m37s（assembleAppDebug -PcustomAppId=io.legado.app）
+
+**注意**：若用户未开通沙箱外权限，仍需在系统原生 PowerShell/CMD 中构建。开通方法见 Trae CN 设置。
+
+### 11.4 Gradle 版本降级方案（废弃）
+
+**背景**：2026-07-28 曾尝试将 Gradle 从 8.14.4 降级到 8.11.1 以规避 transforms 原子移动 bug。
+
+**废弃原因**：
+1. Gradle 8.11.1 下载不完整（F:\gh 中只有 .part 文件，无完整 zip）
+2. 降级方案治标不治本，根因是沙盒限制+杀毒软件锁定，不是 Gradle 版本问题
+3. 恢复到 8.14.4 + 清理 transforms 缓存 + 沙盒权限解除后，构建正常
+
+**当前配置**：`gradle-wrapper.properties` 中 `distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.4-bin.zip`
+
+### 11.5 APK 文件名规则（build.gradle 自动生成）
+
+**文件名格式**：`{name}_{appIdSuffix}_{flavor}_{versionName}.apk`
+
+| 包类型 | applicationId | appIdSuffix | 文件名示例 |
+|--------|--------------|-------------|-----------|
+| 测试包 | io.legado.miss.app.debug | miss | legado_miss_app_3.26.072908.apk |
+| 正式包 | io.legado.miss.app.release | miss | legado_miss_app_3.26.072909.apk |
+| 共存包 | io.legado.app.debug | legacy | legado_legacy_app_3.26.072909.apk |
+
+> **注意**：共存包的 appIdSuffix 是 `legacy`（不是 `coexist`），由 `app/build.gradle` 中 `appId.startsWith("io.legado.app")` 判断决定。测试包和正式包的 appIdSuffix 都是 `miss`（因为 applicationId 都以 `io.legado.miss.app` 开头）。
+
+> **输出目录隔离**：测试包和共存包都输出到 `app/build/outputs/apk/app/debug/`，后构建的会覆盖先构建的。`build-legado.bat` 会在构建完成后立即拷贝到 `output/apk/{test|coexist|release}/`，通过子目录隔离。
+
+---
+
+## 十二、参考链接
 
 | 资源 | 地址 |
 |------|------|

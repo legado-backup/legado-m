@@ -177,14 +177,14 @@ def is_valid_rule_next_page(v):
 
 **根因**：Python 在某些路径下用 `str(None)` 生成 "None"，再被 JSON 序列化为字符串。
 
-**修复**：批量脚本写入前用 `sanitize_source_json()` 过滤 None 值（已有工具函数）：
+**修复**：批量脚本写入前过滤 None 值（AI手动不写None，参考SKILL.md必填字段清单）：
 
 ```python
-from legado_client.utils.file_utils import sanitize_source_json
+# AI手动不写None，无需sanitize
 
 # 批量优化输出前
 for s in sources:
-    s = sanitize_source_json(s)  # 把 None 替换为 ''
+    s = {k: ('' if v is None else v) for k, v in s.items()}  # 把 None 替换为 ''
 ```
 
 ## 陷阱 8：域名迁移优化模式（站点源URL失效但有备用域名提示）

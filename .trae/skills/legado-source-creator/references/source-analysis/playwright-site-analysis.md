@@ -213,7 +213,7 @@ page.evaluate: SyntaxError: Illegal return statement
 2. 执行 IIFE JavaScript 提取4字段 + 导航菜单
 3. 记录到 `source_ref` metadata（verified_against_source=true）
 4. 识别触发字段（CF/login/captcha）→ 必须先源码验证再写规则
-5. 搜索 basic-memory 找同类经验
+5. 搜索 references/ 知识库找同类经验
 ```
 
 ### Phase 2（生成）字段映射
@@ -227,12 +227,10 @@ source = {
     'ruleNextPage': extract_next_page_selector(playwright_result['paginationHTML']),
 }
 
-# v4 必经 sanitize + MandatoryFieldValidator
-from legado_client.utils.file_utils import sanitize_source_json
-from legado_client.validator import validate_source
-sanitized = sanitize_source_json(source)
-result = validate_source(sanitized, source_type='rss', strict_recommended=True)
-assert result['passed'], f"字段缺失: {result['all_missing']}"
+# AI手动不写None，必填字段对照SKILL.md清单校验
+# AI手动构建，sanitize/validate由SKILL.md流程保证
+sanitized = {k: ('' if v is None else v) for k, v in source.items()}  # AI手动不写None
+# AI手动对照SKILL.md必填字段清单校验（CRITICAL/MANDATORY/RECOMMENDED三级）
 ```
 
 ### 字段构建辅助函数
@@ -285,7 +283,7 @@ def extract_next_page_selector(pagination_html):
 - [ ] 已执行 IIFE JavaScript 提取4字段技术结构
 - [ ] sourceIcon/searchUrl/sortUrl/ruleNextPage 4字段值来自真实DOM提取（非猜测）
 - [ ] `source_ref` metadata 标记 `verified_against_source=true`
-- [ ] MandatoryFieldValidator 校验通过
+- [ ] 必填字段清单校验通过（对照SKILL.md）
 - [ ] E2E 14/14 测试无回归
 
 ## 案例：v4 应用任务（2026-07-18）
@@ -304,4 +302,4 @@ def extract_next_page_selector(pagination_html):
 **反哺内容**：
 - 本文档（Playwright 网站分析指南）
 - SKILL.md Phase 1 强化（必经 Playwright）
-- basic-memory case 经验笔记
+- references/ 对应文档经验笔记
