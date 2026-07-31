@@ -13,7 +13,7 @@
 
 **本方案核心目标**：
 - 将 isCronet 默认值改为 true，Cronet 作为初始化自动启用模式
-- 引入 CronetTransportForOkHttp 桥接层，让现有 OkHttp 代码零改动获得 Cronet 能力
+- 评估 CronetTransportForOkHttp 桥接层作为可选优化（源码核实：CronetInterceptor 已通过 cronetEngine.newUrlRequestBuilder 获得完整 Cronet 能力，桥接层非必须迁移）
 - 扩展 Cronet 使用范围至 HttpURLConnection、Glide、文件上传/下载等场景
 - 完善分层降级链，保障 JNI 崩溃等异常场景下的可用性
 - 从反爬成功率、弱网性能、稳定性、体积等多维度全面评估
@@ -23,8 +23,8 @@
 本方案提供以下 6 项核心能力：
 
 1. **默认启用**：isCronet 默认值改为 true，Cronet 作为初始化自动启用模式（保留开关用于紧急关闭）
-2. **桥接方案**：引入 Google 官方 CronetTransportForOkHttp 桥接层，现有 OkHttp 代码零改动获得 QUIC/HTTP3 + BoringSSL 指纹能力
-3. **分层降级链**：Cronet(play-services) → Cronet(embedded) → cronet-fallback → OkHttp，保障异常场景可用性
+2. **桥接评估**：评估 CronetTransportForOkHttp 桥接层作为可选优化（CronetInterceptor 已获得 QUIC/HTTP3 + BoringSSL 指纹能力，桥接层主要提升 OkHttp 调度与 Cronet 集成度）
+3. **分层降级链**：Cronet（动态下载 SO）→ cronet-fallback → OkHttp，保障异常场景可用性
 4. **扩展使用范围**：从核心网络请求扩展至 HttpURLConnection（P1）、Glide 图片加载（P2）、文件上传/下载（P3）
 5. **性能全面评估**：对比 Cronet vs OkHttp 在 TLS 握手、QUIC 弱网、连接迁移、DNS 解析等维度的性能差异
 6. **稳定性保障**：完善 ProGuard 规则、JNI 崩溃监控、自动降级机制、参数调优，确保生产环境稳定
@@ -65,7 +65,7 @@
 - 受 isCronet 开关控制：是
 - 影响范围：所有走 okHttpClient 的请求（34 个文件使用）
 - 覆盖场景：书源请求、订阅源请求、搜索、发现、内容获取、WebDav、应用更新检查、各种导入功能等
-- 新方向：评估升级为 CronetTransportForOkHttp 桥接层（替代 CronetInterceptor）
+- 新方向：评估 CronetTransportForOkHttp 桥接层作为可选优化（源码核实：CronetInterceptor 已通过 proceedWithCronet→cronetEngine.newUrlRequestBuilder 获得完整 Cronet 能力，桥接层非必须迁移）
 
 #### B. ExoPlayer 视频播放器
 - 文件：`app/src/main/java/io/legado/app/help/exoplayer/ExoPlayerHelper.kt`
@@ -140,10 +140,10 @@
 | JNI 崩溃（SIGABRT） | 高 | 降级机制 + 崩溃监控 + 自动回退 OkHttp |
 | ProGuard 规则缺失 | 高 | 完整 keep 规则 + release 包真机测试 |
 | WebSocket 不可用 | 中 | 保留 OkHttp 处理 WebSocket |
-| APK 体积增加 | 中 | 国内用 embedded(+5-8MB)，海外用 play-services(0MB) |
+| APK 体积增加 | 低 | 项目采用动态下载 SO 方案，APK 零增量（SO 运行时下载到 externalCache） |
 | 电池消耗（QUIC 保活） | 低 | 配置 idle timeout + 监控 |
 | 连接迁移平台限制 | 低 | 作为加分项，不强依赖 |
-| Google Play 服务不可用（国内） | 低（国内高） | embedded + fallback 降级链 |
+| Google Play 服务不可用（国内） | 不适用 | 项目采用动态下载 SO 方案，不依赖 Google Play 服务 |
 
 ## 核心结论
 
@@ -156,21 +156,21 @@
 1. **反爬战略价值不可替代**：Cronet 使用 BoringSSL（Chrome 同源），TLS/HTTP2 指纹天然接近 Chrome，这是 OkHttp 通过任何配置都无法模拟的。对爬虫类项目而言，这是决定能否成功抓取的关键因素
 2. **弱网性能优势显著**：QUIC 在弱网下延迟降低约 50%，吞吐量提升约 50%，连接迁移避免网络切换断连，直接提升用户体验
 3. **Google 官方背书**：YouTube/Maps/Photos 等亿级用户 App 默认使用，ExoPlayer/gRPC 官方支持，成熟度有保障
-4. **桥接方案成本低**：通过 CronetTransportForOkHttp，现有 OkHttp 代码零改动即可获得 Cronet 能力
+4. **现有架构已满足核心需求**：CronetInterceptor 已通过 cronetEngine.newUrlRequestBuilder 获得完整 Cronet 能力，isCronet 默认启用即可让多数用户享受反爬收益，CronetTransportForOkHttp 作为可选优化后续评估
 5. **降级机制可控**：保留 OkHttp 处理 WebSocket 和降级兜底，风险可控
 
 ### 推荐方案
 
-- **桥接层**：CronetTransportForOkHttp（Google 官方，`com.google.net.cronet:cronet-okhttp`）
-- **降级链**：Cronet(play-services) → Cronet(embedded) → cronet-fallback → OkHttp
-- **Provider 策略**：国内用 cronet-embedded（+5-8MB），海外用 play-services-cronet（0MB）
+- **桥接层**：CronetTransportForOkHttp（Google 官方，`com.google.net.cronet:cronet-okhttp`，P1 可选优化，非必须迁移）
+- **降级链**：Cronet（动态下载 SO）→ cronet-fallback → OkHttp
+- **Provider 策略**：项目采用动态下载 SO 方案（APK 零增量，SO 运行时下载到 externalCache）
 - **开关策略**：isCronet 默认值改为 true（保留开关用于紧急关闭）
 
 ### 不建议全局无条件替换的理由
 
 1. **WebSocket 缺失**：Cronet 不支持 WebSocket，必须保留 OkHttp
 2. **JNI 崩溃风险**：特定设备/ROM 上的 native 崩溃需降级通道
-3. **体积考量**：国内设备需 cronet-embedded（+5-8MB），需评估 APK 体积敏感度
+3. **体积考量**：动态下载 SO 方案虽零 APK 增量，但首次使用需网络下载 SO（约 6MB），弱网场景可能延迟
 4. **ProGuard 复杂性**：release 包需严格验证混淆规则
 
 ## 实施路径（四阶段）
@@ -183,7 +183,7 @@
 - Cronet 引擎配置优化（连接迁移+DNS选项+QUIC hints）
 
 ### 阶段二：核心网络层接入（P1）
-- 评估 CronetTransportForOkHttp 替代 CronetInterceptor
+- 评估 CronetTransportForOkHttp 作为可选优化（CronetInterceptor 已获得完整 Cronet 能力，非必须迁移）
 - 书源抓取请求走 Cronet（验证反爬+弱网收益）
 - HttpURLConnection 替换为 OkHttp 桥接
 - 编译测试包验证（io.legado.miss.app.debug）
@@ -204,7 +204,7 @@
 ## 设计原则
 
 1. **默认启用，渐进扩展**：Cronet 作为默认网络栈，分阶段扩展使用范围
-2. **桥接优先，零改动**：通过 CronetTransportForOkHttp 桥接层，现有 OkHttp 代码零改动
+2. **现有架构优先，零改动**：CronetInterceptor 已获得完整 Cronet 能力，isCronet 默认启用即可让多数用户受益，桥接层作为可选优化后续评估
 3. **分层降级，风险可控**：保留 OkHttp 作为降级通道，保障异常场景可用性
 4. **可观测，可调优**：关键节点输出技术日志，支持性能监控与参数调优
 5. **用户可控，紧急关闭**：保留 isCronet 开关用于紧急关闭，平衡默认启用与用户选择权
