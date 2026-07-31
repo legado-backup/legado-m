@@ -10,7 +10,7 @@
 
 ### 整体方案
 
-本设计围绕"Cronet 默认自动启用 + 桥接层评估 + 分层降级 + 渐进扩展"展开。核心思路是：将 Cronet 作为项目默认网络栈（`isCronet` 默认 `true`），评估 Google 官方 `CronetTransportForOkHttp` 桥接层替代当前 `CronetInterceptor` 拦截器模式，扩展使用范围至 HttpURLConnection/Glide/文件上传下载，并完善降级链保障稳定性。
+本设计围绕"Cronet 默认自动启用 + 桥接层评估 + 分层降级 + 渐进扩展"展开。核心思路是：将 Cronet 作为项目默认网络栈（`isCronet` 默认 `true`），评估 Google 官方 `CronetTransportForOkHttp` 桥接层作为可选优化（源码核实：CronetInterceptor 已获得完整 Cronet 能力，桥接层非必须迁移），扩展使用范围至 HttpURLConnection/Glide/文件上传下载，并完善降级链保障稳定性。
 
 ### 当前架构分析（CronetInterceptor 拦截器模式）
 
@@ -19,7 +19,7 @@
 | 维度 | 现状 | 说明 |
 |------|------|------|
 | Cronet Provider | 动态下载 SO 方案 | 非 cronet-embedded 也非 play-services-cronet，项目自实现 SO 动态下载 |
-| 桥接方式 | `CronetInterceptor` 拦截器模式 | 通过 `addInterceptor` 注入，仅拦截请求阶段 |
+| 桥接方式 | `CronetInterceptor` 拦截器模式 | 通过 `addInterceptor` 注入，拦截请求后用 cronetEngine.newUrlRequestBuilder 执行（已获得完整 Cronet 能力） |
 | 降级机制 | 连续 5 次协议错误降级 OkHttp | 已存在但未覆盖 JNI 崩溃场景 |
 | `isCronet` 默认值 | `false` | `appCtx.getPrefBoolean(PreferKey.cronet)`，用户需手动开启 |
 | 已接入模块 | OkHttp 拦截器 / ExoPlayer / DohDns / AnalyzeUrl | 4 大模块 |
@@ -327,7 +327,7 @@ URL.setURLStreamHandlerFactory(factory)
 
 ### AD-05: Glide 图片加载扩展接入
 
-- **Context**: 当前 Glide 通过 `okHttpClientManga` 间接接入 Cronet（继承 okHttpClient 拦截器），但拦截器模式无法获得 Cronet 完整传输能力。
+- **Context**: 当前 Glide 通过 `okHttpClientManga` 间接接入 Cronet（继承 okHttpClient 拦截器），已获得完整 Cronet 能力（CronetInterceptor 用 cronetEngine 执行请求）。直接接入 CronetTransportForOkHttp 可提升集成度，但优先级低。
 - **Concern**: 图片加载场景下，拦截器模式的 Cronet 收益有限（图片 CDN 通常反爬不严苛），但弱网加载速度仍有提升空间。
 - **Decision**: 评估 Glide 通过 `OkHttpUrlLoader` 直接注入 OkHttpClient(callFactory=CronetTransport)，替代当前间接接入方式。
 - **Goal**: 让 Glide 图片加载获得 QUIC/Brotli/连接迁移能力，提升弱网下图片加载速度。

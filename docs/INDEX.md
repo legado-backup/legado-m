@@ -110,6 +110,7 @@
 |------|------|
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面板+功能状态 |
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/sniff-stability-enhance-20260731/](./specs/sniff-stability-enhance-20260731/) | 嗅探稳定性增强（基于logs(8)真机日志深度分析9个优化点：P0 R5嗅探去重锁41%浪费消除/P1 DoH负缓存30s→10s+健康检查+视频流强制HTTP/1.1+favicon.ico缓存/P2 StreamReset重用NonCancellable+日志采样+证书错误记忆/P3 play.php预解析+window.__videoUrls__容错） 🔄 设计中 |
 | [specs/bugfix-20260730-batch1/](./specs/bugfix-20260730-batch1/) | 真机测试Bug修复批次1（8个BUG：图片头部遮挡+播放器UI入口缺失+CDN缓存清除+"未找到订阅"提示+ExoPlayer LoadControl共享线程错误+DoH DNS冷启动+Cronet降级+InsetsSource警告） 🔄 设计中 |
 | [specs/cronet-proguard-fix-20260731/](./specs/cronet-proguard-fix-20260731/) | release包Cronet ProGuard规则修复（R8混淆移除org.chromium.net.Cronet入口类导致libcronet.so JNI_OnLoad SIGABRT崩溃9次，嗅探能力减弱；精准补全keep规则保留API入口类） 🔄 设计中 |
 | [specs/cronet-so-download-fix-20260731/](./specs/cronet-so-download-fix-20260731/) | Cronet SO下载修复+嗅探能力恢复（真机日志铁证：DoH 3服务器全失败+HTTP/2协议错误降级OkHttp+SO下载源Google Storage国内不稳定；修复DoH服务器配置增加阿里腾讯+切换SO下载源到GitHub Releases+修复下载逻辑+优化HTTP/2降级时长+恢复嗅探超时5s） 🔄 设计中 |

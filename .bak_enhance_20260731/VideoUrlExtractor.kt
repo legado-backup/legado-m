@@ -63,19 +63,6 @@ object VideoUrlExtractor {
     private val r5InProgress = ConcurrentHashMap<String, Deferred<String?>>()
     private val r5CleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /**
-     * FR-8: play.php 类 URL 预解析缓存（降低首帧延迟方差）
-     *
-     * 根因：play.php 类 URL 首帧延迟方差 7.5 倍（701ms~5309ms），慢路径为重定向处理
-     * 方案：解析成功后缓存结果 5 分钟，下次同一 URL 直接返回缓存（跳过重定向+解析）
-     *
-     * 已知上限：ConcurrentHashMap 常驻内存，每条记录约 300 字节，单次会话 < 30 次
-     * 升级路径：如需更精细控制可引入 LRU 淘汰
-     */
-    private data class PlayerPageCacheEntry(val videoUrl: String, val timestamp: Long)
-    private val playerPageCache = ConcurrentHashMap<String, PlayerPageCacheEntry>()
-    private const val PLAYER_PAGE_CACHE_TTL_MS = 5 * 60 * 1000L  // 5 分钟
-
     // 视频URL正则：匹配 m3u8/mp4 结尾或含 format/type=m3u8 的 URL（忽略大小写）
     private val VIDEO_URL_REGEX =
         Regex("""https?://[^\s"'<>\]\\]+?\.(?:m3u8|mp4)(?:\?[^\s"'<>\]\\]*)?""", RegexOption.IGNORE_CASE)
@@ -601,14 +588,6 @@ object VideoUrlExtractor {
             AppLog.putInfo("extractVideoUrlForEpisode: URL已是视频流, 跳过三层解析直接返回, ${sanitizeUrl(url)}")
             return url
         }
-        // FR-8: play.php 类 URL 预解析缓存检查（5 分钟 TTL，降低首帧延迟方差 7.5 倍）
-        playerPageCache[url]?.let { entry ->
-            if (System.currentTimeMillis() - entry.timestamp < PLAYER_PAGE_CACHE_TTL_MS) {
-                AppLog.putInfo("FR-8 预解析缓存命中, url=${sanitizeUrl(url)}")
-                return entry.videoUrl
-            }
-            playerPageCache.remove(url)
-        }
         // sniff-result-pipeline-fix FR-1: 移除外层 withTimeoutOrNull(12000L) 抢占
         // 根因：外层 12s 超时是抢占式取消，会取消整个协程树，包括内层 R5 的 suspendCancellableCoroutine
         // 铁证：R5 命中(17:56:45.907) → 15ms 后外层超时(17:56:45.922) → 返回 null → WebView 降级
@@ -637,7 +616,6 @@ object VideoUrlExtractor {
                 val m3u8Url = extractPlayerAaaaUrl(playPageHtml)
                 if (!m3u8Url.isNullOrBlank()) {
                     AppLog.put("extractVideoUrlForEpisode: 第一层MacCMS解析成功, m3u8UrlLen=${m3u8Url.length}")
-                    playerPageCache[url] = PlayerPageCacheEntry(m3u8Url, System.currentTimeMillis())
                     return m3u8Url
                 }
                 // 第二层 DOM 解析（复用第一层 HTML，避免重复请求）
@@ -645,7 +623,6 @@ object VideoUrlExtractor {
                     val domUrls = extract(playPageHtml, resolvedUrl)
                     if (domUrls.isNotEmpty()) {
                         AppLog.put("extractVideoUrlForEpisode: 第二层DOM解析成功, urlCount=${domUrls.size}")
-                        playerPageCache[url] = PlayerPageCacheEntry(domUrls[0], System.currentTimeMillis())
                         return domUrls[0]
                     }
                 }
@@ -661,7 +638,6 @@ object VideoUrlExtractor {
             val webViewUrl = extractWithWebView(url, source, delayTime = R5_DELAY_TIME, timeout = R5_TIMEOUT)
             if (!webViewUrl.isNullOrBlank() && webViewUrl != url) {
                 AppLog.put("extractVideoUrlForEpisode: 第三层网络抓包成功, urlLen=${webViewUrl.length}")
-                playerPageCache[url] = PlayerPageCacheEntry(webViewUrl, System.currentTimeMillis())
                 webViewUrl
             } else {
                 // T2.9: 第三层失败返回 null（解决 Bug-16：不返回非视频流URL给 ExoPlayer）

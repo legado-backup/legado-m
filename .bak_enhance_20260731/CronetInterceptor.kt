@@ -87,17 +87,6 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
         @Volatile private var lastFailedHostHintTimeMs = 0L
         private const val HINT_TIMEOUT_MS = 5 * 60 * 1000L  // 5 分钟超时
 
-        // FR-6: 探测跳过日志采样计数器（每 10 次输出 1 次汇总，减少日志噪声）
-        // 根因：152 次"探测跳过非失败 host"日志噪声，全部是相同 host 的重复跳过
-        private val probeSkipCount = java.util.concurrent.atomic.AtomicInteger(0)
-        private const val PROBE_SKIP_LOG_INTERVAL = 10  // 每 10 次输出 1 次
-
-        // FR-7: 证书错误记忆缓存（5 分钟内同 host 不重复 Cronet 尝试，直接走 OkHttp）
-        // 根因：证书错误降级后无缓存，每次请求都先走 Cronet 失败再降级，浪费往返
-        // 方案：证书错误时缓存 host + 过期时间戳（5 分钟），命中直接走 OkHttp
-        private val certErrorCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
-        private const val CERT_ERROR_CACHE_TTL_MS = 5 * 60 * 1000L  // 5 分钟
-
         /**
          * V3-FR-2: 证书错误判定（前缀匹配，覆盖20+错误码）
          *
@@ -197,24 +186,11 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             val hint = lastFailedHostHint
             if (hint != null && requestHost != hint) {
                 // 当前请求不是失败 host，跳过探测走 OkHttp，等待失败 host 的请求到来
-                // FR-6: 采样输出（每 10 次输出 1 次），减少日志噪声
-                val skipCount = probeSkipCount.incrementAndGet()
-                if (skipCount % PROBE_SKIP_LOG_INTERVAL == 0) {
-                    AppLog.putDebug("Cronet 探测跳过非失败host (采样 1/$PROBE_SKIP_LOG_INTERVAL, 累计 $skipCount 次): requestHost=${requestHost.take(3)}***, hintHost=${hint.take(3)}***")
-                }
+                AppLog.putDebug("Cronet 探测跳过非失败host: requestHost=${requestHost.take(3)}***, hintHost=${hint.take(3)}***")
                 return chain.proceed(original)
             }
             isRecoveryProbe = true
             AppLog.put("Cronet 降级满 ${currentIntervalMs / 60000} 分钟, 放行失败host请求探测恢复")
-        }
-        // FR-7: 证书错误记忆缓存检查（5 分钟内同 host 不重复 Cronet 尝试，直接走 OkHttp）
-        // W5 整改：检查位置在 degradedForSession 检查之后、Cronet 执行之前
-        val requestHostForCert = original.url.host
-        certErrorCache[requestHostForCert]?.let { expiry ->
-            if (System.currentTimeMillis() < expiry) {
-                return chain.proceed(original)
-            }
-            certErrorCache.remove(requestHostForCert)  // 过期清除
         }
         //Cronet未初始化（try-catch 防御 lazy 初始化异常逃逸）
         //铁证：真机日志显示 cronetEngine lazy 初始化抛出 RuntimeException 后直接逃逸到 intercept，
@@ -304,8 +280,6 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             // OkHttp 的 okHttpClient 已配置 SSLHelper.unsafeSSLSocketFactory + unsafeTrustManager + unsafeHostnameVerifier
             if (isCertificateError(errMsg)) {
                 logCertError(errMsg)
-                // FR-7: 写入证书错误记忆缓存（5 分钟内同 host 不重复 Cronet 尝试）
-                certErrorCache[original.url.host] = System.currentTimeMillis() + CERT_ERROR_CACHE_TTL_MS
                 try {
                     return chain.proceed(original)
                 } catch (e2: Exception) {

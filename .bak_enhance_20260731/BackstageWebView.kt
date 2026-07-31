@@ -472,14 +472,9 @@ class BackstageWebView(
                         AppLog.putInfo("R5网络抓包: window.__videoUrls__ 为空, 等待 shouldInterceptRequest 或超时")
                         return@evaluateJavascript
                     }
-                    // FR-9: 先用 GSON 解析（源码原有方式），失败时正则提取容错
                     val urls = GSON.fromJsonArray<String>(result).getOrNull()
-                        ?: run {
-                            AppLog.putWarn("R5网络抓包: GSON 解析 window.__videoUrls__ 失败, 尝试正则提取")
-                            extractUrlsByRegex(result)
-                        }
-                    if (urls.isNullOrEmpty()) {
-                        AppLog.putWarn("R5网络抓包: window.__videoUrls__ 解析失败（GSON + 正则均失败）")
+                    if (urls == null) {
+                        AppLog.putWarn("R5网络抓包: 解析 window.__videoUrls__ 失败")
                         return@evaluateJavascript
                     }
                     for (url in urls) {
@@ -496,14 +491,6 @@ class BackstageWebView(
             }
         }
 
-        // FR-9（I2 整改）: 正则提取容错，覆盖 m3u8/mp4/mkv/flv/mp3/m4a/aac/mpd（与 VIDEO_SOURCE_REGEX 对齐）
-        private fun extractUrlsByRegex(jsonStr: String): List<String> {
-            val urlRegex = Regex(
-                """https?://[^\s"'<>]+\.(?:m3u8|mp4|mkv|flv|mp3|m4a|aac|mpd)(?:\?[^\s"'<>]*)?""",
-                RegexOption.IGNORE_CASE
-            )
-            return urlRegex.findAll(jsonStr).map { it.value }.toList()
-        }
     }
 
     companion object {

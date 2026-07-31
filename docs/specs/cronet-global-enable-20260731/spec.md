@@ -13,11 +13,11 @@
 当前 Cronet 使用存在三个核心问题：
 1. **默认未启用**：`isCronet` 默认值为 `false`，用户需手动开启，多数用户未享受到 Cronet 的反爬与弱网收益
 2. **使用范围受限**：仅 OkHttp 拦截器/ExoPlayer/DohDns/AnalyzeUrl 接入，HttpURLConnection/Glide/文件上传下载仍走旧栈
-3. **桥接方式可优化**：当前采用 `CronetInterceptor` 拦截器模式，相较于 Google 官方 `CronetTransportForOkHttp` 桥接层，无法让上层 OkHttp 代码无感获得完整 Cronet 传输能力
+3. **桥接方式可优化**：当前采用 `CronetInterceptor` 拦截器模式（源码核实：已用 cronetEngine 执行请求获得完整 Cronet 能力），`CronetTransportForOkHttp` 桥接层可作为可选优化提升 OkHttp 调度与 Cronet 集成度（非必须迁移）
 
 本规格说明的目标（新方向）：
 - 将 `isCronet` 默认值改为 `true`，Cronet 作为初始化自动启用模式
-- 评估引入 `CronetTransportForOkHttp` 桥接层替代当前 `CronetInterceptor` 拦截器模式
+- 评估 `CronetTransportForOkHttp` 桥接层作为可选优化（源码核实：CronetInterceptor 已用 cronetEngine 执行请求，已获得完整 Cronet 能力，桥接层非必须迁移）
 - 扩展 Cronet 使用范围至 HttpURLConnection / Glide / 文件上传下载
 - 完善降级链（Cronet → fallback → OkHttp），保障稳定性
 - 从性能、稳定性、反爬、体积、风险等多方面进行全面评估
@@ -29,7 +29,7 @@
 | # | 范围 | 说明 |
 |---|------|------|
 | 1 | `isCronet` 默认值改为 `true` | Cronet 作为初始化自动启用模式，保留开关用于紧急关闭 |
-| 2 | 评估 `CronetTransportForOkHttp` 桥接层 | 替代当前 `CronetInterceptor` 拦截器模式，让 OkHttp 代码无感获得完整 Cronet 传输能力 |
+| 2 | 评估 `CronetTransportForOkHttp` 桥接层 | 作为可选优化提升 OkHttp 调度与 Cronet 集成度（CronetInterceptor 已获得完整 Cronet 能力，桥接层非必须迁移） |
 | 3 | 扩展 HttpURLConnection 接入 Cronet | 通过 `okhttp-urlconnection` 适配，底层走 Cronet 桥接 |
 | 4 | 扩展 Glide 图片加载接入 Cronet | 通过 `OkHttpUrlLoader` + Cronet 桥接注入 Glide |
 | 5 | 扩展文件上传/下载接入 Cronet | 使用 Cronet `UploadDataProvider` 与流式 `onReadCompleted` |
@@ -53,7 +53,7 @@
 
 **方案要点**:
 1. `isCronet` 默认值改为 `true`，App 启动后台预初始化 Cronet 引擎
-2. 评估 `CronetTransportForOkHttp` 桥接层替代 `CronetInterceptor` 拦截器模式（现有 OkHttp 代码零改动）
+2. 评估 `CronetTransportForOkHttp` 桥接层作为可选优化（CronetInterceptor 已获得完整 Cronet 能力，桥接层非必须迁移，主要提升 OkHttp 调度与 Cronet 集成度）
 3. 完善降级链：Cronet（动态 SO）→ cronet-fallback → OkHttp，含 JNI 崩溃监控与自动降级
 4. 渐进扩展使用范围：P0 核心网络请求（已接入）→ P1 HttpURLConnection → P2 Glide → P3 文件上传下载
 5. 性能监控：Cronet vs OkHttp 连接成功率/延迟/TLS 握手耗时对比
@@ -70,7 +70,7 @@
 
 | 方案 | 描述 | 优点 | 缺点 | 决策 |
 |------|------|------|------|------|
-| **替代方案1** | 保持当前 `CronetInterceptor` 拦截器模式不改动 | 零架构改动，风险最低 | 1. 拦截器模式仅拦截请求阶段，无法获得 Cronet 完整传输能力（如 QUIC 连接迁移、原生 HTTP/3）<br>2. 默认值仍为 false，多数用户未享受反爬收益<br>3. 扩展范围受限 | 否决（作为过渡保留） |
+| **替代方案1** | 保持当前 `CronetInterceptor` 拦截器模式不改动 | 零架构改动，风险最低 | 1. 默认值仍为 false，多数用户未享受反爬收益<br>2. 扩展范围受限（HttpURLConnection/Glide/文件上传下载仍走旧栈）<br>3. 不评估桥接层集成度优化 | 否决（作为过渡保留） |
 | **替代方案2** | 完全全局替换为 Cronet API，废弃 OkHttp | 架构统一，性能最大化 | 1. Cronet 不支持 WebSocket，需保留 OkHttp<br>2. 现有 OkHttp 生态代码量大，重写成本高<br>3. JNI 崩溃无降级通道<br>4. ProGuard 风险全量暴露 | 否决 |
 | **替代方案3** | 引入 play-services-cronet（零体积方案） | APK 几乎零增量，平台自动更新 | 1. 国内设备普遍无 Google Play 服务，不可用<br>2. 依赖 GMS 初始化异步回调，复杂度高<br>3. 版本不可控 | 否决（国内场景不可用） |
 | **选定方案** | 默认启用 + 桥接层评估 + 分层降级 + 渐进扩展 | 反爬/弱网收益最大化，代码零改动，降级可控 | APK 体积增加/ProGuard 复杂性/JNI 风险 | **采纳** |
@@ -105,15 +105,15 @@
 **验收标准**:
 - 首次安装 App，`isCronet` 默认为 `true`，Cronet 自动初始化
 - 用户可在设置中手动关闭开关，关闭后回退到纯 OkHttp
-- 开关状态变更后无需重启应用即可生效
+- 开关状态变更后需重启应用生效（okHttpClient 是 lazy 单例，见 HttpHelper.kt L75 `by lazy`，开关变更不会触发重建）
 - 已存在用户的 `isCronet` 偏好值不被覆盖（尊重用户既有选择）
 
-### REQ-02: 评估 CronetTransportForOkHttp 桥接层替代 CronetInterceptor
-**优先级**: P0
-**描述**: 评估引入 Google 官方 `CronetTransportForOkHttp` 桥接层，替代当前 `CronetInterceptor` 拦截器模式，使 OkHttp 通过 `callFactory(CronetTransport.newFactory(cronetEngine))` 无感获得完整 Cronet 传输能力。
+### REQ-02: 评估 CronetTransportForOkHttp 桥接层作为可选优化
+**优先级**: P1（降级，源码核实 CronetInterceptor 已获得完整 Cronet 能力）
+**描述**: 评估 Google 官方 `CronetTransportForOkHttp` 桥接层作为可选优化（非必须迁移）。源码核实确认 CronetInterceptor 已通过 `proceedWithCronet` → `cronetEngine.newUrlRequestBuilder` 用 Cronet 引擎执行请求，已获得 BoringSSL TLS 指纹 + QUIC + 连接迁移等完整 Cronet 能力。桥接层的主要价值在于让 OkHttp 调度/重试/连接池与 Cronet 深度集成。
 
 **验收标准**:
-- 完成 `CronetInterceptor` vs `CronetTransportForOkHttp` 架构对比评估（拦截器仅拦截请求阶段 vs 桥接替换整个传输层）
+- 完成 `CronetInterceptor` vs `CronetTransportForOkHttp` 架构对比评估（两者均获得完整 Cronet 能力，桥接层集成度更高）
 - 评估桥接层与现有拦截器链（RedirectCacheInterceptor 等）的兼容性
 - 评估桥接层对 QUIC 连接迁移/原生 HTTP/3/0-RTT 的支持度
 - 给出迁移建议（全量替换 / 渐进迁移 / 保留拦截器）

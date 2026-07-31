@@ -100,9 +100,8 @@ object DohDns : Dns {
     /** N-P1-2: 单服务器硬超时 2s（blocking 调用无法被协程取消中断，只能靠 OkHttp 客户端超时兜底） */
     private const val SERVER_TIMEOUT_SEC = 2L
 
-    /** FR-2: 负缓存 10s——DoH 失败的域名 10s 内不再重复尝试 DoH，避免每个连接都白费 DoH 往返
-     * 从 30s 降至 10s：30s 过长导致临时网络抖动后 DoH 恢复仍被负缓存拦截 */
-    private const val NEGATIVE_CACHE_TTL_MS = 10_000L
+    /** N-P1-2: 负缓存 30s——DoH 失败的域名 30s 内不再重复尝试 DoH，避免每个连接都白费 DoH 往返 */
+    private const val NEGATIVE_CACHE_TTL_MS = 30_000L
 
     /** DNS 解析成功结果缓存（键含记录类型段，见 cacheKey） */
     private val dnsCache = ConcurrentHashMap<String, CacheEntry>()
@@ -251,15 +250,7 @@ object DohDns : Dns {
     /**
      * V-004-P0-1: 异步预热 DoH（冷启动熔断 30s 后尝试探测恢复）
      *
-     * E7 整改: 探测域名从 cloudflare-dns.com 改为 www.baidu.com
-     * 原因：cloudflare-dns.com 是国外域名，国内 DoH 服务器（阿里+腾讯）可能不收录，
-     *   导致探测失败误判 DoH 不可用；www.baidu.com 是国内域名，DoH 服务器必然收录
-     *
-     * 职责分工（与 preheatDohServers 互补）：
-     * - preheatDohServers: App 启动时主动探测 DoH 服务器延迟，选择更优为主（启动预热）
-     * - asyncPreheatDoh: 冷启动 DoH 失败后 30s 异步探测恢复（失败恢复）
-     *
-     * - 30s 后用独立协程尝试 DoH 解析常见国内域名（www.baidu.com）
+     * - 30s 后用独立协程尝试 DoH 解析常见域名（cloudflare-dns.com）
      * - 探测成功：清除熔断状态（dohDisabledUntil=0），下次 lookup 重新尝试 DoH
      * - 探测失败：保持熔断态，等待常规 5min 熔断逻辑接管或下次 lookup 触发
      *
@@ -268,8 +259,7 @@ object DohDns : Dns {
     private fun asyncPreheatDoh() {
         preheatScope.launch {
             kotlinx.coroutines.delay(COLD_START_DISABLE_MS)
-            // E7 整改: 探测域名从 cloudflare-dns.com 改为 www.baidu.com（国内域名，DoH 必然收录）
-            val probeHost = "www.baidu.com"
+            val probeHost = "cloudflare-dns.com"
             val clients = kotlin.runCatching { dohClients }.getOrElse {
                 AppLog.put("DohDns: asyncPreheat dohClients init failed, error=${it.javaClass.simpleName}")
                 return@launch
@@ -281,40 +271,6 @@ object DohDns : Dns {
                 AppLog.put("DohDns: asyncPreheat success, DoH recovered, server#${result.serverIndex + 1}")
             } else {
                 AppLog.put("DohDns: asyncPreheat failed, DoH still unreachable, keep disabled")
-            }
-        }
-    }
-
-    /**
-     * FR-2: 启动时预热 DoH 服务器（探测延迟 + 选择更优为主）
-     *
-     * 触发时机：App.onCreate IO 协程块调用（参考 preInitCronetEngine 调用方式）
-     * 作用：
-     * - 探测 2 个 DoH 服务器（阿里+腾讯）解析 www.baidu.com 的延迟
-     * - 选择延迟更低的服务器作为 lastSuccessServer（后续 lookup 优先使用）
-     * - 提前初始化 dohClients（lazy 触发），避免首次 lookup 时才初始化
-     *
-     * 职责分工（与 asyncPreheatDoh 互补）：
-     * - preheatDohServers: App 启动时主动探测（启动预热）
-     * - asyncPreheatDoh: 冷启动 DoH 失败后 30s 异步探测恢复（失败恢复）
-     *
-     * 已知上限：探测失败不影响正常逻辑，lastSuccessServer 保持默认值 0
-     * 升级路径：如需更精细健康检查可引入定期探测机制
-     */
-    fun preheatDohServers() {
-        preheatScope.launch {
-            val probeHost = "www.baidu.com"
-            val clients = kotlin.runCatching { dohClients }.getOrElse {
-                AppLog.put("DohDns: preheatDohServers dohClients init failed, error=${it.javaClass.simpleName}")
-                return@launch
-            }
-            val startMs = System.currentTimeMillis()
-            val result = parallelLookup(clients, probeHost)
-            if (result != null) {
-                lastSuccessServer.set(result.serverIndex)
-                AppLog.put("DohDns: preheatDohServers success, server#${result.serverIndex + 1}, elapsed=${result.elapsedMs}ms")
-            } else {
-                AppLog.put("DohDns: preheatDohServers failed, keep default server#1")
             }
         }
     }

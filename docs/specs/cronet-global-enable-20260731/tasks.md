@@ -39,16 +39,16 @@
     - Observation:
     - Adapt:
 
-- [ ] 1.4 评估引入 CronetTransportForOkHttp 桥接层（添加 cronet-okhttp 依赖）
+- [ ] 1.4 评估引入 CronetTransportForOkHttp 桥接层（添加 cronet-okhttp 依赖，P1 可选优化）
   - 依赖：`com.google.net.cronet:cronet-okhttp`
-  - 评估点：与现有 CronetInterceptor 的兼容性、性能差异、代码改动量
+  - 评估点：与现有 CronetInterceptor 的集成度差异、兼容性、代码改动量（源码核实：CronetInterceptor 已通过 proceedWithCronet→cronetEngine.newUrlRequestBuilder 获得完整 Cronet 能力，桥接层为可选优化非必须迁移）
   - AOAdapt:
     - Action:
     - Observation:
     - Adapt:
 
 - [ ] 1.5 完善降级链（Cronet→fallback→OkHttp）
-  - 目标链：Cronet(play-services) → Cronet(embedded) → cronet-fallback → OkHttp
+  - 目标链：Cronet（动态下载 SO）→ cronet-fallback → OkHttp（项目实际用动态下载方案，非 play-services 也非 embedded）
   - 现状：已有连续 5 次协议错误降级 OkHttp 机制
   - 扩展：补充 JNI 崩溃（SIGABRT）自动降级
   - AOAdapt:
@@ -74,9 +74,9 @@
 
 ## 2. 阶段二：核心网络层接入（P1）
 
-- [ ] 2.1 评估 CronetTransportForOkHttp 替代 CronetInterceptor
-  - 评估点：是否用 callFactory=CronetTransport.newFactory(cronetEngine) 替代拦截器模式
-  - 优势：桥接层让 OkHttp 代码零改动获得 Cronet 能力
+- [ ] 2.1 评估 CronetTransportForOkHttp 作为可选优化（P1，非必须迁移）
+  - 评估点：是否用 callFactory=CronetTransport.newFactory(cronetEngine) 提升集成度（源码核实：CronetInterceptor 已通过 cronetEngine.newUrlRequestBuilder 获得完整 Cronet 能力，桥接层主要提升 OkHttp 调度/连接池与 Cronet 的集成度）
+  - 优势：桥接层提升 OkHttp 调度与 Cronet 集成度（CronetInterceptor 已获得完整 Cronet 能力，桥接层非必须迁移）
   - AOAdapt:
     - Action:
     - Observation:
@@ -244,5 +244,5 @@
 | JNI 崩溃（SIGABRT） | 高 | 阶段一/二 | 降级机制 + 崩溃监控 + 自动回退 OkHttp |
 | ProGuard 规则缺失 | 高 | 阶段一/二 | 完整 keep 规则 + release 包真机测试 |
 | 循环依赖（SO 下载） | 中 | 阶段二 | CronetLoader.kt 的 SO 下载保留 HttpURLConnection |
-| APK 体积增加 | 中 | 阶段一 | 评估 embedded(+5-8MB) vs play-services(0MB) |
+| APK 体积增加 | 低 | 阶段一 | 项目采用动态下载 SO 方案，APK 零增量（SO 运行时下载到 externalCache） |
 | 电池消耗（QUIC 保活） | 低 | 阶段四 | 配置 idle timeout + 监控 |
