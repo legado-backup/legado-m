@@ -2,7 +2,7 @@
 
 > **创建时间**：2026-07-27
 > **依据**：[design.md](./design.md) 修复方案 + [spec.md](./spec.md) 验收标准
-> **状态**：待实施
+> **状态**：代码实施完成（核心修复已实施），待真机验收
 > **说明**：所有行号为 2026-07-27 源码核验确认的当前行号；实施时若遇偏移以方法名/锚点描述为准
 
 ---
@@ -11,8 +11,8 @@
 
 > 同时解决 R-P1-1（字体覆盖主根因）与 R-P1-2a（预设启用无效）。改动最小、收益最大。
 
-- [ ] T-A1 `createDefaultRules()` 12 条内置规则全部补 `isRegex = true`（HighlightRuleStore.kt:129-256，每条构造函数加一个参数，共 12 处）
-- [ ] T-A2 `normalizeRules()` 刷新判定增加 isRegex 愈合条件：`builtin != null && !safeRule.isRegex && safeRule.pattern == builtin.pattern` → 走 `builtin.copy(...)` 刷新通道（HighlightRuleStore.kt:266-267；刷新通道本体 268-280 行沿用不动）
+- [x] T-A1 `createDefaultRules()` 12 条内置规则全部补 `isRegex = true`（HighlightRuleStore.kt:129-256，每条构造函数加一个参数，共 12 处）
+- [x] T-A2 `normalizeRules()` 刷新判定增加 isRegex 愈合条件：`builtin != null && !safeRule.isRegex && safeRule.pattern == builtin.pattern` → 走 `builtin.copy(...)` 刷新通道（HighlightRuleStore.kt:266-267；刷新通道本体 268-280 行沿用不动）
 - [ ] T-A3 JVM 仿真器验证：12 条内置 pattern 以 `isRegex=true` 对各自 `sampleText` 至少 1 次命中；同批 pattern 以 `isRegex=false` 0 命中（回归对照）（HighlightRuleMatcher.kt:22-63 纯函数；规则样本 HighlightRuleStore.kt:131-255）
 - [ ] T-A4 merge 叠加断言：fontPath 样式与 textColor 样式经 `HighlightStyle.merge()` 后两通道同时非默认（HighlightStyle.kt:38-51）
 - [ ] T-A5 编译验证（assembleDebug 通过，无警告新增）
@@ -21,11 +21,11 @@
 
 > 解决 R-P1-2b（无初始化）与 R-P1-2c（预设添加静默丢弃 + 即时性）。
 
-- [ ] T-B1 `load()` 空值播种：`stored.isNullOrBlank()` 分支改为 `return reset(context)`（HighlightRuleStore.kt:44-47；reset 本体 78-83 行不动）
+- [x] T-B1 `load()` 空值播种：`stored.isNullOrBlank()` 分支改为 `return reset(context)`（HighlightRuleStore.kt:44-47；reset 本体 78-83 行不动）
 - [ ] T-B2 播种语义自检验证：`"[]"` 不重复播种（用户清空全部规则后重启列表保持为空）
-- [ ] T-B3 `HighlightRuleViewModel.update()` 升级 upsert：`if (idx >= 0) list[idx] = rule else list.add(rule)`（HighlightRuleViewModel.kt:38-39；对齐 HighlightRuleEditDialog.kt:229-236 先例）
-- [ ] T-B4 预设添加保留内置 id：去掉 `id = System.currentTimeMillis().toString()` 覆盖（HighlightPresetRuleDialog.kt:83-86），重复添加走 upsert 刷新防副本堆积
-- [ ] T-B5 即时生效：`update()` 写库成功后调 `ReadBook.upHighlightRules()`（HighlightRuleViewModel.kt:41-44 onSuccess 链路；对标 HighlightRuleEditDialog.kt:238 既有模式；HighlightRuleActivity.kt:139-142 onDestroy 调用保留）
+- [x] T-B3 `HighlightRuleViewModel.update()` 升级 upsert：`if (idx >= 0) list[idx] = rule else list.add(rule)`（HighlightRuleViewModel.kt:38-39；对齐 HighlightRuleEditDialog.kt:229-236 先例）
+- [x] T-B4 预设添加保留内置 id：去掉 `id = System.currentTimeMillis().toString()` 覆盖（HighlightPresetRuleDialog.kt:83-86），重复添加走 upsert 刷新防副本堆积
+- [x] T-B5 即时生效：`update()` 写库成功后调 `ReadBook.upHighlightRules()`（HighlightRuleViewModel.kt:41-44 onSuccess 链路；对标 HighlightRuleEditDialog.kt:238 既有模式；HighlightRuleActivity.kt:139-142 onDestroy 调用保留）
 - [ ] T-B6 Grep 复核 `update(` 全部调用方，确认 upsert 语义扩散无负面影响（HighlightRuleActivity.kt:144、HighlightRuleAdapter.kt:80-87 勾选链路）
 - [ ] T-B7 编译验证（assembleDebug 通过）
 
@@ -33,7 +33,7 @@
 
 > 解决 R-P1-1c（附带缺陷）；R-P1-1b 为可选增强。
 
-- [ ] T-C1 `fastDrawTextLine()` 逐列循环补画 fill 矩形（TextLine.kt:223-228 循环内，逻辑同 TextColumn.kt:74-77，`view.highlightPaint(fill)`）
+- [x] T-C1 `fastDrawTextLine()` 逐列循环补画 fill 矩形（TextLine.kt:223-228 循环内，逻辑同 TextColumn.kt:74-77，`view.highlightPaint(fill)`）
 - [ ] T-C2 （可选）字体规则去色 UX 提示：`bindFontRow()` 字体行增加"字体规则建议清除字色，避免覆盖其他颜色规则"提示（HighlightStyleDialog.kt:203-211）
 - [ ] T-C3 编译验证（assembleDebug 通过）
 

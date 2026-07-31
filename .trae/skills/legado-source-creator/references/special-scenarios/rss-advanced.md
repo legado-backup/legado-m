@@ -393,3 +393,128 @@ if (eps.length == 0) {
 ```
 
 > **type=2 内置播放器优势**：原生 ExoPlayer 播放（无需 WebView）、上下滑动切换文章、3秒自动隐藏控件、JSON数组即多集、ruleRoutes/ruleEpisodes即多线路多集、ruleContent为空自动R5抓取。完整指南见 [video-audio.md](video-audio.md) 5.6 节。
+
+## 7.12 聚合站点多子源列表解析陷阱（7源实战总结）
+
+> **核心场景**：聚合站点有多个子源，每个子源使用不同HTML模板（class名不同），但使用同一套源规则。`ruleArticles`必须用通用选择器或`@js`动态判断，否则部分子源列表解析失败。
+
+### 陷阱62: 多HTML模板适配（4种class名通用选择器）
+
+**现象**：聚合站点7个子源使用4种不同HTML模板，卡片class名各不相同：
+- 模板DR001: `.video-card`
+- 模板DR002: `.dr-card`
+- 模板DR003: `.ws-card`
+- 模板DR004: `.pp-card`
+- 模板DR011: `.thumbnail.block`
+
+`ruleArticles`只写一个class选择器（如`.video-card`），只能匹配1/7子源，其他6个子源分类列表为空。
+
+**根因**：聚合站点每个子源由不同开发者编写，HTML模板各自独立，但通过同一域名提供内容。订阅源JSON中所有子源共享同一份规则，无法按子源区分。
+
+**解决方案**：使用CSS多选择器（逗号分隔），列出所有可能的class名：
+```json
+{
+  "ruleArticles": ".video-card, .dr-card, .ws-card, .pp-card, .thumbnail.block"
+}
+```
+
+**通用范式**：
+- 分析聚合站点时，必须用Playwright打开每个子源，提取卡片class名
+- 同一规则文件需覆盖所有子源的class名
+- 如无法穷举class名，改用`@js:`规则按结构特征匹配（见陷阱64）
+
+**铁证**：7源v2版`ruleArticles`只写`.video-card`，7源中只有1个源列表加载成功；改为通用选择器后7/7源列表加载成功。
+
+### 陷阱63: 卡片本身是`<a>`标签（card.attr('href')非card.find('a')）
+
+**现象**：`ruleLink`用CSS选择器`a`或JS `card.find('a')`获取详情页链接，返回空字符串。但浏览器开发者工具明显能看到卡片中包含链接。
+
+**根因**：部分HTML模板的卡片元素本身就是`<a>`标签（`<a class="video-card">...</a>`），而非包含`<a>`子元素。`card.find('a')`在JSoup中查找子元素，找不到任何匹配。
+
+**解决方案**：判断卡片本身是否为`<a>`标签，若是直接用`card.attr('href')`：
+```javascript
+// ✅ 安全写法：先查子元素a，找不到则取卡片本身href
+@js:var link=card.select('a').first();var href=link?link.attr('href'):card.attr('href');href;
+```
+
+```json
+// 或用CSS选择器：a本身或a后代
+{
+  "ruleLink": "a@href||@href"
+}
+```
+
+**JS中安全提取链接模板**：
+```javascript
+// ruleArticles的@js中提取链接
+var cards=d.select('.video-card, .dr-card');
+var list=[];
+for(var i=0;i<cards.size();i++){
+    var card=cards.get(i);
+    // 关键：先查子元素a，找不到则卡片本身是a标签
+    var linkEl=card.select('a').first();
+    var href=linkEl?linkEl.attr('href'):card.attr('href');
+    var titleEl=card.select('.video-title, .title').first();
+    var title=titleEl?titleEl.text():'';
+    var imgEl=card.select('.thumb-img img, img').first();
+    var img=imgEl?imgEl.attr('src'):'';
+    list.push(JSON.stringify({title:title,link:href,image:img}));
+}
+list;
+```
+
+**铁证**：7源v2版`ruleLink`用`card.find('a')`在模板DR003（卡片本身是`<a>`）上返回空字符串，改为"先查子元素再取卡片本身"后所有模板链接正常。
+
+### 陷阱64: JSON vs HTML动态判断ruleArticles（@js动态分支）
+
+**现象**：分类页请求返回JSON格式（`{"list":[...]}`），但`ruleArticles`用CSS选择器`.video-card`导致解析失败，列表为空。或反之，搜索页返回HTML，但`ruleArticles`用JSONPath`$.list`导致解析失败。
+
+**根因**：聚合站点不同子源的分类/搜索接口返回内容格式不一致：
+- 部分子源分类页返回HTML（传统渲染）
+- 部分子源分类页返回JSON（AJAX接口直接暴露）
+- 搜索接口通常统一返回JSON（`searchall_async` API）
+
+单一格式规则（CSS或JSONPath）无法覆盖所有场景。
+
+**解决方案**：`ruleArticles`用`@js:`规则动态判断内容格式：
+```javascript
+@js:var c=result;
+try{
+    // 先尝试JSON解析
+    var j=JSON.parse(c);
+    if(j&&j.list){
+        // JSON格式：返回数组元素（每个元素是JSON字符串，供子规则解析）
+        return j.list.map(function(item){return JSON.stringify(item);});
+    }
+}catch(e){}
+// HTML回退：用Jsoup解析
+var d=org.jsoup.Jsoup.parse(c);
+var cards=d.select('.video-card, .dr-card, .ws-card, .pp-card, .thumbnail.block');
+var list=[];
+for(var i=0;i<cards.size();i++){
+    var card=cards.get(i);
+    var linkEl=card.select('a').first();
+    var href=linkEl?linkEl.attr('href'):card.attr('href');  // 配合陷阱63
+    var titleEl=card.select('.video-title, .title').first();
+    var title=titleEl?titleEl.text():'';
+    var imgEl=card.select('.thumb-img img, img').first();
+    var img=imgEl?imgEl.attr('src'):'';
+    list.push(JSON.stringify({title:title,link:href,image:img}));
+}
+list;
+```
+
+**子规则适配**：JSONPath和CSS子规则都不能直接用，必须用`@js:`从JSON字符串解析或从Element提取：
+```json
+{
+  "ruleTitle": "@js:var j=JSON.parse(result);j.title||'';",
+  "ruleImage": "@js:var j=JSON.parse(result);j.img||'';",
+  "ruleLink": "@js:var j=JSON.parse(result);j.link||'';"
+}
+```
+
+**关键陷阱**：`ruleArticles`返回的列表元素必须是字符串（JSON.stringify或HTML片段），不能是Java对象。子规则中用`JSON.parse(result)`解析。
+
+**铁证**：7源v2版`ruleArticles`只写`$.list`，5个HTML模板子源列表为空；改为`@js:`动态分支后7/7源列表加载成功（JSON子源返回JSON字符串数组，HTML子源用Jsoup提取后转为JSON字符串）。
+
+**经验来源**：`[经验来源:聚合站点多子源列表解析范式]`

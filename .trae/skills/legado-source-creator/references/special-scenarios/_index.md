@@ -100,10 +100,10 @@
 
 ## search-advanced.md — 搜索高级技巧
 
-- **一句话描述**：搜索规则高级写法，涵盖 Cookie 清理、重定向处理、繁体编码、动态搜索地址、分页 URL、多列表处理
-- ✅ 包含：cookie.removeCookie() 清理超时、java.post().header("Location") 重定向、java.s2t(key) 繁体转换、动态搜索地址获取、分页 URL 三种写法、多搜索列表 XPath/CSS 过滤
+- **一句话描述**：搜索规则高级写法，涵盖 Cookie 清理、重定向处理、繁体编码、动态搜索地址、分页 URL、多列表处理、AJAX动态加载改用JSON API
+- ✅ 包含：cookie.removeCookie() 清理超时、java.post().header("Location") 重定向、java.s2t(key) 繁体转换、动态搜索地址获取、分页 URL 三种写法、多搜索列表 XPath/CSS 过滤、**AJAX动态加载页面改用JSON API（Playwright Performance API诊断 + JSONPath解析）**
 - ❌ 不包含：搜索基础规则 → [../booksource-schema.md](../booksource-schema.md)；编码完整指南 → [encoding-guide.md](./encoding-guide.md)；反爬处理 → [anti-crawl.md](./anti-crawl.md)
-- **触发关键词**：搜索高级、Cookie清理、搜索超时、搜索重定向、繁体搜索、分页URL、多搜索列表、搜索地址动态获取
+- **触发关键词**：搜索高级、Cookie清理、搜索超时、搜索重定向、繁体搜索、分页URL、多搜索列表、搜索地址动态获取、AJAX动态加载、JSON API、Performance API、JSONPath、数据API
 
 ---
 

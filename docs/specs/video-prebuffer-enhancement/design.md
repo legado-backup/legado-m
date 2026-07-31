@@ -1,9 +1,10 @@
 # design.md - 视频播放器分段预缓冲机制深度分析与优化
 
-> **状态**：🔄 设计中（R3 修订版）
+> **状态**：🚧 P0 已实施完成（2026-07-28），P1/P2 待实施（R3 修订版）
 > **创建日期**：2026-07-28
 > **R2 修订日期**：2026-07-28
 > **R3 修订日期**：2026-07-28
+> **P0 实施完成日期**：2026-07-28
 
 ---
 
@@ -876,6 +877,66 @@ fun preloadUrl(url: String) {
 - **Goal**: release 包可观测 WARN/ERROR 级别日志，用于生产环境问题定位
 - **Tradeoff**: release 包日志文件略增大（仅 WARN/ERROR），但避免日志膨胀（INFO/DEBUG 仍被拦截）
 - **Status**: Proposed（R3 新增）
+
+### AD-17: P0 实施结果总结（2026-07-28 实施完成）
+
+- **Context**: P0 阶段于 2026-07-28 实施完成，实际实施范围在 R3 设计基础上扩展，除原 P0 项（R1/R2/R3）外，将原 P1 中的 R4（DeviceInfoHelper）、R13（用户可配置参数）、R14（cacheKey 统一）、R17（AppLog 修复）提前到 P0 实施，共完成 7 个文件变更。
+- **Concern**: P0 实施过程中遇到多个 R3 设计未明确的实施细节决策，需记录关键实施决策以便后续 P1 实施参考。
+- **Decision**: P0 实施时做出以下 5 个关键实施决策（均与 R3 设计一致或有合理调整理由）：
+  1. **CacheDataSink 写入 SimpleCache（替代 CacheUtil.cache()）**：
+     - R3 设计：使用 `CacheUtil.cache()` 写入 SimpleCache
+     - 实施调整：改用 ExoPlayer `DataSource` + `CacheDataSink` 组合写入 SimpleCache
+     - 调整理由：`CacheDataSink` 直接写入 SimpleCache，与播放器 `CacheDataSource` 读取路径完全对称，命中率高；`DataSource` 复用 `createPreloadDataSource` 共享 OkHttp 配置，请求行为与播放器一致
+     - 效果：预加载数据真正写入磁盘缓存（原 bug：OkHttp `readBytes()` 只读取到内存后丢弃，播放时仍需重新下载）
+  2. **移除 WiFi/4G 网络感知区分**：
+     - R3 设计：保留 WiFi/4G 网络感知区分（WiFi 3 个/4G 1 个）
+     - 实施调整：移除 WiFi/4G 区分，统一使用 `getPreloadCount()` 动态计算（HIGH=10/MID=7/用户可配）
+     - 调整理由：用户要求激进策略，WiFi/4G 区分过于保守；用户可手动调低 `videoPreloadCount` 控制流量，无需网络感知自动降级
+     - 附带清理：移除 `VideoPreloader.isWifi()`/`isMobile()` 未使用方法
+  3. **cacheKey 统一为纯 URL（不做 MD5）**：
+     - R3 设计：cacheKey 规则为"规范化 URL + MD5"
+     - 实施调整：cacheKey 为纯 URL（不做任何转换，不做 MD5）
+     - 调整理由：播放器 `resolvingDataSource` 解析后 cacheKey 即为纯 URL，预加载器必须与之一致才能命中；MD5 会导致 cacheKey 不匹配，缓存未命中
+     - 效果：cacheKey 统一为纯 URL，预加载器与播放器 cacheKey 100% 一致
+  4. **检测失败降级到 HIGH（非 MID）**：
+     - R3 设计：检测失败降级到 MID
+     - 实施调整：检测失败降级到 HIGH
+     - 调整理由：用户要求默认中高端机参数，现代设备普遍中高端，检测失败时默认 HIGH 更符合用户预期；用户可通过配置参数手动降级到 MID
+     - DeviceInfoHelper 阈值：HIGH（内存≥6GB + CPU≥8核 + 磁盘≥10GB），MID（内存≥4GB 或 CPU≥8核）
+  5. **createPreloadDataSource 复用 OkHttp 配置**：
+     - R3 设计：未明确预加载器 DataSource 创建方式
+     - 实施调整：ExoPlayerHelper 新增 `createPreloadDataSource` 方法，供预加载器复用 OkHttp 配置
+     - 调整理由：预加载器与播放器必须共享同一 OkHttp DataSource 配置（含 headers/cookies/拦截器），确保请求行为一致，避免预加载请求被服务端拒绝（如 403）
+- **Goal**: P0 阶段完成预加载 BUG 修复 + 设备档位检测 + 用户可配置参数 + cacheKey 统一 + AppLog 修复 + HLS 依赖修复，为 P1 激进策略提供基础
+- **Tradeoff**:
+  - P0 实施范围扩展（含原 P1 的 4 项），P0 工作量增加，但避免了后续 P1 实施时的重复重构
+  - 移除 WiFi/4G 区分后，4G 网络下预加载数量较多（10 个），可能增加流量消耗，但用户可手动调低 `videoPreloadCount` 控制
+  - cacheKey 为纯 URL（不做 MD5），URL 较长时 cacheKey 较长，但 SimpleCache 内部已处理，无负面影响
+- **Status**: ✅ Implemented（2026-07-28）
+
+#### AD-17.1 P0 实施文件清单
+
+| # | 文件 | 变更类型 | 关键改动点 |
+|---|------|---------|-----------|
+| 1 | `DeviceInfoHelper.kt` | 新增 | 设备档位检测 HIGH/MID 两档（默认 HIGH），检测失败降级到 HIGH |
+| 2 | `AppLog.kt` | 修改 | release 包输出 WARN/INFO 日志（ERROR/WARN/INFO 无条件 Log.e 输出） |
+| 3 | `VideoPlay.kt` | 修改 | 新增 4 个用户可配置参数（videoMaxBufferSec/videoPreloadCount/videoPreloadBytesMB/videoPreloadTriggerProgress） |
+| 4 | `ExoPlayerHelper.kt` | 修改 | cache 容量 50-500MB → 50-2048MB；新增 `createPreloadDataSource` 方法 |
+| 5 | `FirstFramePreloader.kt` | 修改 | 改用 DataSource + CacheDataSink 写入 SimpleCache；PRELOAD_BYTES/MAX_CACHE_SIZE 动态计算；DataSpec 限制读取字节数 |
+| 6 | `VideoPreloader.kt` | 修改 | 改用 DataSource + CacheDataSink 写入 SimpleCache；移除 WiFi/4G 区分；PRELOAD_BYTES/MAX_CACHE_SIZE 动态计算 |
+| 7 | `build.gradle` | 修改 | 取消注释 `media3.exoplayer.hls` 依赖，显式声明 HLS 支持 |
+
+#### AD-17.2 P0 验证状态
+
+| 验证项 | 状态 | 说明 |
+|--------|------|------|
+| 编译通过 | ✅ | BUILD SUCCESSFUL in 4m 32s |
+| APK 安装 | ✅ | 测试包 `io.legado.miss.app.debug`，版本 3.26.072816 |
+| 真机测试 | 🔄 进行中 | 用户正在真机测试中，稍后提供调试日志 |
+| 预加载写入 SimpleCache | ⏳ 待真机验证 | 代码层面已修复，待真机 logcat 验证 cache hit |
+| readBytes 限制 | ⏳ 待真机验证 | 已用 DataSpec 限制，待真机内存监控验证 |
+| cacheKey 命中率 | ⏳ 待真机验证 | cacheKey 统一为纯 URL，待真机验证命中率 |
+| release 包日志 | ⏳ 待真机验证 | AppLog 已修改，待 release 包验证 WARN/ERROR 输出 |
 
 > **R3 修订说明**：AD-11（低端机降级到 V1 保守策略）已移除，因为 R3 移除 LOW 档位，默认参数适配中高端机。
 

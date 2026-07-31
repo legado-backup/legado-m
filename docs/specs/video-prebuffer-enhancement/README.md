@@ -1,9 +1,10 @@
 # 视频播放器分段预缓冲机制深度分析与优化（video-prebuffer-enhancement）
 
-> **状态**：🔄 设计中（R3 修订版——基于 R2 激进版审查反馈，移除低端机保护 + 用户可配置 + 放弃热切换 + 4 个新阻塞点修复）
+> **状态**：🚧 P0 已实施完成（2026-07-28），P1/P2 待实施（R3 修订版——基于 R2 激进版审查反馈，移除低端机保护 + 用户可配置 + 放弃热切换 + 4 个新阻塞点修复）
 > **创建日期**：2026-07-28
 > **R2 修订日期**：2026-07-28
 > **R3 修订日期**：2026-07-28
+> **P0 实施完成日期**：2026-07-28
 > **优先级**：P1（体验增强 + Bug 修复）
 > **核心原则**：源码深度分析 + 业界成熟方案对标 + **激进缓冲策略（默认 HIGH 档位，用户可往下调）** + 最小改动优先修复 BUG，再分层引入优化 + **预加载器与播放器 cacheKey 统一 + 触发时机去重 + 内部播放列表管理**
 
@@ -131,24 +132,25 @@ AppLog 在 release 包中默认不输出日志，导致生产环境无法通过�
 
 本 spec 聚焦多类优化，按优先级分层（R3 修订版）：
 
-| 优先级 | 能力 | 解决问题 |
-|--------|------|---------|
-| **P0** | 修复预加载 BUG（数据未写入 SimpleCache + readBytes 无限制） | 预加载实际无效 → 修复后真正加速 |
-| **P0** | 确认 HLS 依赖实际状态 + 修复 build.gradle 与代码不一致 | 避免依赖被误删导致编译失败 |
-| **P0** | **cacheKey 策略统一**（阻塞点6） | 预加载器与播放器 cacheKey 一致，缓存命中率提升 |
-| **P0** | **AppLog release 包日志修复**（阻塞点10） | 生产环境可输出 WARN/ERROR 日志，便于排查 |
-| **P1** | **设备档位检测**（HIGH/MID 两档，默认 HIGH） | 为激进策略提供设备能力基础，移除低端机保护 |
-| **P1** | **用户可配置参数**（AppConfig/Preferences） | 用户可往下调 maxBuffer/预加载数量/预加载字节/缓存上限 |
-| **P1** | **激进 LoadControl**（好网 maxBuffer 120s，prepare 前设置，不热切换） | 最大化利用好网带宽，降低卡顿概率 |
-| **P1** | **激进预加载**（好网预加载 10 个 + 预加载字节数 10MB） | 确保切下一集时已缓存部分正片 |
-| **P1** | **预加载触发时机+去重**（阻塞点7：默认 10% 触发 + URL 去重） | 提前触发预加载 + 避免重复预加载浪费带宽 |
-| **P1** | **内部播放列表管理**（阻塞点8：VideoPreloader 自动推断下一集） | 自动预加载下一集，无需外部每次传入 URL |
-| **P1** | 启用 HLS 协议级优化（`setAllowChunklessPreparation`） | HLS 首屏耗时降低 30%+ |
-| **P1** | 网络切换运行时感知（NetworkCallback 动态调整预加载策略，**不热切换 LoadControl**） | 网络切换时预加载策略立即生效（LoadControl 下次 prepare 生效） |
-| **P1** | **全格式统一激进策略**（HLS/DASH/MP4/FLV/SS 统一激进缓冲） | 各类型视频都支持快速缓冲加载 |
-| **P2** | 引入 Media3 `DefaultPreloadManager`（官方主推，**远期搁置**） | 替换自研预加载器，获得官方维护红利 |
-| **P2** | 缓存命中率/失败率/首帧命中率埋点 | 为后续调优提供数据支撑 |
-| **P3** | AI 智能预缓冲（LSTM + TFLite，远期方向） | 首帧时间降 33%、卡顿降 50%（业界数据） |
+| 优先级 | 能力 | 解决问题 | 实施状态 |
+|--------|------|---------|---------|
+| **P0** | 修复预加载 BUG（数据未写入 SimpleCache + readBytes 无限制） | 预加载实际无效 → 修复后真正加速 | ✅ 已完成（2026-07-28） |
+| **P0** | 确认 HLS 依赖实际状态 + 修复 build.gradle 与代码不一致 | 避免依赖被误删导致编译失败 | ✅ 已完成（2026-07-28） |
+| **P0** | **cacheKey 策略统一**（阻塞点6） | 预加载器与播放器 cacheKey 一致，缓存命中率提升 | ✅ 已完成（2026-07-28） |
+| **P0** | **AppLog release 包日志修复**（阻塞点10） | 生产环境可输出 WARN/ERROR 日志，便于排查 | ✅ 已完成（2026-07-28） |
+| **P0（提前实施）** | **设备档位检测**（HIGH/MID 两档，默认 HIGH） | 为激进策略提供设备能力基础，移除低端机保护 | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+| **P0（提前实施）** | **用户可配置参数**（AppConfig/Preferences） | 用户可往下调 maxBuffer/预加载数量/预加载字节/缓存上限 | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+| **P0（提前实施）** | **ExoPlayerHelper cache 容量扩展 + createPreloadDataSource** | cache 容量从 50-500MB 扩展到 50-2048MB，支持 HIGH 档位 1GB 缓存 | ✅ 已完成（2026-07-28，原 P1 提前到 P0） |
+| **P1** | **激进 LoadControl**（好网 maxBuffer 120s，prepare 前设置，不热切换） | 最大化利用好网带宽，降低卡顿概率 | ⏳ 待实施 |
+| **P1** | **激进预加载**（好网预加载 10 个 + 预加载字节数 10MB） | 确保切下一集时已缓存部分正片 | ⏳ 待实施 |
+| **P1** | **预加载触发时机+去重**（阻塞点7：默认 10% 触发 + URL 去重） | 提前触发预加载 + 避免重复预加载浪费带宽 | ⏳ 待实施 |
+| **P1** | **内部播放列表管理**（阻塞点8：VideoPreloader 自动推断下一集） | 自动预加载下一集，无需外部每次传入 URL | ⏳ 待实施 |
+| **P1** | 启用 HLS 协议级优化（`setAllowChunklessPreparation`） | HLS 首屏耗时降低 30%+ | ⏳ 待实施 |
+| **P1** | 网络切换运行时感知（NetworkCallback 动态调整预加载策略，**不热切换 LoadControl**） | 网络切换时预加载策略立即生效（LoadControl 下次 prepare 生效） | ⏳ 待实施 |
+| **P1** | **全格式统一激进策略**（HLS/DASH/MP4/FLV/SS 统一激进缓冲） | 各类型视频都支持快速缓冲加载 | ⏳ 待实施 |
+| **P2** | 引入 Media3 `DefaultPreloadManager`（官方主推，**远期搁置**） | 替换自研预加载器，获得官方维护红利 | ⏳ 待实施 |
+| **P2** | 缓存命中率/失败率/首帧命中率埋点 | 为后续调优提供数据支撑 | ⏳ 待实施 |
+| **P3** | AI 智能预缓冲（LSTM + TFLite，远期方向） | 首帧时间降 33%、卡顿降 50%（业界数据） | ⏳ 远期方向 |
 
 ---
 
@@ -233,3 +235,56 @@ AppLog 在 release 包中默认不输出日志，导致生产环境无法通过�
 - ❌ 不实施 LoadControl 运行时热切换（R3 放弃，路径 A：prepare 前设置）
 - ❌ 不实施低端机保护（R3 移除 LOW 档位，用户可通过配置参数往下调）
 - ❌ 不在 R3 引入 Media3 DefaultPreloadManager（P2 远期搁置）
+
+---
+
+## 八、实施状态（P0 已完成，2026-07-28）
+
+### 8.1 P0 实施范围说明
+
+P0 实施范围在 R3 设计基础上扩展，除原 P0 项（预加载 BUG 修复 + HLS 依赖修复 + cacheKey 统一 + AppLog 修复）外，将原 P1 中的 **设备档位检测**、**用户可配置参数**、**ExoPlayerHelper cache 容量扩展** 三项提前到 P0 实施，为后续 P1 激进策略提供基础。
+
+### 8.2 P0 已完成的 7 个文件变更
+
+| # | 文件 | 变更类型 | 关键改动点 |
+|---|------|---------|-----------|
+| 1 | `DeviceInfoHelper.kt`（新增） | 新增 | 设备档位检测 HIGH/MID 两档（默认 HIGH）；HIGH 阈值：内存≥6GB + CPU≥8核 + 磁盘≥10GB；MID 阈值：内存≥4GB 或 CPU≥8核；检测失败降级到 HIGH（用户要求默认中高端机参数） |
+| 2 | `AppLog.kt`（修改） | 修改 | release 包输出 WARN/INFO 日志；`putEntry`：ERROR/WARN/INFO 级别无条件 Log.e 输出（release 包也能采集关键日志）；`putDebugWithTag`：recordLog 关闭时 ERROR/WARN/INFO 仍输出到 logcat |
+| 3 | `VideoPlay.kt`（修改） | 修改 | 新增 4 个用户可配置参数：`videoMaxBufferSec`（最大缓冲时长，0=自动，HIGH=120s/MID=90s）、`videoPreloadCount`（预加载数量，0=自动，HIGH=10/MID=7）、`videoPreloadBytesMB`（预加载字节数，0=自动，HIGH=10MB/MID=5MB）、`videoPreloadTriggerProgress`（预加载触发进度，默认10%）；用户可往下调 |
+| 4 | `ExoPlayerHelper.kt`（修改） | 修改 | cache 容量范围从 50-500MB 调整为 50-2048MB（支持 HIGH 档位 1GB 缓存）；新增 `createPreloadDataSource` 方法（供预加载器复用 OkHttp 配置，确保请求行为一致） |
+| 5 | `FirstFramePreloader.kt`（修改） | 修改 | `prewarmUrl`/`preloadUrl` 从 OkHttp Request + readBytes 改为 ExoPlayer DataSource + CacheDataSink；预加载数据现在真正写入 SimpleCache（原 bug：只读取后丢弃，播放时仍需重新下载）；`PRELOAD_BYTES` 从固定 1MB 改为 `getPreloadBytes()` 动态计算（HIGH=10MB/MID=5MB/用户可配）；`MAX_CACHE_SIZE` 从固定 10 改为 `getPreloadCount()` 动态计算；用 DataSpec 限制读取字节数防止 OOM；cacheKey 为纯 URL（与播放器 resolvingDataSource 解析后一致） |
+| 6 | `VideoPreloader.kt`（修改） | 修改 | `preloadUrl` 从 OkHttp Request + readBytes 改为 ExoPlayer DataSource + CacheDataSink；预加载数据现在真正写入 SimpleCache；`PRELOAD_BYTES` 从固定 256KB 改为 `getPreloadBytes()` 动态计算；移除 WiFi/4G 网络感知区分（用户要求激进策略，用户可手动调低 videoPreloadCount 控制流量）；`MAX_CACHE_SIZE` 从 WiFi 3/4G 1 改为 `getPreloadCount()` 动态计算；移除 `isWifi()`/`isMobile()` 未使用方法 |
+| 7 | `build.gradle`（修改） | 修改 | 取消注释 `media3.exoplayer.hls` 依赖，显式声明 HLS 支持 |
+
+### 8.3 P0 验证状态
+
+| 验证项 | 状态 | 说明 |
+|--------|------|------|
+| 编译通过 | ✅ | BUILD SUCCESSFUL in 4m 32s |
+| APK 安装 | ✅ | 测试包 `io.legado.miss.app.debug`，版本 3.26.072816 |
+| 真机测试 | 🔄 进行中 | 用户正在真机测试中，稍后提供调试日志 |
+| 预加载写入 SimpleCache | ⏳ 待真机验证 | 代码层面已修复，待真机 logcat 验证 cache hit |
+| readBytes 限制 | ⏳ 待真机验证 | 已用 DataSpec 限制，待真机内存监控验证 |
+| cacheKey 命中率 | ⏳ 待真机验证 | cacheKey 统一为纯 URL，待真机验证命中率 |
+| release 包日志 | ⏳ 待真机验证 | AppLog 已修改，待 release 包验证 WARN/ERROR 输出 |
+
+### 8.4 P0 实施关键决策（详见 design.md AD-17）
+
+1. **CacheDataSink 写入 SimpleCache**：预加载器改用 ExoPlayer DataSource + CacheDataSink，预加载数据真正写入磁盘缓存（原 bug：OkHttp readBytes 只读取到内存后丢弃）
+2. **移除 WiFi/4G 网络感知区分**：用户要求激进策略，统一使用 `getPreloadCount()` 动态计算（HIGH=10/MID=7/用户可配），用户可手动调低 `videoPreloadCount` 控制流量
+3. **cacheKey 统一为纯 URL**：与播放器 `resolvingDataSource` 解析后一致，避免 cacheKey 不匹配导致缓存未命中
+4. **检测失败降级到 HIGH**：用户要求默认中高端机参数，检测失败时降级到 HIGH 档位（非 MID）
+5. **createPreloadDataSource 复用 OkHttp 配置**：预加载器与播放器共享同一 OkHttp DataSource 配置，确保请求行为一致
+
+### 8.5 P1 待实施项（5 项）
+
+1. 激进 LoadControl（默认 HIGH 档位参数 120s maxBuffer，prepare 前设置，不热切换）
+2. 全格式统一激进策略 + HLS 优化（setAllowChunklessPreparation）
+3. 预加载触发时机调整（默认10%）+ URL 去重
+4. 内部播放列表管理（PlayListManager）
+5. 运行时网络感知（NetworkCallback，仅调整预加载策略，不热切换 LoadControl）
+
+### 8.6 P2 待实施项（2 项）
+
+1. 埋点（命中率/设备档位/网络档位/maxBuffer）
+2. DefaultPreloadManager 评估

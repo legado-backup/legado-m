@@ -23,7 +23,7 @@ Web Components自定义元素（如 `<a href="/book/123">`）的 href 属性返�
 ```
 
 ## 注意事项
-- JVM仿真器方向1已修复 baseUrl 传递，但 JS 中拼接仍需手动处理
+- 注意：JS 中拼接 baseUrl 仍需手动处理
 - 域名需硬编码在 JS 中，网站换域名时需同步更新
 - `result.indexOf('http')===0` 判断比 `result.startsWith('http')` 更兼容（Rhino ES5）
 - 若网站协议不一致（http/https混用），建议统一拼接为 https

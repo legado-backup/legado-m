@@ -76,9 +76,8 @@ ws.onmessage = (e) => console.log(e.data);
 | 维度 | 真机 | JAR 仿真器 |
 |------|------|-----------|
 | 日志格式 | 纯文本 `[MM:SS.mmm] msg` | JSON `{"type":"log","state":11,"msg":"..."}` |
-| 网络环境 | Android DNS/网络栈 | PC JVM 网络栈 |
-| User-Agent | Android WebView UA | PC JVM UA（已伪装为移动 Chrome） |
-| SSL | Android 系统信任链 | JVM 信任链（已信任所有证书） |
+| 网络环境 | Android DNS/网络栈 | PC 网络栈 |
+| User-Agent | Android WebView UA | PC UA（已伪装为移动 Chrome） |
+| SSL | Android 系统信任链 | PC 信任链（已信任所有证书） |
 | Cookie | Android CookieManager | 内存 CookieStoreStub |
-| JS 引擎 | Rhino on Android | Rhino on JVM |
 | 搜索全源 | 真机全源搜索（慢） | 不支持全源搜索 |

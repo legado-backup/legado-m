@@ -66,7 +66,7 @@ var key = keyPage.match(/key='([^']+)'/)[1];
 var content = java.ajax("https://example.com/api/content?key=" + key);
 ```
 
-> **注意**：`java.ajax()` 在 JVM 仿真器中不自动携带 Cookie/Header，依赖 Cookie 的请求可信度为"低"。详见 [ajax-diff-analysis.md](../../tools/ajax-diff-analysis.md)。
+> **注意**：`java.ajax()` 在 OkHttp 中不自动携带 Cookie/Header，依赖 Cookie 的请求可信度为"低"。详见 [ajax-diff-analysis.md](../../tools/ajax-diff-analysis.md)。
 
 ## 频率洞察
 

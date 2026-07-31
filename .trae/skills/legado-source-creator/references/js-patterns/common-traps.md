@@ -83,7 +83,7 @@ var html = java.webView(url);
 java.webView(url, null, "document.querySelector('.content').innerHTML");
 ```
 
-> **注意**：webView 规则无法在 JVM 仿真器中验证，标记为"不可验证"。
+> **注意**：webView 规则无法在 OkHttp 中验证，需用真机或 Playwright MCP 验证。
 
 ## 6. JSON.stringify构造POST请求
 

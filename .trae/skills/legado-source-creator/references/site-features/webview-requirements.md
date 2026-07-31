@@ -106,7 +106,7 @@ JAR 仿真端                          Python 客户端
 1. **URL 配置**：如果页面需要 JS 渲染，在 URL 中添加 `webView:true` 选项
 2. **ruleContent**：如果需要嗅探视频地址，使用 `webViewGetSource(null, baseUrl, null, "正则")`
 3. **sourceRegex**：嗅探资源时必须提供正则表达式（如 `.*\.m3u8.*`）
-4. **测试流程**：先用 JVM 仿真端测试 → 检测到 needsWebView → 用 Selenium 渲染 → 回传 JAR 解析
+4. **测试流程**：先用 OkHttp 测试 → 检测到 needsWebView → 用 Playwright MCP 渲染 → 回传 JAR 解析
 
 ### 登录场景处理
 

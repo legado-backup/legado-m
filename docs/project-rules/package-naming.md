@@ -190,3 +190,84 @@ APK文件名包含包名标识，用于区分不同包类型：
 - **包名变更后无法覆盖安装**：从`io.legado.app`改为`io.legado.miss.app`后，新包无法覆盖旧包安装（包名不同=不同应用），需先卸载旧包
 - **namespace不变**：Kotlin源码包路径仍是`io.legado.app`，只有applicationId变了，不影响源码
 - **Firebase需重新配置**：新包名需在Firebase Console中重新注册，或移除google-services插件
+
+## 🔴 libcronet.so 动态下载规范
+
+> **来源**：2026-07-31 用户决策"优化为动态下载"，移除 jniLibs/libcronet.so，减少 APK 体积 6.37MB
+> **强制等级**：🔴（违反=三包m3u8播放全部失效）
+> **背景**：m3u8 播放器修复（Cronet 集成解决 CDN TLS 指纹检测）依赖 `libcronet.so` 提供 Native BoringSSL TLS 栈。so 文件缺失会导致 Cronet 降级 JavaCronetEngine（OkHttp/Conscrypt），TLS 指纹被 CDN 检测拒绝，m3u8 视频无法播放。
+> **演进**：2026-07-30 初版采用"打包 so 到 jniLibs"方案（APK +6.37MB）；2026-07-31 优化为"动态下载"方案（APK 减少 6.37MB），通过 ProGuard 规则保留 Cronet Java 类确保 release 包 JNI 调用正常。
+
+### 文件位置与作用
+
+| 文件 | 路径 | 作用 |
+|------|------|------|
+| libcronet.so（动态下载） | 应用私有目录 `/data/data/{pkg}/files/cronet/{abi}/libcronet.{version}.so` | Cronet Native 引擎（BoringSSL TLS 栈），解决 CDN TLS 指纹检测 |
+| CronetHelper.kt | `app/src/main/java/io/legado/app/lib/cronet/CronetHelper.kt` | 优先 `syncEnsureSoFile()` + `manualLoad()` 动态下载加载，失败降级 `System.loadLibrary("cronet")`（jniLibs 兜底） |
+| CronetLoader.kt | `app/src/main/java/io/legado/app/lib/cronet/CronetLoader.kt` | `syncEnsureSoFile()` 同步下载 + `manualLoad()` 显式 `System.load` 加载 |
+| cronet-proguard-rules.pro | `app/cronet-proguard-rules.pro` | Cronet 官方 ProGuard 规则，保留所有 provider 类和 native 方法 |
+| proguard-rules.pro | `app/proguard-rules.pro` L134-154 | 补充 ProGuard 规则，保留 NativeCronetEngineBuilderImpl + AndroidProxy 等 |
+
+### 三包动态下载要求
+
+| 包类型 | 包名 | libcronet.so 要求 | 验证方法 |
+|--------|------|------------------|---------|
+| 测试包 | `io.legado.miss.app.debug` | ✅ 动态下载 | APK 不含 so（`unzip -l APK | grep libcronet` 无结果） |
+| 正式包 | `io.legado.miss.app.release` | ✅ 动态下载 | APK 不含 so + R8 混淆通过 + ProGuard 规则完整 |
+| 共存包 | `io.legado.app.debug` | ✅ 动态下载 | APK 不含 so |
+
+### 构建后验证流程（强制）
+
+每次构建 APK 后，必须执行以下验证：
+
+```powershell
+# 验证 APK 不含 libcronet.so（动态下载模式）
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$tmpZip = "$env:TEMP\check_apk.zip"
+Copy-Item "<APK路径>" $tmpZip -Force
+$zip = [System.IO.Compression.ZipFile]::OpenRead($tmpZip)
+$soEntry = $zip.Entries | Where-Object { $_.FullName -like "lib/arm64-v8a/libcronet*" }
+if ($soEntry) {
+    Write-Host "[FAIL] libcronet.so found in APK: $($soEntry.FullName)" -ForegroundColor Red
+    exit 1
+} else {
+    Write-Host "[OK] No libcronet.so in APK (dynamic download mode)" -ForegroundColor Green
+}
+$zip.Dispose()
+Remove-Item $tmpZip -Force
+```
+
+### 禁止行为
+
+- ❌ 将 `libcronet.so` 打包到 `app/src/main/jniLibs/`（已改为动态下载，打包会导致 APK 体积 +6.37MB）
+- ❌ 修改 `app/cronet-proguard-rules.pro` 或 `app/proguard-rules.pro` 中的 Cronet 规则（release 包 R8 会移除未保留的 Cronet Java 类，导致 JNI 调用崩溃）
+- ❌ 构建后不验证 APK 不含 libcronet.so
+- ❌ 移除 `CronetLoader.syncEnsureSoFile()` 或 `CronetLoader.manualLoad()` 方法（动态下载核心逻辑）
+
+### 依赖链说明
+
+```
+CronetLoader.syncEnsureSoFile()（同步下载 libcronet.{version}.so 到应用私有目录）
+  ↓ CronetLoader.manualLoad()（System.load 加载带版本号的 so）
+NativeCronetEngineBuilderImpl (CronetHelper.kt，绕过 pickBuilderImpl 降级逻辑)
+  ↓ build()（ProGuard 规则保留所有 Cronet Java 类，JNI 调用正常）
+CronetUrlRequestContext (Native引擎)
+  ↓ CronetDataSource.Factory (ExoPlayerHelper.kt)
+ExoPlayer HlsMediaSource
+  ↓ 播放 m3u8
+用户观看视频（TLS指纹与Chrome一致，CDN不拒绝）
+```
+
+### 崩溃根因与修复（2026-07-30 铁证）
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| release 包崩溃 SIGABRT | R8 移除未保留的 Cronet Java 类，JNI `GetStaticMethodID` 找不到类 | cronet-proguard-rules.pro 保留所有 provider 类 + native 方法 |
+| 测试包正常，正式包崩溃 | `minifyEnabled` 差异：debug=false 不执行 R8，release=true 执行 R8 移除类 | ProGuard 规则确保 release 包保留 Cronet 类 |
+| Cronet 降级 JavaCronetEngine | `ExperimentalCronetEngine.Builder` 的 `pickBuilderImpl` 降级逻辑 | 直接创建 `NativeCronetEngineBuilderImpl` 绕过降级 |
+
+### 相关规范
+
+- [APK 发布流程规范](./apk-publish-workflow.md) 第 5.1 节"标准发布流程"已增加动态下载验证步骤
+- [Cronet 集成设计文档](../specs/video-player-m3u8-fix/) m3u8 播放器修复完整方案
+- [AGENTS.md "🔴🔴 强制规则：真机测试包选择规范"](../../AGENTS.md) 三包选择规则
