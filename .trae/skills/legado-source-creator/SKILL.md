@@ -248,6 +248,12 @@ adb shell "am start -n io.legado.miss.app.release/io.legado.app.ui.welcome.Welco
 > - **多API搜索方案对比**：ajaxAll并发 vs ajax串行 vs 仅主源搜索
 > - **推荐方案**：仅主源搜索 + 串行补充（用`java.ajax(u)`单参数版本，避免陷阱60）
 > - **ruleArticles合并模板**：主源结果+缓存子源结果合并，HTML回退用Jsoup多模板适配
+>
+> **封面解密**（见 references/special-scenarios/encrypted-images.md）：
+> - **陷阱66 coverDecodeJs 不能带 `@js:` 前缀**：ImageUtils.decode→BaseSource.evalJS→AbstractScriptEngine.eval 全程无前缀剥离，`@js:` 直接 JS 编译失败
+> - **陷阱67 hutool createSymmetricCrypto 的 transformation 坑**：hutool 5.8.22 `new SymmetricCrypto("AES/CBC/PKCS5Padding", key)` 在 JVM 抛 InvalidKeyException（KeyUtil.generateKey 把完整 transformation 当算法名），用 JavaImporter 直调 javax.crypto 兜底
+> - **陷阱68 key/iv 下划线十进制 ASCII**：站点 media_key/media_iv 常为下划线分隔十进制 ASCII，需还原为 16 字节字节串（`String.fromCharCode(...)`）
+> - **陷阱69 NativeJavaArray 兼容**：ScriptBindings.set 经 Context.javaToJS 包装 ByteArray 为 NativeJavaArray，`cipher.doFinal(result)` 可正常匹配 `doFinal(byte[])`
 
 ## 真机测试脚本
 

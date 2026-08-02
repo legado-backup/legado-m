@@ -152,6 +152,7 @@
 | [specs/folder-view-welcome-refactor/](./specs/folder-view-welcome-refactor/) | 书源/订阅源文件夹视图重构 + 欢迎页增强 + 前端样式审计 ✅ 实施完成，待真机验证 |
 | [specs/video-m3u8-cache/](./specs/video-m3u8-cache/) | 视频播放器 m3u8 边下边播缓存（cachePlay 配置 + 设置开关，默认开启） ✅ 已实施，待真机验证 |
 | [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表页 DiffUtil 增量更新 + WebView cacheFirst 默认 true） ✅ 已实施，待真机验证 |
+| [specs/rss-image-decrypt-optimization/](./specs/rss-image-decrypt-optimization/) | 订阅源图片解密优化（调试输出截断防崩溃 + 列表并行化提速；真机发现并修复 ImageUtils 块对齐校验误拦截 base64 文本封面致图片永不显示） ✅ 引擎修复完成（ImageUtils 移除块校验+失败兜底bytes），真机验证图片显示通过 |
 | [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静音 + 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮） ✅ 已实施，待真机验证 |
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分组 bug + 视图模式扩展5种 + 订阅源排序 + 类型筛选 + 统一配置对话框） 🔄 设计中 |
 | [specs/exoplayer-resilience/](./specs/exoplayer-resilience/) | ExoPlayer 韧性优化（预嗅探+LRU缓存+自动WebView降级，解决3002错误码和浏览器能播放但内置播放器失败痛点） 🔄 实施中 |

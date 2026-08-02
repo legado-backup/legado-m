@@ -19,7 +19,7 @@
 | [troubleshooting/](./troubleshooting/_index.md) | 1181行 | 6个子文档 + 索引 | 常见陷阱与故障排除 |
 | [js-extensions/](./js-extensions/_index.md) | 1209行 | 11个子文档 + 索引 | JS扩展函数完整参考 |
 | [js-patterns/](./js-patterns/_index.md) | 710行 | 11个子文档 + 索引 | JS模式参考手册 |
-| [special-scenarios/](./special-scenarios/_index.md) | 781行 | 14个子文档 + 索引 | 登录/验证码/加密/视频/WebSocket调试等特殊场景 |
+| [special-scenarios/](./special-scenarios/_index.md) | 781行 | 15个子文档 + 索引 | 登录/验证码/加密/视频/WebSocket调试等特殊场景 |
 | [source-analysis/](./source-analysis/_index.md) | — | 6个子文档 + 索引 | Legado源码深度分析验证 |
 | [site-features/](./site-features/_INDEX.md) | — | 4个子文档 + 索引 | 真实源验证积累的高频问题模式与修复方案 |
 | [rule-construction-guide/](./rule-construction-guide/_index.md) | — | 3个子文档 + 索引 | Phase 2 规则构建：解析方式决策树+字段填写模板+网站类型策略 |
@@ -120,5 +120,12 @@
 
 | 日期 | 经验类型 | 标题 | 沉淀位置 | 经验来源标记 |
 |------|---------|------|---------|-------------|
+| 2026-08-02 | 方案类（加密图片） | 封面图字节 AES 密文解密（站点JT实例）：图片密钥与 API 响应密钥不同，藏于打包 bundle `crypto-worker.js` 的 `media_key`/`media_iv`（下划线十进制 ASCII）；**改解密规则后 Glide 磁盘缓存残留旧密文致白屏**，须 `am force-stop` 后删 `image_manager_disk_cache` | special-scenarios/encrypted-images.md（§4.6 实例块） | `[经验来源:封面解密范式]` |
+| 2026-08-02 | 方案类（加密API响应） | 加密响应 API 解密：站点 API 返回 `{"errcode":0,"data":"<AES base64>"}`，ruleArticles/ruleContent 内联 JavaImporter javax.crypto 解密取列表/直链；外层先 JSON.parse 取 data；ruleContent 重查 API 按 hash 匹配新鲜直链，**列表轮换快时禁止回退 list[0]（播错视频）须回退 rssArticle.link**；sortUrl 单分类须 `::` 前缀（否则回退首页 HTML 0条）；ruleNextPage=PAGE | special-scenarios/encrypted-api-response.md（新建） | `[经验来源:加密响应API解密范式]` |
+| 2026-08-02 | 方案类（真机测试） | 封面图真机显示验证：content-desc「加载中…」是静态XML属性不能判加载状态，须截图+PIL像素分析（stddev/colors）；release R8 移除全部Log（含Log.e）只能用AppLog；改解密规则必须清Glide/okhttp缓存 | source-analysis/real-device-image-verification.md | `[经验来源:封面图真机验证范式]` |
+| 2026-08-02 | 方案类（视频源） | 播放页内联JS变量正则提取m3u8（P2首选，优先于嗅探P4）：`/var url = "([^"]+)"/`，sign动态变化无需固定，AES-128流ExoPlayer自动处理 | troubleshooting/video-source-traps.md（陷阱41b） | `[经验来源:播放页内联变量正则提取范式]` |
+| 2026-08-02 | 方案类（动态域名） | 地址发布页 document.write编码 + gotoPath域名轮换 + 逐域名验证：所有页面（含列表/搜索/播放）均编码须先解码；缓存命中后须java.ajax验证特征内容（防"昨天能用今天不能用"）；gotoPath多域名逐个验证可用性 | troubleshooting/dynamic-domain-traps.md（陷阱G） | `[经验来源:发布页gotoPath动态域名范式]` |
+| 2026-08-02 | 陷阱类（加密图片/引擎层） | base64文本封面被ImageUtils块对齐校验静默拦截：非块对齐字节跳过解密→coverDecodeJs不执行→skia 'unimplemented' 图片不显示；引擎层修复（移除块校验+evalJS失败兜底bytes） | special-scenarios/encrypted-images.md（§4.1 陷阱块） | `[经验来源:封面解密范式]` |
+| 2026-08-01 | 方案类（加密图片） | AES加密图片解密：JavaImporter 直调 javax.crypto 写 coverDecodeJs（无@js:前缀 + hutool transformation 坑 + NativeJavaArray兼容 + key/iv下划线十进制ASCII逆向） | special-scenarios/encrypted-images.md（§4.1 + §4.6） | `[经验来源:封面解密范式]` |
 | 2026-07-30 | 陷阱类（Rhino/协程） | 协程IO线程死锁（含`java.ajax()`的JS不能在`Dispatchers.IO`执行，须用独立线程执行器） | troubleshooting/rhino-js-traps.md（陷阱58） | `[经验来源:协程IO线程死锁范式]` |
 | 2026-07-30 | 方案类（搜索高级） | AJAX动态加载页面改用JSON API（Playwright Performance API诊断 + JSONPath解析） | special-scenarios/search-advanced.md（第7节） | `[经验来源:AJAX动态加载改用JSON API范式]` |

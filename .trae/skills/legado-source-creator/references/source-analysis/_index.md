@@ -27,3 +27,4 @@
 | [default-syntax.md](default-syntax.md) | Default 语法完整行为：规则前缀解析 + 关键字前缀 + 索引语法 + 提取类型 + 选择器兼容性 | 2026-06-03 |
 | [cf-bypass-source.md](cf-bypass-source.md) | CF 绕过源码分析：Cloudflare 检测机制 + 绕过策略 + WebView Cookie 同步 | 2026-06-06 |
 | [ajax-diff-analysis.md](ajax-diff-analysis.md) | MockJsExtensions ajax() 差异分析：完整调用链 + 行为差异汇总（Cookie/Header/WebView等） | 2026-06-12 |
+| [real-device-image-verification.md](real-device-image-verification.md) | 封面图真机显示验证方法论：content-desc 静态陷阱 + PIL 像素分析 + release R8 日志策略 + Glide 缓存清理要点 | 2026-08-02 |

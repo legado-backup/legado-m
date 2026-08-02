@@ -27,7 +27,27 @@ Legado 规则引擎支持 `##` 操作符对提取的字符串进行替换，语�
 1. 视频地址需要复杂 JS 解密
 2. 播放页需要登录或 cookie
 
-**优先级**：ruleContent="" 嗅探是**兜底方案而非首选**，视频地址提取优先级见 SKILL.md 偏好优先级章节
+**⚠️ 优先级澄清（修正 2026-08-02）**：嗅探（ruleContent=""）是**兜底方案（P4）而非首选**。视频地址提取严格遵循 SKILL.md 偏好优先级：**P1 CMS API（ac=detail&ids）→ P2 播放页内联 JS 正则提取（见陷阱41b）→ P3 XPath/CSS 选择器 → P4 嗅探兜底**。不要因为"ruleContent 留空最简单"就直接选嗅探——嗅探慢、耗电、依赖网络抓包且可能误抓广告流；能正则提取到内联 `var url="..."` 就优先用规则提取。
+
+## 陷阱41b: 播放页内联 JS 变量正则提取（P2 首选方案）
+
+当播放页 HTML 中直接内联视频地址变量（如 xgplayer/自有播放器常写 `var url = "https://.../index.m3u8?sign=..."`），用正则直接提取，**优于**嗅探。
+
+**提取模板**：
+```json
+{
+  "ruleContent": "@js:(function(){var m=result.match(/var url = \"([^\"]+)\"/);return m?m[1]:'';})()"
+}
+```
+
+**要点**：
+1. 变量名/引号以真实页面为准，先 Playwright 在播放页查 `var url =` / `var playUrl =` / `domainPlay` 等特征
+2. 若 `ruleContent` 规则里 JS 拿到的 `result` 是解码后的播放页 HTML（见 document.write 编码陷阱），先解码再 match
+3. 提取的 m3u8 常带动态 sign 参数（每次刷新页面变化），**无需固定**——每次播放都重新请求播放页提取即可
+4. 验证：`java.ajax` / curl 带 Referer 抓 m3u8 URL 返回 `#EXTM3U` 即有效
+5. 若 m3u8 流是 AES-128 加密（`#EXT-X-KEY METHOD=AES-128`），Legado ExoPlayer 会自动处理 key URI，规则无需干预
+
+**经验来源**：`[经验来源:播放页内联变量正则提取范式]`
 
 ## 陷阱42: 播放页链路验证（列表链接≠播放页）
 

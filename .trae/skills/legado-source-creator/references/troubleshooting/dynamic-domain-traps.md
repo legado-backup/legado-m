@@ -267,3 +267,73 @@ if(pos>=0){
 **铁证**：7源v2版marker用`href=https://xn--`，7个源分类列表全部为空（HTML中是`href="https://xn--"`带引号）；改为`https://xn--`后7/7源列表加载成功。
 
 **经验来源**：`[经验来源:HTML属性值marker匹配范式]`
+
+## 陷阱G: 地址发布页 document.write 编码 + gotoPath 域名轮换（2026-08-02 欢乐谷实战）
+
+**适用站点特征**：入口是「地址发布页」（HTML 整体被 `<script>document.write(decodeURIComponent("<URL编码HTML>"))</script>` 包裹），内含「点击进入网站」按钮 + 「最新地址1/2/3」列表，每次刷新 gotoPath 域名不同（多域名轮换），永久域名已失效。
+
+**两处 document.write 编码**：
+1. **发布页本身**：需解码才能看到 gotoPath 域名
+2. **主站所有页面（列表/分类/搜索/播放）也编码**：HTML 整体被 document.write 包裹，所有规则（ruleArticles/ruleContent/ruleNextPage）的 JS 必须**先解码再解析**
+
+**解码算法（Rhino ES5 兼容）**：
+```javascript
+function decodeDoc(html){
+  var st = html.indexOf('document.write(decodeURIComponent("');
+  if (st < 0) return html;          // 非编码页原样返回
+  st += 'document.write(decodeURIComponent("'.length;
+  var en = html.indexOf('");', st);
+  if (en < 0) en = html.indexOf('")', st);
+  var s = html.substring(st, en);
+  try { return decodeURIComponent(s); } catch(e) { return html; }  // 防 URIError（孤立%）
+}
+```
+
+**gotoPath 域名提取 + 逐域名验证（核心范式）**：gotoPath 域名每次刷新随机，且**个别域名可能被污染/劫持（跳转异站）**，必须逐个验证内容特征：
+```javascript
+function resolveDomain(){
+  var ck = 'siteX_dom_v1';
+  var d = cache.get(ck);
+  if (d) {   // 缓存命中也要先验证（陷阱E 增强）
+    try {
+      var h = decodeDoc(String(java.ajax('https://' + d + '/')));
+      if (h.indexOf('vod-item') >= 0) return d;   // 特征标记：真实主站
+    } catch(e) {}
+    d = null;   // 失效则重新解析
+  }
+  var pub = decodeDoc(String(java.ajax('https://固定发布页入口')));
+  var doms = []; var pos = 0;
+  for (var k = 0; k < 10; k++) {      // 提取全部 gotoPath('https://xxx') 域名
+    var gp = pub.indexOf("gotoPath('https://", pos);
+    if (gp < 0) break;
+    gp += "gotoPath('https://".length;
+    var ge = pub.indexOf("'", gp);
+    var cand = pub.substring(gp, ge);
+    if (doms.indexOf(cand) < 0) doms.push(cand);   // 去重
+    pos = ge + 1;
+  }
+  for (var i = 0; i < doms.length; i++) {          // 逐个验证可用性
+    try {
+      var h2 = decodeDoc(String(java.ajax('https://' + doms[i] + '/')));
+      if (h2.indexOf('vod-item') >= 0) { d = doms[i]; break; }
+    } catch(e) {}
+  }
+  if (d) cache.put(ck, d, 21600);                  // 6小时
+  return d || '兜底域名:8888';
+}
+```
+
+**关键设计点**：
+1. **缓存命中后必须验证**（本范式相对陷阱52/53/57 的关键升级）：缓存里是失效域名时，直接复用会重演"昨天能用今天不能用"（404 兜底 → 分类请求返回发布页 HTML → 解析 0 文章）。`java.ajax` 探测 + 内容特征检查，失效才重新解析
+2. **gotoPath 域名逐个验证**：发布页给出的域名不保证全部有效（实测部分被劫持跳转异站），用 `java.ajax` 抓取后检查主站特征内容（如 `vod-item`/`vod-img`），第一个命中的采用
+3. **所有页面都要 decodeDoc**：ruleArticles/ruleContent/ruleNextPage 的 JS 对 `result`（HTML）先 `decodeDoc(result)` 再 Jsoup/正则解析
+4. **视频地址提取**：播放页解码后正则 `/var url = "([^"]+)"/` 提取 m3u8（见 video-source-traps.md 陷阱41b）
+5. **sourceComment 必须记录**：回家域名（永久地址）+ 备用域名段 + 邮箱 + 当前发布页入口 + 「动态域名:发布页gotoPath提取+逐域名验证」
+
+**常见坑**：
+- `java.ajax()` 返回的是 Java String，第一步必须 `String(...)` 包装（Rhino 陷阱4.1）
+- decodeURIComponent 遇孤立 `%` 抛 URIError，必须 try-catch
+- 反斜杠/引号在 JSON 双重转义易错，建议 marker 用 `indexOf+substring` 而非正则
+- 兜底域名不能写死已过期域名，需定期更新为当前可用域名
+
+**经验来源**：`[经验来源:发布页gotoPath动态域名范式]`
