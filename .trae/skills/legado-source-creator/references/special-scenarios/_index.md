@@ -39,8 +39,17 @@
 
 - **一句话描述**：封面图片解密（coverDecodeJs）、正文图片解密/替换（replaceRegex）、图片代理（imageStyle）
 - ✅ 包含：coverDecodeJs、java.imageDecode、replaceRegex 图片解密、imageStyle（FULL/WIDE/CENTER/CUSTOM）
-- ❌ 不包含：AES/DES 通用加密 → [encryption.md](./encryption.md)；视频地址提取 → [video-audio.md](./video-audio.md)
+- ❌ 不包含：AES/DES 通用加密 → [encryption.md](./encryption.md)；**加密响应 API 解密（ruleArticles/ruleContent 内联解密，非 coverDecodeJs）→ [encrypted-api-response.md](./encrypted-api-response.md)**；视频地址提取 → [video-audio.md](./video-audio.md)
 - **触发关键词**：加密图片、coverDecodeJs、imageDecode、图片解密、图片代理、imageStyle、replaceRegex图片
+
+---
+
+## encrypted-api-response.md — 加密响应 API 解密
+
+- **一句话描述**：站点 API 响应体 AES 加密（`{"errcode":0,"data":"<AES base64>"}`），在 ruleArticles/ruleContent 的 `@js:` 内联解密取列表/直链
+- ✅ 包含：JavaImporter javax.crypto 内联 AES-CBC 解密、base64 解码降级（java.util→android.util）、外层 JSON 先 parse 取 data、UTF-8 字节处理、ruleContent 重查 API 按 hash 匹配新鲜直链、**列表轮换时禁止回退 list[0]（会播错视频）必须回退 rssArticle.link**、sortUrl `::` 前缀陷阱、ruleNextPage=PAGE
+- ❌ 不包含：搜索参数加密 → [encryption.md](./encryption.md)；封面/图片解密（coverDecodeJs）→ [encrypted-images.md](./encrypted-images.md)
+- **触发关键词**：加密响应、加密API、AES解密、CryptoJS、decrypt、videolist、加密列表、JavaImporter、javax.crypto、内联解密、加密JSON响应
 
 ---
 

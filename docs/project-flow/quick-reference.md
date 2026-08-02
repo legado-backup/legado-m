@@ -12,9 +12,9 @@
 | 运行测试 | `./gradlew test` |
 | Lint 检查 | `./gradlew lint` |
 | 清理构建 | `./gradlew clean` |
-| Vue3 开发 | `npm run dev`（legado-web 目录下） |
-| Vue3 构建 | `npm run build`（legado-web 目录下，含 type-check + sync.js） |
-| Vue3 类型检查 | `npm run type-check`（legado-web 目录下） |
+| Vue3 开发 | `npm run dev`（modules/web/ 目录下） |
+| Vue3 构建 | `npm run build`（modules/web/ 目录下，含 type-check + vite build + sync.js） |
+| Vue3 类型检查 | `npm run type-check`（modules/web/ 目录下） |
 
 > **打包完整流程**：环境搭建、签名配置、构建后验证（签名/桌面显示名/安装/启动）详见 [build-apk-guide.md](./build-apk-guide.md)。
 

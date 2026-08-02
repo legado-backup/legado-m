@@ -20,7 +20,23 @@ JS 执行时自动注入以下变量：
 
 ### 示例
 
-**AES-CBC 解密封面**：
+**AES-CBC 解密封面（推荐，JavaImporter 直调 javax.crypto）**：
+
+```json
+{
+  "coverDecodeJs": "(function(){\nvar aly = new JavaImporter(Packages.javax.crypto.Cipher, Packages.javax.crypto.spec.SecretKeySpec, Packages.javax.crypto.spec.IvParameterSpec);\nvar out;\nwith (aly) {\n  var key = new SecretKeySpec(Packages.java.lang.String('f5d965df75336270').getBytes('UTF-8'), 'AES');\n  var iv = new IvParameterSpec(Packages.java.lang.String('97b60394abc2fbe1').getBytes('UTF-8'));\n  var cipher = Cipher.getInstance('AES/CBC/PKCS5Padding');\n  cipher.init(Cipher.DECRYPT_MODE, key, iv);\n  out = cipher.doFinal(result);\n}\nreturn out;\n})()"
+}
+```
+
+> **⚠️ 必须无 `@js:` 前缀**：调用链 `ImageUtils.decode` → `BaseSource.evalJS` → `AbstractScriptEngine.eval(script, scope)` → `RhinoScriptEngine.eval(reader, scope)` 全程无前缀剥离，`@js:` 会直接 JS 编译失败（2026-08-01 站点H封面解密验证）。
+>
+> **⚠️ 慎用 hutool `java.createSymmetricCrypto`**：hutool 5.8.22 `new SymmetricCrypto("AES/CBC/PKCS5Padding", key)` 在 JVM 抛 `InvalidKeyException: Wrong algorithm: AES or Rijndael required`（`KeyUtil.generateKey` 把完整 transformation 当算法名传给 `SecretKeySpec`）。Android Conscrypt 行为未验证，双保险用 `javax.crypto` 直调。
+>
+> **`result` 传参兼容**：`ScriptBindings.set` 经 `Context.javaToJS` 把 ByteArray 包装成 `NativeJavaArray`，`cipher.doFinal(result)` 可正常匹配 `doFinal(byte[])`（Rhino 1.8.1 端到端验证）。
+>
+> **加密端填充判定**：密文 16 对齐 + 解密尾部为 N 字节 `0x0N` 时，说明加密端用标准 PKCS7 填充，用 `AES/CBC/PKCS5Padding` 自动 unpad，无需手动截尾。
+
+**AES-CBC 解密封面（旧写法，hutool）**：
 
 ```json
 {
@@ -35,6 +51,16 @@ JS 执行时自动注入以下变量：
   "coverDecodeJs": "var arr = result;\nfor (var i = 0; i < arr.length; i++) {\n  arr[i] = arr[i] ^ 0xFF;\n}\narr"
 }
 ```
+
+> **⚠️ base64 文本封面被"块对齐校验"静默拦截（2026-08-02 真机验证）**：当封面图片原始字节是 **base64 编码的文本**（如 `.dat` 后缀、首字节为 base64 ASCII `U`=0x55）而非二进制密文时，`ImageUtils.decode` 会先执行块对齐校验（旧源码 `bytes.size % 8 != 0 && bytes.size % 16 != 0` 则跳过解密）——base64 文本长度任意，极易非块对齐（如 95884%8=4、%16=12）→ **coverDecodeJs 完全不执行**，base64 文本原样返回给 Glide → skia 报 `Failed to create image decoder with message 'unimplemented'`，图片永远不显示。
+>
+> **诊断要点**：Logcat 大量 `skia ... 'unimplemented'` + 无「图片解密错误」AppLog + Glide 磁盘缓存（image_manager_disk_cache）里存的是 base64 文本（head `UklGR...`）而非 `RIFF`/WebP 头 → 基本可判定被此校验拦截。
+>
+> **修复**（已在 Legado 源码 `app/src/main/java/io/legado/app/utils/ImageUtils.kt` 修复）：
+> 1. 移除块对齐校验块（`if (bytes.size % 8 != 0 && bytes.size % 16 != 0) return bytes`）——未加密图片保护由 `isKnownImageFormat` 文件头检测（PNG 89/JPG FF D8 FF/GIF 47 49 46 38/WebP 52 49 46 46）独立覆盖，块校验是冗余拦截，移除安全
+> 2. evalJS 失败兜底由返回 null（→ onStreamReady(null) → failUrl 永久短路不再重试）改为 `?: bytes` 返回原始字节，允许后续重试
+>
+> 本项属于 Legado 引擎层修复，书源侧仅需保证：封面走 coverDecodeJs 时用 base64 解码（`Packages.java.util.Base64.getDecoder().decode(s)` 优先 + `Packages.android.util.Base64.decode(s,0)` 兜底 + 返回 result 最后兜底）。经验来源 `[经验来源:封面解密范式]`。
 
 ### 源码位置
 
@@ -220,6 +246,38 @@ JS 执行时自动注入以下变量：
 ---
 
 ## 4.6 常见加密图片场景
+
+### key/iv 逆向获取（站点 JS 下划线十进制 ASCII）
+
+部分站点的加密 key/iv 不直接明文暴露，而是以 `media_key`/`media_iv` 形式存于 `app.config.js` 等配置文件，值为下划线分隔的十进制 ASCII：
+
+```js
+// 站点 app.config.js
+media_key: "102_53_100_57_54_53_100_102_55_53_51_51_54_50_55_48",
+media_iv: "57_55_98_54_48_51_57_52_97_98_99_50_102_98_101_49"
+```
+
+还原方式（站点 JS 用 `String.fromCharCode(...)`，实现直接写死十进制值）：
+
+```js
+// key = 'f5d965df75336270'  iv = '97b60394abc2fbe1'
+var key = Packages.java.lang.String('102_53_100_57_54_53_100_102_55_53_51_51_54_50_55_48'.split('_').map(function(n){return String.fromCharCode(parseInt(n,10));}).join(''));
+```
+
+> 逆向步骤：Playwright/curl 抓 `app.config.js` → 定位 `media_key`/`media_iv` → 下划线十进制 ASCII → 16 字节 AES-128 key/iv。经验标注 `[经验来源:封面解密范式]`。
+
+### 站点JT实例（2026-08-02，与站点H同密钥组）
+
+> 站点JT（视频订阅源）封面图片字节为 AES-CBC 密文（头 `093de3b1`/`1e37f55c`/`3eaa708e` 非图片魔数，Content-Type `binary/octet-stream`），密钥与 API 响应密钥（http.js）**不同**，藏于打包 bundle `crypto-worker.js`：
+>
+> ```js
+> media_key: "102_53_100_57_54_53_100_102_55_53_51_51_54_50_55_48",  // key = f5d965df75336270
+> media_iv:  "57_55_98_54_48_51_57_52_97_98_99_50_102_98_101_49",  // iv  = 97b60394abc2fbe1
+> ```
+>
+> 解密后为 JPEG(`ffd8ffe0`)/PNG(`89504e47`)。coverDecodeJs 用 JavaImporter javax.crypto AES-CBC-PKCS5，`cipher.doFinal(result)` 返回解密后 ByteArray（.png 解密后仍 PNG，.jpeg 解密后仍 JPEG，格式正确）。
+
+**⚠️ Glide 磁盘缓存残留旧密文陷阱（2026-08-02 真机验证）**：当封面从"未加密"状态改为"新增 coverDecodeJs"后，`image_manager_disk_cache` 中已缓存的同 URL 密文不会重新走解密（Glide 命中缓存直接返回旧字节）→ 该图继续白屏。**修复**：`am force-stop` 后删除 `/data/data/{pkg}/cache/image_manager_disk_cache`（与 `okhttp_cache`）再重启。经验标注 `[经验来源:封面解密范式]`。
 
 ### Mirages 图片加密
 

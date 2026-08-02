@@ -1,6 +1,8 @@
 # 加密认证
 
 > MD5/SHA 密码加密、动态签名/Token 生成、AES/DES 对称加密、搜索参数加密实战案例。
+>
+> ⚠️ **本文档覆盖请求侧加密（搜索参数/签名）**。响应侧加密（API 返回体 AES 加密需内联解密）见 [encrypted-api-response.md](./encrypted-api-response.md)。
 
 ## 3.1 MD5/SHA 密码加密
 
