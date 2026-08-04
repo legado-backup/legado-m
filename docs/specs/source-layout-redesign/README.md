@@ -1,6 +1,6 @@
 # 书源/订阅源布局设置重做
 
-> 状态：🔄 设计中
+> 状态：✅ 代码已完成（tasks 26/37 勾选；唯一未做=showConfigDialog 迁移至 Activity；待真机验证）
 >
 > 关联文档：[spec.md](./spec.md) | [design.md](./design.md) | [tasks.md](./tasks.md)
 

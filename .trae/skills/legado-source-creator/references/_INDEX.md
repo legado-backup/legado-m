@@ -120,6 +120,8 @@
 
 | 日期 | 经验类型 | 标题 | 沉淀位置 | 经验来源标记 |
 |------|---------|------|---------|-------------|
+| 2026-08-02 | 方案类（RSS视频源） | TikTok风格滑动+网格双模式视频订阅源：sourceUrl用?view=grid；ruleArticles@js双分支grid优先（首页grid页DOM含隐藏.swiper-slide防误判）；分类页强制swiper；grid标题从URL slug用split-join提取；ruleNextPage正则+追加view=grid且必须IIFE；sortUrl首行「最新」 | special-scenarios/rss-advanced.md（7.13节） | `[经验来源:滑动+网格双模式视频订阅源范式]` |
+| 2026-08-02 | 陷阱类（Rhino） | @js规则顶层return触发 msg.bad.return「返回的值无效」（ruleNextPage编译失败→翻页失效），必须IIFE `(function(){...})()` 包裹；jsoup Java String.replace(正则,字符串)触发「选择不明确」，用 split().join() 或先 String() 转换 | troubleshooting/rhino-js-traps.md（陷阱70/71） | `[经验来源:Rhino String.replace歧义范式]` |
 | 2026-08-02 | 方案类（加密图片） | 封面图字节 AES 密文解密（站点JT实例）：图片密钥与 API 响应密钥不同，藏于打包 bundle `crypto-worker.js` 的 `media_key`/`media_iv`（下划线十进制 ASCII）；**改解密规则后 Glide 磁盘缓存残留旧密文致白屏**，须 `am force-stop` 后删 `image_manager_disk_cache` | special-scenarios/encrypted-images.md（§4.6 实例块） | `[经验来源:封面解密范式]` |
 | 2026-08-02 | 方案类（加密API响应） | 加密响应 API 解密：站点 API 返回 `{"errcode":0,"data":"<AES base64>"}`，ruleArticles/ruleContent 内联 JavaImporter javax.crypto 解密取列表/直链；外层先 JSON.parse 取 data；ruleContent 重查 API 按 hash 匹配新鲜直链，**列表轮换快时禁止回退 list[0]（播错视频）须回退 rssArticle.link**；sortUrl 单分类须 `::` 前缀（否则回退首页 HTML 0条）；ruleNextPage=PAGE | special-scenarios/encrypted-api-response.md（新建） | `[经验来源:加密响应API解密范式]` |
 | 2026-08-02 | 方案类（真机测试） | 封面图真机显示验证：content-desc「加载中…」是静态XML属性不能判加载状态，须截图+PIL像素分析（stddev/colors）；release R8 移除全部Log（含Log.e）只能用AppLog；改解密规则必须清Glide/okhttp缓存 | source-analysis/real-device-image-verification.md | `[经验来源:封面图真机验证范式]` |

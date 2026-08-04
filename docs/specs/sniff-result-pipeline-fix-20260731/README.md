@@ -1,5 +1,7 @@
 # 嗅探结果管线修复（sniff-result-pipeline-fix-20260731）
 
+> 状态：✅ 已实施（commit d69e266fe 落地，勾选已同步 2026-08-04）
+
 ## 功能概述
 
 修复 V3 嗅探稳定性修复（sniff-stability-fix-20260731）后仍然存在的"嗅探能力下降"和"图片加载失败"问题。真机日志铁证显示：之前归因于"Cronet 降级导致 TLS 指纹被拒"的结论完全错误，真实根因是 **嗅探结果管线断裂** + **OkHttp HTTP/2 StreamReset 无容错**。

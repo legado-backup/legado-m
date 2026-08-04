@@ -518,3 +518,73 @@ list;
 **铁证**：7源v2版`ruleArticles`只写`$.list`，5个HTML模板子源列表为空；改为`@js:`动态分支后7/7源列表加载成功（JSON子源返回JSON字符串数组，HTML子源用Jsoup提取后转为JSON字符串）。
 
 **经验来源**：`[经验来源:聚合站点多子源列表解析范式]`
+
+## 7.13 滑动+网格双模式视频订阅源范式（TikTok风格wpst站点）
+
+**适用站点**：WordPress + wpst 主题的 TikTok 风格短视频站（竖屏滑动流）。**核心特征**：列表页默认 Swiper 滑动模式（每页仅 5-6 个 `.swiper-slide`），但支持 `?view=grid` 切换网格模式（每页 12-24 个 `.tab-content-grid li` 卡片）。
+
+**页面结构差异（必须实测）**：
+| 页面 | 模式 | 结构 | 特征 |
+|------|------|------|------|
+| 首页默认 | swiper | `.swiper-slide` 内嵌 schema.org VideoObject meta | 每页 5-6 条；`meta[itemprop=contentURL]`=mp4直链；`meta[itemprop=thumbnailUrl]`=封面；`meta[itemprop=name]`=标题；含 `a.copy-link[data-clipboard-text]`=详情页URL |
+| 首页 `?view=grid` | grid | `.tab-content-grid li[data-id] > .media-box > a[href] > img` | 每页 12-24 条；**卡片无标题元素**，标题只能从详情页URL slug 提取；img 懒加载 `src=base64占位` 真实图在 `data-src` |
+| 分类页 | **强制 swiper** | 同上 | **`?view=grid` 对分类页无效**（grid li=0），必须走 swiper 分支 |
+| 搜索页 `?s={{key}}` | grid | 同上 | 无 rel=next（搜索单页） |
+
+**关键决策**：
+1. **sourceUrl 用 `?view=grid` 形式**（首页即 grid 模式 24 条/页，比 swiper 5-6 条信息密度高），而非默认 swiper 模式。
+2. **ruleArticles 必须 @js 双分支且 grid 优先**：先查 `.tab-content-grid li`（覆盖首页 grid + 搜索页），li=0 再查 `.swiper-slide`（覆盖分类页）。⚠️ **首页 grid 页面 DOM 同时含隐藏 `.swiper-slide`**（模板残留，约4个），若 swiper 优先会误判只出 4 条。
+3. **grid 分支标题从 URL slug 末段提取**：`a[href]` 末段 `split('-').join(' ')` 大写化。⚠️ **必须用 split-join 而非 String.replace(/-/g,' ')**（陷阱71：jsoup Java String.replace 正则参数歧义）。
+4. **swiper 分支标题/封面/详情页直取 meta**：`meta[itemprop=name]@content` / `meta[itemprop=thumbnailUrl]@content` / `a.copy-link@data-clipboard-text`。
+5. **ruleContent 用详情页 `meta[itemprop=contentURL]@content`** 取第一个 mp4 直链（type=2 播放）。⚠️ ruleLink 必须是**详情页URL**不能是 mp4（type=2 空 ruleContent 才用 link 当视频URL；非空 ruleContent 时 R5 抓 link 页 HTML 提取，link 是 mp4 会当 HTML 解析失败）。
+6. **ruleNextPage 用 `link[rel=next]@href` 或 @js 正则 + 追加 `view=grid`**：WordPress 分页 rel=next 指向 `/page/N/` 不带 view 参数，须手动拼接 `?view=grid` 保持网格模式；⚠️ **@js 必须 IIFE 包裹**（陷阱70：顶层 return 编译失败）。
+7. **sortUrl 首行加「最新」**：`最新::https://站点/?view=grid`，让 RssSortActivity 第一个 tab 即 sourceUrl（否则默认第一个分类）。
+8. **searchUrl** 用原生 `/?s={{key}}`（返回 grid 模式，单页无分页可接受）。
+
+**ruleArticles 双分支模板**：
+```javascript
+@js:(function(){
+  var doc = org.jsoup.Jsoup.parse(result);
+  var out = [];
+  var items = doc.select('.tab-content-grid li');
+  var mode = 'grid';
+  if (items.size() === 0) { items = doc.select('.swiper-slide'); mode = 'swiper'; }
+  for (var i = 0; i < items.size(); i++) {
+    var it = items.get(i);
+    var item = {};
+    if (mode === 'grid') {
+      var a = it.select('a').first();
+      var img = it.select('img').first();
+      item.link = a ? a.attr('href') : '';
+      var src = img ? (img.attr('data-src') || img.attr('src')) : '';
+      item.img = src;
+      var tmp = item.link;
+      while (tmp.length > 0 && tmp.charAt(tmp.length - 1) === '/') tmp = tmp.substring(0, tmp.length - 1);
+      var seg = tmp.split('/');
+      var t = seg[seg.length - 1] || '';
+      item.title = t.split('-').join(' ');
+    } else {
+      item.title = it.select('meta[itemprop=name]').attr('content');
+      item.img = it.select('meta[itemprop=thumbnailUrl]').attr('content');
+      var cl = it.select('a.copy-link').first();
+      item.link = cl ? cl.attr('data-clipboard-text') : '';
+    }
+    out.push(JSON.stringify(item));
+  }
+  return out;
+})()
+```
+子规则：`ruleTitle=$.title` / `ruleLink=$.link` / `ruleImage=$.img`（返回 JSON 字符串数组）。
+
+**ruleNextPage 模板**：
+```javascript
+@js:(function(){
+  var m = result.match(/rel="next" href="([^"]*)"/);
+  if (!m) return '';
+  var u = m[1];
+  if (u.indexOf('view=') < 0) u = u + (u.indexOf('?') >= 0 ? '&' : '?') + 'view=grid';
+  return u;
+})()
+```
+
+**经验来源**：`[经验来源:滑动+网格双模式视频订阅源范式]`

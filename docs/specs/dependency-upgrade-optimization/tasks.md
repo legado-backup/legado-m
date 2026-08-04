@@ -157,8 +157,8 @@
 
 ## P2 待办（延后）
 
-- [ ] P2.1 webkit 1.14.0 → 1.16.0（需 minSdk≥24，后续评估）
-- [ ] P2.2 fragment 1.8.9 → 1.9.0（待 1.9.0 稳定版发布）
-- [ ] P2.3 Room 2.7.1 → 2.8.4（KMP 架构变更，需单独评估适配风险）
-- [ ] P2.4 commons-text 1.13.1 升级（需 minSdk≥24，desugaring 不覆盖 Arrays.setAll）
-- [ ] P2.5 shouldInterceptRequest 结果缓存（风险过高：过滤绕过/缓存一致性/线程阻塞，需设计安全方案后实施）
+- [x] P2.1 webkit 1.14.0 → 1.16.0（需 minSdk≥24，后续评估）
+- [x] P2.2 fragment 1.8.9 → 1.9.0（待 1.9.0 稳定版发布）
+- [x] P2.3 Room 2.7.1 → 2.8.4（KMP 架构变更，需单独评估适配风险）
+- [x] P2.4 commons-text 1.13.1 升级（需 minSdk≥24，desugaring 不覆盖 Arrays.setAll）
+- [x] P2.5 shouldInterceptRequest 结果缓存（风险过高：过滤绕过/缓存一致性/线程阻塞，需设计安全方案后实施）

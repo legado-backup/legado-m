@@ -5,25 +5,25 @@
 
 ## 实施前检查清单
 
-- [ ] 用户已审核四文档并通过检查点1
-- [ ] 确认 `VideoPlay.kt` L304-325 当前代码与 design.md 描述一致
-- [ ] 确认 `BackstageWebView.kt` L357-369 `SnifferWebClient.onLoadResource` 逻辑未变
-- [ ] 确认 `JsExtensions.kt` L241-264 `webViewGetSource` 实现未变（作为参考）
+- [x] 用户已审核四文档并通过检查点1
+- [x] 确认 `VideoPlay.kt` L304-325 当前代码与 design.md 描述一致
+- [x] 确认 `BackstageWebView.kt` L357-369 `SnifferWebClient.onLoadResource` 逻辑未变
+- [x] 确认 `JsExtensions.kt` L241-264 `webViewGetSource` 实现未变（作为参考）
 
 ---
 
 ## Section 1：准备工作
 
-- [ ] 1.1 读取并加载子规范 `docs/project-rules/openspec-workflow.md`（OpenSpec 流程规范）
-- [ ] 1.2 读取并加载子规范 `docs/project-rules/logging-during-refactoring.md`（改造过程日志记录规范）
-- [ ] 1.3 读取并加载子规范 `docs/project-rules/version-delivery-sync.md`（版本交付同步规范）
-- [ ] 1.4 读取 `ai_tests/docs/fixed_test_workflow.md` SOP（测试前必读）
-- [ ] 1.5 Read 确认 `VideoPlay.kt` L248-330 当前代码状态（分流逻辑）
-- [ ] 1.6 Read 确认 `VideoUrlExtractor.kt` 全文（现有 5 种方法 + companion object）
-- [ ] 1.7 Read 确认 `BackstageWebView.kt` L53-67 构造参数 + L321-369 SnifferWebClient 逻辑
-- [ ] 1.8 Read 确认 `JsExtensions.kt` L241-264 `webViewGetSource` 实现（作为参考）
-- [ ] 1.9 Read 确认 `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt` 构造函数签名
-- [ ] 1.10 Read 确认 `app/src/main/java/io/legado/app/constant/AppLog.kt` 的 putInfo/putWarn/put 签名
+- [x] 1.1 读取并加载子规范 `docs/project-rules/openspec-workflow.md`（OpenSpec 流程规范）
+- [x] 1.2 读取并加载子规范 `docs/project-rules/logging-during-refactoring.md`（改造过程日志记录规范）
+- [x] 1.3 读取并加载子规范 `docs/project-rules/version-delivery-sync.md`（版本交付同步规范）
+- [x] 1.4 读取 `ai_tests/docs/fixed_test_workflow.md` SOP（测试前必读）
+- [x] 1.5 Read 确认 `VideoPlay.kt` L248-330 当前代码状态（分流逻辑）
+- [x] 1.6 Read 确认 `VideoUrlExtractor.kt` 全文（现有 5 种方法 + companion object）
+- [x] 1.7 Read 确认 `BackstageWebView.kt` L53-67 构造参数 + L321-369 SnifferWebClient 逻辑
+- [x] 1.8 Read 确认 `JsExtensions.kt` L241-264 `webViewGetSource` 实现（作为参考）
+- [x] 1.9 Read 确认 `app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt` 构造函数签名
+- [x] 1.10 Read 确认 `app/src/main/java/io/legado/app/constant/AppLog.kt` 的 putInfo/putWarn/put 签名
 
 ---
 
@@ -34,14 +34,14 @@
 > 遵循"源码文件修改串行化"规范，由主 Agent 串行执行
 > **依赖关系**：本 Section 必须先于 Section 3（VideoUrlExtractor）完成，因为 extractWithWebView 依赖新参数
 
-- [ ] 2.1 新增 import：`android.webkit.WebResourceRequest`、`android.webkit.WebResourceResponse`、`android.graphics.Bitmap`
+- [x] 2.1 新增 import：`android.webkit.WebResourceRequest`、`android.webkit.WebResourceResponse`、`android.graphics.Bitmap`
   - 验证：现有 import L13 已有 `WebResourceRequest`，需确认 `WebResourceResponse` 和 `Bitmap` 是否需要新增
-- [ ] 2.2 在构造参数列表（L53-67）末尾新增 2 个参数（在 `isRule: Boolean = false` 之后）：
+- [x] 2.2 在构造参数列表（L53-67）末尾新增 2 个参数（在 `isRule: Boolean = false` 之后）：
   ```kotlin
   private val interceptAllRequests: Boolean = false,  // 新增：是否拦截所有请求（fetch/XHR），仅视频抓取场景启用
   private val videoSniffJs: String? = null            // 新增：页面加载前注入的JS（视频嗅探用）
   ```
-- [ ] 2.3 在 `SnifferWebClient` 内部类（L321）新增 `shouldInterceptRequest` 重写：
+- [x] 2.3 在 `SnifferWebClient` 内部类（L321）新增 `shouldInterceptRequest` 重写：
   ```kotlin
   // 新增：拦截所有网络请求（包括 fetch/XHR），这是 onLoadResource 无法捕获的
   // 参考 Fongmi/TV Sniffer.java 的 shouldInterceptRequest + isVideoFormat 多层判断
@@ -75,7 +75,7 @@
   }
   ```
   > **卡点5验证**：`closed` 标志（L72）+ `callback = null`（destroy L180）双重防御，确保 destroy 后 shouldInterceptRequest 不再处理请求。`closed` 非 volatile 但最坏情况仅多处理 1-2 个请求，`callback?.onResult` 的 null 安全 + `!block.isCompleted` 检查保证无副作用。
-- [ ] 2.4 在 `SnifferWebClient` 内部类新增 `onPageStarted` 重写（注入 JS 嗅探脚本）：
+- [x] 2.4 在 `SnifferWebClient` 内部类新增 `onPageStarted` 重写（注入 JS 嗅探脚本）：
   ```kotlin
   // 新增：onPageStarted 注入 JS 嗅探脚本（覆写 fetch/XHR，参考 M3U8 Link Finder bookmarklet）
   override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -85,8 +85,8 @@
       }
   }
   ```
-- [ ] 2.5 新增 import：`kotlinx.serialization.json.Json`（用于解析 window.__videoUrls__ JSON 数组）—— 若 BackstageWebView 已有则跳过
-- [ ] 2.6 **优化1：新增 `ReadVideoUrlsRunnable` 内部类**（补全 window.__videoUrls__ 读取逻辑）：
+- [x] 2.5 新增 import：`kotlinx.serialization.json.Json`（用于解析 window.__videoUrls__ JSON 数组）—— 若 BackstageWebView 已有则跳过
+- [x] 2.6 **优化1：新增 `ReadVideoUrlsRunnable` 内部类**（补全 window.__videoUrls__ 读取逻辑）：
   > 设计遗漏修复：VIDEO_SNIFF_JS 注入了 5路 hook 收集 URL 到 window.__videoUrls__，但原方案没有读取逻辑。本任务补全读取逻辑，作为 shouldInterceptRequest 和 onLoadResource 的兜底（覆盖 video.src 直接赋值、MSE blob 等）。
   ```kotlin
   // 新增：onPageFinished + delayTime 后读取 window.__videoUrls__，用 sourceRegex 匹配
@@ -124,7 +124,7 @@
   }
   ```
   > 注意：`json` 是 kotlinx.serialization.json.Json 实例（可用 `Json { ignoreUnknownKeys = true }`），需在 companion object 或文件顶部声明
-- [ ] 2.7 **优化2：改造 SnifferWebClient.onPageFinished**，触发 ReadVideoUrlsRunnable（delayTime 自适应）：
+- [x] 2.7 **优化2：改造 SnifferWebClient.onPageFinished**，触发 ReadVideoUrlsRunnable（delayTime 自适应）：
   > delayTime 语义明确：从 onPageFinished 开始计时（而非 onPageStarted），慢站点页面加载时间不计入 delayTime，确保 JS hook 有足够时间收集 URL。这与现有 BackstageWebView 的 onPageFinished + LoadJsRunnable 行为一致（L375）。
   ```kotlin
   override fun onPageFinished(webView: WebView, url: String) {
@@ -141,10 +141,10 @@
       }
   }
   ```
-- [ ] 2.8 验证 `SnifferWebClient` 现有 `shouldOverrideUrlLoading`（L323-339）和 `onLoadResource`（L357-369）逻辑保持不变
-- [ ] 2.9 验证 `HtmlWebViewClient`（L209）不受影响（不使用新参数，不触发 ReadVideoUrlsRunnable）
-- [ ] 2.10 验证 `createWebView`（L161-176）中 `SnifferWebClient()` 无参构造仍可工作（新参数有默认值）
-- [ ] 2.11 git diff 确认改动范围：
+- [x] 2.8 验证 `SnifferWebClient` 现有 `shouldOverrideUrlLoading`（L323-339）和 `onLoadResource`（L357-369）逻辑保持不变
+- [x] 2.9 验证 `HtmlWebViewClient`（L209）不受影响（不使用新参数，不触发 ReadVideoUrlsRunnable）
+- [x] 2.10 验证 `createWebView`（L161-176）中 `SnifferWebClient()` 无参构造仍可工作（新参数有默认值）
+- [x] 2.11 git diff 确认改动范围：
   - 新增 2 个构造参数（interceptAllRequests + videoSniffJs）
   - SnifferWebClient 新增 shouldInterceptRequest 重写
   - SnifferWebClient 新增 onPageStarted 重写
@@ -159,8 +159,8 @@
 > 文件：`app/src/main/java/io/legado/app/help/video/VideoUrlExtractor.kt`
 > 遵循"源码文件修改串行化"规范，由主 Agent 串行执行
 
-- [ ] 3.1 新增 import：`io.legado.app.data.entities.BaseSource`、`io.legado.app.help.http.BackstageWebView`、`io.legado.app.constant.AppLog`、`io.legado.app.model.analyzeRule.AnalyzeUrl`
-- [ ] 3.2 将 `object VideoUrlExtractor` 改为 `object VideoUrlExtractor { companion object { ... } }` 结构？—— **否**，object 本身就是单例，直接在 object 内定义常量和方法。在 `VIDEO_URL_REGEX` 等正则定义后新增 `VIDEO_SOURCE_REGEX` 和 `VIDEO_SNIFF_JS` 常量：
+- [x] 3.1 新增 import：`io.legado.app.data.entities.BaseSource`、`io.legado.app.help.http.BackstageWebView`、`io.legado.app.constant.AppLog`、`io.legado.app.model.analyzeRule.AnalyzeUrl`
+- [x] 3.2 将 `object VideoUrlExtractor` 改为 `object VideoUrlExtractor { companion object { ... } }` 结构？—— **否**，object 本身就是单例，直接在 object 内定义常量和方法。在 `VIDEO_URL_REGEX` 等正则定义后新增 `VIDEO_SOURCE_REGEX` 和 `VIDEO_SNIFF_JS` 常量：
   ```kotlin
   // 视频流 URL 正则：用于 BackstageWebView SnifferWebClient.shouldInterceptRequest + onLoadResource 匹配网络请求
   // 参考 Fongmi/TV Sniffer.java 的 SNIFFER 正则（生产环境验证方案）
@@ -230,7 +230,7 @@
       })();
   """
   ```
-- [ ] 3.3 在 `extract` 方法之后（L62 后）新增 `extractWithWebView` suspend 方法：
+- [x] 3.3 在 `extract` 方法之后（L62 后）新增 `extractWithWebView` suspend 方法：
   ```kotlin
   /**
    * 第二层抓取：BackstageWebView 网络抓包拦截
@@ -285,11 +285,11 @@
       }.getOrNull()
   }
   ```
-- [ ] 3.4 验证 `AnalyzeUrl` 构造函数签名是否支持 `source = source, ruleData = null`（若不支持调整为正确签名）
-- [ ] 3.5 验证 `BaseSource.getKey()` 方法存在（RssSource 继承自 BaseSource）
-- [ ] 3.6 验证 `BackstageWebView.getStrResponse()` 是 suspend 函数（确认在 suspend fun 内调用合法）
-- [ ] 3.7 验证 `StrResponse.body` 字段返回的是匹配的 resUrl（参考 BackstageWebView.kt L361 `StrResponse(url!!, resUrl)`）
-- [ ] 3.8 验证 `interceptAllRequests` 和 `videoSniffJs` 参数名与 Section 2.2 新增的构造参数名一致
+- [x] 3.4 验证 `AnalyzeUrl` 构造函数签名是否支持 `source = source, ruleData = null`（若不支持调整为正确签名）
+- [x] 3.5 验证 `BaseSource.getKey()` 方法存在（RssSource 继承自 BaseSource）
+- [x] 3.6 验证 `BackstageWebView.getStrResponse()` 是 suspend 函数（确认在 suspend fun 内调用合法）
+- [x] 3.7 验证 `StrResponse.body` 字段返回的是匹配的 resUrl（参考 BackstageWebView.kt L361 `StrResponse(url!!, resUrl)`）
+- [x] 3.8 验证 `interceptAllRequests` 和 `videoSniffJs` 参数名与 Section 2.2 新增的构造参数名一致
 
 ---
 
@@ -299,8 +299,8 @@
 > 改造点：L304-325 else 分支
 > 遵循"源码文件修改串行化"规范，由主 Agent 串行执行
 
-- [ ] 3.1 Read 确认 L304-325 当前代码（else 分支：回退文章链接逻辑）
-- [ ] 3.2 用 Edit 替换 else 分支，改造为三层降级结构：
+- [x] 3.1 Read 确认 L304-325 当前代码（else 分支：回退文章链接逻辑）
+- [x] 3.2 用 Edit 替换 else 分支，改造为三层降级结构：
   ```kotlin
   else -> {
       // R5 第二层：网络抓包拦截降级（BackstageWebView）
@@ -352,10 +352,10 @@
       }
   }
   ```
-- [ ] 3.3 验证 `extractWithWebView` 是 suspend 函数，在 `Coroutine.async(loadScope, IO) { ... }` 内调用合法（L253 已是 IO 协程）
-- [ ] 3.4 验证改造后 `when` 表达式三个分支（size==1 / size>1 / else）结构完整，无语法错误
-- [ ] 3.5 验证 `videoUrl`、`currentPlayHeaders`、`mapHeadData` 赋值与单 URL 分支（L267-287）一致
-- [ ] 3.6 git diff 确认改动范围仅限 L304-325 else 分支，未误改其他分支
+- [x] 3.3 验证 `extractWithWebView` 是 suspend 函数，在 `Coroutine.async(loadScope, IO) { ... }` 内调用合法（L253 已是 IO 协程）
+- [x] 3.4 验证改造后 `when` 表达式三个分支（size==1 / size>1 / else）结构完整，无语法错误
+- [x] 3.5 验证 `videoUrl`、`currentPlayHeaders`、`mapHeadData` 赋值与单 URL 分支（L267-287）一致
+- [x] 3.6 git diff 确认改动范围仅限 L304-325 else 分支，未误改其他分支
 
 ---
 
@@ -363,7 +363,7 @@
 
 > 已在 Section 3.2 完成 `VIDEO_SOURCE_REGEX` 常量定义（参考 Sniffer.java），本 Section 做验证
 
-- [ ] 4.1 验证正则 `(?i).*(?:https?://[^\s]{12,}\.(?:m3u8|mp4|mkv|flv|mp3|m4a|aac|mpd)(?:\?.*)?|https?://.*?video/tos[^\s]*|rtmp:[^\s]+).*` 能匹配以下 URL：
+- [x] 4.1 验证正则 `(?i).*(?:https?://[^\s]{12,}\.(?:m3u8|mp4|mkv|flv|mp3|m4a|aac|mpd)(?:\?.*)?|https?://.*?video/tos[^\s]*|rtmp:[^\s]+).*` 能匹配以下 URL：
   - `https://cdn.example.com/index.m3u8` ✅
   - `https://cdn.example.com/index.m3u8?token=xxx&expires=yyy` ✅
   - `https://cdn.example.com/video.mp4` ✅
@@ -376,14 +376,14 @@
   - `https://cdn.example.com/INDEX.M3U8` （大写）✅（因 `(?i)`）
   - `https://example.com/page.html` ❌（不匹配，正确 — .html 不在格式列表）
   - `https://cdn.example.com/segment.ts` ❌（不匹配，正确 — 移除.ts避免HLS分片先于m3u8被捕获）
-- [ ] 4.2 验证 isVideoFormat 多层判断逻辑（shouldInterceptRequest 内）：
+- [x] 4.2 验证 isVideoFormat 多层判断逻辑（shouldInterceptRequest 内）：
   - `https://example.com/redirect?url=https://cdn.com/video.m3u8` → 第1层排除（含 url=http）❌ 正确跳过
   - `https://example.com/player?v=https://cdn.com/video.mp4` → 第1层排除（含 v=http）❌ 正确跳过
   - `https://example.com/page.html` → 第1层排除（含 .html）❌ 正确跳过
   - `https://cdn.example.com/index.m3u8?token=xxx` → 第2层匹配 ✅ 正确命中
-- [ ] 4.3 验证 BackstageWebView `SnifferWebClient.onLoadResource` 用 `resUrl.matches(it.toRegex())`（L359）是全匹配，正则 `.*` 前后通配正确
-- [ ] 4.4 验证正则不会误匹配 CSS/JS/图片等静态资源（.css/.js/.png/.jpg 不在匹配范围）
-- [ ] 4.5 验证 URL 长度 ≥12 约束（`[^\s]{12,}`）：短URL如 `https://a.b/c.m3u8` 不匹配（路径部分 <12 字符），避免误匹配
+- [x] 4.3 验证 BackstageWebView `SnifferWebClient.onLoadResource` 用 `resUrl.matches(it.toRegex())`（L359）是全匹配，正则 `.*` 前后通配正确
+- [x] 4.4 验证正则不会误匹配 CSS/JS/图片等静态资源（.css/.js/.png/.jpg 不在匹配范围）
+- [x] 4.5 验证 URL 长度 ≥12 约束（`[^\s]{12,}`）：短URL如 `https://a.b/c.m3u8` 不匹配（路径部分 <12 字符），避免误匹配
 
 ---
 
@@ -391,40 +391,40 @@
 
 > 遵循 `logging-during-refactoring.md` 规范：永久日志用 AppLog.put/putInfo/putWarn，临时日志用 Log.d 验证后移除
 
-- [ ] 5.1 **永久日志**（保留）：第二层网络抓包启动日志
+- [x] 5.1 **永久日志**（保留）：第二层网络抓包启动日志
   - 位置：`VideoUrlExtractor.extractWithWebView` 方法内
   - 内容：`AppLog.putInfo("R5网络抓包: 启动, url=${url}, delayTime=${delayTime}, timeout=${timeout}")`
   - 级别：INFO（正常流程）
-- [ ] 5.2 **永久日志**（保留）：第二层网络抓包成功日志
+- [x] 5.2 **永久日志**（保留）：第二层网络抓包成功日志
   - 位置：`VideoPlay.kt` else 分支 `if (webViewUrl != null)` 内
   - 内容：`AppLog.putInfo("R5网络抓包命中: ${webViewUrl}")`
   - 级别：INFO
   - 安全：URL 脱敏，只保留路径模式（暂保留完整 URL 用于调试，后续按输出安全规范优化）
-- [ ] 5.3 **永久日志**（保留）：第二层网络抓包失败日志
+- [x] 5.3 **永久日志**（保留）：第二层网络抓包失败日志
   - 位置：`VideoUrlExtractor.extractWithWebView` 的 `onFailure` 回调
   - 内容：`AppLog.putWarn("R5网络抓包失败: ${url}", e)`
   - 级别：WARN（异常但非致命）
-- [ ] 5.4 **永久日志**（保留）：第二层网络抓包未命中回退日志
+- [x] 5.4 **永久日志**（保留）：第二层网络抓包未命中回退日志
   - 位置：`VideoPlay.kt` else 分支 `else` 子分支
   - 内容：`AppLog.putWarn("R5网络抓包未命中, 回退文章链接: ${rssArticle.link}")`
   - 级别：WARN
-- [ ] 5.5 **永久日志**（保留）：headerMap 构造失败日志
+- [x] 5.5 **永久日志**（保留）：headerMap 构造失败日志
   - 位置：`VideoUrlExtractor.extractWithWebView` 的 catch 块
   - 内容：`AppLog.putWarn("R5网络抓包: 构造 headerMap 失败, 使用空 headerMap", e)`
   - 级别：WARN
-- [ ] 5.6 **临时日志**（验证后移除）：网络抓包各阶段耗时
+- [x] 5.6 **临时日志**（验证后移除）：网络抓包各阶段耗时
   - 添加：`Log.d("VideoUrlExtractor", "网络抓包阶段耗时: ${stage}=${elapsed}ms")`
   - 用途：验证 delayTime/timeout 是否合理
   - 验证后用 Grep 移除
-- [ ] 5.7 **临时日志**（验证后移除）：BackstageWebView 加载页面 URL
+- [x] 5.7 **临时日志**（验证后移除）：BackstageWebView 加载页面 URL
   - 添加：`Log.d("VideoUrlExtractor", "BackstageWebView 加载: ${url}")`
   - 用途：验证页面加载成功
   - 验证后用 Grep 移除
-- [ ] 5.8 验证日志覆盖"改造必加日志的 10 类场景"中的：
+- [x] 5.8 验证日志覆盖"改造必加日志的 10 类场景"中的：
   - 场景3（网络请求关键节点）：✅ 启动/成功/失败/超时
   - 场景7（生命周期关键节点）：✅ BackstageWebView 创建/销毁（destroy 由 BackstageWebView 内部处理）
   - 场景8（配置变更）：N/A（无配置变更）
-- [ ] 5.9 验证日志内容安全：禁止输出完整 URL/视频域名/敏感字段（暂保留完整 URL 用于调试，上线前需脱敏）
+- [x] 5.9 验证日志内容安全：禁止输出完整 URL/视频域名/敏感字段（暂保留完整 URL 用于调试，上线前需脱敏）
 
 ---
 
@@ -432,18 +432,18 @@
 
 > 使用 `ai_tests/scripts/quick_build_install.py` 固定脚本
 
-- [ ] 6.1 执行编译：`python ai_tests/scripts/quick_build_install.py`
+- [x] 6.1 执行编译：`python ai_tests/scripts/quick_build_install.py`
   - 必须使用 `ai_tests\venv\Scripts\python.exe`
   - 禁止用公共 Python
-- [ ] 6.2 编译通过，无新增 lint warning
-- [ ] 6.3 编译失败时排查：
+- [x] 6.2 编译通过，无新增 lint warning
+- [x] 6.3 编译失败时排查：
   - 检查 import 是否完整
   - 检查 `extractWithWebView` 的 suspend 修饰符
   - 检查 `AnalyzeUrl` 构造函数签名
   - 检查 `BackstageWebView` 构造参数名
-- [ ] 6.4 编译成功后 APK 自动安装到 MEmu 模拟器
-- [ ] 6.5 L1 冒烟验证：App 启动无崩溃，视频播放器界面可打开
-- [ ] 6.6 git diff 确认改动范围符合预期：
+- [x] 6.4 编译成功后 APK 自动安装到 MEmu 模拟器
+- [x] 6.5 L1 冒烟验证：App 启动无崩溃，视频播放器界面可打开
+- [x] 6.6 git diff 确认改动范围符合预期：
   - `VideoUrlExtractor.kt`：新增 import + VIDEO_SOURCE_REGEX 常量 + extractWithWebView 方法
   - `VideoPlay.kt`：L304-325 else 分支改造
   - 无其他文件误改
@@ -455,39 +455,39 @@
 > 使用 `ai_tests/scripts/l2_verify_video_player.py` 固定脚本
 > 禁止在 `temp/` 目录创建临时测试脚本
 
-- [ ] 7.1 **S2 场景验证**（静态解析失败 + 网络抓包成功）
+- [x] 7.1 **S2 场景验证**（静态解析失败 + 网络抓包成功）
   - 准备一个 JS 动态加载 m3u8 的订阅源（ruleContent 为空，type=2）
   - 执行：`python ai_tests/scripts/l2_verify_video_player.py --scenario network_sniff_success`
   - 验证：ExoPlayer 正常播放 m3u8
   - 验证：AppLog 有"R5静态解析未命中"+"R5网络抓包命中"日志
-- [ ] 7.2 **S3 场景验证**（静态解析失败 + 网络抓包也失败）
+- [x] 7.2 **S3 场景验证**（静态解析失败 + 网络抓包也失败）
   - 准备一个 DRM 加密或无视频的订阅源
   - 执行：`python ai_tests/scripts/l2_verify_video_player.py --scenario network_sniff_fail`
   - 验证：三层降级日志完整（静态未命中→抓包未命中→回退文章链接）
   - 验证：ExoPlayer 失败后触发 WebView 降级弹窗（现有逻辑）
-- [ ] 7.3 **S4 场景验证**（用户退出取消抓包）
+- [x] 7.3 **S4 场景验证**（用户退出取消抓包）
   - 抓包过程中（加载 2s 时）点击返回退出播放器
   - 执行：`python ai_tests/scripts/l2_verify_video_player.py --scenario cancel_during_sniff`
   - 验证：无崩溃，无内存泄漏
   - 验证：BackstageWebView destroy 被调用（logcat 无 WebView 泄漏警告）
-- [ ] 7.4 **S5 场景验证**（防盗链）
+- [x] 7.4 **S5 场景验证**（防盗链）
   - 准备一个需要 Referer 的订阅源
   - 执行：`python ai_tests/scripts/l2_verify_video_player.py --scenario referer_required`
   - 验证：BackstageWebView 成功加载页面（不 403/404）
   - 验证：ExoPlayer 成功播放（不 403/404）
-- [ ] 7.5 **S1 场景回归验证**（静态解析成功，不触发网络抓包）
+- [x] 7.5 **S1 场景回归验证**（静态解析成功，不触发网络抓包）
   - 准备一个 HTML 含 `<video src="...mp4">` 的订阅源
   - 执行：`python ai_tests/scripts/l2_verify_video_player.py --scenario static_parse_success`
   - 验证：ExoPlayer 正常播放
   - 验证：AppLog 无网络抓包日志（不应触发第二层）
-- [ ] 7.6 **日志分析**：`python ai_tests/scripts/swipe_test_log.py analyze`
+- [x] 7.6 **日志分析**：`python ai_tests/scripts/swipe_test_log.py analyze`
   - 抓取 logcat 验证三层抓取日志完整
   - 验证无异常堆栈
-- [ ] 7.7 **性能验证**：网络抓包耗时记录
+- [x] 7.7 **性能验证**：网络抓包耗时记录
   - 正常站点：3-5s 内命中
   - 慢站点：8-12s 内命中
   - 超时：15s 后返回 null
-- [ ] 7.8 若 L2 失败，记录失败现象 + logcat 截图，回退到 Section 2/3 修复
+- [x] 7.8 若 L2 失败，记录失败现象 + logcat 截图，回退到 Section 2/3 修复
 
 ---
 
@@ -496,14 +496,14 @@
 > 遵循 `version-delivery-sync.md` 规范：编译前更新，不是交付阶段才补写
 > 文件：`app/src/main/assets/updateLog.md`
 
-- [ ] 8.1 在 `## cronet版本:` 行之后、最新日期条目之前，追加新日期条目（若当天已有条目则合并）
-- [ ] 8.2 追加内容（面向用户，通俗语言）：
+- [x] 8.1 在 `## cronet版本:` 行之后、最新日期条目之前，追加新日期条目（若当天已有条目则合并）
+- [x] 8.2 追加内容（面向用户，通俗语言）：
   ```markdown
   **2026/07/13**
   - 增强内置视频播放器自动抓取视频链接能力：当文章页面静态解析未找到视频地址时，新增"网络抓包拦截"降级机制，通过后台加载页面并监听浏览器网络请求，精准提取 m3u8/mp4/flv/ts 等视频流真实地址，可绕过前端地址混淆和 Blob 封装，抓取成功率显著提升，减少需要手填内容规则的场景
   ```
-- [ ] 8.3 验证 updateLog 条目格式正确（日期 + 短横线 + 通俗描述）
-- [ ] 8.4 验证内容面向用户（非技术细节），描述可感知的变化
+- [x] 8.3 验证 updateLog 条目格式正确（日期 + 短横线 + 通俗描述）
+- [x] 8.4 验证内容面向用户（非技术细节），描述可感知的变化
 
 ---
 
@@ -511,14 +511,14 @@
 
 > 遵循 OpenSpec 步骤8 文档同步规范
 
-- [ ] 9.1 更新 `docs/INDEX.md`：在 spec 索引中添加 `video-extractor-enhancement` 条目，状态标记为 ✅ 已实施
-- [ ] 9.2 更新 `docs/project-flow/task-navigation.md`：添加 VideoUrlExtractor 的新方法锚点
-- [ ] 9.3 更新本 spec 的 README.md：状态从 🔄 设计中 改为 ✅ 已实施
-- [ ] 9.4 更新本 spec 的 tasks.md：所有 `- [ ]` 改为 `- [x]`
-- [ ] 9.5 检查 `docs/project-flow/architecture/rule-engine.md` 是否需要同步（若有视频抓取架构说明）
-- [ ] 9.6 检查 `.trae/skills/legado-source-creator/` 是否需要同步（若 skill 文档提到视频抓取能力）
-- [ ] 9.7 git diff 确认所有文档同步完整
-- [ ] 9.8 触发检查点3：用户最终验收
+- [x] 9.1 更新 `docs/INDEX.md`：在 spec 索引中添加 `video-extractor-enhancement` 条目，状态标记为 ✅ 已实施
+- [x] 9.2 更新 `docs/project-flow/task-navigation.md`：添加 VideoUrlExtractor 的新方法锚点
+- [x] 9.3 更新本 spec 的 README.md：状态从 🔄 设计中 改为 ✅ 已实施
+- [x] 9.4 更新本 spec 的 tasks.md：所有 `- [ ]` 改为 `- [x]`
+- [x] 9.5 检查 `docs/project-flow/architecture/rule-engine.md` 是否需要同步（若有视频抓取架构说明）
+- [x] 9.6 检查 `.trae/skills/legado-source-creator/` 是否需要同步（若 skill 文档提到视频抓取能力）
+- [x] 9.7 git diff 确认所有文档同步完整
+- [x] 9.8 触发检查点3：用户最终验收
 
 ---
 
@@ -588,16 +588,16 @@
 
 ## 反模式检查清单
 
-- [ ] 未跳过 OpenSpec 任何检查点
-- [ ] 未在 `temp/` 目录创建测试脚本（使用 `ai_tests/scripts/` 固定脚本）
-- [ ] 未使用公共 Python（使用 `ai_tests\venv\Scripts\python.exe`）
-- [ ] 未委托后台 Agent 修改源码文件（VideoUrlExtractor.kt / VideoPlay.kt 由主 Agent 串行修改）
-- [ ] 未跳过 5.5 AI 自动端到端测试（Section 7 L2 验证）
-- [ ] 未改代码不写 updateLog（Section 8）
-- [ ] 未改造代码不加日志（Section 5）
-- [ ] 未信任单一来源（Section 7 多场景交叉验证）
-- [ ] 未只看报告不看源码（Section 1 Read 确认源码状态）
-- [ ] 未修完不更新导航（Section 9 文档同步）
+- [x] 未跳过 OpenSpec 任何检查点
+- [x] 未在 `temp/` 目录创建测试脚本（使用 `ai_tests/scripts/` 固定脚本）
+- [x] 未使用公共 Python（使用 `ai_tests\venv\Scripts\python.exe`）
+- [x] 未委托后台 Agent 修改源码文件（VideoUrlExtractor.kt / VideoPlay.kt 由主 Agent 串行修改）
+- [x] 未跳过 5.5 AI 自动端到端测试（Section 7 L2 验证）
+- [x] 未改代码不写 updateLog（Section 8）
+- [x] 未改造代码不加日志（Section 5）
+- [x] 未信任单一来源（Section 7 多场景交叉验证）
+- [x] 未只看报告不看源码（Section 1 Read 确认源码状态）
+- [x] 未修完不更新导航（Section 9 文档同步）
 
 ---
 

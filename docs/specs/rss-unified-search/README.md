@@ -1,6 +1,6 @@
 # 订阅源统一搜索功能 (RSS Unified Search)
 
-> **状态标记**：🔄 设计中
+> **状态标记**：✅ 已实施（RssSearchActivity 全套源码实证，勾选已同步）
 > **创建日期**：2026-07-20
 > **功能代号**：rss-unified-search
 

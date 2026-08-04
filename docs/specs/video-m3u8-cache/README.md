@@ -1,9 +1,11 @@
 # 视频播放器 m3u8 边下边播缓存
 
-> **状态**：✅ 已实施（待真机验证）
+> **状态**：✅ 已实施（编译通过，待真机验证）
 > **创建日期**：2026-07-08
 > **优先级**：P2（体验增强，非阻塞）
 > **核心原则**：最小改动，复用现有 cache 参数与配置体系，默认开启可关闭
+
+> **实施偏差（2026-08-04）**：`VideoPlay.cachePlay` 为 @Deprecated 且 getter 恒返回 `false`（旧 GSY ProxyCacheManager 代理缓存路径已被 P0-2 统一缓存机制废弃）。实际缓存由 ExoPlayer SimpleCache 承担，经 `ExoPlayerHelper.cacheDataSourceFactory` 单点控制。故开关实装为 `VideoPlay.videoCache`（默认 `true`），在 `ExoPlayerHelper.cacheDataSourceFactory` 处按开关返回缓存/直连 DataSource，并在设置对话框与悬浮面板均新增"边下边播"勾选项（重启生效）。
 
 ---
 

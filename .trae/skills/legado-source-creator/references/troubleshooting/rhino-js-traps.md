@@ -564,3 +564,66 @@ var result=r.join(LF);
 **铁证**：7源sortUrl的JS用`r.join('\\n')`拼接12个分类，Legado解析后分类标签消失（实际是合并为一个含`\n`字面量的字符串）。改为`r.join(String.fromCharCode(10))`后12个分类正常显示。
 
 **经验来源**：`[经验来源:JSON双重转义换行符范式]`
+
+## 陷阱70: Rhino顶层return触发msg.bad.return「返回的值无效」（@js规则必须用IIFE包裹）
+
+**现象**：@js规则（ruleNextPage/ruleArticles等）用顶层 `return` 语句，解析时 logcat 出现 `AnalyzeRule JS 编译失败: EvaluatorException: 返回的值无效`。**每次进列表/搜索都会出现1条该日志**，且规则实际失效。
+
+**根因**：Rhino Parser 对**脚本顶层（非函数体内）的 `return` 语句**编译时报 `msg.bad.return`。中文环境命中 `Messages_zh_CN.properties` 的 `msg.bad.return = 返回的值无效`。编译失败→getOrCompileScript 返回 null→规则返回 null→功能失效。
+
+**错误信息**：
+```
+org.mozilla.javascript.EvaluatorException: 返回的值无效
+```
+
+**验证**（JVM + Rhino 1.8.1 实测）：
+```javascript
+// ❌ 顶层return → FAIL msg.bad.return
+if (!m) return ''; ... return u;
+
+// ✅ IIFE包裹 → OK
+(function(){ if (!m) return ''; ... return u; })()
+```
+
+**解决方案**：@js 规则体**禁止顶层 return**，必须用 IIFE `(function(){ ... })()` 包裹。
+
+**适用场景**：
+- ruleNextPage 取下一页URL（`PAGE` 关键字外）
+- 任何 @js 内联规则的顶层 return
+
+**陷阱65补充**：`u.length`（属性）而非 `u.length()`（方法调用）——见陷阱59。
+
+**铁证**：ruleNextPage 用顶层 return 时翻页从未生效（首页 grid 只有第1页24条），改为 IIFE 后 `Rss 开始获取RSS文章 page=3/4/5/6` 正常翻页。
+
+## 陷阱71: jsoup Java String.replace(正则, 字符串)触发「对应 Java 方法 String.replace 选择不明确」
+
+**现象**：@js 规则中对 jsoup 元素属性值（Java String）调用 `.replace(/-/g, ' ')` 或 `.replace(/\/+$/, '')`，解析时 logcat 报 `org.mozilla.javascript.EvaluatorException: 对应 Java 方法 String.replace 选择不明确`，且 `AnalyzeRule JS 编译失败: 返回的值无效`。
+
+**错误信息**：
+```
+EvaluatorException: 对应于 JavaScript 参数类型 (object,string) 的 Java 方法 java.lang.String.replace 的选择不明确
+```
+
+**根因**：jsoup `el.attr('href')` 返回的是 `java.lang.String`（Java 字符串，非 JS 原生 String）。Rhino 对该对象调用 `.replace()` 时，JS 的 `String.prototype.replace` 与 Java 的 `String.replace(CharSequence, CharSequence)` 重载签名歧义，抛「选择不明确」。
+
+**解决方案**（ES5 安全写法，禁用正则参数）：
+```javascript
+// ❌ 错误：Java String.replace 正则参数歧义
+var t = el.attr('href').replace(/-/g, ' ');
+
+// ✅ 正确1：split + join 替代（最安全，纯JS方法）
+var t = el.attr('href').split('-').join(' ');
+
+// ✅ 正确2：先 String() 转 JS 原生字符串再用 replace
+var t = String(el.attr('href')).replace(/-/g, ' ');
+
+// ✅ 尾部斜杠去除（ES5 循环替代 replace(/\/+$/, '')）
+var tmp = el.attr('href');
+while (tmp.length > 0 && tmp.charAt(tmp.length-1) === '/') tmp = tmp.substring(0, tmp.length-1);
+```
+
+**通用规则**：Rhino JS 中调用返回 `java.lang.String` 的方法（`el.attr()` / `java.ajax()` / `String()` 等）后，要调用 `.replace(正则, 字符串)` 前必须先 `String()` 转 JS 原生字符串，或改用 `split().join()` 避免正则参数歧义。
+
+**铁证**：grid 分支 `t.replace(/-/g, ' ')` 导致搜索（RssSearchActivity）整条规则编译失败返回无效；改为 `split('-').join(' ')` 后搜索 12 条结果正常显示。
+
+**经验来源**：`[经验来源:Rhino String.replace歧义范式]`

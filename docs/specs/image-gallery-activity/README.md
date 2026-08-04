@@ -1,6 +1,6 @@
 # 图片浏览器 Activity 化改造（image-gallery-activity）
 
-> 状态：✅ 设计完成 → 🔄 开发中
+> 状态：♻️ 被取代（双 ViewPager2 架构被 [image-player-vertical-canvas-optimization](../image-player-vertical-canvas-optimization/) 显式废弃，勿按本文档继续实现）
 > 创建时间：2026-07-25
 > 类型：功能优化 / 架构改造
 
