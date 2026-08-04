@@ -13,9 +13,9 @@
 
 ## 状态
 
-🔄 设计中（v4，检查点1已基于review-report.md完成BLK-1~3+ADJ-1~9全部修订）
+✅ 实施完成（源码实证 49/54：parseConcurrency/双并发配置 + CheckRssSourceService 5维校验去重权重回填全落地；余运行时实测项）
 
-**前置验证（实施前必须）**：编译测试 GlideExecutor.newSourceExecutor(threadCount: Int) 在 Glide 5.0.5 的可用性。验证失败则需求一降级（仅保留解析并发配置化）。
+**前置验证（已通过）**：GlideExecutor.newSourceExecutor(threadCount: Int) 已在 Glide 5.0.5 落地（LegadoGlideModule.kt:53）。
 
 ## 文档索引
 

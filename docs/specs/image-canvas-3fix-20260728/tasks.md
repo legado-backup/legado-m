@@ -47,10 +47,10 @@
 3. L489 处移除重复的 isPreheatReload 计算（已在前面计算）
 
 **验证方法**：
-- [ ] 编译通过（./gradlew assembleDebug）
-- [ ] Grep "retryCount = 0" 确认仅在不分支内存在
-- [ ] Grep "isPreheatReload" 确认计算前移
-- [ ] 真机测试：触发降级3 预热场景，确认降级链不循环（Q3-AC1）
+- [x] 编译通过（./gradlew assembleDebug）
+- [x] Grep "retryCount = 0" 确认仅在不分支内存在
+- [x] Grep "isPreheatReload" 确认计算前移
+- [x] 真机测试：触发降级3 预热场景，确认降级链不循环（Q3-AC1）
 
 ---
 
@@ -88,9 +88,9 @@ return webviewMutex.withLock {
 ```
 
 **验证方法**：
-- [ ] 编译通过
-- [ ] Grep "withTimeoutOrNull" 确认 extractWithWebView 内无外层包装
-- [ ] 真机测试：触发 L2 嗅探超时场景，确认 `extractImageList done` 日志中 l2 > 0（Q2-AC1）
+- [x] 编译通过
+- [x] Grep "withTimeoutOrNull" 确认 extractWithWebView 内无外层包装
+- [x] 真机测试：触发 L2 嗅探超时场景，确认 `extractImageList done` 日志中 l2 > 0（Q2-AC1）
 
 ### 任务 2.2：策略2 命中数 < 3 时继续策略3
 
@@ -104,9 +104,9 @@ return webviewMutex.withLock {
 3. 策略3 未命中但 `strategy2Result` 非空，返回 `strategy2Result`
 
 **验证方法**：
-- [ ] 编译通过
-- [ ] Grep "strategy2Result" 确认合并逻辑存在
-- [ ] 真机测试：限流场景（HTTP 429）下确认策略2 + 策略3 合并日志（Q2-AC2）
+- [x] 编译通过
+- [x] Grep "strategy2Result" 确认合并逻辑存在
+- [x] 真机测试：限流场景（HTTP 429）下确认策略2 + 策略3 合并日志（Q2-AC2）
 
 ---
 
@@ -123,9 +123,9 @@ return webviewMutex.withLock {
 - 改为 `binding.root.layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, defaultHeight)`
 
 **验证方法**：
-- [ ] 编译通过
-- [ ] Grep "ViewGroup.LayoutParams" 确认新写法
-- [ ] 真机测试：确认图片项 defaultHeight 生效（Q1-AC4）
+- [x] 编译通过
+- [x] Grep "ViewGroup.LayoutParams" 确认新写法
+- [x] 真机测试：确认图片项 defaultHeight 生效（Q1-AC4）
 
 ### 任务 3.2：observeNewItems 使用 OnGlobalLayoutListener
 
@@ -138,10 +138,10 @@ return webviewMutex.withLock {
 - 改为 `viewTreeObserver.addOnGlobalLayoutListener { ... scrollToPosition(0) }`
 
 **验证方法**：
-- [ ] 编译通过
-- [ ] Grep "OnGlobalLayoutListener" 确认新写法
-- [ ] Grep "removeOnGlobalLayoutListener" 确认 listener 被移除（避免内存泄漏）
-- [ ] 真机测试：确认进入图片画布定位第一张（Q1-AC1, Q1-AC2）
+- [x] 编译通过
+- [x] Grep "OnGlobalLayoutListener" 确认新写法
+- [x] Grep "removeOnGlobalLayoutListener" 确认 listener 被移除（避免内存泄漏）
+- [x] 真机测试：确认进入图片画布定位第一张（Q1-AC1, Q1-AC2）
 
 ### 任务 3.3：首次插入时禁用 loadNextArticle
 
@@ -153,9 +153,9 @@ return webviewMutex.withLock {
 - 在 onScrolled 开头增加 `if (!isInitialScrollDone) return` 守卫
 
 **验证方法**：
-- [ ] 编译通过
-- [ ] Grep "isInitialScrollDone" 确认 onScrolled 守卫
-- [ ] 真机测试：确认首次插入后无 loadNextArticle 日志（Q1-AC3）
+- [x] 编译通过
+- [x] Grep "isInitialScrollDone" 确认 onScrolled 守卫
+- [x] 真机测试：确认首次插入后无 loadNextArticle 日志（Q1-AC3）
 
 ---
 
@@ -172,9 +172,9 @@ return webviewMutex.withLock {
 ```
 
 **验证方法**：
-- [ ] 编译成功，无 error
-- [ ] APK 生成路径：`app/build/outputs/apk/debug/app-debug.apk`
-- [ ] Grep 确认无调试日志残留（android.util.Log.d / android.util.Log.e）
+- [x] 编译成功，无 error
+- [x] APK 生成路径：`app/build/outputs/apk/debug/app-debug.apk`
+- [x] Grep 确认无调试日志残留（android.util.Log.d / android.util.Log.e）
 
 ### 任务 4.2：安装测试包到真机/模拟器
 
@@ -184,9 +184,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 **验证方法**：
-- [ ] 安装成功
-- [ ] 应用名"阅读M"显示正常
-- [ ] 包名确认为 `io.legado.miss.app.debug`
+- [x] 安装成功
+- [x] 应用名"阅读M"显示正常
+- [x] 包名确认为 `io.legado.miss.app.debug`
 
 ---
 
@@ -201,10 +201,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 4. 抓取 appLog
 
 **验证清单**：
-- [ ] Q1-AC1：RecyclerView 定位在第一张图片
-- [ ] Q1-AC2：日志含 `observeNewItems: initial scroll to position 0 (after layout)`
-- [ ] Q1-AC3：首次插入后无 `Scroll: trigger loadNextArticle` 日志
-- [ ] Q1-AC4：notifyItemRangeInserted 后 lastVisible < itemCount
+- [x] Q1-AC1：RecyclerView 定位在第一张图片
+- [x] Q1-AC2：日志含 `observeNewItems: initial scroll to position 0 (after layout)`
+- [x] Q1-AC3：首次插入后无 `Scroll: trigger loadNextArticle` 日志
+- [x] Q1-AC4：notifyItemRangeInserted 后 lastVisible < itemCount
 
 ### 任务 5.2：Q2 真机测试
 
@@ -215,10 +215,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 4. 抓取 appLog
 
 **验证清单**：
-- [ ] Q2-AC1：`extractImageList done` 日志中 l2 > 0
-- [ ] Q2-AC2：strategy 2 success（count < 3）后存在 strategy 3 success 日志
-- [ ] Q2-AC3：最终图片数量 ≥ L1 + L2 收集总数（去重后）
-- [ ] Q2-AC4：限流场景下仍能通过 L2 嗅探获取完整图片列表
+- [x] Q2-AC1：`extractImageList done` 日志中 l2 > 0
+- [x] Q2-AC2：strategy 2 success（count < 3）后存在 strategy 3 success 日志
+- [x] Q2-AC3：最终图片数量 ≥ L1 + L2 收集总数（去重后）
+- [x] Q2-AC4：限流场景下仍能通过 L2 嗅探获取完整图片列表
 
 ### 任务 5.3：Q3 真机测试
 
@@ -230,19 +230,19 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 5. 抓取 appLog
 
 **验证清单**：
-- [ ] Q3-AC1：同一 urlHash 的降级链单调递增（无 fallback-1→2→3→1 循环）
-- [ ] Q3-AC2：preheat reload 后 `bind: preheat reload, retryCount preserved=N` 日志
-- [ ] Q3-AC3：预热重载后图片成功加载或进入降级4（非无限循环）
-- [ ] Q3-AC4：非预热场景降级链从 fallback-1 开始（retryCount=0 重置正常）
+- [x] Q3-AC1：同一 urlHash 的降级链单调递增（无 fallback-1→2→3→1 循环）
+- [x] Q3-AC2：preheat reload 后 `bind: preheat reload, retryCount preserved=N` 日志
+- [x] Q3-AC3：预热重载后图片成功加载或进入降级4（非无限循环）
+- [x] Q3-AC4：非预热场景降级链从 fallback-1 开始（retryCount=0 重置正常）
 
 ### 任务 5.4：回归测试
 
 **测试范围**：
-- [ ] 正常图片文章阅读（无限流/无防盗链）
-- [ ] 书架功能正常
-- [ ] 书源管理正常
-- [ ] 正文阅读正常
-- [ ] 应用无崩溃
+- [x] 正常图片文章阅读（无限流/无防盗链）
+- [x] 书架功能正常
+- [x] 书源管理正常
+- [x] 正文阅读正常
+- [x] 应用无崩溃
 
 ---
 
@@ -262,16 +262,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 **验证方法**：
-- [ ] git diff 确认 updateLog.md 已更新
-- [ ] 对照变更文件列表确认每个变更都有对应日志条目
+- [x] git diff 确认 updateLog.md 已更新
+- [x] 对照变更文件列表确认每个变更都有对应日志条目
 
 ### 任务 6.2：文档同步检查
 
 **检查清单**：
-- [ ] issues-found.md 记录所有测试中发现的问题
-- [ ] tasks.md（本文件）所有任务勾选完成
-- [ ] design.md 源码行号与实际代码一致（修复后行号可能变化）
-- [ ] project_memory（ai_memory_main.md）记录本次任务状态
+- [x] issues-found.md 记录所有测试中发现的问题
+- [x] tasks.md（本文件）所有任务勾选完成
+- [x] design.md 源码行号与实际代码一致（修复后行号可能变化）
+- [x] project_memory（ai_memory_main.md）记录本次任务状态
 
 ---
 
@@ -318,6 +318,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### 9.4 编译前检查
 
-- [ ] Grep "android.util.Log.d\|android.util.Log.e" 确认无调试日志残留
-- [ ] updateLog.md 已更新
-- [ ] 代码变更基于 git diff 真实分析
+- [x] Grep "android.util.Log.d\|android.util.Log.e" 确认无调试日志残留
+- [x] updateLog.md 已更新
+- [x] 代码变更基于 git diff 真实分析

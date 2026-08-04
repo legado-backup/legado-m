@@ -115,6 +115,7 @@
 | [specs/cronet-proguard-fix-20260731/](./specs/cronet-proguard-fix-20260731/) | release包Cronet ProGuard规则修复（R8混淆移除org.chromium.net.Cronet入口类导致libcronet.so JNI_OnLoad SIGABRT崩溃9次，嗅探能力减弱；精准补全keep规则保留API入口类） 🔄 设计中 |
 | [specs/cronet-so-download-fix-20260731/](./specs/cronet-so-download-fix-20260731/) | Cronet SO下载修复+嗅探能力恢复（真机日志铁证：DoH 3服务器全失败+HTTP/2协议错误降级OkHttp+SO下载源Google Storage国内不稳定；修复DoH服务器配置增加阿里腾讯+切换SO下载源到GitHub Releases+修复下载逻辑+优化HTTP/2降级时长+恢复嗅探超时5s） 🔄 设计中 |
 | [specs/cronet-global-enable-20260731/](./specs/cronet-global-enable-20260731/) | Cronet 全局启用深度分析与优化方案（深度分析4大已用模块OkHttp/ExoPlayer/DoH/AnalyzeUrl+3大未用模块WebView/Glide/HttpURLConnection；识别isCronet开关不一致问题：ExoPlayer+DoH不受开关控制；统一开关逻辑+日志诊断增强+ProGuard规则完善） 🔄 设计中 |
+| [specs/rhino-engine-upgrade/](./specs/rhino-engine-upgrade/) | Rhino 引擎升级兼容性分析（字节码实证：1.9.1 唯一 VarHandle 出处 SlotMapOwner$ThreadedAccess；运行时探针证实该项目配置下该 class 永不加载、26/26 书源片段通过、书源型负载 +31%；唯一障碍收敛为构建期 D8 反糖化） ✅ 已完成 — 最终决策=保持锁定 1.8.1，沉淀「待抬 minSdk≥33 直跳 1.9.1」里程碑 |
 | [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
 | [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
 | [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager等10项集成设计） 🔄 设计中 |

@@ -11,12 +11,12 @@
 
 > 优先级最高，独立于其他任务，可先行实施验证。
 
-- [ ] 1.1 移除 `BookSourceActivity.kt` 中的 `groupMenuLifecycleOwner`
+- [x] 1.1 移除 `BookSourceActivity.kt` 中的 `groupMenuLifecycleOwner`
   - 删除 L149-161 的 `groupMenuLifecycleOwner` 定义
   - 删除 `onMenuOpened` / `onPanelClosed` 中的 `groupMenuLifecycleOwner.onMenuOpened/onMenuClosed()` 调用
   - **验证**：编译通过，搜索 `groupMenuLifecycleOwner` 全项目无残留引用
 
-- [ ] 1.2 重写 `initLiveDataGroup()` 方法
+- [x] 1.2 重写 `initLiveDataGroup()` 方法
   - 改为 `lifecycleScope.launch { appDb.bookSourceDao.flowGroups().flowOn(IO).conflate().collect { ... } }`
   - collect 块内：`groups.clear()` → `groups.addAll(it)` → `upGroupMenu()` → `if (isShowingFolder) upFolderView()`
   - 对齐订阅源 `RssSourceActivity.initGroupFlow()` 的实现
@@ -28,27 +28,27 @@
 
 > 为 UI 层提供数据查询能力和配置持久化能力。
 
-- [ ] 2.1 `BookSourceDao.kt` 新增 `flowByType` 方法
+- [x] 2.1 `BookSourceDao.kt` 新增 `flowByType` 方法
   - 在 `BookSourceDao.kt` 中添加：`@Query("select * from book_sources_part where bookSourceType = :type order by customOrder asc") fun flowByType(type: Int): Flow<List<BookSourcePart>>`
   - 注意：`book_sources_part` 是 DatabaseView，字段名是 `bookSourceType`（不是 `type`）
   - **验证**：编译通过
 
-- [ ] 2.2 `RssSourceDao.kt` 新增 `flowByType` 方法
+- [x] 2.2 `RssSourceDao.kt` 新增 `flowByType` 方法
   - 在 `RssSourceDao.kt` 中添加：`@Query("select * from rssSources where type = :type order by customOrder") fun flowByType(type: Int): Flow<List<RssSource>>`
   - **验证**：编译通过
 
-- [ ] 2.3 新建 `RssSourceSort.kt` 枚举
+- [x] 2.3 新建 `RssSourceSort.kt` 枚举
   - 路径：`app/src/main/java/io/legado/app/ui/rss/source/manage/RssSourceSort.kt`
   - 内容：`enum class RssSourceSort { Default, Name, Url, Update, Enable }`
   - 参考 `BookSourceSort.kt` 的结构
   - **验证**：编译通过
 
-- [ ] 2.4 `PreferKey.kt` 新增配置 key
+- [x] 2.4 `PreferKey.kt` 新增配置 key
   - 新增 `const val rssSort = "rssSort"`
   - 新增 `const val rssSortAscending = "rssSortAscending"`
   - **验证**：编译通过
 
-- [ ] 2.5 `AppConfig.kt` 新增订阅源排序配置
+- [x] 2.5 `AppConfig.kt` 新增订阅源排序配置
   - 新增 `var rssSort: Int`（getPrefInt 默认 0，对应 RssSourceSort.Default）
   - 新增 `var rssSortAscending: Boolean`（getPrefBoolean 默认 true）
   - **验证**：编译通过
@@ -59,7 +59,7 @@
 
 > 新增菜单项、item 布局、统一配置对话框。
 
-- [ ] 3.1 `book_source.xml` 新增类型筛选 SubMenu
+- [x] 3.1 `book_source.xml` 新增类型筛选 SubMenu
   - 在 `menu_group` 的 `<menu>` 内（`source_group` 之前或之后）新增：
     ```xml
     <item android:id="@+id/menu_type" android:title="@string/source_type">
@@ -77,39 +77,39 @@
     ```
   - **验证**：菜单预览可见类型子菜单
 
-- [ ] 3.2 `rss_source.xml` 新增排序 + 类型筛选 SubMenu
+- [x] 3.2 `rss_source.xml` 新增排序 + 类型筛选 SubMenu
   - 新增排序 SubMenu（参考 `book_source.xml` 的 `action_sort` 结构，仅含手动/名称/URL/更新时间/启用状态 + 倒序）
   - 新增类型筛选 SubMenu（仅含全部/网页/图片/视频，对应 type 0/1/2）
   - **验证**：菜单预览可见排序和类型子菜单
 
-- [ ] 3.3 `strings.xml` 新增字符串资源
+- [x] 3.3 `strings.xml` 新增字符串资源
   - 新增：`source_type`（类型）、`type_text`（文本）、`type_audio`（音频）、`type_image`（图片）、`type_file`（文件）、`type_video`（视频）
   - 新增：`view_mode_list`（列表）、`view_mode_compact`（紧凑列表）、`view_mode_grid_2`（网格2列）、`view_mode_grid_3`（网格3列）、`view_mode_folder`（文件夹）
   - 新增：`sort_by_lastUpdateTime`（如已存在则复用）
   - **验证**：编译通过，无字符串资源缺失警告
 
-- [ ] 3.4 新建 `item_book_source_compact.xml`
+- [x] 3.4 新建 `item_book_source_compact.xml`
   - 路径：`app/src/main/res/layout/item_book_source_compact.xml`
   - 紧凑列表 item：单行显示源名 + 启用状态指示，高度小于列表 item
   - 参考 `item_book_source_list.xml`（如存在）的结构，精简布局
   - **验证**：布局预览可见
 
-- [ ] 3.5 新建 `item_book_source_grid.xml`
+- [x] 3.5 新建 `item_book_source_grid.xml`
   - 路径：`app/src/main/res/layout/item_book_source_grid.xml`
   - 网格 item：卡片样式，源名 + 启用状态，固定宽度
   - **验证**：布局预览可见
 
-- [ ] 3.6 新建 `item_rss_source_compact.xml`
+- [x] 3.6 新建 `item_rss_source_compact.xml`
   - 路径：`app/src/main/res/layout/item_rss_source_compact.xml`
   - 参考 `item_book_source_compact.xml` 结构，适配订阅源字段（sourceName / sourceUrl）
   - **验证**：布局预览可见
 
-- [ ] 3.7 新建 `item_rss_source_grid.xml`
+- [x] 3.7 新建 `item_rss_source_grid.xml`
   - 路径：`app/src/main/res/layout/item_rss_source_grid.xml`
   - 参考 `item_book_source_grid.xml` 结构
   - **验证**：布局预览可见
 
-- [ ] 3.8 新建 `dialog_source_config.xml`
+- [x] 3.8 新建 `dialog_source_config.xml`
   - 路径：`app/src/main/res/layout/dialog_source_config.xml`
   - 参考 `dialog_bookshelf_config.xml` 结构
   - 包含：RadioGroup `rgView`（5个 RadioButton：列表/紧凑/网格2列/网格3列/文件夹）+ RadioGroup `rgSort`（5-7个排序项）+ SeekBar `sbMargin`
@@ -143,7 +143,7 @@
 
 > 将数据层、UI 资源层、Adapter 层集成到 Activity，实现完整功能。
 
-- [ ] 5.1 `BookSourceActivity.kt` 扩展 `applyListView()` 方法
+- [x] 5.1 `BookSourceActivity.kt` 扩展 `applyListView()` 方法
   - 根据 `AppConfig.sourceViewMode` 选择 LayoutManager 和 item 类型：
     - 0 → LinearLayoutManager + 列表 item
     - 2 → LinearLayoutManager + 紧凑 item
@@ -164,11 +164,11 @@
   - 对话框 OK 回调：保存视图模式 + 排序 + 间距，调用 `applyListView()` / `applyFolderView()` 刷新
   - **验证**：对话框显示正常，切换配置后视图立即刷新
 
-- [ ] 5.4 `RssSourceActivity.kt` 扩展 `applyListView()` 方法
+- [x] 5.4 `RssSourceActivity.kt` 扩展 `applyListView()` 方法
   - 同 5.1，适配订阅源
   - **验证**：切换视图模式后列表布局正确变化
 
-- [ ] 5.5 `RssSourceActivity.kt` 新增排序逻辑
+- [x] 5.5 `RssSourceActivity.kt` 新增排序逻辑
   - 新增 `sort` 和 `sortAscending` 变量
   - 在 `upSourceFlow` 的 Flow map 操作符中根据 `sort` 排序
   - 在 `onCompatOptionsItemSelected` 中处理排序菜单项

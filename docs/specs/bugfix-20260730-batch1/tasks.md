@@ -1,6 +1,6 @@
 # Bug修复批次1 - 任务清单
 
-> 状态: ✅ 分析完成
+> 状态: ✅ 实施完成（12 bug 已修复入码，含 BUG6-9-V2；待真机验证）
 
 ## 0. 已修复验证通过的BUG（无需操作）
 
@@ -27,23 +27,23 @@
 
 ## 2. 新发现隐藏BUG修复（P1，7-30日志深度分析）
 
-- [ ] 2.1 修复BUG6-V2: Cronet恢复探测误判导致降级震荡
+- [x] 2.1 修复BUG6-V2: Cronet恢复探测误判导致降级震荡
   - 在CronetInterceptor.kt中：恢复探测改用最近失败过的host（而非随机可达host）
   - 增加观察窗口期：切回Cronet后持续观察30秒，失败率>50%则立即回退OkHttp
   - 增加降级计数器：连续降级超过3次后，恢复探测间隔指数退避（5min→10min→20min）
   - 验证方法：真机测试日志中不再出现5轮降级-恢复-再降级循环
 
-- [ ] 2.2 修复BUG7-V2: DNS negative cache导致已失败host不重试
+- [x] 2.2 修复BUG7-V2: DNS negative cache导致已失败host不重试
   - 在OkHttpHelper.kt或自定义Dns类中：失败结果TTL上限30秒，超期强制重试
   - 或在NetworkCallback网络恢复事件中：主动清除DNS negative cache
   - 验证方法：网络恢复后日志中不再出现"negative cache hit"导致的不重试
 
-- [ ] 2.3 修复BUG8-V2: rssRoutes为空解析遗漏
+- [x] 2.3 修复BUG8-V2: rssRoutes为空解析遗漏
   - 在WebBook.kt或BookContent.kt的getRoutesContentAwait入口：ruleRoutes使用isNullOrBlank()替代!=null
   - 若ruleRoutes为空字符串：直接走默认线路解析逻辑
   - 验证方法：日志中不再出现"routesNull=true, routesSize=0"（应为routesNull=true直接跳过规则解析）
 
-- [ ] 2.4 修复BUG9-V2: DNS解析到0.0.0.0回环超时
+- [x] 2.4 修复BUG9-V2: DNS解析到0.0.0.0回环超时
   - 在AnalyzeUrl.kt或自定义Dns类中：解析后过滤loopback/linkLocal/anyLocal地址
   - 过滤列表：0.0.0.0、[::]、127.x.x.x、169.254.x.x
   - 若所有结果被过滤：触发重新解析或降级到系统DNS

@@ -1,6 +1,6 @@
 # P0 核心 Bug 修复（第一轮）
 
-> **状态**：🔄 设计中
+> **状态**：✅ 实施完成（代码 38/49 勾选；余 E2E 自动化测试 3.3-3.8 与交付 5.x 待跑）
 > **创建日期**：2026-07-09
 > **关联审查报告**：[yesterday-changes-deep-audit/audit-report.md](../yesterday-changes-deep-audit/audit-report.md)
 > **修复范围**：P0 核心 bug 4 项（M-01/M-02 + F-01 + V-01 + C-01）

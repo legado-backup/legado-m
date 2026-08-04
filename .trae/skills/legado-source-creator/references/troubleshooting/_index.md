@@ -32,7 +32,7 @@
 
 - ✅ 包含：ES6不可用、正则兼容性、byte数组、字符串转字节、内置方法优先、RSS @js result对象、广告排除、加密图片处理、**NativeJavaObject toString哈希（#79）**、**unwrapRhinoResult 6种类型解包**、**Rhino类型转换陷阱（java.ajax返回Java String，陷阱55）**、**player_data JSON提取平衡括号算法（陷阱56）**、**协程IO线程死锁陷阱（陷阱58，含java.ajax()的JS不能在Dispatchers.IO执行）**
 - ❌ 不包含：源类型选择问题（→ source-type-traps.md）、JS技巧模式（→ ../js-patterns/）、视频源URL转换/嗅探（→ video-source-traps.md）、动态域名解析（→ dynamic-domain-traps.md）
-- **触发关键词**：Rhino, ES6, let, const, 箭头函数, 正则, byte, 字节, result, Element, 广告排除, NativeJavaObject, unwrap, 仿真器哈希, Java String, 类型转换, 平衡括号, player_data, JSON提取, charAt, length, 协程, 死锁, Dispatchers.IO, ajax死锁, 线程执行器, Executors
+- **触发关键词**：Rhino, ES6, let, const, 箭头函数, 正则, byte, 字节, result, Element, 广告排除, NativeJavaObject, unwrap, 仿真器哈希, Java String, 类型转换, 平衡括号, player_data, JSON提取, charAt, length, 协程, 死锁, Dispatchers.IO, ajax死锁, 线程执行器, Executors, 返回的值无效, msg.bad.return, 顶层return, IIFE, String.replace, 选择不明确, split-join
 - **自进化写入规则**：当发现新的Rhino语法限制或JS兼容性问题时追加
 
 ### source-type-traps.md

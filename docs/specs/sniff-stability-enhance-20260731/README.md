@@ -1,6 +1,6 @@
 # sniff-stability-enhance-20260731（嗅探稳定性增强）
 
-> 🔄 设计中
+> 🔄 部分实施（9 项 FR 大体已落地；FR-3 路径直通部分，走 videoStreamClient 路线）
 
 ## 功能概述
 

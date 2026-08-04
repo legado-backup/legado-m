@@ -18,7 +18,7 @@
   - 右侧 cb_book_source(16sp) + tv_book_source_url(13sp, drawableStart=ic_author) + tv_debug_text(13sp, drawableStart=ic_history)
   - 右侧操作 swt_enabled + iv_edit(48dp) + iv_menu_more(48dp) + iv_explore(8dp) + iv_progressBar(25dp)
   - 顶部 tv_host_text（域名分组标题）
-- [ ] **T1.2** 重构 item_book_source_compact.xml（书源紧凑列表，参考 item_bookshelf_list2.xml）
+- [x] **T1.2** 重构 item_book_source_compact.xml（书源紧凑列表，参考 item_bookshelf_list2.xml）
   - 左侧 FrameLayout 48x64dp + bg_source_folder_cover + tv_source_initial(20sp白色加粗) + v_enabled_dot(8dp)
   - 右侧 cb_book_source(**16sp**, ADR-18字号变更从14sp) + tv_book_source_url(13sp, 合并行格式)
   - 右侧操作 swt_enabled
@@ -28,40 +28,40 @@
 
 ### 阶段2：订阅源布局重构
 
-- [ ] **T2.1** 调查 RssSourceActivity.applyListView 现状，确认已有列表模式（layout=0）—— 已确认（ADR-5）
-- [ ] **T2.2** 重构 item_rss_source.xml（订阅源列表，参考 item_book_source.xml 结构）
+- [x] **T2.1** 调查 RssSourceActivity.applyListView 现状，确认已有列表模式（layout=0）—— 已确认（ADR-5）
+- [x] **T2.2** 重构 item_rss_source.xml（订阅源列表，参考 item_book_source.xml 结构）
   - 根布局从 **LinearLayout 改为 ConstraintLayout**（ADR-14）
   - 字段差异（ADR-13）：无 iv_explore / iv_progressBar / tv_debug_text
   - 替代：tv_debug_text → **tv_last_update**（显示最后更新时间，ADR-20）
   - 保留：iv_source_cover / tv_source_initial / v_enabled_dot / cb_source / tv_rss_source_url / swt_enabled / iv_edit / iv_menu_more / tv_host_text / vw_foreground
-- [ ] **T2.3** 重构 item_rss_source_compact.xml（订阅源紧凑列表，参考 item_book_source_compact.xml）
+- [x] **T2.3** 重构 item_rss_source_compact.xml（订阅源紧凑列表，参考 item_book_source_compact.xml）
   - cb_source 字号从 14sp 改为 **16sp**（ADR-18）
   - **必须保留 iv_type_badge**（ADR-6，订阅源类型映射：0=网页/1=图片/2=视频，用 item.type）
 - [x] **T2.4** 确认 item_rss_source_grid.xml 已对齐书架（ADR-17，12sp 2行居中）—— 无需修改
 
 ### 阶段3：Adapter 代码适配
 
-- [ ] **T3.1** 新建 `app/src/main/java/io/legado/app/help/source/SourceExt.kt`，新增扩展函数：
+- [x] **T3.1** 新建 `app/src/main/java/io/legado/app/help/source/SourceExt.kt`，新增扩展函数：
   - `BookSourcePart.sourceInitial()`：`bookSourceName.firstOrNull()?.toString() ?: ""`（ADR-12）
   - `RssSource.sourceInitial()`：`sourceName.firstOrNull()?.toString() ?: ""`（ADR-12）
   - `BookSourcePart.sourceUrlHost()`：`lastHost ?: bookSourceUrl` + extractHost（ADR-11）
   - `RssSource.sourceUrlHost()`：`lastHost ?: sourceUrl` + extractHost（ADR-11）
-- [ ] **T3.2** 修改 BookSourceAdapter.bindViewHolder 绑定新控件（ADR-7）
+- [x] **T3.2** 修改 BookSourceAdapter.bindViewHolder 绑定新控件（ADR-7）
   - convert payloads.isEmpty 全量分支：tvSourceInitial/tvBookSourceUrl/vEnabledDot
   - areContentsTheSame 增加 lastHost 比较（子代理审计A4）
   - getChangePayload 增加 upHost payload
   - convert payloads 分支：upHost/upName/enabled 同步新控件
-- [ ] **T3.3** 修改 BookSourceAdapterCompact.bindViewHolder 绑定新控件（ADR-7）
+- [x] **T3.3** 修改 BookSourceAdapterCompact.bindViewHolder 绑定新控件（ADR-7）
   - convert payloads.isEmpty 全量分支：tvSourceInitial/tvBookSourceUrl/vEnabledDot
   - areContentsTheSame 增加 lastHost 比较
   - **无 getChangePayload，无需 payload 增量代码**（子代理审计A5）
 - [x] **T3.4** 检查 BookSourceGridAdapter 已绑定新控件（L78-80）—— 无需修改
-- [ ] **T3.5** 修改 RssSourceAdapter.bindViewHolder 绑定新控件（ADR-7）
+- [x] **T3.5** 修改 RssSourceAdapter.bindViewHolder 绑定新控件（ADR-7）
   - convert payloads.isEmpty 全量分支：tvSourceInitial/tvRssSourceUrl/vEnabledDot/tvLastUpdate（ADR-20）
   - areContentsTheSame 增加 lastHost + lastUpdateTime 比较
   - getChangePayload 增加 upHost/upLastUpdate payload
   - convert payloads 分支同步新控件
-- [ ] **T3.6** 修改 RssSourceAdapterCompact.bindViewHolder 绑定新控件（ADR-7）
+- [x] **T3.6** 修改 RssSourceAdapterCompact.bindViewHolder 绑定新控件（ADR-7）
   - convert payloads.isEmpty 全量分支：tvSourceInitial/tvRssSourceUrl/vEnabledDot
   - areContentsTheSame 增加 lastHost 比较
   - **无 getChangePayload，无需 payload 增量代码**（子代理审计A5）
@@ -69,12 +69,12 @@
 
 ### 阶段3.5：订阅源 upSourceHost 链路改造（子代理审计A2/B1）
 
-- [ ] **T3.5.1** RssSourceAdapter.CallBack 接口新增 `fun getSourceHost(origin: String): String`
-- [ ] **T3.5.2** RssSourceActivity.getSourceHost 从 private 改为 override
-- [ ] **T3.5.3** RssSourceActivity.getSourceHost 修复异常输入处理（对齐 BookSourceActivity，空/http/https 返回 #）
-- [ ] **T3.5.4** RssSourceAdapter 新增 showSourceHost 字段 + upSourceHost + isItemHeader + getHeaderText（参考 BookSourceAdapter L251-309）
-- [ ] **T3.5.5** RssSourceAdapter.onCurrentListChanged 触发 upSourceHost 更新（参考 BookSourceAdapter L157-164）
-- [ ] **T3.5.6** RssSourceActivity 设置 adapter.showSourceHost = groupSourcesByDomain
+- [x] **T3.5.1** RssSourceAdapter.CallBack 接口新增 `fun getSourceHost(origin: String): String`
+- [x] **T3.5.2** RssSourceActivity.getSourceHost 从 private 改为 override
+- [x] **T3.5.3** RssSourceActivity.getSourceHost 修复异常输入处理（对齐 BookSourceActivity，空/http/https 返回 #）
+- [x] **T3.5.4** RssSourceAdapter 新增 showSourceHost 字段 + upSourceHost + isItemHeader + getHeaderText（参考 BookSourceAdapter L251-309）
+- [x] **T3.5.5** RssSourceAdapter.onCurrentListChanged 触发 upSourceHost 更新（参考 BookSourceAdapter L157-164）
+- [x] **T3.5.6** RssSourceActivity 设置 adapter.showSourceHost = groupSourcesByDomain
 
 ### 阶段4：编译验证
 

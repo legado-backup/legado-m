@@ -1,6 +1,6 @@
 # Cronet 默认自动启用与扩展使用方案
 
-> 状态：🔄 设计中
+> 状态：🔄 部分实施（P0 全局启用已落地：AppConfig.isCronet 默认 true、CronetInterceptor 常驻；P1-3 扩展未做）
 > 创建日期：2026-07-31
 > Spec ID：cronet-global-enable-20260731
 > 负责模块：网络层 / 视频播放器 / DNS 解析 / 图片加载 / 文件传输
