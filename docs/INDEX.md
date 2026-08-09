@@ -117,8 +117,11 @@
 | [specs/cronet-global-enable-20260731/](./specs/cronet-global-enable-20260731/) | Cronet 全局启用深度分析与优化方案（深度分析4大已用模块OkHttp/ExoPlayer/DoH/AnalyzeUrl+3大未用模块WebView/Glide/HttpURLConnection；识别isCronet开关不一致问题：ExoPlayer+DoH不受开关控制；统一开关逻辑+日志诊断增强+ProGuard规则完善） 🔄 设计中 |
 | [specs/rhino-engine-upgrade/](./specs/rhino-engine-upgrade/) | Rhino 引擎升级兼容性分析（字节码实证：1.9.1 唯一 VarHandle 出处 SlotMapOwner$ThreadedAccess；运行时探针证实该项目配置下该 class 永不加载、26/26 书源片段通过、书源型负载 +31%；唯一障碍收敛为构建期 D8 反糖化） ✅ 已完成 — 最终决策=保持锁定 1.8.1，沉淀「待抬 minSdk≥33 直跳 1.9.1」里程碑 |
 | [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
+| [specs/sniff-migration-booksource/](./specs/sniff-migration-booksource/) | 嗅探与滑动切换能力迁移至书源（图片嗅探→type2书源 ReadManga 0图兜底 ImageSnifferWebView / 视频嗅探→type4书源 R5链接入解决播放页URL / 上下滑动切换上/下集放开 isUserInputEnabled+章节滚动；零数据库变更=RSS 不受影响） 🔄 设计中 |
 | [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
 | [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager等10项集成设计） 🔄 设计中 |
+| [specs/forks-ecosystem-analysis/](./specs/forks-ecosystem-analysis/) | Legado 延伸版本生态功能深度分析（更新10+下载7=17个直系fork源码仓库，9大功能领域横向对比排除UI维度，输出汇总式analysis-report+三态borrow-decisions借鉴决策矩阵） 🔄 实施中（阶段B系列：B12/B14/B15/B16 已落地，真机验证已执行通过，详见 issues-found.md） |
+| [specs/precise-manage/](./specs/precise-manage/) | 精准管理聚合页（借鉴 Legado_Max：我的页新增入口聚合网址记录/存储管理/下载管理/文件管理，View 体系重写；网址记录=OkHttp 拦截器+Room 新表 Migration 102→103+搜索/筛选/日期分组/批量清除；存储管理=复用 cache 统计 API 8 类缓存清理；下载管理=DownloadState 内存单例+500ms 轮询系统 DownloadManager 列表页） ✅ 已实施（2026/08/08 编译+单测 186 通过，待真机） |
 | [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优化 legado（播放器双引擎+网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计中 |
 | [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击） 🔄 设计中 |
 | [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回写+P1过期清理+P2全局清空+P3死代码+P4域名不匹配） 🔄 设计中 |
@@ -191,6 +194,8 @@
 | [specs/highlight-rule-fix-20260727/](./specs/highlight-rule-fix-20260727/) | 阅读高亮规则系统修复（isRegex 修正+首启播种+upsert+即时生效+fill 快绘补画，6 项根因修复） ✅ 已实施（核心修复完成，回归由 highlight-rule-restore-default-20260729 修复） |
 | [specs/highlight-rule-restore-default-20260729/](./specs/highlight-rule-restore-default-20260729/) | 高亮规则丢失修复 + 恢复默认规则（修复愈合逻辑覆盖用户 pattern 的 BUG + 新增"恢复默认规则"菜单支持合并/覆盖模式，解决用户清空后无法恢复内置常规规则痛点） 🔄 实施中（Phase A/B 完成，待编译+真机验收） |
 | [specs/video-player-m3u8-fix/](./specs/video-player-m3u8-fix/) | 内置视频播放器 m3u8 播放失败深度分析与优化（m3u8 URL 短路嗅探+HLS fallback 链去重+分片重试策略增强+Cache-Control 请求头移除） 🔄 设计中 |
+| [specs/source-arch-mutual-borrow/](./specs/source-arch-mutual-borrow/) | 书源/订阅源架构差异分析与机制层互补优化 V2（按用户反馈推翻V1字段借鉴方案；抽取6个共享机制组件：M1并发控制/M2正文URL过滤/M3缓存策略/M4预连接/M5WebView控制/M6网络请求统一；零实体字段增加+零数据库迁移；WebBook.kt 4处+Rss.kt 2处重复网络请求模式统一；修复RssSource.parseConcurrency未落地BUG；分6批实施M6→M1→M4→M2→M3→M5） 🔄 设计中 V2 |
+| [specs/harden-blank-highlight-rules-20260808/](./specs/harden-blank-highlight-rules-20260808/) | 高亮规则空数据自动修复（根因：用户升级后 prefs 存储 12 条规则 name/pattern 全空导致列表空+编辑空+不生效；HighlightRuleStore.load() 增加"全部规则 name+pattern 为空→自动 reset 恢复内置规则"自愈加固） ✅ 实施完成（编译+真机验证：全空注入自动恢复、混合数据不误伤、正常数据无自愈日志） |
 ### 归档 Specs
 
 | 文档 | 说明 |
