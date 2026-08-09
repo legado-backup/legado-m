@@ -117,7 +117,7 @@
 | [specs/cronet-global-enable-20260731/](./specs/cronet-global-enable-20260731/) | Cronet 全局启用深度分析与优化方案（深度分析4大已用模块OkHttp/ExoPlayer/DoH/AnalyzeUrl+3大未用模块WebView/Glide/HttpURLConnection；识别isCronet开关不一致问题：ExoPlayer+DoH不受开关控制；统一开关逻辑+日志诊断增强+ProGuard规则完善） 🔄 设计中 |
 | [specs/rhino-engine-upgrade/](./specs/rhino-engine-upgrade/) | Rhino 引擎升级兼容性分析（字节码实证：1.9.1 唯一 VarHandle 出处 SlotMapOwner$ThreadedAccess；运行时探针证实该项目配置下该 class 永不加载、26/26 书源片段通过、书源型负载 +31%；唯一障碍收敛为构建期 D8 反糖化） ✅ 已完成 — 最终决策=保持锁定 1.8.1，沉淀「待抬 minSdk≥33 直跳 1.9.1」里程碑 |
 | [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
-| [specs/sniff-migration-booksource/](./specs/sniff-migration-booksource/) | 嗅探与滑动切换能力迁移至书源（图片嗅探→type2书源 ReadManga 0图兜底 ImageSnifferWebView / 视频嗅探→type4书源 R5链接入解决播放页URL / 上下滑动切换上/下集放开 isUserInputEnabled+章节滚动；零数据库变更=RSS 不受影响） 🔄 设计中 |
+| [specs/sniff-migration-booksource/](./specs/sniff-migration-booksource/) | 嗅探与滑动切换能力迁移至书源（图片嗅探→type2书源 ReadManga 0图兜底 reuse ImageSnifferWebView / 视频嗅探→type4书源复用统一三层入口 extractVideoUrlForEpisode 泛化 ruleData 解决播放页URL / 上下滑动切换上/下集 episodes 驱动多页；零数据库变更、RSS 不受影响） ✅ 已完成（代码实施+编译通过+RSS 真机回归通过；书源侧真机验证因无测试源由用户决策改源码级验证） |
 | [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化为 legado 订阅源（字段映射+类型适配+规则转换+批量处理） 🔄 设计中 |
 | [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager等10项集成设计） 🔄 设计中 |
 | [specs/forks-ecosystem-analysis/](./specs/forks-ecosystem-analysis/) | Legado 延伸版本生态功能深度分析（更新10+下载7=17个直系fork源码仓库，9大功能领域横向对比排除UI维度，输出汇总式analysis-report+三态borrow-decisions借鉴决策矩阵） 🔄 实施中（阶段B系列：B12/B14/B15/B16 已落地，真机验证已执行通过，详见 issues-found.md） |
@@ -133,6 +133,7 @@
 | [specs/video-buffer-speed-optimization/](./specs/video-buffer-speed-optimization/) | 当前播放视频缓冲速度优化（聚焦当前视频非预加载；7层联合优化：LoadControl深度调优 setTargetBufferBytes(-1)+setPrioritizeTimeOverSizeThresholds / HLS LL-HLS targetOffsetMs+超时配置 / OkHttp EventListener+Dispatcher / CacheDataSource FLAG_IGNORE_CACHE_ON_ERROR / 自适应码率 / 解码器异步队列 / AnalyticsListener 性能监控埋点；12个ADR决策；15个需求项R1-R15；10个验证场景） 🔄 设计中 |
 | [specs/image-player-vertical-canvas-optimization/](./specs/image-player-vertical-canvas-optimization/) | 内置图片播放器垂直画布优化方案（单 RecyclerView 垂直长画布+点击进入 ViewPager2 大图+滚动到底部自动加载下一篇，取代 player-review-and-optimization 图片部分，含 13 个 ADR + 17 个验证场景 + 48 项任务） ✅ V4 设计审查通过+全部任务实施完成（Phase 0-8 共 48 项），待编译验证+L2 真机测试 |
 | [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） ✅ 实施完成 |
+| [specs/ui-redesign-m3/](./specs/ui-redesign-m3/) | UI 重构设计（对标 33 个已下载 fork 的 M3 设计资产：HapeLee MD3双引擎主题/legadoT种青色/legados桥接/Suml-1换肤zip/高亮下划线族；保留暗夜紫默认主题；阅读优先+底弹窗Z化+卡片18/按钮12；交付每页四要素设计文档，本次仅设计不写代码） 🔄 设计中 |
 | [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅源+默认值） ✅ 已完成 |
 | [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA） ✅ 已完成 |
 | [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
