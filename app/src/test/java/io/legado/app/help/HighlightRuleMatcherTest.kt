@@ -65,7 +65,7 @@ class HighlightRuleMatcherTest {
             style = style
         )
         val validRule = HighlightRuleMatcher.Rule(
-            id = 2L,
+            id = "2",
             pattern = "测试",
             isRegex = false,
             style = style
@@ -115,4 +115,113 @@ class HighlightRuleMatcherTest {
         assertEquals("第 1 处 ruleId=1", "1", matches[0].ruleId)
         assertEquals("第 2 处 ruleId=2", "2", matches[1].ruleId)
     }
+
+    //region B15 捕获组样式模板解析
+
+    private val boldRed = HighlightStyle(bold = true, textColor = 0xFFFF0000.toInt())
+    private val italic = HighlightStyle(italic = true)
+
+    @Test
+    fun matchWithTemplate_regexGroupStyles_producesSubSpans() {
+        // 正常用例：带模板的正则命中按捕获组产出子样式段
+        val text = "他说：你好世界"
+        val rule = HighlightRuleMatcher.Rule(
+            id = "1",
+            pattern = "([你您])好(世界)",
+            isRegex = true,
+            style = style,
+            replacement = "<b><font color=\"red\">$1</font></b><i>$2</i>"
+        )
+        val matches = HighlightRuleMatcher.matchWithTemplate(text, listOf(rule))
+        assertEquals("应命中 1 处", 1, matches.size)
+        val m = matches[0]
+        assertEquals("主命中 start=3", 3, m.start)
+        assertEquals("主命中 end=7", 7, m.end)
+        assertEquals("主命中样式不变", style, m.style)
+        assertEquals("应产出 2 个子样式段", 2, m.subSpans.size)
+
+        val span1 = m.subSpans[0]
+        assertEquals("组1 start=3", 3, span1.start)
+        assertEquals("组1 end=4", 4, span1.end)
+        assertEquals("组1 内容=你", "你", text.substring(span1.start, span1.end))
+        assertTrue("组1 bold", span1.style.bold)
+        assertEquals("组1 颜色", 0xFFFF0000.toInt(), span1.style.textColor)
+
+        val span2 = m.subSpans[1]
+        assertEquals("组2 start=5", 5, span2.start)
+        assertEquals("组2 end=7", 7, span2.end)
+        assertEquals("组2 内容=世界", "世界", text.substring(span2.start, span2.end))
+        assertTrue("组2 italic", span2.style.italic)
+    }
+
+    @Test
+    fun matchWithTemplate_plainGroup_noSubSpans() {
+        // 边界用例：裸 $N（无样式标签）不产出子样式段
+        val text = "你好世界"
+        val rule = HighlightRuleMatcher.Rule(
+            id = "1",
+            pattern = "(你好)(世界)",
+            isRegex = true,
+            style = style,
+            replacement = "$1 $2"
+        )
+        val matches = HighlightRuleMatcher.matchWithTemplate(text, listOf(rule))
+        assertEquals("应命中 1 处", 1, matches.size)
+        assertTrue("无样式组不产出子段", matches[0].subSpans.isEmpty())
+    }
+
+    @Test
+    fun matchWithTemplate_emptyReplacement_behavesLikeMatch() {
+        // 边界用例：空模板退化为普通匹配
+        val text = "你好世界"
+        val rule = HighlightRuleMatcher.Rule(
+            id = "1",
+            pattern = "你好",
+            isRegex = false,
+            style = style,
+            replacement = ""
+        )
+        val matches = HighlightRuleMatcher.matchWithTemplate(text, listOf(rule))
+        assertEquals("应命中 1 处", 1, matches.size)
+        assertTrue("无模板无子段", matches[0].subSpans.isEmpty())
+    }
+
+    @Test
+    fun matchWithTemplate_isDotAll_matchesAcrossNewline() {
+        // 正常用例：isDotAll 使 . 匹配换行
+        val text = "第一行\n第二行"
+        val dotAllRule = HighlightRuleMatcher.Rule(
+            id = "1",
+            pattern = "第一行.第二行",
+            isRegex = true,
+            style = style,
+            isDotAll = true
+        )
+        val dotAllMatches = HighlightRuleMatcher.matchWithTemplate(text, listOf(dotAllRule))
+        assertEquals("dotAll 跨行匹配 1 处", 1, dotAllMatches.size)
+        assertEquals("跨行命中 start=0", 0, dotAllMatches[0].start)
+        assertEquals("跨行命中 end=7", 7, dotAllMatches[0].end)
+
+        val plainRule = dotAllRule.copy(isDotAll = false)
+        val plainMatches = HighlightRuleMatcher.matchWithTemplate(text, listOf(plainRule))
+        assertTrue("非 dotAll 不跨行", plainMatches.isEmpty())
+    }
+
+    @Test
+    fun match_doesNotProduceSubSpans() {
+        // 回归：原 match() 不解析模板，不产出子样式段
+        val text = "你好世界"
+        val rule = HighlightRuleMatcher.Rule(
+            id = "1",
+            pattern = "(你好)(世界)",
+            isRegex = true,
+            style = style,
+            replacement = "<b>$1</b>"
+        )
+        val matches = HighlightRuleMatcher.match(text, listOf(rule))
+        assertEquals("应命中 1 处", 1, matches.size)
+        assertTrue("match() 无子段", matches[0].subSpans.isEmpty())
+    }
+
+    //endregion
 }
