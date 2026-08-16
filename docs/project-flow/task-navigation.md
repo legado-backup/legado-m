@@ -74,6 +74,8 @@
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
 | UI 层架构总览 | [architecture/android-ui.md](./architecture/android-ui.md) | - |
+| UI 重构设计规范 | [specs/ui-redesign-m3/](../specs/ui-redesign-m3/) | - |
+| 阅读器浮层 Compose 化（S5） | [specs/reader-overlay-compose/](../specs/reader-overlay-compose/) | - |
 | 主界面/MainActivity | `ui/main/MainActivity.kt` | L70-503 |
 | 阅读界面 | `ui/book/read/ReadBookActivity.kt` | L151-166 |
 | 搜索界面 | `ui/book/search/SearchActivity.kt` | L66-70 |

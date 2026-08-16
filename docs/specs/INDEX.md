@@ -1,6 +1,6 @@
 # 项目状态面板
 
-> 最后更新：2026-08-04
+> 最后更新：2026-08-12
 > 状态判定原则：以源码实证为准，任务勾选框/README 状态不视为最终事实（本仓库存在大量"已实现但未勾选"，本次已大幅校正）。
 
 ## 项目概况
@@ -137,6 +137,7 @@ app-stability-round2、子代理预算、技术文档审计修复、视频播放
 | legado_client 平台化 | P2 | FastAPI+MySQL+Vue3，与 skill 精简冲突 | 大/中 | [legado-client-enhancement/](./legado-client-enhancement/) |
 | RSS 年龄验证自动绕过 | P2 | 三层绕过配置全未实施（仅调研勾选）；loginCheckJs 等为原版框架字段 | 中/中 | [rss-age-verify-autobypass/](./rss-age-verify-autobypass/) |
 | 上游 fork 对比分析 | P3 | 分析型产出为设计文档；实现/集成 47 项未做，temp/forks-comparison/legados 缺失 | 小/中 | [legados-forks-comparison/](./legados-forks-comparison/) |
+| 本地视觉大模型测试 | P1 | ai_tests 接入 Qwen3VL-8B（脱离 LM Studio 自动托管）：AI 判定器回填 ai_verdict + GUI Agent 混合定位执行器 + 经验层，全部存在于设计文档 | 中/高 | [ai-llm-testing/](./ai-llm-testing/) |
 
 ---
 

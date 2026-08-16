@@ -5,9 +5,11 @@
 将 Legado（阅读 App fork）的 UI 从"XML View 原版观感"升级为 **Material3 设计语言 + 阅读优先**的现代化体验，同时：
 
 1. **全量保留业务能力**（书源引擎、JS 编辑器、净化规则、RSS、WebDAV、本地书籍、备份恢复），业务逻辑零改动。
-2. **对标开源 fork 生态**：学习 33 个已下载 fork 的 UI 设计资产，抽取可借鉴方案；本次交付一份"UI 重构设计文档"（含每页四要素设计）。
+2. **对标开源 fork 生态**：学习 33 个已下载 fork 的 UI 设计资产，抽取可借鉴方案并**转化为自有统一设计语言**（而非照抄他人页面）。
 3. **保留默认暗紫色主题**：现状 `themeConfig.json` 中的"暗夜紫"（primary `#7B1FA2`、accent `#CE93D8`、背景 `#1E1E32`）作为默认暗色主题保留，不因重构丢失。
-4. **Compose 时机与风险控制**：明确"是否整套换 Compose"的技术路径，正文引擎（PageView/TextChapterLayout 7 种翻页委托）保持原生 View 包嵌，仅对长列表/弹窗/页面容器使用 Compose 层。
+4. **最终目标：前端全部 Compose**（页面壳/浮层/列表/弹窗/菜单全量 Compose，达到工程级项目级标准规范）。**边界**：正文引擎（PageView/TextChapterLayout/7 种翻页委托）、漫画/音频/WebView 池（PooledWebView）、代码编辑器（sora）、相机扫码（camera-scan）等**内核与第三方控件保留原生 View，用 Compose 做页面壳与浮层**（AD-02/AD-20）。改造页面时依据 [`ui-standards.md`](./ui-standards.md) 工程规范快速定位页面骨架与组件选型。
+5. **统一设计思想，杜绝每页独立风格**：同一类型页面（列表管理/表单编辑/详情/全屏沉浸）共用统一骨架模板与组件族，样式/布局/间距/圆角 token 全站复用（见 `ui-standards.md`）。
+6. **核心功能一个不漏**：全量 84 个页面类逐一登记功能点核对表（`pages-inventory.md`），每页 Compose 化时逐项核对，真机功能点覆盖测试通过才算完成。
 
 ## Scope
 
@@ -17,28 +19,31 @@
 |------|------|
 | 设计令牌体系 | color / spacing / radius / typography 四类 token 的命名与取色来源 |
 | 主题系统 | 三套内置主题（米白/暖黄/纯黑）**Wave + 保留暗夜紫默认**、日夜切换、阅读模式独立配色 |
-| 页面层级 | 8 类核心页面：书架（主 Grid）、阅读器页、书籍详情、我的/设置、书源管理、发现、RSS/订阅源、正文内浮层 |
-| 每页设计输出 | 布局文字框图 / 交互流程（点击、长按、手势）/ Compose 组件实现思路 / 绘图 Prompt |
-| 技术路线 | XML View 与 Compose 共存的边界、组件复用选型、最小改造清单 |
+| 页面层级 | **全量 84 页面类**（详见 [pages-inventory.md](./pages-inventory.md)）：主框架/我的、书架、阅读器、书籍详情/编辑、书源/订阅源/替换/词典/高亮/自动任务管理、发现、搜索、导入/缓存/存储/下载、RSS 全套、视频/音频/漫画/图片、配置 6 子页、文件/URL记录/回收站、登录/扫码/透明窗、debug 工具、about |
+| 每页设计输出 | 布局文字框图 / 交互流程（点击、长按、手势）/ Compose 组件实现思路 / 绘图 Prompt / 功能点核对（功能一个不漏） |
+| 工程规范 | 6 类页面骨架模板、组件六族复用规则、状态管理范式、三态规范、页面改造检查清单、验收 KPI（[ui-standards.md](./ui-standards.md)） |
+| 技术路线 | XML View 与 Compose 共存的边界、组件复用选型、逐页迁移路线图与优先级 |
 
 ### Out of Scope（不由本次设计文档实现，仅描述方向）
 
 | 排除项 | 原因 |
 |--------|------|
-| 实际代码编写（Compose 重写/迁移） | 本 spec 是"设计先行"，实施另立工程 |
 | 业务逻辑改动 | 书源/净化/规则引擎零改动 |
 | 数据库 schema 变更 | 无 |
 | 第三方源仓库结构调整 | 无 |
+| 内核/第三方控件重写 | 正文引擎/漫画/音频/WebView 池/代码编辑器/相机扫码保留原生 View（AD-02），仅换 Compose 壳 |
 
 ## Approach
 
 ### Selected Approach
 
-采用**"设计先行 + 渐进式 Compose"**三阶段路线：
+采用**"设计先行 + 渐进式 Compose + 工程规范兜底"**路线：
 
-1. **设计分层**：先建设计令牌层（View+Compose 共用），再逐页面设计，最后输出绘图 Prompt 供美工/GPT 生成效果图。
-2. **主题系统双层**：`ThemeStore` 保持全局唯一主题权威源；新增 `ThemeSpec` 三套内置配色（米白/暖黄护眼/纯黑），**暗夜紫保留为默认主题配置**。Compose 侧 `LegadoTheme` 复用现有映射（sp全部守恒），阅读器用自己的 `ReadBookConfig` 独立配色不参与整体切换。
-3. **阅读器保留原生 View**：`TextChapterLayout`/`PageView`/7 种翻页委托与正文绘制不改，仅对阅读菜单（`ReadMenu`）与浮层改 **BottomSheet**。Compose 页用 `AndroidView` 桥接正文。理由：换 View 会牵动全部排版/触碰命中，风险极高（对照 Mihon/微信读书均保留 EPUB 渲染核心）。
+1. **工程规范先行**：`ui-standards.md` 定义 6 类页面骨架、组件六族、状态范式、三态、检查清单——所有页面共用同一脚手架，杜绝每页独立风格。
+2. **全量页面清单逐页推进**：`pages-inventory.md` 登记 84 页面类功能点与迁移优先级，逐页 Compose 化时逐项核对功能不丢。
+3. **设计分层**：先建设计令牌层（View+Compose 共用），再逐页面设计，最后输出绘图 Prompt 供美工/GPT 生成效果图。
+4. **主题系统双层**：`ThemeStore` 保持全局唯一主题权威源；新增 `ThemeSpec` 三套内置配色（米白/暖黄护眼/纯黑），**暗夜紫保留为默认主题配置**。Compose 侧 `LegadoTheme` 复用现有映射（sp全部守恒），阅读器用自己的 `ReadBookConfig` 独立配色不参与整体切换。
+5. **阅读器保留原生 View**：`TextChapterLayout`/`PageView`/7 种翻页委托与正文绘制不改，仅对阅读菜单（`ReadMenu`）与浮层改 **BottomSheet**。Compose 页用 `AndroidView` 桥接正文。理由：换 View 会牵动全部排版/触碰命中，风险极高（对照 Mihon/微信读书均保留 EPUB 渲染核心）。
 
 ### Why now
 
@@ -90,12 +95,18 @@ graph LR
 | FR-5 | 弹窗总量大幅减少，设置类改为 BottomSheet | P1 | 书源编辑相关弹窗改为 sheet（审核阶段设计稿） |
 | FR-6 | 正文浮层（搜索、替换、图内）为 BottomSheet + 长按快捷方式 | P1 | 走查全部弹窗调用点 |
 | FR-7 | 未读角标/通知改为小圆点而非刺眼数字红标 | P2 | 走查书架与 RSS 角标 |
+| FR-8 | **前端全部 Compose**：页面壳/浮层/列表/弹窗全量 Compose 化，正文内核与第三方控件保留原生 View | P1 | 全量 84 页面类按迁移路线图（pages-inventory §G）逐页完成，真机功能点覆盖测试通过 |
+| FR-9 | **统一页面骨架**：同一类型页面共用统一骨架模板（ui-standards §2），样式/布局/间距/圆角 token 全站复用，禁止每页独立风格 | P0 | 逐页核对同类型页骨架一致；全仓 grep 非内核页面硬编码色值=0、页面私有重复组件=0 |
+| FR-10 | **组件复用门禁**：公共组件库已有能力，页面禁止私有复制（如 UnreadBadge 复制 BadgeDot） | P0 | 孤儿组件全部接线；0 处私有重复（巡检 KPI） |
+| FR-11 | **真机功能点覆盖测试**：每页 Compose 化后必须用真机/模拟器覆盖全部功能点（ai_e2e 框架），通过才算完成 | P0 | tasks.md 逐页挂测试门禁；测试记录留档 |
+| FR-12 | **工程规范文档交付**：提供可指导后续任意页面优化的规范（ui-standards.md） | P0 | 新页面改造按 §7 检查清单通过 9 项 |
 
 ## NFR
 
 - 性能：长列表滑动不掉帧，正文翻页无新增卡顿。
 - 兼容：minSdk 23，AndroidX 版本不动，**不引新增依赖**。
 - 开源合规：基于 M3 公共组件与自有 token，不复制他人代码。
+- 状态管理：统一"受控组件 + ViewModel + Flow"范式（ui-standards §4），禁止 Fragment 散落重复订阅。
 
 ## Scenarios
 
@@ -123,9 +134,13 @@ graph LR
 
 ## Checklist（验证完整性）
 
-- [ ] 每个页面是否给出布局结构（文字 block 图）
-- [ ] 每个页面是否给出交互/手势清单
-- [ ] 每个页面是否给出 Compose 复用思路
-- [ ] 每个页面是否给出绘图 Prompt
-- [ ] 系统主题 4 套（含暗紫）隐忧排除
-- [ ] 与现有基础设施（LegadoTheme、ThemeStore、BottomSheet）引用一致
+- [x] 每个核心页面是否给出布局结构（文字 block 图）
+- [x] 每个核心页面是否给出交互/手势清单
+- [x] 每个核心页面是否给出 Compose 复用思路
+- [x] 每个核心页面是否给出绘图 Prompt
+- [x] 系统主题 4 套（含暗紫）隐忧排除
+- [x] 与现有基础设施（LegadoTheme、ThemeStore、BottomSheet）引用一致
+- [x] 全量 84 页面类功能点核对表（pages-inventory.md）——**核心功能一个不漏**
+- [x] 工程规范（ui-standards.md）——统一骨架/组件复用/状态范式/三态/检查清单
+- [x] 统一性验收 KPI（同型页骨架一致、硬编码色=0、私有重复=0、真机覆盖）
+- [ ] 逐页 Compose 化 + 真机功能点覆盖测试（随迁移 Phase1-5 执行）

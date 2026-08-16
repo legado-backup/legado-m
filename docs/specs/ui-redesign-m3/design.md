@@ -263,7 +263,59 @@ flowchart LR
 - **Decision**: LegadoTheme 色板推导改用「5 色→34 槽位」配方（沿用 MoRealm 的 mix/hueShift/contrastOn，仅作算法参考，只读复制思路不抄代码）；**不采用 34 个 `animateColor` 平滑换肤动画**（常驻 recomposition 成本，保留即时切换 + 局部动效）。
 - **Goal**: 一套公式产全 M3 色板，替代零散 lerp 特判；保留用户背景色锚定。
 - **Tradeoff**: 需对照现有主题 JSON 逐一校验色值；引入 34 槽位概念后主题设置 UI 需适配。
-- **Status**: Proposed
+- **Status**: Accepted（Phase1 已落地，LegadoTheme lerp 块已替换为 toM3Scheme）
+
+## ADR（Y-Statement）v2：全量 Compose 迁移与工程规范（2026-08-11 补）
+
+> 用户评审 Phase0-3 后提出新要求：反思学习 5 个开源前端后改造效果差的原因，并明确最终目标是**前端全部 Compose + 工程级项目级标准规范**。本组 ADR 是把 v1 的「五支柱理念」落成**可执行规则**的关键决策。配套权威文档：`ui-standards.md`（工程规范）+ `pages-inventory.md`（全量页面核对表）。
+
+### AD-19: 六类页面骨架模板（统一全局布局风格的载体）
+- **Context**: 现状每页独立写布局（列表/表单/详情/全屏形态各异），导致「看起来杂乱无章」。用户明确要求样式布局在全前端每个页面尽量复用。
+- **Concern**: 不抽象骨架则每页继续自由发挥，组件库再有 token 也无法保证页面级一致。
+- **Decision**: 归纳全量 84 页面类为 **6 类骨架模板**（S1 主框架Tab / S2 列表管理 / S3 表单编辑器 / S4 详情阅读 / S5 全屏沉浸 / S6 弹窗透明窗），每类骨架 = 统一 TopBar + 内容区 + 底部行为区结构 + 明确组件引用（详见 `ui-standards.md` §2）。每页 Compose 化时必须先归类骨架再实现。
+- **Goal**: 同型页面视觉/结构一致；新页面继承骨架即获得全局风格。
+- **Tradeoff**: 个别页面（阅读器正文、CodeEdit、视频播放器）天然特殊，允许在 S5 全屏类下保留专属手势，但视觉 token（圆角/间距/色彩）仍须复用全局。
+- **Status**: Accepted
+
+### AD-20: 全量页面 Compose 迁移路线图（三阶段 + N 不迁移清单）
+- **Context**: 当前 Compose 页面仅 9/84（≈10.7%）。用户要求前端**全部 Compose**，但编译/内核风险须受控。
+- **Concern**: 无路线图则迁移是零散的「碰到哪页改哪页」，无法验收「全部 Compose」最终状态。
+- **Decision**: 迁移分 **P0 已改造 → P1 高优核心 → P2 次优高频 → P3 长尾**，与 **N 永不迁移**清单（阅读器正文引擎/CodeEdit sora 内核/WebView 池/扫码相机/协议分发透明窗），逐页登记在 `pages-inventory.md` §G 路线图。每页迁移验收 = 功能点核对无误 + 真机覆盖测试（FR-11 门禁）。
+- **Goal**: 「全部 Compose」有可核对的终点；每个页面迁移有验收标准，避免半吊子改造。
+- **Tradeoff**: 阅读器正文等 N 清单页仍为原生 View（AD-02 维持），「全部 Compose」指**页面壳/浮层/列表/编辑器全部 Compose**，不含被 `AndroidView` 桥包围的内核控件。
+- **Status**: Accepted
+
+### AD-21: 组件复用强制规范（消灭页面私有复制）
+- **Context**: 调查发现 `UnreadBadge`（BookshelfItems）复制了公共库 `BadgeDot` 能力、`MyPreferenceFragment` 与 `ProfileScreen3Level` 功能重叠、12/19 组件处于孤儿状态。设计理念「组件复用」落到代码层被打破。
+- **Concern**: 页面私有实现公共能力 = token 漂移源、维护双份、风格难统一。
+- **Decision**: ① 公共组件目录 `ui/widget/components/` 为唯一权威，页面**禁止** private 复制其能力；② 新增组件必须登记 `ui-standards.md` §3 目录并带 KDoc 设计来源标注（AD-xx）；③ 孤儿组件（未接线）必须接入库或用前标注「待接线目标页」；④ 改造每个页面时 grep 排查对公共组件的私有复制并收敛。验收 KPI：私有重复=0。
+- **Goal**: 组件库成为唯一被消费的 UI 原子；全局视觉统一。
+- **Tradeoff**: 首次收敛需清理存量重复（UnreadBadge→BadgeDot 等）+ 12 孤儿接线，成本已计入 Phase1.5/Phase4 一致性巡检。
+- **Status**: Accepted
+
+### AD-22: Compose 状态管理范式（受控组件 + ViewModel 数据源）
+- **Context**: 现状书架/我的页状态管理轻（produceState/remember 就地管理、style1/style2 两份重复数据订阅、Fragment 持 loading/booksJob），无统一范式，页面一复杂就出死锁（Phase2 已踩 produceState+LaunchedEffect 死锁）。
+- **Concern**: 无范式则每页一套状态写法，工程级不达标、难以维护。
+- **Decision**: 统一为「**受控组件模式**」：Composable 顶层**无状态**（接收 `data class State` + 回调），数据由 **ViewModel（或 Fragment 壳）持有 Room Flow + StateFlow**，`collectAsStateWithLifecycle` 接入；业务协程统一 `Coroutine.async{}...onSuccess{}.onError{}` 链；DisposableEffect 清理；禁止 produceState 与 LaunchedEffect 写同一状态（Phase2 死锁教训，已入 AOAdapt）。详见 `ui-standards.md` §4。
+- **Goal**: 页面状态逻辑收敛、可测、可复用于 style1/style2 双书架；避免状态重复与死锁。
+- **Tradeoff**: 轻量单页（如 profile 统计）允许退化到单 produceState + IO，但须遵循「单状态源」原则。
+- **Status**: Accepted
+
+### AD-23: 实施回执机制（Component Usage Receipt，强制验收前置）
+- **Context**: 用户要求（2026-08-11）「设计文档要有回执校验功能……要求后续真正开发实施时填写回执：用了哪些公共组件、布局、样式，这些是否对后续帮复用」。现状页面改造完成后无法量化"复用了多少公共资产、沉淀了什么新资产"。
+- **Concern**: 无回执则"组件复用、样式统一"只是口号——每页做完就过，复用率与新增资产不沉淀，无法支撑"越来越快"的开发节奏。
+- **Decision**: 每个页面 Compose 化实施完成后**强制填写实施回执**（模板见 `ui-standards.md` §3.3）：本次复用组件/骨架/样式 token、本次沉淀新增可复用资产、私有复制/硬编码色计数、对后续页复用贡献、真机覆盖清单、遗留项。回执缺失 = 页面未完成（验收 KPI 第 5 项）。
+- **Goal**: 形成「组件复用自增长闭环」——每页沉淀的新资产回流组件库，后续页查询回执即可复用，越做越快、越一致。
+- **Tradeoff**: 每页多一步填写投入；但对纯复用页（枝叶层）回执很短，成本极低。
+- **Status**: Accepted
+
+### AD-24: 主干 → 支干 → 枝叶 全局构建策略（用户指定开发节奏）
+- **Context**: 用户判断（2026-08-11）「最难的是一开始，全局公共组件完成后，后续页面基本就是复用引用实现，所以会越来越快」。现状实施零散（每页从头设计），未充分利用已建成的主干资产。
+- **Concern**: 若每页 Com 化仍独立设计，则公共主干（Phase0-3）红利的发挥有限，进度不随支架积累加速，风格仍有漂移风险。
+- **Decision**: 构建分层：**主干**（主题+组件库+6 骨架+状态范式，已完成 Phase0-3）→ **支干**（每类骨架 S1-S6 各指定一个**样板页 reference page** 完整走通该骨架复用模式并冻结验收，样板页分配表见 `ui-standards.md` §9.2）→ **枝叶**（同类剩余页直接复用样板，只替换业务数据与功能点）。构建节奏见 §9.3。
+- **Goal**: 全局构建从外到内、从主干到枝叶成立；样板页冻结后同类页实现机械化加速，视觉一致性由样板保证。
+- **Tradeoff**: 支干样板页需投入一次"高质量打磨"时间（S2→BookSourceActivity、S3→BookSourceEditActivity 等），一旦冻结后续页不可另起炉灶。
+- **Status**: Accepted
 
 ## Data Flow
 
@@ -276,12 +328,14 @@ flowchart LR
 | 文件 | 类型 | 说明 |
 |------|------|------|
 | `docs/specs/ui-redesign-m3/{README,spec,design,tasks}.md` | 新增 | OpenSpec 四文档 |
-| `docs/specs/ui-redesign-m3/forks-deep-dive.md` | 新增 | 33 forks 深度学习清单（学了什么/源码佐证/移植评级） |
-| `docs/specs/ui-redesign-m3/four-fork-deep-dive.md` | 新增 | 四 Fork（HapeLee/legados/Rimchars/legado_NG）+鸿蒙版前端对标、组件化方案、MyCenter 三级布局 |
-| `docs/specs/ui-redesign-m3/morealm-deep-dive.md` | 新增 | 墨境 MoRealm 深度学习清单（导航/主题/组件/阅读器/Book列表、Top10 可搬运组件、权衡表） |
+| `docs/specs/ui-redesign-m3/background/forks-deep-dive.md` | 新增 | 33 forks 深度学习清单（学了什么/源码佐证/移植评级；学习笔记→背景参考） |
+| `docs/specs/ui-redesign-m3/background/four-fork-deep-dive.md` | 新增 | 四 Fork（HapeLee/legados/Rimchars/legado_NG）+鸿蒙版前端对标、组件化方案、MyCenter 三级布局（学习笔记→背景参考） |
+| `docs/specs/ui-redesign-m3/background/morealm-deep-dive.md` | 新增 | 墨境 MoRealm 深度学习清单（导航/主题/组件/阅读器/Book列表、Top10 可搬运组件、权衡表；学习笔记→背景参考） |
 | `docs/specs/ui-redesign-m3/frontend-synthesis.md` | 新增 | **整体前端思想综合**：五支柱收敛、五仓贡献→组件矩阵、整体架构图、**功能不裁剪红线清单（A内核/B数据/C UI入口/D死代码）**、实施 Phase 0~4 |
 | `docs/specs/ui-redesign-m3/implementation-spec.md` | 新增 | **实现细化规格**：17 组件签名、主题 toM3Scheme 代码映射、真实文件锚点（LegadoTheme.kt:40-43 等）、PR 粒度任务+KPI、themeConfig 格式封口、风险四则 |
 | `docs/specs/ui-redesign-m3/pages/*.md` | 新增 | 每页四要素设计（8 页） |
+| `docs/specs/ui-redesign-m3/ui-standards.md` | 新增 v2 | **前端 UI 工程规范（权威）**：6 类页面骨架/组件六族目录与孤儿接线计划/状态管理范式/三态/无障碍/页面改造检查清单/验收 KPI（详见 AD-19~22） |
+| `docs/specs/ui-redesign-m3/pages-inventory.md` | 新增 v2 | **全量 84 页面类功能点核对表** + 技术栈 + 骨架归类 + 迁移优先级 + P0/N 路线图（详见 AD-20） |
 | `docs/INDEX.md` | 变更 | 登记 spec 条目 |
 | 实施阶段（另行立项）：`ui/theme/` 色板升级 / 阅读浮层 sheet 化 / 页面 Compose 迁移 | 新增/改造 | 不属本 spec |
 
