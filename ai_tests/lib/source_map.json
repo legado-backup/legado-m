@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-07-08T18:39:20.979085",
+  "generated_at": "2026-08-12T20:55:37.805191",
   "activities": {
     "SharedReceiverActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\receiver\\SharedReceiverActivity.kt",
@@ -239,6 +239,14 @@
       "ui_components": [],
       "tc_ids": []
     },
+    "DownloadManageActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\download\\DownloadManageActivity.kt",
+      "callers": [],
+      "ui_components": [
+        "R.id.menu_clear_completed"
+      ],
+      "tc_ids": []
+    },
     "FileManageActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\file\\FileManageActivity.kt",
       "callers": [],
@@ -264,7 +272,29 @@
         "R.id.menu_export_highlight_rule",
         "R.id.menu_group_manage",
         "R.id.menu_import_highlight_rule",
-        "R.id.menu_preset_rule"
+        "R.id.menu_preset_rule",
+        "R.id.menu_restore_default"
+      ],
+      "tc_ids": []
+    },
+    "ImageDetailActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\image\\ImageDetailActivity.kt",
+      "callers": [
+        "ImageGalleryActivity"
+      ],
+      "ui_components": [],
+      "tc_ids": []
+    },
+    "ImageGalleryActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\image\\ImageGalleryActivity.kt",
+      "callers": [
+        "ImageDetailActivity"
+      ],
+      "ui_components": [
+        "R.id.menu_image_browser_open",
+        "R.id.menu_image_log",
+        "R.id.menu_image_refresh",
+        "R.id.menu_image_star"
       ],
       "tc_ids": []
     },
@@ -274,6 +304,7 @@
         "AudioPlayActivity",
         "AutoTaskEditActivity",
         "BookInfoActivity",
+        "BookSourceActivity",
         "BookSourceEditActivity",
         "ReadBookActivity",
         "ReadRssActivity",
@@ -293,10 +324,7 @@
         "WelcomeActivity"
       ],
       "ui_components": [
-        "R.id.menu_bookshelf",
-        "R.id.menu_discovery",
-        "R.id.menu_my_config",
-        "R.id.menu_rss"
+        "setContent{}"
       ],
       "tc_ids": [
         "TC-F-P0-1-15",
@@ -350,12 +378,28 @@
       ],
       "tc_ids": []
     },
+    "UrlRecordActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\urlrecord\\UrlRecordActivity.kt",
+      "callers": [],
+      "ui_components": [
+        "R.id.menu_url_record_clear_30d",
+        "R.id.menu_url_record_clear_7d",
+        "R.id.menu_url_record_clear_all",
+        "R.id.menu_url_record_enable",
+        "R.id.menu_url_record_filter",
+        "R.id.search_view"
+      ],
+      "tc_ids": []
+    },
     "VideoPlayerActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\video\\VideoPlayerActivity.kt",
       "callers": [
-        "BookInfoActivity"
+        "BookInfoActivity",
+        "RssArticleInfoActivity"
       ],
       "ui_components": [
+        "R.id.menu_browser_open",
+        "R.id.menu_change_source",
         "R.id.menu_config_settings",
         "R.id.menu_copy_video_url",
         "R.id.menu_custom_btn",
@@ -364,9 +408,39 @@
         "R.id.menu_log",
         "R.id.menu_login",
         "R.id.menu_open_other_video_player",
+        "R.id.menu_rss_refresh",
         "R.id.menu_rss_star"
       ],
-      "tc_ids": []
+      "tc_ids": [
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28"
+      ]
     },
     "WelcomeActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\welcome\\WelcomeActivity.kt",
@@ -405,6 +479,8 @@
       "callers": [],
       "ui_components": [
         "R.id.menu_book_group",
+        "R.id.menu_cache_rate",
+        "R.id.menu_cache_stats",
         "R.id.menu_download",
         "R.id.menu_download_after",
         "R.id.menu_download_all",
@@ -437,25 +513,11 @@
         "ExploreShowActivity",
         "ReadBookActivity",
         "ReadMangaActivity",
+        "RssArticleInfoActivity",
         "SearchActivity"
       ],
       "ui_components": [
-        "R.id.menu_can_update",
-        "R.id.menu_clear_cache",
-        "R.id.menu_copy_book_url",
-        "R.id.menu_copy_toc_url",
-        "R.id.menu_custom_btn",
-        "R.id.menu_delete_alert",
-        "R.id.menu_edit",
-        "R.id.menu_log",
-        "R.id.menu_login",
-        "R.id.menu_refresh",
-        "R.id.menu_set_book_variable",
-        "R.id.menu_set_source_variable",
-        "R.id.menu_share_it",
-        "R.id.menu_split_long_chapter",
-        "R.id.menu_top",
-        "R.id.menu_upload"
+        "setContent{}"
       ],
       "tc_ids": [
         "TC-F-P0-5-01",
@@ -598,6 +660,7 @@
         "BookSourceActivity",
         "BookSourceEditActivity",
         "ReadRecordActivity",
+        "RssSearchActivity",
         "SharedReceiverActivity"
       ],
       "ui_components": [
@@ -611,7 +674,37 @@
         "R.id.search_src_text",
         "R.id.search_view"
       ],
-      "tc_ids": []
+      "tc_ids": [
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28",
+        "TC-XXX-NN"
+      ]
     },
     "SearchContentActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\book\\searchContent\\SearchContentActivity.kt",
@@ -625,12 +718,22 @@
       ],
       "tc_ids": []
     },
+    "StorageManageActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\book\\storage\\StorageManageActivity.kt",
+      "callers": [],
+      "ui_components": [
+        "R.id.menu_clear_all",
+        "R.id.menu_refresh"
+      ],
+      "tc_ids": []
+    },
     "TocActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\book\\toc\\TocActivity.kt",
       "callers": [],
       "ui_components": [
         "R.id.menu_export_bookmark",
         "R.id.menu_export_md",
+        "R.id.menu_export_obsidian",
         "R.id.menu_group_bookmark",
         "R.id.menu_group_text",
         "R.id.menu_group_toc",
@@ -737,15 +840,19 @@
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\book\\source\\manage\\BookSourceActivity.kt",
       "callers": [
         "AutoTaskActivity",
+        "RssSourceActivity",
         "SearchActivity"
       ],
       "ui_components": [
         "R.id.action_sort",
         "R.id.menu_add_book_source",
         "R.id.menu_add_group",
+        "R.id.menu_bottom",
         "R.id.menu_bottom_sel",
         "R.id.menu_check_selected_interval",
         "R.id.menu_check_source",
+        "R.id.menu_debug_source",
+        "R.id.menu_del",
         "R.id.menu_disable_explore",
         "R.id.menu_disable_selection",
         "R.id.menu_disabled_explore_group",
@@ -766,7 +873,10 @@
         "R.id.menu_import_local",
         "R.id.menu_import_onLine",
         "R.id.menu_import_qr",
+        "R.id.menu_login",
+        "R.id.menu_recycle_bin",
         "R.id.menu_remove_group",
+        "R.id.menu_search",
         "R.id.menu_share_source",
         "R.id.menu_sort_auto",
         "R.id.menu_sort_desc",
@@ -776,6 +886,7 @@
         "R.id.menu_sort_respondTime",
         "R.id.menu_sort_time",
         "R.id.menu_sort_url",
+        "R.id.menu_top",
         "R.id.menu_top_sel",
         "R.id.menu_type_0",
         "R.id.menu_type_1",
@@ -784,7 +895,8 @@
         "R.id.menu_type_4",
         "R.id.menu_type_all",
         "R.id.search_view",
-        "R.id.source_group"
+        "R.id.source_group",
+        "setContent{}"
       ],
       "tc_ids": [
         "TC-F-P0-6-01",
@@ -872,7 +984,35 @@
         "TC-F-P0-4-07",
         "TC-F-P0-4-08",
         "TC-F-P0-4-09",
-        "TC-F-P0-4-10"
+        "TC-F-P0-4-10",
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28"
       ]
     },
     "RssFavoritesActivity": {
@@ -887,10 +1027,15 @@
     },
     "ReadRssActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\rss\\read\\ReadRssActivity.kt",
-      "callers": [],
+      "callers": [
+        "ImageDetailActivity",
+        "ImageGalleryActivity",
+        "RssArticleInfoActivity"
+      ],
       "ui_components": [
         "R.id.menu_aloud",
         "R.id.menu_browser_open",
+        "R.id.menu_change_source",
         "R.id.menu_edit_source",
         "R.id.menu_log",
         "R.id.menu_login",
@@ -899,7 +1044,95 @@
         "R.id.menu_rss_star",
         "R.id.menu_share_it"
       ],
+      "tc_ids": [
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28"
+      ]
+    },
+    "RssArticleInfoActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\rss\\search\\RssArticleInfoActivity.kt",
+      "callers": [
+        "RssSearchActivity"
+      ],
+      "ui_components": [],
       "tc_ids": []
+    },
+    "RssSearchActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\rss\\search\\RssSearchActivity.kt",
+      "callers": [],
+      "ui_components": [
+        "R.id.menu_1",
+        "R.id.menu_group_1",
+        "R.id.menu_group_2",
+        "R.id.menu_group_3",
+        "R.id.menu_log",
+        "R.id.menu_search_scope",
+        "R.id.menu_search_type",
+        "R.id.menu_source_manage",
+        "R.id.menu_type_all",
+        "R.id.menu_type_image",
+        "R.id.menu_type_video",
+        "R.id.menu_type_web",
+        "R.id.search_src_text",
+        "R.id.search_view"
+      ],
+      "tc_ids": [
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28",
+        "TC-XXX-NN"
+      ]
     },
     "RuleSubActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\rss\\subscription\\RuleSubActivity.kt",
@@ -951,12 +1184,15 @@
     },
     "RssSourceActivity": {
       "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\rss\\source\\manage\\RssSourceActivity.kt",
-      "callers": [],
+      "callers": [
+        "RssSearchActivity"
+      ],
       "ui_components": [
         "R.id.action_sort",
         "R.id.menu_add",
         "R.id.menu_add_group",
         "R.id.menu_bottom_sel",
+        "R.id.menu_check_rss_source",
         "R.id.menu_check_selected_interval",
         "R.id.menu_disable_selection",
         "R.id.menu_disabled_group",
@@ -968,6 +1204,7 @@
         "R.id.menu_group_login",
         "R.id.menu_group_manage",
         "R.id.menu_group_null",
+        "R.id.menu_group_sources_by_domain",
         "R.id.menu_help",
         "R.id.menu_import_default",
         "R.id.menu_import_local",
@@ -988,6 +1225,47 @@
         "R.id.menu_type_all",
         "R.id.search_view",
         "R.id.source_group"
+      ],
+      "tc_ids": [
+        "TC-F-P0-8-01",
+        "TC-F-P0-8-02",
+        "TC-F-P0-8-03",
+        "TC-F-P0-8-04",
+        "TC-F-P0-8-05",
+        "TC-F-P0-8-06",
+        "TC-F-P0-8-07",
+        "TC-F-P0-8-08",
+        "TC-F-P0-8-09",
+        "TC-F-P0-8-10",
+        "TC-F-P0-8-11",
+        "TC-F-P0-8-12",
+        "TC-F-P0-8-13",
+        "TC-F-P0-8-14",
+        "TC-F-P0-8-15",
+        "TC-F-P0-8-16",
+        "TC-F-P0-8-17",
+        "TC-F-P0-8-18",
+        "TC-F-P0-8-19",
+        "TC-F-P0-8-20",
+        "TC-F-P0-8-21",
+        "TC-F-P0-8-22",
+        "TC-F-P0-8-23",
+        "TC-F-P0-8-24",
+        "TC-F-P0-8-25",
+        "TC-F-P0-8-26",
+        "TC-F-P0-8-27",
+        "TC-F-P0-8-28"
+      ]
+    },
+    "RecycleBinActivity": {
+      "path": "app\\src\\main\\java\\io\\legado\\app\\ui\\source\\recycle\\RecycleBinActivity.kt",
+      "callers": [
+        "BookSourceActivity"
+      ],
+      "ui_components": [
+        "R.id.menu_recycle_bin_delete_selection",
+        "R.id.menu_recycle_bin_empty",
+        "R.id.menu_recycle_bin_help"
       ],
       "tc_ids": []
     }

@@ -5,7 +5,7 @@
 覆盖范围：
 - parse_args（8：基础参数默认值/显式传参/--apk/--no-rules/--keep-device/--instance-id/--init-device/V3 参数）
 - filter_cases（6：all/P0/P1/模块名/TC-ID 单用例/无匹配）
-- handle_v3_reserved_args（5：无 V3/--diff 降级/--gen-test 退出/--update-source-map 警告/--feedback 警告）
+- handle_v3_reserved_args（5：无 V3/--diff 不降级/--gen-test 退出/--update-source-map 已实现/--feedback 警告）
 - 退出码逻辑（2：parse_args 默认 instance_id/MEmu instance_id=0 边界）
 
 运行：
@@ -15,7 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # 添加项目根到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -232,15 +232,15 @@ def test_handle_v3_no_reserved_args():
     print("✅ test_handle_v3_no_reserved_args")
 
 
-def test_handle_v3_diff_degrade():
-    """20. --diff HEAD~1 降级为 --tc all"""
+def test_handle_v3_diff_not_handled():
+    """20. --diff HEAD~1 不在 handle_v3 范围（M8 由 main() 步骤 5.5 处理）"""
     args = parse_args(["--diff", "HEAD~1", "--tc", "P0"])
     original_tc = args.tc
     assert original_tc == "P0"
     result = handle_v3_reserved_args(args)
     assert result is None, f"--diff 应返回 None（继续执行），实际: {result}"
-    assert args.tc == "all", f"--diff 应降级 tc 为 all，实际: {args.tc}"
-    print("✅ test_handle_v3_diff_degrade")
+    assert args.tc == "P0", f"handle_v3 不应改动 --tc，实际: {args.tc}"
+    print("✅ test_handle_v3_diff_not_handled")
 
 
 def test_handle_v3_gen_test_early_exit():
@@ -251,12 +251,20 @@ def test_handle_v3_gen_test_early_exit():
     print("✅ test_handle_v3_gen_test_early_exit")
 
 
-def test_handle_v3_update_source_map_warning():
-    """22. --update-source-map 仅警告，返回 None（继续执行）"""
-    args = parse_args(["--update-source-map"])
-    result = handle_v3_reserved_args(args)
-    assert result is None, f"--update-source-map 应返回 None，实际: {result}"
-    print("✅ test_handle_v3_update_source_map_warning")
+def test_handle_v3_update_source_map_exec():
+    """22. --update-source-map 已实现（M8），重建 source_map 后返回 0"""
+    with patch("ai_tests.lib.source_impact_analyzer.SourceImpactAnalyzer") as mock_sia:
+        mock_analyzer = MagicMock()
+        mock_analyzer.build_source_map.return_value = {
+            "activities": {
+                "BookshelfActivity": {"tc_ids": ["TC-F-P0-1-01"]}
+            }
+        }
+        mock_sia.return_value = mock_analyzer
+        args = parse_args(["--update-source-map"])
+        result = handle_v3_reserved_args(args)
+    assert result == 0, f"--update-source-map 应返回 0，实际: {result}"
+    print("✅ test_handle_v3_update_source_map_exec")
 
 
 def test_handle_v3_feedback_warning():
@@ -268,11 +276,14 @@ def test_handle_v3_feedback_warning():
 
 
 def test_handle_v3_multiple_reserved_args():
-    """24. 多 V3 参数组合：--diff + --feedback 同时"""
-    args = parse_args(["--diff", "HEAD~1", "--feedback", "--update-source-map"])
-    result = handle_v3_reserved_args(args)
-    assert result is None, f"V3 组合应返回 None，实际: {result}"
-    assert args.tc == "all", f"--diff 应降级 tc 为 all，实际: {args.tc}"
+    """24. 多 V3 参数组合：--update-source-map 优先命中返回 0"""
+    with patch("ai_tests.lib.source_impact_analyzer.SourceImpactAnalyzer") as mock_sia:
+        mock_analyzer = MagicMock()
+        mock_analyzer.build_source_map.return_value = {"activities": {}}
+        mock_sia.return_value = mock_analyzer
+        args = parse_args(["--diff", "HEAD~1", "--feedback", "--update-source-map"])
+        result = handle_v3_reserved_args(args)
+    assert result == 0, f"含 --update-source-map 应返回 0，实际: {result}"
     print("✅ test_handle_v3_multiple_reserved_args")
 
 
@@ -374,9 +385,9 @@ def run_all_tests():
         test_filter_cases_empty_input,
         # handle_v3_reserved_args 测试
         test_handle_v3_no_reserved_args,
-        test_handle_v3_diff_degrade,
+        test_handle_v3_diff_not_handled,
         test_handle_v3_gen_test_early_exit,
-        test_handle_v3_update_source_map_warning,
+        test_handle_v3_update_source_map_exec,
         test_handle_v3_feedback_warning,
         test_handle_v3_multiple_reserved_args,
         # 退出码逻辑测试

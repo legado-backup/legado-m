@@ -39,7 +39,7 @@ def _make_memu(adb_returns=None):
 def test_evidence_collector_instantiation():
     """正常用例：EvidenceCollector 可实例化"""
     ec = EvidenceCollector(_make_memu())
-    assert ec.package.startswith("io.legado.app")
+    assert ec.package.startswith("io.legado")
     assert ec._logcat_start is None
     print("[PASS] test_evidence_collector_instantiation")
 
@@ -506,6 +506,9 @@ def test_collect_all_no_logcat():
 
 def test_collect_all_with_logcat():
     """正常用例：collect_all 含 logcat（先 start_logcat）"""
+    from datetime import datetime, timedelta
+    # FATAL 行时间戳用"当前时间+1分钟"，确保晚于 start_logcat 记录的起点，不被 slice 过滤
+    future_ts = (datetime.now() + timedelta(minutes=1)).strftime("%m-%d %H:%M:%S")
     # start_logcat 1 次 + 5 并行任务
     adb_returns = [
         # start_logcat: adb logcat -c
@@ -521,7 +524,7 @@ def test_collect_all_with_logcat():
         # activity_stack
         (0, "ACTIVITY", ""),
         # stop_logcat: adb logcat -d（collect_all 末尾调用）
-        (0, "07-08 10:00:00 FATAL EXCEPTION: main\n", ""),
+        (0, f"{future_ts} FATAL EXCEPTION: main\n", ""),
     ]
     memu = _make_memu(adb_returns)
     ec = EvidenceCollector(memu)
