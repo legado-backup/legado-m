@@ -17,9 +17,9 @@
 
 > ⚠️ 重要修正（不裁剪红线落地）：`themeConfig.json` 的 entry 结构是 `primaryColor/backgroundColor/textColor` 等**完整历史字段**，**不可改写为 34 槽位格式**，否则用户旧存档 + 全部历史主题失效。正确做法：**读取时推导**（`ThemeSpec.toColorScheme()` 运行时扩展槽位），**写入仍保持旧格式**。此点封死 AD-18 的落地方式。
 
-## 二、组件签名规格（`ui/widget/components/` 全新建仓，17 组件）
+## 二、组件签名规格（`ui/widget/components/` 全新建仓，17 组件 + Dialog 族 6 待建）
 
-> 全部 `@Composable`，位于 `app/src/main/java/io/legado/app/ui/widget/components/`。签名遵循本仓 Compose 风格（朴素顶层函数、无 DI）。
+> 全部 `@Composable`，位于 `app/src/main/java/io/legado/app/ui/widget/components/`。签名遵循本仓 Compose 风格（朴素顶层函数、无 DI）。**说明**：建仓时实际落 19 文件（比 spec 17 多 2，拆 Modifier 独立文件所致，见 tasks AOAdapt）；L2 Dialog 族 6 组件（§2.3.1）为 S6 弹窗统一方案待建项（见 ui-standards §3/§6）。
 
 ### 2.1 导航组件
 ```kotlin
@@ -110,6 +110,66 @@ fun SwipeActionContainer(
     content: @Composable () -> Unit
 )
 ```
+
+### 2.3.1 Dialog 族（L2 语义对话框，S6 弹窗统一三层体系）
+```kotlin
+// ConfirmDialog.kt（确认/删除确认）
+@Composable
+fun ConfirmDialog(
+    title: String,
+    text: String? = null,
+    confirmText: String = "确定",
+    cancelText: String = "取消",
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+)
+
+// AppEditDialog.kt（单/多字段文本输入，替代全仓 DialogEditText 系）
+@Composable
+fun AppEditDialog(
+    title: String,
+    fields: List<EditField>,          // data class EditField(label, initial, hint, singleLine)
+    onConfirm: (List<String>) -> Unit,
+    onDismiss: () -> Unit
+)
+
+// AppSelectDialog.kt（单列表选择，替代 GroupSelect/SourcePicker/主题列表）
+@Composable
+fun AppSelectDialog(
+    title: String,
+    options: List<SelectOption>,      // data class SelectOption(label, value)
+    selected: String? = null,
+    onSelect: (SelectOption) -> Unit,
+    onDismiss: () -> Unit
+)
+
+// AppNumberPickerDialog.kt（数字选择，替代 NumberPicker 系）
+@Composable
+fun AppNumberPickerDialog(
+    title: String,
+    value: Int,
+    range: IntRange,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+)
+
+// AppTextDialog.kt（文本/MD/HTML 查看，替代 TextDialog/MD Dialog）
+@Composable
+fun AppTextDialog(
+    title: String,
+    text: String,
+    isMarkdown: Boolean = false,
+    onDismiss: () -> Unit
+)
+
+// AppWaitDialog.kt（阻塞等待，替代 WaitDialog）
+@Composable
+fun AppWaitDialog(
+    text: String? = null,
+    show: Boolean
+)
+```
+> 全部复用 `MaterialTheme` + Settings* 行/卡片（禁页面私有 Dialog 布局）；数据（字段/选项）由页面 ViewModel 提供，回调注入（受控组件）。
 
 ### 2.4 进度/骨架/反馈
 ```kotlin
@@ -219,10 +279,13 @@ fun ThemeSpec.toM3Scheme(isLight: Boolean): ColorScheme   // Color.mix + hueShif
 | P1 | `ui/theme/LegadoTheme.kt` | 改造 | `:40-43` lerp → `toM3Scheme`；新增 `ui/theme/ThemeSpec.kt` |
 | P1 | `ui/theme/ComposeActivitySupport.kt` | 不动 | 已是 Compose Activity 基座 |
 | P2 | `ui/main/my/MyFragment.kt` | 改造 | `:55` binding 前缀改为 Compose；`:57-64` `replace(R.id.pre_fragment)` 仍保留但内容换 `ProfileScreen3Level()`；`MyPreferenceFragment` 收敛为列表数据源（不删任何入口） |
-| P2 | `ui/main/bookshelf/style1/BookshelfFragment1.kt` | 可选重写 | `:78` `tabLayout.setupWithViewPager` 保留；列表可先不动 |
+| P2 | `ui/main/bookshelf/style1/BookshelfFragment1.kt` | 改造(已实施) | 内容区改挂 ComposeView（保留 toolbar+12 菜单 View 壳），背景 `ProfileScreen3Level` 属 P2 我的页 |
 | P2 | `assets/defaultData/themeConfig.json` | **不写** | 保持旧格式 |
-| P3 | `ui/book/read/` 浮层类（Dialog） | 改造 | Dialog → `AppModalBottomSheet` 容器；新增 `BookTocBookmarkSheet` |
-| P4 | 全 App 巡检 | 审计 | 组件验收矩阵跑水平 |
+| P3 | `ui/main/bookshelf/BookshelfScreen.kt` | 新增 | 书架 Compose 整页（style1 Tab+style2 Folder/Grid/List0/List2/下拉刷新/空态/排序/FastScroller/封面 glide-compose/点击长按） |
+| P3 | `ui/main/bookshelf/style1/BookshelfFragment1.kt` + `style2/BookshelfFragment2.kt` | 改造 | 内容区改挂 `ComposeView{LegadoTheme{BookshelfScreen(...)}}`；`BaseBookshelfFragment` 12 菜单/toolbar/导入导出/configBookshelf/WaitDialog 全保留（用户红线） |
+| P3 | `app/build.gradle` | 变更 | `implementation(libs.glide.compose)`（toml 已有 glide-compose=1.0.0-beta08） |
+| P4 | `ui/book/read/` 浮层类（Dialog） | 改造 | Dialog → `AppModalBottomSheet` 容器；新增 `BookTocBookmarkSheet` |
+| P5 | 全 App 巡检 | 审计 | 组件验收矩阵跑水平 |
 
 ## 五、PR 粒度任务 + 每 Phase KPI
 
@@ -243,15 +306,36 @@ fun ThemeSpec.toM3Scheme(isLight: Boolean): ColorScheme   // Color.mix + hueShif
 - **PR-2.2** (可选) 书架骨架屏接入、style1 列表改 Grid Cache
 - **KPI**：4 组高频入口（备份/主题/书源/Web服务）≤2 步可达；pref_main 死代码清理后 4 入口回归通过；真机 P4 页截图比对。
 
-### Phase 3 — 阅读浮层 Sheet 化
-- **PR-3.1** 目录→`BookTocBookmarkSheet`，书签→合并双 Tab
-- **PR-3.2** 高亮选色等次要浮层 BatchDialog→BottomSheet
+### Phase 3 — 书架 Compose 化（用户红线：12 菜单/toolbar/导入导出/configBookshelf 对话框全保留为 View 壳）
+
+> 实施纪要（探针已完成，2026/08/10 落盘）：
+> - **架构**：`BookshelfScreen.kt`（Compose 整页）承载风格 1（分组 Tab+每组列表）与风格 2（Folder 平铺分组头+书，点击进组/back 返回根）；`BookshelfFragment1/2` 各自 onFragmentCreated 保留 setSupportToolbar + 12 菜单，内容区改挂 `ComposeView{setContent{LegadoTheme{BookshelfScreen(...)}}}`。
+> - **数据**：`appDb.bookDao.flowByGroup(groupId)` + 排序（0 durChapterTime desc /1 latestChapterTime desc /2 书名 cnCompare /3 order /4 综合 max(latest,dur) desc /5 作者 cnCompare；分组可覆盖 `AppConfig.getBookSortByGroupId`/`BookGroup.getRealBookSort()`）；`flowWithLifecycleAndDatabaseChangeFirst(RESUMED, BOOK_TABLE_NAME)`；空态 `@string/bookshelf_empty`；下拉刷新→`activityViewModel.upToc(books, onlyUpdateRead)`。
+> - **渲染矩阵**（对标 View 契约）：布局 `bookshelfLayout` 0=List0(66x90)/1=List2(48x64)/2..6=Grid n 列；`showBookname` 0隐藏/1显示/2渐变覆盖；未读 badge=`getUnreadChapterNum()`+`lastCheckCount`(>0 高亮 accent)；更新中 rl_loading（`!isLocal && isUpdate(url)`）隐藏 badge；进度 `readProgress()`（percent 仅 List）；更新时间 `showLastUpdateTime && !isLocal`（toTimeAgo）；封面 `getDisplayCover()`=customCoverUrl?:coverUrl。
+> - **多选已迁移**（本 fork 与原版差异）：长按多选不在书架主列表，已独立到 `BookshelfManageActivity`（menu_bookshelf_manage 入口）——Compose 主列表无需实现多选！
+> - **事件**：`EventBus.UP_BOOKSHELF(bookUrl)`→单条 notification / `BOOKSHELF_REFRESH`→notifyDataSetChanged。
+> - **图片**：Glide 5.0.5，`BookCover.load(ctx, path, false)` 返回 Requester<Drawable>；需引入 `implementation(libs.glide.compose)`（toml 已有 `glide-compose=1.0.0-beta08`）。
+- **PR-3.1** 新建 `BookshelfScreen.kt`（分组 Tab(style1)/Folder(style2) + Grid(2-6)/List0/List2 渲染 + 下拉刷新 + 空态 + 排序 + 封面 glide-compose + 点击/长按回调 + isEInkMode gotoTop）
+- **PR-3.2** `app/build.gradle` 加 `implementation(libs.glide.compose)`；`BookshelfFragment1/2` 改挂 ComposeView；保留 BaseBookshelfFragment 12 菜单/toolbar/导入导出/configBookshelf
+- **KPI**:真机书架渲染（两种风格/网格 3 列/空态）；「书源管理/搜索」入口 ≤2 步；`./gradlew assembleAppDebug` 通过。
+
+### Phase 4 — 阅读浮层 Sheet 化
+- **PR-4.1** 目录→`BookTocBookmarkSheet`，书签→合并双 Tab
+- **PR-4.2** 高亮选色等次要浮层 BatchDialog→BottomSheet
 - **KPI**：`activity_book_read.xml:8` read_view 下浮层不遮挡正文；正文读翻页性能无回归；真机手势冒烟。
 
-### Phase 4 — 一致性巡检
-- **PR-4.1** 组件验收矩阵（对齐 NG_COMPONENT_ACCEPTANCE_CHECKLIST）全 App 扫码
-- **PR-4.2** 对齐调色板/圆角/间距复核（SplicedColumnGroup 段落半径、RowIcon 36dp）
+### Phase 5 — 一致性巡检
+- **PR-5.1** 组件验收矩阵（对齐 NG_COMPONENT_ACCEPTANCE_CHECKLIST）全 App 扫码
+- **PR-5.2** 对齐调色板/圆角/间距复核（SplicedColumnGroup 段落半径、RowIcon 36dp）
 - **KPI**：0 处页面私有重复组件实现；公共 token 命中率 100%。
+
+### Phase 6 — 全量页面 Compose 化（v2 新增，2026-08-11 用户评审后）
+
+> 用户明确「前端全部 Compose + 工程级标准规范」。逐页按 `pages-inventory.md` §G 路线图（P1 高优核心 → P2 次优高频 → P3 长尾）执行，每页过 FR-11 真机功能点覆盖测试门禁。
+
+- **PR-6.x** 每页三步：① 功能点核对（pages-inventory 逐项，核心功能一个不漏）② 骨架归类（ui-standards S1-S6）③ 组件复用 + 主题接入 + 三态
+- **N 不迁移**（内核被 AndroidView 桥包围）：阅读器正文引擎（AD-02）、CodeEdit（sora 内核）、WebView 池、扫码相机、协议分发透明窗
+- **KPI**：N 不迁移页除外全页面类 Compose 化；硬编码色=0；私有重复组件=0；孤儿组件全接线；每页四入口 ≤2 步 + 真机覆盖 ✅
 
 ## 六、风险与封口（新增）
 
