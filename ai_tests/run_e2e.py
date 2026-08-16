@@ -130,6 +130,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                         help="V3: 重建 source_map.json")
     parser.add_argument("--feedback", action="store_true",
                         help="V3: 触发反馈闭环处理")
+    parser.add_argument("--ai-verify", action="store_true",
+                        help="AI-LLM-Testing: 报告生成后自动拉起 VL 模型判定 manual 用例并回填 ai_verdict")
 
     return parser.parse_args(argv)
 
@@ -511,6 +513,27 @@ def main(argv: Optional[List[str]] = None) -> int:
         affected_modules=None,
         feedback_signals=feedback_signals if feedback_signals else None,
     )
+
+    # 11.5 AI-LLM-Testing：--ai-verify 自动判定 manual 用例并回填 ai_verdict
+    if args.ai_verify:
+        print("[9.5] AI 判定器: 拉起 VL 模型判定 manual 用例...")
+        from ai_tests.lib.llm_server import LlmServerManager, LlmUnavailableError
+        from ai_tests.lib.ai_verifier import AiVerifier
+        mgr = LlmServerManager()
+        try:
+            info = mgr.ensure_online()
+            print(f"    模型服务在线: {info}")
+            verifier = AiVerifier(report_dir=rg.report_dir)
+            summary = verifier.verify_report(rg.report_dir / "report.json")
+            print(
+                f"    AI 判定: manual={summary['manual_total']} "
+                f"ai_verified={summary['ai_verified']} "
+                f"skipped={summary['skipped']} unavailable={summary['ai_unavailable']}"
+            )
+        except LlmUnavailableError as e:
+            print(f"    [WARN] 模型不可用，判定器降级（规则判定保持不变）: {e}")
+        finally:
+            mgr.stop()
 
     # 12. 清理
     if not args.keep_device:

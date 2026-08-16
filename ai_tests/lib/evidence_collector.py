@@ -521,7 +521,7 @@ if __name__ == "__main__":
     from ai_tests.lib.memu_controller import MemuController
     # 正常用例
     ec = EvidenceCollector(MemuController())
-    assert ec.package.startswith("io.legado.app"), "package 应为 io.legado.app.xxx"
+    assert ec.package.startswith("io.legado"), "package 应为 io.legado 前缀（当前包名见 config.PACKAGE）"
     # 边界用例
     try:
         EvidenceCollector(None)
