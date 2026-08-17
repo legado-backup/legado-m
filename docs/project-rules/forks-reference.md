@@ -1,16 +1,17 @@
 # 延伸版本参考与对比方法论（forks-reference）
 
 > **AI 在进行网络层/前端/协程/WebView 等组件优化时，必须主动对比以下延伸版本的实现，学习借鉴优点，不闭门造车。**
-> 来源：[阅读·全版本集散地](https://momo-b5a.pages.dev/%E4%B8%8B%E8%BD%BD/xz)（27+ 版本）
+> 来源：[阅读·全版本集散地](https://momoa.cc.cd/%E4%B8%8B%E8%BD%BD/xz)（41+ 版本；旧地址 momo-b5a.pages.dev 已失效，2026-08-16 更新）
+> 上游活跃度快照（2026-07-16 ~ 2026-08-16 实测）：**原版 gedoor 已停更**（最后推送 2026-05-27）；活跃上游依次为 喵公子（14 release）、阅读T（30 提交）、MD3（27 提交）、阅读Archive（46 提交，relay 子系统）、阅读NG（Compose 迁移）、legado-E（仅 EPUB 修复 PR#451）；蛋蛋Max/阅读R/辞晨 零提交。详见 `docs/specs/sync-upstream-optimizations-20260816/README.md` §1.1。
 
 ## 主线分支（基于原版，网络层与原版基本一致）
 
 | 版本 | git 仓库 | 特色 | 对比优先级 |
 |------|----------|------|-----------|
-| 原版阅读 | [gedoor/legado](https://github.com/gedoor/legado) | 原版，所有 fork 的源头 | ⭐⭐⭐⭐⭐ |
+| 原版阅读 | [gedoor/legado](https://github.com/gedoor/legado) | 所有 fork 的源头；**2026-05 起停更，仅作历史基线** | ⭐⭐⭐（回归对照） |
 | 阅读Sigma | [Luoyacheng/legado-E](https://github.com/Luoyacheng/legado-E) | 本项目 fork 源 | ⭐⭐⭐⭐⭐ |
-| 喵公子阅读 | [LegadoTeam/legado](https://github.com/LegadoTeam/legado) | 主流分支，活跃度高 | ⭐⭐⭐⭐ |
-| 阅读T | [skybbk1001/legadoT](https://github.com/skybbk1001/legadoT) | 主流分支 | ⭐⭐⭐ |
+| 喵公子阅读 | [LegadoTeam/legado](https://github.com/LegadoTeam/legado) | **事实上的活跃上游**（release 最频繁） | ⭐⭐⭐⭐⭐ |
+| 阅读T | [skybbk1001/legadoT](https://github.com/skybbk1001/legadoT) | 主流分支；活跃（TextDialog 搜索/HttpTTS 字段/原生加密替代 hutool——解锁 hutool 地雷的参考路径） | ⭐⭐⭐⭐ |
 | 阅读Archive | [Rimchars/legado](https://github.com/Rimchars/legado) | 主流分支 | ⭐⭐⭐ |
 | 阅读R | [refgd/legado](https://github.com/refgd/legado) | 主流分支 | ⭐⭐ |
 | Jingshiro阅读 | [Jingshiro/legado](https://github.com/Jingshiro/legado) | 主流分支 | ⭐⭐ |

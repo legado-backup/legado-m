@@ -1,6 +1,6 @@
 # 项目状态面板
 
-> 最后更新：2026-08-12
+> 最后更新：2026-08-16
 > 状态判定原则：以源码实证为准，任务勾选框/README 状态不视为最终事实（本仓库存在大量"已实现但未勾选"，本次已大幅校正）。
 
 ## 项目概况
@@ -138,6 +138,8 @@ app-stability-round2、子代理预算、技术文档审计修复、视频播放
 | RSS 年龄验证自动绕过 | P2 | 三层绕过配置全未实施（仅调研勾选）；loginCheckJs 等为原版框架字段 | 中/中 | [rss-age-verify-autobypass/](./rss-age-verify-autobypass/) |
 | 上游 fork 对比分析 | P3 | 分析型产出为设计文档；实现/集成 47 项未做，temp/forks-comparison/legados 缺失 | 小/中 | [legados-forks-comparison/](./legados-forks-comparison/) |
 | 本地视觉大模型测试 | P1 | ai_tests 接入 Qwen3VL-8B（脱离 LM Studio 自动托管）：AI 判定器回填 ai_verdict + GUI Agent 混合定位执行器 + 经验层，全部存在于设计文档 | 中/高 | [ai-llm-testing/](./ai-llm-testing/) |
+| 上游同步优化批次 20260816 | P0 | ✅设计定稿(08-16)待实施。近一月生态对比（10 仓库：喵公子 14 版 + legado-E EPUB 修复 + 阅读T/MD3/Archive/Jingshiro 提交级，原版已停更）→ 16 项同步：EPUB delTag 位运算实锤 bug、章节缓存写入保护、更新弹窗大小日期、日志分享、下拉书签、目录分卷折叠、TTS 段落停顿+定时三模式、JS 并发工具、漫画长按保存、WebDAV 删书联动、预测返回、URL 超时/重定向、TextDialog 文档内搜索、TXT 分割字数、ReadRecord OOM 核查、HttpTTS CookieJar；2 硬门禁（3.1.0 Rhino 线程模型先对比上游、3.4.1 onBackPressed 清零）；阶段0 门禁=等 Compose 化提交固化 | 中/高 | [sync-upstream-optimizations-20260816/](./sync-upstream-optimizations-20260816/) |
+| 主题架构 v2（全局即时换肤） | P0 | ✅已实施+真机验证(08-17)。修复 Compose 迁移后主题设置大面积失效（RECREATE 仅 2 处订阅/LegadoTheme 一次性读值/非激活组静默无效）→ ThemeSync 全局版本信号（bump 即全 Compose 换肤零重建）+ BaseActivity 统一订阅（沉浸/设置页豁免改刷系统栏）+ onResume 令牌懒同步（Archive 模式）+ ThemeSpec 撞色守卫（对比度<1.3 跨昼夜兜底，压平 alpha 防崩）+ 底栏选中色改跟随主色（消除蓝顶栏红选中撞色）；主题设置页全 Compose 重设计（主题瓦片网格/ColorPickerSheet HSL 活预览/非激活组 toast/AppMenuSheet 背景图流）；新组件 ThemeSync/ColorPickerSheet/SettingsColorRow，删孤儿 ThemeListDialog；VLM 评审 8.5/10、主页综合 75/100（间距圆角细节留独立立项） | 中 | [theme-architecture-v2/](./theme-architecture-v2/) |
 
 ---
 
