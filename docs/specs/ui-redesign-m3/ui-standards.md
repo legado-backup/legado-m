@@ -111,6 +111,9 @@
 | 族 | 组件 | 状态 | 用途 |
 |----|------|------|------|
 | **主题** | `ThemeSpec`（toM3Scheme/contrastOn/hueShift） | ✅ 在用 | 5色→34槽位 |
+| **主题** | `ThemeSync`（全局版本信号） | ✅ 在用（主题架构 v2，2026-08-17） | applyTheme/recreateActivities bump→全 Compose 即时换肤（零重建）；LegadoTheme/GlassTopAppBar/PillNavigationBar/ThemeConfigScreen 组合中读 version 订阅 |
+| | `ColorPickerSheet` | ✅ 在用（L-E2 主题设置页，2026-08-17） | 色盘弹层：MATERIAL_COLORS 预置网格+HSL 三滑块（色相彩虹渐变轨道）+hex 活预览；AppModalBottomSheet 容器 |
+| | `SettingsColorRow` | ✅ 在用（L-E2 主题设置页，2026-08-17） | 色设置行（RowIcon+标题/副标+36×28dp 8dp 圆角色块预览，outlineVariant 描边） |
 | **导航** | `PillNavigationBar` | ✅ 已接线（S1 MainActivity，2026-08-12） | S1 主框架底栏（AD-17） |
 | **顶栏** | `GlassTopAppBar` | ✅ 已接线（S4 B6 BookInfoActivity，2026-08-12） | S2/S3/S4 磨砂顶栏 |
 | **设置** | `SettingsSection` | ✅ 在用 | 分组标题 |
@@ -535,3 +538,4 @@
 - 2026-08-13 v2.18：**轻量页 task 占位符清零（用户要求每页设计文档有明确 task 子任务对应）**——对 pages/light/ 全部 43 份轻量文档逐份审计（audit-lightweight-docs.md），发现 16 份页面身份残留 `tasks.md 12.xx` 占位符 + 6 份标 `task 待接线` + 11 份仅 pages-inventory 引用无 task 号。按 tasks.md「轻量页 task 精确映射表」（12.40-12.62）统一回填：34 份页面身份「对应 task」+「变更记录」双处补/换精确 task 号（L-B5→12.4F、L-B7→12.50、L-B8→12.41、L-B9→12.51、L-B10→12.42、L-B12→12.43、L-B13→12.44、L-B14→12.52、L-B15→12.53、L-B16→12.54、L-C3→12.45、L-C4→12.46、L-C5→12.47、L-C6→12.55、L-C9→12.56、L-C10→12.57、L-C11→12.58、L-C12→12.59、L-C13→12.48、L-C15→12.49、L-C16→12.5A、L-C17→12.5B、L-C20→12.5C、L-D3→12.5D、L-D4→12.40、L-D6→12.4A、L-D7→12.5E、L-D8→12.5F、L-D9→12.4B、L-E1→12.4C、L-E3→12.60、L-E4→12.4D、L-E5→12.61、L-E6→12.62）。核验：light/ 目录 Grep `12.xx` 0 残留，每份轻量文档均含精确 task 号可定位实施/验证任务。
 - 2026-08-16 v2.19：**§3 组件目录表全量回填 59 文件**——审计回填：新增 AppShapes/EmptyStatePlaceholder/TagChip/SettingsSelectableRow/ReaderMenuSheet/HighlightStyleSheet/MenuLayer/LazyListFastScroller/ManageScreenSheet 共 9 行登记；原标「32 文件」修正为实际 59 文件；ListScaffold 补充孤儿状态标注；§11 变更记录追加本行。
 - 2026-08-16 v2.20：孤儿组件清理——删除 SummaryCard/ThemedSnackbarHost/SplicedColumnGroup/ManageScreenSheet 4 个无消费场景孤儿组件；VerticalScrollbar 接线到 DownloadManageScreen；ListScaffold 登记为模板待用（task 12.30）。
+- 2026-08-17 v2.21：**主题架构 v2 落地（theme-architecture-v2 spec）**——§3 组件表新增 ThemeSync/ColorPickerSheet/SettingsColorRow 3 行；主题设置页（L-E2）重设计为全 Compose（瓦片网格+色盘活预览）；AppNumberPickerDialog 增 neutralText/onNeutral；PillNavigationBar 选中色 accent→primaryColor（对齐 View 语义）；BaseActivity 统一 RECREATE 订阅（沉浸页/设置宿主页 recreateOnThemeChange=false 豁免）+onResume 令牌懒同步；ThemeSpec 增 withContrastGuard 撞色守卫。
