@@ -9,7 +9,7 @@
 - [x] 0.3 基于最新 tag 四维度深度差异分析（后端核心/数据库/主题/UI 接口契约 + 特色接线）— 已完成，5 份 rev2 报告见 `docs/temp-analysis/`
 - [x] 0.4 当前 Compose 迁移 WIP 快照分支 `test_compose_self_20260818` 提交并推送远端 — ✅ 已完成（commit 86ac9a802，53 文件）
 - [x] 0.5 四文档修订 v2（README/spec/design/tasks 基于 rev2 分析 + 用户调整意见）— ✅ 已完成，**检查点 1 已通过**（用户确认：文档通过 + AI 完整搬入 + EPub 搬入 + 迁移分支确认 + 单元测试门禁）
-- [ ] 0.6 从 master 干净点创建迁移分支 `migration-archive-ui`（基线 = 当前 master HEAD）
+- [x] 0.6 从 master 干净点（aa1170a08）创建迁移分支 `migration-archive-ui` 并推送远端 — ✅ 已完成（cherry-pick 设计文档 429168283 + .gitignore 忽略 archive-ref/temp-analysis 1bd1e94a0）
 - [ ] 0.7 登记迁移 UI 标准基线（组件清单初版）到 `docs/project-flow/ui-standards/`
 
 ## 1. Cronet 升级（子任务 1，方案 1 `cronet-bundled` 已确认）
