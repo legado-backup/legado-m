@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.MoreVert
@@ -63,10 +61,9 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
     private fun initComposeTopBar() {
         binding.composeTopBar.setContent {
             LegadoTheme {
-                Column(modifier = Modifier.statusBarsPadding()) {
-                    GlassTopAppBar(
-                        title = getString(R.string.my),
-                        actions = {
+                GlassTopAppBar(
+                    title = getString(R.string.my),
+                    actions = {
                             Box {
                                 IconButton(onClick = { menuExpanded = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = null)
@@ -85,7 +82,6 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                             }
                         }
                     )
-                }
             }
         }
     }

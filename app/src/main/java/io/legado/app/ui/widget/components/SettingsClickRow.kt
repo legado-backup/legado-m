@@ -1,7 +1,7 @@
 package io.legado.app.ui.widget.components
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 设置点击行（36dp RowIcon 图标块 + 标题 + 副标题 + 尾值 + 右箭头）
+ * onLongClick：可选长按回调（P3-2b 备份恢复页 web_dav_restore 长按本地恢复保留），默认 null 行为与 clickable 一致。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsClickRow(
     icon: ImageVector?,
@@ -33,6 +35,7 @@ fun SettingsClickRow(
     subtitle: String? = null,
     value: String? = null,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     trailingIcon: ImageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
     enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null
@@ -40,7 +43,7 @@ fun SettingsClickRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             // 最小行高 60dp，与 View 体系设置行高度对齐（消除 48~72dp 波动）
             .heightIn(min = 60.dp),

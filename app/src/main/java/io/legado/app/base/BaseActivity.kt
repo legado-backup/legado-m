@@ -220,7 +220,8 @@ abstract class BaseActivity<VB : ViewBinding>(
         if (fullScreen && !isInMultiWindow) {
             fullScreen()
         }
-        val isTransparentStatusBar = AppConfig.isTransparentStatusBar
+        // 沉浸联动：打开「沉浸式操作栏」时顶部状态栏一并沉浸（头部与底部导航栏行为一致）
+        val isTransparentStatusBar = AppConfig.isTransparentStatusBar || AppConfig.immNavigationBar
         val statusBarColor = ThemeStore.statusBarColor(this, isTransparentStatusBar)
         setStatusBarColorAuto(statusBarColor, isTransparentStatusBar, fullScreen)
         if (toolBarTheme == Theme.Dark) {

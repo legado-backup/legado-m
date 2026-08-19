@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -38,8 +39,8 @@ import io.legado.app.ui.widget.components.SettingsToggleRow
  * L-E6 欢迎配置（S2 配置列表页）。
  *
  * 内容区全 Compose：欢迎页显示时间（Slider 0-800）/ 自定义欢迎开关 /
- * 日/夜背景图行（点击选图/删除，summary 显示当前路径或「选择图片」）。
- * 文字/图标开关设计文档留空，未实现。
+ * 日/夜背景图行（点击选图/删除，summary 显示当前路径或「选择图片」）/
+ * 日/夜 文字/图标显隐 4 开关（C2 恢复，消费逻辑见 WelcomeActivity.upBackgroundImage）。
  */
 @Composable
 fun WelcomeConfigScreen(
@@ -47,10 +48,18 @@ fun WelcomeConfigScreen(
     customWelcome: Boolean,
     welcomeImageSummary: String,
     welcomeImageDarkSummary: String,
+    showText: Boolean,
+    showTextDark: Boolean,
+    showIcon: Boolean,
+    showIconDark: Boolean,
     onShowTimeChange: (Int) -> Unit,
     onCustomWelcomeChange: (Boolean) -> Unit,
     onWelcomeImageClick: () -> Unit,
     onWelcomeImageDarkClick: () -> Unit,
+    onShowTextChange: (Boolean) -> Unit,
+    onShowTextDarkChange: (Boolean) -> Unit,
+    onShowIconChange: (Boolean) -> Unit,
+    onShowIconDarkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var sliderValue by remember { mutableFloatStateOf(showTime.toFloat()) }
@@ -118,7 +127,7 @@ fun WelcomeConfigScreen(
             )
         }
 
-        // 日模式：背景图片行
+        // 日模式：背景图片行 + 文字/图标显隐开关
         SettingsSection(title = stringResource(R.string.day), modifier = Modifier.fillMaxWidth()) {
             SettingsCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsClickRow(
@@ -127,10 +136,24 @@ fun WelcomeConfigScreen(
                     value = welcomeImageSummary,
                     onClick = onWelcomeImageClick
                 )
+                SettingsToggleRow(
+                    icon = Icons.Default.TextFields,
+                    title = stringResource(R.string.show_welcome_text),
+                    subtitle = stringResource(R.string.welcome_text),
+                    checked = showText,
+                    onCheckedChange = onShowTextChange
+                )
+                SettingsToggleRow(
+                    icon = Icons.Default.Image,
+                    title = stringResource(R.string.show_icon),
+                    subtitle = stringResource(R.string.show_default_book_icon),
+                    checked = showIcon,
+                    onCheckedChange = onShowIconChange
+                )
             }
         }
 
-        // 夜模式：背景图片行
+        // 夜模式：背景图片行 + 文字/图标显隐开关
         SettingsSection(title = stringResource(R.string.night), modifier = Modifier.fillMaxWidth()) {
             SettingsCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsClickRow(
@@ -138,6 +161,20 @@ fun WelcomeConfigScreen(
                     title = stringResource(R.string.background_image),
                     value = welcomeImageDarkSummary,
                     onClick = onWelcomeImageDarkClick
+                )
+                SettingsToggleRow(
+                    icon = Icons.Default.TextFields,
+                    title = stringResource(R.string.show_welcome_text),
+                    subtitle = stringResource(R.string.welcome_text),
+                    checked = showTextDark,
+                    onCheckedChange = onShowTextDarkChange
+                )
+                SettingsToggleRow(
+                    icon = Icons.Default.Image,
+                    title = stringResource(R.string.show_icon),
+                    subtitle = stringResource(R.string.show_default_book_icon),
+                    checked = showIconDark,
+                    onCheckedChange = onShowIconDarkChange
                 )
             }
         }

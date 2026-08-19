@@ -265,10 +265,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     // ===== 书源/订阅源布局深度重构配置（学习书架两维度独立架构） =====
     // 分组样式：0=列表(平铺), 1=按类型, 2=按分组
+    // P1-1 默认值 0→1：发现/订阅默认按类型分组（问题5「默认按类型」），新装/未改设置生效
     var sourceGroupStyle: Int
         get() {
             migrateSourceConfigIfNeeded()
-            return appCtx.getPrefInt(PreferKey.sourceGroupStyle, 0)
+            return appCtx.getPrefInt(PreferKey.sourceGroupStyle, 1)
         }
         set(value) {
             appCtx.putPrefInt(PreferKey.sourceGroupStyle, value)
@@ -317,7 +318,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
      * 旧配置迁移到新配置（仅执行一次）。
      * 迁移映射：
      * - sourceViewMode=0 + sourceFolderStyle=0 → sourceGroupStyle=0 (列表平铺)
-     * - sourceViewMode=1 + sourceFolderStyle=0 → sourceGroupStyle=2 (按分组)
+     * - sourceViewMode=1 + sourceFolderStyle=0 → sourceGroupStyle=1 (按类型)  // P1-1 原为2(按分组)，默认改按类型
      * - sourceViewMode=1 + sourceFolderStyle=1 → sourceGroupStyle=1 (按类型)
      * - sourceViewMode=0 + sourceFolderStyle=1 → sourceGroupStyle=0 (列表平铺)
      */
@@ -328,7 +329,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         val newGroupStyle = when {
             oldViewMode == 0 -> 0  // 旧列表视图 → 列表平铺
             oldFolderStyle == 1 -> 1  // 旧文件夹+按类型 → 按类型
-            else -> 2  // 旧文件夹+按分组 → 按分组
+            else -> 1  // 旧默认(文件夹+按分组) → 按类型（P1-1 默认改按类型）
         }
         appCtx.putPrefInt(PreferKey.sourceGroupStyle, newGroupStyle)
         // 迁移旧间距配置

@@ -7,6 +7,7 @@ import android.view.inputmethod.InputMethodManager
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -28,6 +29,7 @@ import io.legado.app.databinding.ActivitySearchContentBinding
 import io.legado.app.help.IntentData
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isLocal
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.ui.theme.LegadoTheme
@@ -35,10 +37,10 @@ import io.legado.app.ui.widget.components.AppDropdownMenu
 import io.legado.app.ui.widget.components.GlassTopAppBar
 import io.legado.app.ui.widget.components.MenuAction
 import io.legado.app.ui.widget.components.SettingsSearchBar
-import io.legado.app.ui.widget.recycler.UpLinearLayoutManager
-import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarMargin
+import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.hexString
 import io.legado.app.utils.invisible
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
@@ -53,13 +55,10 @@ import splitties.systemservices.inputMethodManager
 
 
 class SearchContentActivity :
-    VMBaseActivity<ActivitySearchContentBinding, SearchContentViewModel>(),
-    SearchContentAdapter.Callback {
+    VMBaseActivity<ActivitySearchContentBinding, SearchContentViewModel>() {
 
     override val binding by viewBinding(ActivitySearchContentBinding::inflate)
     override val viewModel by viewModels<SearchContentViewModel>()
-    private val adapter by lazy { SearchContentAdapter(this, this) }
-    private val mLayoutManager by lazy { UpLinearLayoutManager(this) }
     private var durChapterIndex = 0
     private var searchJob: Job? = null
     private var initJob: Job? = null
@@ -67,6 +66,14 @@ class SearchContentActivity :
     private var composeSearchQuery by mutableStateOf("")
     private var menuExpanded by mutableStateOf(false)
     private val searchFocusRequester = FocusRequester()
+    // search-content-compose 壳层化：结果列表快照（驱动 Compose LazyColumn 重组）+ Compose 列表状态（供底部跳转按钮）
+    private var searchResults by mutableStateOf<List<SearchResult>>(emptyList())
+    private var searchListState: LazyListState? = null
+    private var pendingScrollIndex: Int = 0
+    private val searchTextColor: String
+        get() = getCompatColor(R.color.primaryText).hexString.substring(2)
+    private val searchAccentColor: String
+        get() = accentColor.hexString.substring(2)
 
     // search-content-compose 壳层化：菜单动作 ID（原 R.id.menu_xxx，菜单资源已删除）
     private object MenuId {
@@ -86,7 +93,7 @@ class SearchContentActivity :
         val position = intent.getIntExtra("searchResultIndex", 0)
         val noSearchResult = searchResultList == null
         initComposeTopBar()
-        initRecyclerView()
+        initComposeList()
         initView()
         val bookUrl = intent.getStringExtra("bookUrl") ?: return
         viewModel.initBook(bookUrl) {
@@ -168,23 +175,48 @@ class SearchContentActivity :
         list ?: return
         viewModel.searchResultList.addAll(list)
         viewModel.searchResultCounts = list.size
-        adapter.setItems(list)
-        binding.recyclerView.scrollToPosition(position)
+        searchResults = viewModel.searchResultList.toList()
+        // 若 Compose 列表状态已就绪则直接定位，否则挂起等待
+        val state = searchListState
+        if (state != null) {
+            lifecycleScope.launch { state.scrollToItem(position) }
+        } else {
+            pendingScrollIndex = position
+        }
     }
 
-    private fun initRecyclerView() {
-        binding.recyclerView.layoutManager = mLayoutManager
-        binding.recyclerView.addItemDecoration(VerticalDivider(this))
-        binding.recyclerView.adapter = adapter
+    // search-content-compose 壳层化：主体列表由 RecyclerView 迁移为 Compose LazyColumn
+    private fun initComposeList() {
+        binding.composeHost.setContent {
+            LegadoTheme {
+                SearchContentScreen(
+                    results = searchResults,
+                    durChapterIndex = durChapterIndex,
+                    textColor = searchTextColor,
+                    accentColor = searchAccentColor,
+                    onResultClick = { result, index -> openSearchResult(result, index) },
+                    onListStateReady = { state ->
+                        searchListState = state
+                        if (pendingScrollIndex > 0) {
+                            val target = pendingScrollIndex
+                            pendingScrollIndex = 0
+                            lifecycleScope.launch { state.scrollToItem(target) }
+                        }
+                    }
+                )
+            }
+        }
     }
 
     private fun initView() {
         binding.ivSearchContentTop.setOnClickListener {
-            mLayoutManager.scrollToPositionWithOffset(0, 0)
+            searchListState?.let { lifecycleScope.launch { it.scrollToItem(0, 0) } }
         }
         binding.ivSearchContentBottom.setOnClickListener {
-            if (adapter.itemCount > 0) {
-                mLayoutManager.scrollToPositionWithOffset(adapter.itemCount - 1, 0)
+            if (searchResults.isNotEmpty()) {
+                searchListState?.let {
+                    lifecycleScope.launch { it.scrollToItem(searchResults.size - 1, 0) }
+                }
             }
         }
         binding.tvCurrentSearchInfo.setOnClickListener {
@@ -217,7 +249,8 @@ class SearchContentActivity :
             withContext(IO) {
                 viewModel.cacheChapterNames.addAll(BookHelp.getChapterFiles(book))
             }
-            adapter.notifyItemRangeChanged(0, adapter.itemCount, true)
+            // 缓存文件名就绪后强制刷新，使已渲染条目重算命中高亮
+            searchResults = viewModel.searchResultList.toList()
         }
     }
 
@@ -226,7 +259,7 @@ class SearchContentActivity :
             viewModel.book?.bookUrl?.let { bookUrl ->
                 if (book.bookUrl == bookUrl) {
                     viewModel.cacheChapterNames.add(chapter.getFileName())
-                    adapter.notifyItemChanged(chapter.index, true)
+                    searchResults = viewModel.searchResultList.toList()
                 }
             }
         }
@@ -237,7 +270,7 @@ class SearchContentActivity :
         // 按章节搜索内容
         if (query.isBlank()) return
         searchJob?.cancel()
-        adapter.clearItems()
+        searchResults = emptyList()
         viewModel.searchResultList.clear()
         viewModel.searchResultCounts = 0
         viewModel.lastQuery = query
@@ -248,7 +281,7 @@ class SearchContentActivity :
             kotlin.runCatching {
                 appDb.bookChapterDao.getChapterList(viewModel.bookUrl).forEach { bookChapter ->
                     ensureActive()
-                    val searchResults = if (isLocalBook
+                    val chapterResults = if (isLocalBook
                         || viewModel.cacheChapterNames.contains(bookChapter.getFileName())
                     ) {
                         viewModel.searchChapter(query, bookChapter)
@@ -256,28 +289,25 @@ class SearchContentActivity :
                         return@forEach
                     }
                     ensureActive()
-                    if (searchResults.isNotEmpty()) {
-                        viewModel.searchResultList.addAll(searchResults)
+                    if (chapterResults.isNotEmpty()) {
+                        viewModel.searchResultList.addAll(chapterResults)
                         binding.tvCurrentSearchInfo.post {
                             binding.tvCurrentSearchInfo.text =
                                 this@SearchContentActivity.getString(R.string.search_content_size) + ": ${viewModel.searchResultCounts}"
-                            adapter.addItems(searchResults)
+                            // search-content-compose：由 status 快照驱动 Compose LazyColumn 增量追加
+                            searchResults = viewModel.searchResultList.toList()
                         }
                     }
                 }
-                if (viewModel.searchResultCounts == 0) {
-                    val noSearchResult =
-                        SearchResult(resultText = getString(R.string.search_content_empty))
-                    binding.tvCurrentSearchInfo.post {
-                        adapter.addItem(noSearchResult)
-                    }
-                }
+                // 空结果由 SearchContentScreen 空态 EmptyStatePlaceholder 呈现，无需再插入占位条目
             }.onFailure {
                 AppLog.put("全文搜索出错\n${it.localizedMessage}", it)
             }
             binding.tvCurrentSearchInfo.post {
                 binding.fbStop.invisible()
                 binding.refreshProgressBar.isAutoLoading = false
+                // 无结果时同步刷新快照触发空态展示
+                searchResults = viewModel.searchResultList.toList()
             }
         }
     }
@@ -285,7 +315,7 @@ class SearchContentActivity :
     private val isLocalBook: Boolean
         get() = viewModel.book?.isLocal == true
 
-    override fun openSearchResult(searchResult: SearchResult, index: Int) {
+    fun openSearchResult(searchResult: SearchResult, index: Int) {
         searchJob?.cancel()
         postEvent(EventBus.SEARCH_RESULT, viewModel.searchResultList as List<SearchResult>)
         val searchData = Intent()
@@ -298,7 +328,7 @@ class SearchContentActivity :
         finish()
     }
 
-    override fun durChapterIndex(): Int {
+    fun durChapterIndex(): Int {
         return durChapterIndex
     }
 

@@ -160,6 +160,7 @@
 | [specs/video-m3u8-cache/](./specs/video-m3u8-cache/) | 视频播放�?m3u8 边下边播缓存（cachePlay 配置 + 设置开关，默认开启） �?已实施，待真机验�?|
 | [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表�?DiffUtil 增量更新 + WebView cacheFirst 默认 true�?�?已实施，待真机验�?|
 | [specs/rss-image-decrypt-optimization/](./specs/rss-image-decrypt-optimization/) | 订阅源图片解密优化（调试输出截断防崩�?+ 列表并行化提速；真机发现并修�?ImageUtils 块对齐校验误拦截 base64 文本封面致图片永不显示） �?引擎修复完成（ImageUtils 移除块校�?失败兜底bytes），真机验证图片显示通过 |
+| [specs/ui-issues-round-20260818/](./specs/ui-issues-round-20260818/) | UI 问题综合整改（2026-08-18 用户验收 9 大 UI 问题：书架标签头部/沉浸式操作栏联动/启动界面/发现订阅批量分组+搜索框显隐+去分组弹框/书源编辑页还原/长按进详情 null 修复/弹框三样式统一/组件风格统一/功能裁剪回溯+除阅读详情页外全页面 Compose 化；P0→P3 四阶段） 🔄 设计中 |
 | [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静�?+ 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮�?�?已实施，待真机验�?|
 | [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分�?bug + 视图模式扩展5�?+ 订阅源排�?+ 类型筛�?+ 统一配置对话框） 🔄 设计�?|
 | [specs/exoplayer-resilience/](./specs/exoplayer-resilience/) | ExoPlayer 韧性优化（预嗅�?LRU缓存+自动WebView降级，解�?002错误码和浏览器能播放但内置播放器失败痛点�?🔄 实施�?|

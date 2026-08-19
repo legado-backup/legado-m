@@ -153,10 +153,15 @@ fun BookSourceScreen(
     var moreMenuVisible by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
+    // P3-2 疑点2 修复：布局菜单补 2-6 网格列数细分（0=列表/1=紧凑/2-6=网格列数）
     val layoutOptions = listOf(
         ListLayoutOption(0, Icons.Default.ViewList, stringResource(R.string.layout_list)),
         ListLayoutOption(1, Icons.Default.ViewAgenda, stringResource(R.string.layout_list_compact)),
-        ListLayoutOption(2, Icons.Default.GridView, stringResource(R.string.layout_grid2))
+        ListLayoutOption(2, Icons.Default.GridView, stringResource(R.string.layout_grid2)),
+        ListLayoutOption(3, Icons.Default.GridView, stringResource(R.string.layout_grid3)),
+        ListLayoutOption(4, Icons.Default.GridView, stringResource(R.string.layout_grid4)),
+        ListLayoutOption(5, Icons.Default.GridView, stringResource(R.string.layout_grid5)),
+        ListLayoutOption(6, Icons.Default.GridView, stringResource(R.string.layout_grid6))
     )
     val sortOptions = listOf(
         ListSortOption("0", stringResource(R.string.source_sort_0)),
@@ -164,10 +169,12 @@ fun BookSourceScreen(
         ListSortOption("2", stringResource(R.string.source_sort_2)),
         ListSortOption("3", stringResource(R.string.source_sort_3)),
         ListSortOption("4", stringResource(R.string.source_sort_4)),
-        ListSortOption("5", stringResource(R.string.source_sort_5))
+        ListSortOption("5", stringResource(R.string.source_sort_5)),
+        // C3 恢复「最近更新」：bookSourceSort==6 -> lastUpdateTime 排序逻辑已存在（BookSourceActivity.sortSources），仅补 UI 入口
+        ListSortOption("6", stringResource(R.string.sort_by_lastUpdateTime))
     )
-    // 布局归一化：2-6 网格列数视为「网格」选项
-    val layoutForMenu = if (currentLayout in 2..6) 2 else currentLayout
+    // P3-2 疑点2 修复：布局菜单直接传 currentLayout（2-6 网格列数不再归一化为 2）
+    val layoutForMenu = currentLayout.coerceIn(0, 6)
 
     if (showTopBar) {
         BackHandler {
@@ -373,27 +380,21 @@ fun BookSourceScreen(
                     }
                 }
                 else -> {
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val columns = when {
-                            maxWidth < 400.dp -> 2
-                            maxWidth < 600.dp -> 3
-                            maxWidth < 800.dp -> 4
-                            else -> 6
-                        }
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(columns),
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(8.dp)
-                        ) {
-                            items(sources, key = { it.bookSourceUrl }) { source ->
-                                BookSourceGridItem(
-                                    source = source,
-                                    isSelecting = isSelecting,
-                                    isChecked = selectedUrls.contains(source.bookSourceUrl),
-                                    onClick = { onItemClick(source) },
-                                    onLongClick = { onItemLongClick(source) }
-                                )
-                            }
+                    // P3-2 疑点2 修复：网格列数读 currentLayout（2-6），不再按屏幕宽度硬编码覆盖
+                    val columns = currentLayout.coerceIn(2, 6)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        items(sources, key = { it.bookSourceUrl }) { source ->
+                            BookSourceGridItem(
+                                source = source,
+                                isSelecting = isSelecting,
+                                isChecked = selectedUrls.contains(source.bookSourceUrl),
+                                onClick = { onItemClick(source) },
+                                onLongClick = { onItemLongClick(source) }
+                            )
                         }
                     }
                 }

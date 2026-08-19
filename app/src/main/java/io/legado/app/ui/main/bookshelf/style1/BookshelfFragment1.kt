@@ -87,6 +87,9 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
                 startActivity<BookInfoActivity> {
                     putExtra("name", book.name)
                     putExtra("author", book.author)
+                    // 补传 bookUrl：书架中 name/author 为空或重名时，
+                    // BookInfoViewModel.initData 靠 getBook(bookUrl) 兜底（book is null 修复）
+                    putExtra("bookUrl", book.bookUrl)
                 }
             },
         )

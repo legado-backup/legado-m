@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_select_all"
+        android:title="@string/select_all"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_revert_selection"
+        android:title="@string/revert_selection"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_add_group"
+        android:title="@string/add_group"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_remove_group"
+        android:title="@string/remove_group"
+        app:showAsAction="never" />
+
+</menu>

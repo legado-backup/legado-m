@@ -9,11 +9,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import io.legado.app.ui.widget.components.AppShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,10 +40,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -83,6 +80,7 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.view.ThemeCheckBox
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
@@ -92,8 +90,10 @@ import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.AppDropdownMenu
+import io.legado.app.ui.widget.components.AppSelectDialog
 import io.legado.app.ui.widget.components.GlassTopAppBar
 import io.legado.app.ui.widget.components.MenuAction
+import io.legado.app.ui.widget.components.SelectOption
 import io.legado.app.ui.widget.components.SettingsCard
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
@@ -131,7 +131,6 @@ class BookSourceEditActivity :
     private val adapter by lazy { BookSourceEditAdapter() }
     private val recyclerView by lazy { RecyclerView(this) }
     private var menuExpanded by mutableStateOf(false)
-    private var typeMenuExpanded by mutableStateOf(false)
     private var typeIndex by mutableIntStateOf(0)
     private var isEnable by mutableStateOf(true)
     private var isEnableExplore by mutableStateOf(true)
@@ -412,32 +411,39 @@ class BookSourceEditActivity :
         }
     }
 
-    // S3 阶段3：顶部快捷工具条 SettingsCard 分组 Compose 化（类型 Spinner + 开关组，删死字段 cb_is_enable_review）
-    // 修复（v2）：类型不再用全宽 SettingsClickRow——其内部 fillMaxWidth() 在 FlowRow 中会占满整行，
-    // 导致「类型」独占一行、其余开关全部换行到下面。改为紧凑「标签+值+下拉箭头」可点击行，
-    // 与「启用/发现/自动保存Cookie」同一 FlowRow 内自然同行（还原原版第一行结构），事件监听/定制按钮自动换第二行
-    @OptIn(ExperimentalLayoutApi::class)
+    // S3 阶段3：顶部快捷工具条 SettingsCard 分组 Compose 化
+    // 问题7 P2-2 还原：由「单行 FlowRow 包裹 + M3 Checkbox + 内联 DropdownMenu」还原为贴近原版
+    // XML 表单的两行横向滚动结构（对齐 RssSourceEditActivity 保留的原版表单视觉，AD-04 尊重原样式）：
+    //   Row1: 类型(点击弹 AppSelectDialog，替代原 Spinner) + 启用/发现/自动保存Cookie (ThemeCheckBox 朴素横排)
+    //   Row2: 事件监听/定制按钮 (ThemeCheckBox)
+    // 简化说明：ThemeCheckBox 经 AndroidView 桥接复用（自动 tint accentColor、方形复选框+文字右排），
+    // 其 setOnUserCheckedChangeListener 仅在用户点击时回调，避免 upSourceView 回填触发 onChange 覆盖状态。
     private fun initComposeQuickToolbar() {
         binding.composeQuickToolbar.setContent {
             LegadoTheme {
+                var showTypeDialog by remember { mutableStateOf(false) }
                 val typeLabels = resources.getStringArray(R.array.book_type)
                 SettingsCard {
-                    // 类型+五个开关全部放入 FlowRow 自动换行：类型/启用/发现/自动保存Cookie 第一行 → 事件监听/定制按钮 第二行
-                    FlowRow(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                            .padding(vertical = 4.dp)
                     ) {
-                        // 类型：紧凑「标签+值+下拉箭头」可点击行，点击弹菜单（不用全宽 SettingsClickRow，避免独占一行）
-                        Box {
+                        // Row1：类型 + 启用/发现/自动保存Cookie
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 类型：紧凑「标签+值+下拉箭头」可点击行，点击弹 AppSelectDialog（对齐原版 Spinner 行为，不再用内联 DropdownMenu）
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(AppShapes.Chip)
-                                    .clickable { typeMenuExpanded = true }
-                                    .padding(horizontal = 6.dp)
+                                    .clickable { showTypeDialog = true }
+                                    .padding(horizontal = 8.dp)
                                     .height(40.dp)
                             ) {
                                 Text(
@@ -457,58 +463,60 @@ class BookSourceEditActivity :
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            DropdownMenu(
-                                expanded = typeMenuExpanded,
-                                onDismissRequest = { typeMenuExpanded = false }
-                            ) {
-                                typeLabels.forEachIndexed { index, label ->
-                                    DropdownMenuItem(
-                                        text = { Text(text = label) },
-                                        onClick = {
-                                            typeIndex = index
-                                            typeMenuExpanded = false
-                                        }
-                                    )
-                                }
-                            }
+                            // 内联 AndroidView 桥接 ThemeCheckBox（避免 kapt 对 @Composable 顶层函数的 stub 解析失败）
+                            AndroidView(
+                                factory = { ctx -> ThemeCheckBox(ctx).apply { text = getString(R.string.is_enable); isChecked = isEnable; setOnUserCheckedChangeListener { isEnable = it } } },
+                                update = { v -> v.isChecked = isEnable }
+                            )
+                            AndroidView(
+                                factory = { ctx -> ThemeCheckBox(ctx).apply { text = getString(R.string.discovery); isChecked = isEnableExplore; setOnUserCheckedChangeListener { isEnableExplore = it } } },
+                                update = { v -> v.isChecked = isEnableExplore }
+                            )
+                            AndroidView(
+                                factory = { ctx -> ThemeCheckBox(ctx).apply { text = getString(R.string.auto_save_cookie); isChecked = isEnableCookie; setOnUserCheckedChangeListener { isEnableCookie = it } } },
+                                update = { v -> v.isChecked = isEnableCookie }
+                            )
                         }
-                        // 5 开关按原版 ThemeCheckBox 样式（CheckBox+文字 朴素横排）
-                        // 内联 Checkbox+Row 避免 kapt 对 @Composable 函数生成 NonExistentClass 桩错误
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
-                            Checkbox(checked = isEnable, onCheckedChange = { isEnable = it },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(text = getString(R.string.is_enable), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
-                            Checkbox(checked = isEnableExplore, onCheckedChange = { isEnableExplore = it },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(text = getString(R.string.discovery), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
-                            Checkbox(checked = isEnableCookie, onCheckedChange = { isEnableCookie = it },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(text = getString(R.string.auto_save_cookie), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
-                            Checkbox(checked = isEventListener, onCheckedChange = { isEventListener = it },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(text = getString(R.string.is_event_listener), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
-                            Checkbox(checked = isCustomButton, onCheckedChange = { isCustomButton = it },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(text = getString(R.string.custom_button), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        // Row2：事件监听 + 定制按钮
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AndroidView(
+                                factory = { ctx -> ThemeCheckBox(ctx).apply { text = getString(R.string.is_event_listener); isChecked = isEventListener; setOnUserCheckedChangeListener { isEventListener = it } } },
+                                update = { v -> v.isChecked = isEventListener }
+                            )
+                            AndroidView(
+                                factory = { ctx -> ThemeCheckBox(ctx).apply { text = getString(R.string.custom_button); isChecked = isCustomButton; setOnUserCheckedChangeListener { isCustomButton = it } } },
+                                update = { v -> v.isChecked = isCustomButton }
+                            )
                         }
                     }
+                }
+                if (showTypeDialog) {
+                    AppSelectDialog(
+                        title = getString(R.string.book_type),
+                        options = typeLabels.mapIndexed { index, label ->
+                            SelectOption(label, index.toString())
+                        },
+                        selected = typeIndex.toString(),
+                        confirmText = getString(R.string.ok),
+                        cancelText = getString(R.string.cancel),
+                        onSelect = { option ->
+                            option.value.toIntOrNull()?.let { typeIndex = it }
+                            showTypeDialog = false
+                        },
+                        onDismiss = { showTypeDialog = false }
+                    )
                 }
             }
         }
     }
+
+    // 问题7 P2-2：原版 ThemeCheckBox 朴素横排（对齐 RssSourceEditActivity 原 XML 表单视觉）
 
     // S3 阶段3：字段区（保留 EditText 行内编辑）
     // 简化说明：不套 SettingsCard——其内层 Column 不撑满高度且带 16dp 水平内边距+圆角，
@@ -1160,3 +1168,6 @@ class BookSourceEditActivity :
     }
 
 }
+
+// 问题7 P2-2 注：ThemeCheckBox 复用方式为 initComposeQuickToolbar 内内联 AndroidView 桥接
+// （kapt 对带 @Composable 注解的类内/顶层函数都会生成 @error.NonExistentClass stub 解析失败，故不封装）

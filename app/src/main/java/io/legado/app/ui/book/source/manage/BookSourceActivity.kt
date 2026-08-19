@@ -207,7 +207,6 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     },
                     onLayoutSelect = { layout ->
                         AppConfig.sourceLayout = layout
-                        applyListView()
                         upBookSource()
                     },
                     onSortSelect = { key, ascending ->
@@ -383,41 +382,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     private fun initRecyclerView() {
-        // source-compose 桥接后 recyclerView 已改 android:visibility="gone"（ComposeView 渲染列表），
-        // 旧 DragSelectTouchHelper/ItemTouchHelper 滑选接线为纯死接线，已移除。
-        // 多选交互降级为：长按进入多选 + 逐项勾选（Compose 侧 onItemLongClick/onItemClick toggleSelect）。
-        binding.recyclerView.setEdgeEffectColor(primaryColor)
-        binding.recyclerView.recycledViewPool.setMaxRecycledViews(0, 15)
-        // source-folder-cover：管理页固定平铺，始终列表视图
-        applyListView()
-    }
-
-    // source-layout-refactor 应用列表视图（支持 sourceLayout: 0=列表/1=紧凑/2-6=网格）
-    private fun applyListView() {
-        binding.recyclerView.removeItemDecoration(gridSpacingDecoration)
-        binding.recyclerView.removeItemDecoration(verticalDivider)
-        val layout = AppConfig.sourceLayout
-        when (layout) {
-            0 -> { // 列表
-                binding.recyclerView.addItemDecoration(verticalDivider)
-                binding.recyclerView.layoutManager = LinearLayoutManager(this)
-                binding.recyclerView.adapter = adapter
-            }
-            1 -> { // 紧凑列表
-                binding.recyclerView.addItemDecoration(verticalDivider)
-                binding.recyclerView.layoutManager = LinearLayoutManager(this)
-                binding.recyclerView.adapter = adapterCompact
-            }
-            else -> { // 网格 2-6 列
-                gridSpacingDecoration.spacing = AppConfig.sourceMargin.dpToPx()
-                binding.recyclerView.addItemDecoration(gridSpacingDecoration)
-                binding.recyclerView.layoutManager = GridLayoutManager(this, layout)
-                binding.recyclerView.adapter = adapterGrid
-            }
-        }
-        itemTouchCallback.isCanDrag =
-            AppConfig.bookSourceSort == 0 && sort == BookSourceSort.Default
-            && layout == 0 && !groupSourcesByDomain
+        // P3-2 疑点2 修复：列表已由 ComposeView 渲染，旧 View RecyclerView 为 visibility="gone"，
+        // 原 setEdgeEffectColor/setMaxRecycledViews/applyListView 均操作死 View，已整体清理。
     }
 
     // M-01 修复：获取当前选择适配器（统一 list/compact/grid 的 selection API）
@@ -472,7 +438,6 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         currentType = -1
         currentGroup = null
         isShowingFolder = false
-        applyListView()
         upBookSource(composeSearchQuery)
     }
 
@@ -638,11 +603,14 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
             composeCurrentType = -1
             composeCurrentGroup = null
             // source-folder-cover：管理页固定平铺，返回根目录始终列表视图
-            applyListView()
             upBookSource(composeSearchQuery)
             return
         }
-        super.onBackPressed()
+        // 修复：BackHandler 递归——Compose BackHandler 回调触发本方法后，
+        // super.onBackPressed() 会经 OnBackPressedDispatcher 重新分发返回事件，
+        // 再次进入同一 BackHandler 形成无限递归（StackOverflowError）。
+        // 改为直接 finish()（finish() 覆写会处理搜索词清空逻辑），避免 dispatcher 重入。
+        finish()
     }
 
 

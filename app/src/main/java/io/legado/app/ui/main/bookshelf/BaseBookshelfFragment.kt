@@ -3,8 +3,6 @@ package io.legado.app.ui.main.bookshelf
 import android.annotation.SuppressLint
 import android.view.View
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
@@ -130,28 +128,26 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
         }
         composeTopBar.setContent {
             LegadoTheme {
-                Column(modifier = Modifier.statusBarsPadding()) {
-                    GlassTopAppBar(
-                        title = composeTopBarTitle,
-                        actions = {
-                            // 搜索（原 main_bookshelf.xml 的 showAsAction="always" 项）
-                            IconButton(onClick = { startActivity<SearchActivity>() }) {
-                                Icon(Icons.Default.Search, contentDescription = null)
-                            }
-                            // 更多菜单（原 main_bookshelf.xml 其余项，数据驱动）
-                            Box {
-                                IconButton(onClick = { menuExpanded = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = null)
-                                }
-                                AppDropdownMenu(
-                                    expanded = menuExpanded,
-                                    onDismiss = { menuExpanded = false },
-                                    actions = buildMenuActions()
-                                )
-                            }
+                GlassTopAppBar(
+                    title = composeTopBarTitle,
+                    actions = {
+                        // 搜索（原 main_bookshelf.xml 的 showAsAction="always" 项）
+                        IconButton(onClick = { startActivity<SearchActivity>() }) {
+                            Icon(Icons.Default.Search, contentDescription = null)
                         }
-                    )
-                }
+                        // 更多菜单（原 main_bookshelf.xml 其余项，数据驱动）
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = null)
+                            }
+                            AppDropdownMenu(
+                                expanded = menuExpanded,
+                                onDismiss = { menuExpanded = false },
+                                actions = buildMenuActions()
+                            )
+                        }
+                    }
+                )
             }
         }
     }
@@ -291,11 +287,12 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             customView { alertBinding.root }
             okButton {
                 alertBinding.apply {
-                    var notifyMain = false
                     var recreate = false
                     if (AppConfig.bookGroupStyle != spGroupStyle.selectedItemPosition) {
                         AppConfig.bookGroupStyle = spGroupStyle.selectedItemPosition
-                        notifyMain = true
+                        // 分组样式切换须重建 fragment（style1 标签 / style2 文件夹为两类不同 fragment，
+                        // MainActivity.getFragmentId 按 bookGroupStyle==1 分发，仅 notifyMain 不会重建）
+                        recreate = true
                     }
                     if (showBookname != rgbLayout.getCheckedIndex()) {
                         AppConfig.showBookname = rgbLayout.getCheckedIndex()
@@ -347,8 +344,6 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                     }
                     if (recreate) {
                         postEvent(EventBus.RECREATE, "")
-                    } else if (notifyMain) {
-                        postEvent(EventBus.NOTIFY_MAIN, false)
                     }
                 }
             }

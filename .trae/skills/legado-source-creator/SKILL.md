@@ -16,7 +16,7 @@ description: "为 Legado 阅读器生成优秀好用的书源/订阅源 JSON。�
 4. **真机验证为最终标准**：编译+安装+导入+真机测试+日志分析
 5. **自动修复闭环**：生成 → 测试 → 失败 → 手动诊断 → 修复 → 重测
 6. **输出安全防线**：思考/输出双闭口禁止违禁词。域名→站点代号、源名称→源[N]、URL→路径模式（/path/{id}）、cookie→***。Grep 只搜技术字段不搜业务字段
-7. **导出目录规范**：所有新生成或优化的源 JSON 必须导出到 `output/ai_source/` 目录（订阅源→`rss/`，书源→`book/`，命名 `{类型}_{描述}_{日期YYYYMMDD}.json`）
+7. **导出目录规范**：所有新生成或优化的源 JSON 必须导出到 `output/ai_source/` 目录，按「源类型/域名」两级子目录存放（订阅源→`rss/{域名}/`，书源→`book/{域名}/`），文件命名 `{类型}_{描述}_{日期YYYYMMDD}.json`。域名取源 JSON 首个源的 `sourceUrl`/`bookSourceUrl` 的 host（小写、去 `www.` 前缀、去端口/路径；域名字符集 `[a-z0-9.-]` 在 Windows/Linux 天然合法可直接作目录名）。同域名的最终版 JSON 与同名分析报告 `.md` 同目录存放；被取代的迭代版本/备份移入 `{域名}/history/`；测试日志等非源产物放 `_logs/`（结构详见 `output/ai_source/README.md`）
 8. **自进化沉淀**：发现新范式后按质量标准沉淀到 references/，实现 skill 越用越智能
 
 ## 快速入门
@@ -38,7 +38,7 @@ description: "为 Legado 阅读器生成优秀好用的书源/订阅源 JSON。�
    - 用 Grep/SearchCodebase 工具搜索关键词
    - 关键词示例：动态域名 / Rhino类型转换 / MacCMS / Cloudflare / 平衡括号
 2. **源2：output/ai_source/ 已生成源JSON检索**
-   - 用 Glob 找同类源模板（`output/ai_source/rss/*.json` / `output/ai_source/book/*.json`）
+   - 用 Glob 找同类源模板（`output/ai_source/rss/**/*.json` / `output/ai_source/book/**/*.json`，按域名子目录组织；`history/` 内为被取代的旧版迭代）
    - 读取同类源的规则字段作为参考
 3. **检索时机**：Phase 1 分析前 + Phase 4 修复时
 4. **检索输出**：在网站分析报告"规则映射建议"标注 `[经验来源:通用范式名]`（禁止用站点代号）
@@ -50,11 +50,11 @@ description: "为 Legado 阅读器生成优秀好用的书源/订阅源 JSON。�
 > **🔴 铁律**：禁止仅凭 CMS 主题名或经验猜测字段值，必须用 Playwright MCP 真实访问目标站点。
 
 1. **必经 Playwright 访问**：用 `playwright_navigate` 真实访问目标站点首页（headless=True, waitUntil=domcontentloaded）
-2. **必经 JavaScript 提取**：用 `playwright_evaluate` 执行 IIFE 提取4字段（sourceIcon/searchUrl/sortUrl/ruleNextPage）
+2. **必经 JavaScript 提取**：用 `playwright_evaluate` 执行 IIFE 提取4字段（sourceIcon/searchUrl/sortUrl/ruleNextPage）；并按报告模板 1.1 章逐项盘点列表项信息字段（发布/更新时间、类型标签、简介、集数/状态、作者、热度等，均为相对 `ruleArticles` 的子选择器，站点无该项填「无」禁止留空）
 3. **必经播放页链路验证（视频源）**：点击列表项验证落地页是否直接含 `<video>` 或 m3u8 流；若落地页是详情页，分析"详情页→播放页"跳转规律（URL模式差异如 `/info/` → `/play/`）；优先用 `##` 操作符转换 URL
 4. **必经网站恢复信息提取**：提取回家域名/邮箱/备用域名写入 sourceComment
 5. **识别触发字段**：CF/登录/验证码 → 必须先源码验证再写规则
-6. **输出网站分析报告**：存放路径与源JSON同名（书源→`output/ai_source/book/`，订阅源→`output/ai_source/rss/`）
+6. **输出网站分析报告**：与源 JSON 同目录同名（书源→`output/ai_source/book/{域名}/`，订阅源→`output/ai_source/rss/{域名}/`）
 
 **报告模板**：[templates/site-analysis-report.md](./templates/site-analysis-report.md)
 **Playwright 完整指南**：[references/source-analysis/playwright-site-analysis.md](./references/source-analysis/playwright-site-analysis.md)
@@ -80,7 +80,7 @@ description: "为 Legado 阅读器生成优秀好用的书源/订阅源 JSON。�
 1. 按网站分析报告的"规则映射建议"写源 JSON
 2. AI 自己不写 None（避免 None 序列化为 "None" 字符串触发 Rss.kt:64 ReferenceError）
 3. 对照必填字段清单校验（CRITICAL/MANDATORY/RECOMMENDED）
-4. 导出到 `output/ai_source/` 目录
+4. 导出到 `output/ai_source/` 对应域名子目录（`book/{域名}/` 或 `rss/{域名}/`，结构见 `output/ai_source/README.md`）
 
 ### Phase 3: 真机验证
 
@@ -134,6 +134,7 @@ adb shell "am start -n io.legado.miss.app.release/io.legado.app.ui.welcome.Welco
 |------|------|----------|
 | **CRITICAL** | `sourceUrl` | 导入时抛 NoStackTraceException("不是订阅源") |
 | **MANDATORY** | `sourceName`/`ruleArticles`/`ruleTitle`/`ruleLink`/`ruleContent` | 核心功能失效（无名称/无列表/无标题/无链接/无正文） |
+| **MANDATORY**（站点具备该信息时） | `rulePubDate`/`ruleDescription` | 列表时间行空白/内容项描述信息缺失（类型标签/集数等无独立字段的信息须按模板1.1章合并进 `ruleDescription`） |
 | **RECOMMENDED** | `sourceIcon`/`searchUrl`/`sortUrl`/`sourceGroup`/`sourceComment` | 优秀好用标准 |
 | **OPTIONAL** | `ruleRoutes`/`ruleEpisodes` | 仅 type=2 视频源使用（多线路多集按需采集，详见下方章节） |
 

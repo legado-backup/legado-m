@@ -2,17 +2,21 @@ package io.legado.app.ui.config
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
+import android.view.ViewGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.preference.EditTextPreference
-import androidx.preference.ListPreference
-import androidx.preference.Preference
+import androidx.fragment.app.Fragment
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
@@ -30,23 +34,24 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
-import io.legado.app.lib.prefs.fragment.PreferenceFragment
-import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.webdav.WebDavException
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.MenuAction
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.checkWrite
+import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.launch
+import io.legado.app.utils.putPrefBoolean
+import io.legado.app.utils.putPrefString
 import io.legado.app.utils.requestInputMethod
-import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
-import io.legado.app.utils.toEditable
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
@@ -57,13 +62,33 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 
-class BackupConfigFragment : PreferenceFragment(),
+/**
+ * 备份与恢复（P3-2b 配置子页 Compose 化，对齐 OtherConfigFragment 双轨范式）。
+ *
+ * 内容区全 Compose（[BackupConfigScreen]），设置项零裁剪迁移：
+ * 编辑框（WebDAV 地址/账户/密码/子目录/设备名）、文件选择（备份路径/备份目录/恢复文档/导入旧数据）、
+ * WebDAV 备份/恢复/重命名/删除、忽略设置等副作用保留本 Fragment；
+ * 「恢复」行长按 → 本地恢复（[onRestoreLongClick]，原版 onLongClick 隐藏功能）。
+ */
+class BackupConfigFragment : Fragment(),
     SharedPreferences.OnSharedPreferenceChangeListener {
 
     private val viewModel by activityViewModels<ConfigViewModel>()
     private val waitDialog by lazy { WaitDialog(requireContext()) }
     private var backupJob: Job? = null
     private var restoreJob: Job? = null
+
+    // Compose 桥接状态（延迟初始化：构造期 requireContext 未 attach 会崩，真实值在 onCreateView 赋值）
+    private var webDavUrl by mutableStateOf("")
+    private var webDavAccount by mutableStateOf("")
+    private var webDavPassword by mutableStateOf("")
+    private var webDavDir by mutableStateOf("legado")
+    private var webDavDeviceName by mutableStateOf("")
+    private var syncBookProgress by mutableStateOf(true)
+    private var syncBookProgressPlus by mutableStateOf(false)
+    private var backupPath by mutableStateOf("")
+    private var onlyLatestBackup by mutableStateOf(true)
+    private var autoCheckNewBackup by mutableStateOf(true)
 
     private val selectBackupPath = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -107,45 +132,51 @@ class BackupConfigFragment : PreferenceFragment(),
         }
     }
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        addPreferencesFromResource(R.xml.pref_config_backup)
-        findPreference<EditTextPreference>(PreferKey.webDavPassword)?.let {
-            it.setOnBindEditTextListener { editText ->
-                editText.inputType =
-                    InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
-                editText.setSelection(editText.text.length)
+    override fun onCreateView(
+        inflater: android.view.LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        // 延迟初始化：真实值（构造期 requireContext 未 attach）
+        webDavUrl = getPrefString(PreferKey.webDavUrl) ?: ""
+        webDavAccount = getPrefString(PreferKey.webDavAccount) ?: ""
+        webDavPassword = getPrefString(PreferKey.webDavPassword) ?: ""
+        webDavDir = getPrefString(PreferKey.webDavDir, "legado") ?: "legado"
+        webDavDeviceName = getPrefString(PreferKey.webDavDeviceName, Build.MODEL) ?: Build.MODEL
+        syncBookProgress = getPrefBoolean(PreferKey.syncBookProgress, true)
+        syncBookProgressPlus = getPrefBoolean(PreferKey.syncBookProgressPlus, false)
+        backupPath = AppConfig.backupPath ?: ""
+        onlyLatestBackup = getPrefBoolean(PreferKey.onlyLatestBackup, true)
+        autoCheckNewBackup = getPrefBoolean(PreferKey.autoCheckNewBackup, true)
+        return ComposeView(requireContext()).apply {
+            setContent {
+                LegadoTheme {
+                    BackupConfigScreen(
+                        state = BackupConfigState(
+                            webDavUrl = webDavUrl,
+                            webDavAccount = webDavAccount,
+                            webDavPassword = webDavPassword,
+                            webDavDir = webDavDir,
+                            webDavDeviceName = webDavDeviceName,
+                            syncBookProgress = syncBookProgress,
+                            syncBookProgressPlus = syncBookProgressPlus,
+                            backupPath = backupPath,
+                            onlyLatestBackup = onlyLatestBackup,
+                            autoCheckNewBackup = autoCheckNewBackup
+                        ),
+                        onToggleChange = { key, value -> onToggleChange(key, value) },
+                        onItemClick = { key -> onItemClick(key) },
+                        onRestoreLongClick = { restoreFromLocal() }
+                    )
+                }
             }
         }
-        findPreference<EditTextPreference>(PreferKey.webDavDir)?.let {
-            it.setOnBindEditTextListener { editText ->
-                editText.text = AppConfig.webDavDir?.toEditable()
-                editText.setSelection(editText.text.length)
-            }
-        }
-        findPreference<EditTextPreference>(PreferKey.webDavDeviceName)?.let {
-            it.setOnBindEditTextListener { editText ->
-                editText.text = AppConfig.webDavDeviceName?.toEditable()
-                editText.setSelection(editText.text.length)
-            }
-        }
-        upPreferenceSummary(PreferKey.webDavUrl, getPrefString(PreferKey.webDavUrl))
-        upPreferenceSummary(PreferKey.webDavAccount, getPrefString(PreferKey.webDavAccount))
-        upPreferenceSummary(PreferKey.webDavPassword, getPrefString(PreferKey.webDavPassword))
-        upPreferenceSummary(PreferKey.webDavDir, AppConfig.webDavDir)
-        upPreferenceSummary(PreferKey.webDavDeviceName, AppConfig.webDavDeviceName)
-        upPreferenceSummary(PreferKey.backupPath, getPrefString(PreferKey.backupPath))
-        findPreference<io.legado.app.lib.prefs.Preference>("web_dav_restore")
-            ?.onLongClick {
-                restoreFromLocal()
-                true
-            }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.backup_restore)
-        preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
-        listView.setEdgeEffectColor(primaryColor)
+        requireContext().defaultSharedPreferences.registerOnSharedPreferenceChangeListener(this)
         // L-E1 S2 改造：菜单迁移至 ConfigActivity Compose 顶栏（原 MenuProvider menu_backup_restore）
         (activity as? ConfigActivity)?.setTopBarMenu(
             listOf(
@@ -168,74 +199,115 @@ class BackupConfigFragment : PreferenceFragment(),
 
     override fun onDestroy() {
         super.onDestroy()
-        preferenceManager.sharedPreferences?.unregisterOnSharedPreferenceChangeListener(this)
+        context?.defaultSharedPreferences?.unregisterOnSharedPreferenceChangeListener(this)
     }
 
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+    /**
+     * 开关项：写偏好 + 更新 Compose 状态（副作用经 onSharedPreferenceChanged 统一处理，避免双重执行）。
+     */
+    private fun onToggleChange(key: String, value: Boolean) {
         when (key) {
-            PreferKey.backupPath -> upPreferenceSummary(key, getPrefString(key))
-            PreferKey.webDavUrl,
-            PreferKey.webDavAccount,
-            PreferKey.webDavPassword,
-            PreferKey.webDavDir -> listView.post {
-                upPreferenceSummary(key, appCtx.getPrefString(key))
-                viewModel.upWebDavConfig()
+            PreferKey.syncBookProgress -> {
+                syncBookProgress = value
+                putPrefBoolean(PreferKey.syncBookProgress, value)
             }
 
-            PreferKey.webDavDeviceName -> upPreferenceSummary(key, getPrefString(key))
-        }
-    }
-
-    private fun upPreferenceSummary(preferenceKey: String, value: String?) {
-        val preference = findPreference<Preference>(preferenceKey) ?: return
-        when (preferenceKey) {
-            PreferKey.webDavUrl ->
-                if (value.isNullOrBlank()) {
-                    preference.summary = getString(R.string.web_dav_url_s)
-                } else {
-                    preference.summary = value
-                }
-
-            PreferKey.webDavAccount ->
-                if (value.isNullOrBlank()) {
-                    preference.summary = getString(R.string.web_dav_account_s)
-                } else {
-                    preference.summary = value
-                }
-
-            PreferKey.webDavPassword ->
-                if (value.isNullOrEmpty()) {
-                    preference.summary = getString(R.string.web_dav_pw_s)
-                } else {
-                    preference.summary = "*".repeat(value.length)
-                }
-
-            PreferKey.webDavDir -> preference.summary = when (value) {
-                null -> "legado"
-                else -> value
+            PreferKey.syncBookProgressPlus -> {
+                syncBookProgressPlus = value
+                putPrefBoolean(PreferKey.syncBookProgressPlus, value)
             }
 
-            else -> {
-                if (preference is ListPreference) {
-                    val index = preference.findIndexOfValue(value)
-                    // Set the summary to reflect the new value.
-                    preference.summary = if (index >= 0) preference.entries[index] else null
-                } else {
-                    preference.summary = value
-                }
+            PreferKey.onlyLatestBackup -> {
+                onlyLatestBackup = value
+                putPrefBoolean(PreferKey.onlyLatestBackup, value)
+            }
+
+            PreferKey.autoCheckNewBackup -> {
+                autoCheckNewBackup = value
+                putPrefBoolean(PreferKey.autoCheckNewBackup, value)
             }
         }
     }
 
-    override fun onPreferenceTreeClick(preference: Preference): Boolean {
-        when (preference.key) {
+    /**
+     * 点击项：保留原 PreferenceFragment.onPreferenceTreeClick 全部副作用。
+     */
+    private fun onItemClick(key: String) {
+        when (key) {
+            PreferKey.webDavUrl -> showEditTextDialog(
+                PreferKey.webDavUrl, getString(R.string.web_dav_url), getPrefString(PreferKey.webDavUrl) ?: ""
+            )
+
+            PreferKey.webDavAccount -> showEditTextDialog(
+                PreferKey.webDavAccount, getString(R.string.web_dav_account), getPrefString(PreferKey.webDavAccount) ?: ""
+            )
+
+            PreferKey.webDavPassword -> showEditTextDialog(
+                PreferKey.webDavPassword, getString(R.string.web_dav_pw),
+                getPrefString(PreferKey.webDavPassword) ?: "", isPassword = true
+            )
+
+            PreferKey.webDavDir -> showEditTextDialog(
+                PreferKey.webDavDir, getString(R.string.sub_dir), webDavDir
+            )
+
+            PreferKey.webDavDeviceName -> showEditTextDialog(
+                PreferKey.webDavDeviceName, getString(R.string.webdav_device_name), webDavDeviceName
+            )
+
             PreferKey.backupPath -> selectBackupPath.launch()
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
             "web_dav_restore" -> restore()
             "import_old" -> restoreOld.launch()
         }
-        return super.onPreferenceTreeClick(preference)
+    }
+
+    /**
+     * WebDAV 编辑项（地址/账户/密码/子目录/设备名）对话框，保留原 EditTextPreference 编辑语义。
+     */
+    private fun showEditTextDialog(key: String, title: String, value: String, isPassword: Boolean = false) {
+        alert(title) {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.hint = title
+                editView.setText(value)
+                if (isPassword) {
+                    editView.inputType =
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
+                }
+                editView.setSelection(value.length)
+            }
+            customView { alertBinding.root }
+            okButton {
+                putPrefString(key, alertBinding.editView.text?.toString().orEmpty())
+            }
+            cancelButton()
+        }
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        when (key) {
+            PreferKey.backupPath -> backupPath = AppConfig.backupPath ?: ""
+
+            PreferKey.webDavUrl,
+            PreferKey.webDavAccount,
+            PreferKey.webDavPassword,
+            PreferKey.webDavDir -> {
+                webDavUrl = getPrefString(PreferKey.webDavUrl) ?: ""
+                webDavAccount = getPrefString(PreferKey.webDavAccount) ?: ""
+                webDavPassword = getPrefString(PreferKey.webDavPassword) ?: ""
+                webDavDir = getPrefString(PreferKey.webDavDir, "legado") ?: "legado"
+                viewModel.upWebDavConfig()
+            }
+
+            PreferKey.webDavDeviceName ->
+                webDavDeviceName = getPrefString(PreferKey.webDavDeviceName, Build.MODEL) ?: Build.MODEL
+
+            PreferKey.syncBookProgress -> syncBookProgress = getPrefBoolean(PreferKey.syncBookProgress, true)
+            PreferKey.syncBookProgressPlus -> syncBookProgressPlus = getPrefBoolean(PreferKey.syncBookProgressPlus, false)
+            PreferKey.onlyLatestBackup -> onlyLatestBackup = getPrefBoolean(PreferKey.onlyLatestBackup, true)
+            PreferKey.autoCheckNewBackup -> autoCheckNewBackup = getPrefBoolean(PreferKey.autoCheckNewBackup, true)
+        }
     }
 
     /**
@@ -355,7 +427,7 @@ class BackupConfigFragment : PreferenceFragment(),
                     items = names,
                     onClick = { _, index ->
                         if (index in 0 until names.size) {
-                            listView.post {
+                            view?.post {
                                 restoreWebDav(names[index])
                             }
                         }

@@ -55,6 +55,11 @@ class WelcomeConfigFragment : Fragment(),
     private var customWelcome by mutableStateOf(true)
     private var welcomeImageSummary by mutableStateOf("")
     private var welcomeImageDarkSummary by mutableStateOf("")
+    // C2 恢复：日/夜 文字/图标显隐 4 开关
+    private var showText by mutableStateOf(true)
+    private var showTextDark by mutableStateOf(true)
+    private var showIcon by mutableStateOf(true)
+    private var showIconDark by mutableStateOf(true)
 
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -76,6 +81,10 @@ class WelcomeConfigFragment : Fragment(),
         customWelcome = getPrefBoolean(PreferKey.customWelcome, true)
         welcomeImageSummary = getPrefString(PreferKey.welcomeImage) ?: getString(R.string.select_image)
         welcomeImageDarkSummary = getPrefString(PreferKey.welcomeImageDark) ?: getString(R.string.select_image)
+        showText = getPrefBoolean(PreferKey.welcomeShowText, true)
+        showTextDark = getPrefBoolean(PreferKey.welcomeShowTextDark, true)
+        showIcon = getPrefBoolean(PreferKey.welcomeShowIcon, true)
+        showIconDark = getPrefBoolean(PreferKey.welcomeShowIconDark, true)
         return ComposeView(requireContext()).apply {
             setContent {
                 LegadoTheme {
@@ -84,6 +93,10 @@ class WelcomeConfigFragment : Fragment(),
                         customWelcome = customWelcome,
                         welcomeImageSummary = welcomeImageSummary,
                         welcomeImageDarkSummary = welcomeImageDarkSummary,
+                        showText = showText,
+                        showTextDark = showTextDark,
+                        showIcon = showIcon,
+                        showIconDark = showIconDark,
                         onShowTimeChange = { value ->
                             showTime = value
                             putPrefInt(PreferKey.welcomeShowTime, value)
@@ -143,6 +156,22 @@ class WelcomeConfigFragment : Fragment(),
                                     }
                                 }
                             }
+                        },
+                        onShowTextChange = { value ->
+                            showText = value
+                            putPrefBoolean(PreferKey.welcomeShowText, value)
+                        },
+                        onShowTextDarkChange = { value ->
+                            showTextDark = value
+                            putPrefBoolean(PreferKey.welcomeShowTextDark, value)
+                        },
+                        onShowIconChange = { value ->
+                            showIcon = value
+                            putPrefBoolean(PreferKey.welcomeShowIcon, value)
+                        },
+                        onShowIconDarkChange = { value ->
+                            showIconDark = value
+                            putPrefBoolean(PreferKey.welcomeShowIconDark, value)
                         }
                     )
                 }
@@ -182,6 +211,22 @@ class WelcomeConfigFragment : Fragment(),
 
             PreferKey.welcomeImageDark -> {
                 welcomeImageDarkSummary = getPrefString(key) ?: getString(R.string.select_image)
+            }
+
+            PreferKey.welcomeShowText -> {
+                showText = getPrefBoolean(key, true)
+            }
+
+            PreferKey.welcomeShowTextDark -> {
+                showTextDark = getPrefBoolean(key, true)
+            }
+
+            PreferKey.welcomeShowIcon -> {
+                showIcon = getPrefBoolean(key, true)
+            }
+
+            PreferKey.welcomeShowIconDark -> {
+                showIconDark = getPrefBoolean(key, true)
             }
         }
     }

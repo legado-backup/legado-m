@@ -34,6 +34,9 @@ temp/
 output/
 .zcode/
 
+# 参考项目源码（archive 迁移预研用，不入库）
+archive-ref/
+
 # 签名密钥（不入 git，仅本地使用）
 *.jks
 *.keystore

@@ -38,6 +38,25 @@ class RssViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    // P1-3b 问题4：批量移入/移出分组（对齐管理页 RssSourceViewModel 模式）
+    fun selectionAddToGroups(sources: List<RssSource>, groups: String) {
+        execute {
+            val array = Array(sources.size) {
+                sources[it].copy().addGroup(groups)
+            }
+            appDb.rssSourceDao.update(*array)
+        }
+    }
+
+    fun selectionRemoveFromGroups(sources: List<RssSource>, groups: String) {
+        execute {
+            val array = Array(sources.size) {
+                sources[it].copy().removeGroup(groups)
+            }
+            appDb.rssSourceDao.update(*array)
+        }
+    }
+
     fun disable(rssSource: RssSource) {
         execute {
             rssSource.enabled = false

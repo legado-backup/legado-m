@@ -1,5 +1,6 @@
 package io.legado.app.ui.widget.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 设置开关行（36dp RowIcon 图标块 + 标题 + 副标题 + M3 Switch）
+ * 整行可点击切换（P3-2 疑点1 修复：原仅 Switch 本体 48dp 可点，点标题/图标/空白无效）
  */
 @Composable
 fun SettingsToggleRow(
@@ -33,6 +35,7 @@ fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 12.dp)
             // 最小行高 60dp，与 View 体系设置行高度对齐（消除 48~72dp 波动）
             .heightIn(min = 60.dp),

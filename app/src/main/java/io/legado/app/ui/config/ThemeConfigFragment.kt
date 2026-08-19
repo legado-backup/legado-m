@@ -4,8 +4,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -14,13 +12,13 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.http.addHeaders
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.widget.components.MenuAction
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -170,6 +168,17 @@ class ThemeConfigFragment : Fragment() {
                             startActivity<ConfigActivity> {
                                 putExtra("configTag", ConfigTag.WELCOME_CONFIG)
                             }
+                        },
+                        onThemeModeChange = { mode ->
+                            // C1 主题四态选择器（跟随系统/日间/夜间/墨水屏）：
+                            // 写 PreferKey.themeMode → applyDayNight（applyTheme+initNightMode+RECREATE）
+                            requireContext().putPrefString(PreferKey.themeMode, mode)
+                            ThemeConfig.applyDayNight(requireContext())
+                        },
+                        onLauncherIconChange = { icon ->
+                            // C4 桌面图标切换：记录选择并启用/禁用对应 LauncherN 组件
+                            requireContext().putPrefString("launcherIcon", icon)
+                            LauncherIconHelp.changeIcon(icon)
                         }
                     )
                 }
@@ -180,19 +189,7 @@ class ThemeConfigFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.theme_setting)
-        // L-E2 S2：菜单迁移至 ConfigActivity Compose 顶栏（日夜切换）
-        (activity as? ConfigActivity)?.setTopBarMenu(
-            listOf(
-                MenuAction(
-                    icon = Icons.Filled.DarkMode,
-                    title = getString(R.string.theme_mode),
-                    onClick = {
-                        AppConfig.isNightTheme = !AppConfig.isNightTheme
-                        ThemeConfig.applyDayNight(requireContext())
-                    }
-                )
-            )
-        )
+        // C1：原顶栏日夜二态 toggle 已由页面内「主题模式」四态选择器替代（onThemeModeChange）
     }
 
     override fun onDestroyView() {

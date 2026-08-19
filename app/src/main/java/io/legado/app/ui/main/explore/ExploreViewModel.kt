@@ -23,4 +23,27 @@ class ExploreViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    // P1-3b 问题4：批量移入/移出分组（对齐管理页 BookSourceViewModel 模式）
+    fun selectionAddToGroups(sources: List<BookSourcePart>, groups: String) {
+        execute {
+            val array = sources.map {
+                it.copy().apply {
+                    addGroup(groups)
+                }
+            }
+            appDb.bookSourceDao.upGroup(array)
+        }
+    }
+
+    fun selectionRemoveFromGroups(sources: List<BookSourcePart>, groups: String) {
+        execute {
+            val array = sources.map {
+                it.copy().apply {
+                    removeGroup(groups)
+                }
+            }
+            appDb.bookSourceDao.upGroup(array)
+        }
+    }
+
 }

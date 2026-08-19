@@ -6,7 +6,10 @@ import androidx.appcompat.widget.AppCompatCheckBox
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.applyTint
 
-class ThemeCheckBox(context: Context, attrs: AttributeSet) : AppCompatCheckBox(context, attrs) {
+class ThemeCheckBox(context: Context, attrs: AttributeSet?) : AppCompatCheckBox(context, attrs) {
+
+    // Compose AndroidView 桥接便捷构造器：仅 context，无样式属性（无参 attrs=null）
+    constructor(context: Context) : this(context, null)
 
     private var isUserAction = false
 

@@ -61,9 +61,11 @@ import io.legado.app.ui.widget.components.AppEditDialog
 import io.legado.app.ui.widget.components.AppMenuSheet
 import io.legado.app.ui.widget.components.AppModalBottomSheet
 import io.legado.app.ui.widget.components.AppNumberPickerDialog
+import io.legado.app.ui.widget.components.AppSelectDialog
 import io.legado.app.ui.widget.components.ColorPickerSheet
 import io.legado.app.ui.widget.components.EditField
 import io.legado.app.ui.widget.components.MenuAction
+import io.legado.app.ui.widget.components.SelectOption
 import io.legado.app.ui.widget.components.SettingsCard
 import io.legado.app.ui.widget.components.SettingsClickRow
 import io.legado.app.ui.widget.components.SettingsColorRow
@@ -106,6 +108,8 @@ fun ThemeConfigScreen(
     onFontScaleChange: (Int) -> Unit,
     onCoverConfigClick: () -> Unit,
     onWelcomeConfigClick: () -> Unit,
+    onThemeModeChange: (String) -> Unit,
+    onLauncherIconChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -122,8 +126,23 @@ fun ThemeConfigScreen(
     var saveDialogNight by remember { mutableStateOf<Boolean?>(null) }
     var elevationDialog by remember { mutableStateOf(false) }
     var fontScaleDialog by remember { mutableStateOf(false) }
+    var themeModeDialog by remember { mutableStateOf(false) }
+    var launcherIconDialog by remember { mutableStateOf(false) }
 
     val isNightNow = remember(themeVersion) { AppConfig.isNightTheme }
+
+    // C1 主题四态选择器：当前主题模式标签（跟随系统/日间/夜间/墨水屏）
+    val themeModeLabels = remember { context.resources.getStringArray(R.array.theme_mode).toList() }
+    val themeMode = remember(themeVersion) { AppConfig.themeMode }
+    val themeModeLabel = themeModeLabels.getOrNull(themeMode?.toIntOrNull() ?: 0).orEmpty()
+
+    // C4 桌面图标切换：当前选中图标标签（icons 值 / icon_names 标签 位置一一对应）
+    val launcherIconValues = remember { context.resources.getStringArray(R.array.icons).toList() }
+    val launcherIconNames = remember { context.resources.getStringArray(R.array.icon_names).toList() }
+    val launcherIcon = remember { context.getPrefString("launcherIcon", "ic_launcher") }
+    val launcherIconLabel = launcherIconNames
+        .getOrNull(launcherIconValues.indexOf(launcherIcon).takeIf { it >= 0 } ?: 0)
+        .orEmpty()
 
     fun currentColor(key: String, defRes: Int): Int =
         context.getPrefInt(key, context.getCompatColor(defRes))
@@ -343,6 +362,14 @@ fun ThemeConfigScreen(
         // ---------- 通用 ----------
         SettingsSection(title = stringResource(R.string.theme_general_section)) {
             SettingsCard(modifier = Modifier.fillMaxWidth()) {
+                // C1 主题四态选择器（跟随系统/日间/夜间/墨水屏，替代原顶栏日夜二态 toggle）
+                SettingsClickRow(
+                    icon = Icons.Filled.DarkMode,
+                    title = stringResource(R.string.theme_mode),
+                    subtitle = stringResource(R.string.theme_mode_desc),
+                    value = themeModeLabel,
+                    onClick = { themeModeDialog = true }
+                )
                 SettingsToggleRow(
                     icon = Icons.Filled.Layers,
                     title = stringResource(R.string.immersion_status_bar),
@@ -379,6 +406,13 @@ fun ThemeConfigScreen(
                     title = stringResource(R.string.welcome_style),
                     subtitle = stringResource(R.string.welcome_style_summary),
                     onClick = onWelcomeConfigClick
+                )
+                SettingsClickRow(
+                    icon = Icons.Filled.Wallpaper,
+                    title = stringResource(R.string.change_icon),
+                    subtitle = stringResource(R.string.change_icon_summary),
+                    value = launcherIconLabel,
+                    onClick = { launcherIconDialog = true }
                 )
             }
         }
@@ -539,6 +573,44 @@ fun ThemeConfigScreen(
                 onFontScaleChange(it)
             },
             onDismiss = { fontScaleDialog = false }
+        )
+    }
+
+    if (themeModeDialog) {
+        AppSelectDialog(
+            title = stringResource(R.string.theme_mode),
+            options = themeModeLabels.mapIndexed { index, label ->
+                SelectOption(label, index.toString())
+            },
+            selected = themeMode,
+            confirmText = stringResource(R.string.ok),
+            cancelText = stringResource(R.string.cancel),
+            onSelect = { option ->
+                themeModeDialog = false
+                if (option.value != themeMode) {
+                    onThemeModeChange(option.value)
+                }
+            },
+            onDismiss = { themeModeDialog = false }
+        )
+    }
+
+    if (launcherIconDialog) {
+        AppSelectDialog(
+            title = stringResource(R.string.change_icon),
+            options = launcherIconNames.mapIndexed { index, label ->
+                SelectOption(label, launcherIconValues.getOrElse(index) { label })
+            },
+            selected = launcherIcon,
+            confirmText = stringResource(R.string.ok),
+            cancelText = stringResource(R.string.cancel),
+            onSelect = { option ->
+                launcherIconDialog = false
+                if (option.value != launcherIcon) {
+                    onLauncherIconChange(option.value)
+                }
+            },
+            onDismiss = { launcherIconDialog = false }
         )
     }
 }
