@@ -636,6 +636,33 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 > **注意**：可在**系统 CMD** 或 **Trae CN 终端 PowerShell** 中运行。沙盒限制已解除（需用户开通沙箱外权限，铁证：2026-07-29 三包在 Trae CN PowerShell 构建成功）。若遇 transforms move 失败，见 [10.4 已修复的构建问题](#104-已修复的构建问题) 和 [常见问题排查](#常见问题排查)。
 
+### 4.10 打包后清理构建进程（强制门禁）
+
+> **背景（2026-08-21 铁证）**：打包后残留 `Gradle daemon`（实测 4.2GB）+ `Kotlin daemon`（实测 2.9GB）不退出，`--no-daemon` 只禁 Gradle 复用、**管不住 Kotlin daemon**（它带 `--daemon-autoshutdownIdleSeconds=7200`，空闲 2 小时才自退）；Gradle daemon 默认空闲 3 小时才退。频繁打包必堆积，可打爆 32G 内存。
+
+**强制要求**：无论哪种打包入口，**构建完成后必须执行清理**，防止残留 daemon 堆积：
+
+| 打包入口 | 清理方式 |
+|---------|---------|
+| `build-legado.bat` | 已内置 `:STOP_DAEMON`，结束自动清场，无需手动 |
+| 直接 `gradlew assembleApp*` / IDE | 构建结束后执行 `stop-daemons.bat` |
+
+核心命令等价于：
+```powershell
+# 1. 停 Gradle daemon（连带停由其拉起的 Kotlin daemon）
+.\gradlew --stop
+
+# 2. 强杀本项目残留 Kotlin daemon（按 marker 路径含 in-legado 过滤，避免误杀他项目）
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like '*KotlinCompileDaemon*' -and $_.CommandLine -like '*in-legado*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+```
+
+配套内存约束（`gradle.properties`）：
+- `org.gradle.jvmargs` → `-Xmx3g`（Gradle daemon 堆上限，原 6g）
+- `kotlin.daemon.jvmargs=-Xmx3g`（显式限制 Kotlin daemon 堆）
+- `org.gradle.daemon.idletimeout=600000`（Gradle daemon 空闲 10 分钟自退，默认 3h）
+
+> ✅ 已落地：`stop-daemons.bat`（根目录）一键清场 + `build-legado.bat` 内置 `:STOP_DAEMON` + `gradle.properties` 三处内存/回收配置。AI 打包后若走了非 bat 入口，必须补跑 `stop-daemons.bat`。
+
 ---
 
 ## 五、Cronet 网络库

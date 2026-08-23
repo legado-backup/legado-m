@@ -26,6 +26,8 @@
 9. **项目标识还原**：应用名称、logo、仓库地址、开发者信息改回本项目。
 10. **Archive 重 AI 功能完整搬入（用户已确认，替代原"仅建表保编译"默认）**：AI 助手 / AI 记忆 / AI Agent / AI 绘图 / 角色 / 朗读 BGM / 段落规则 等的 **25 实体 + 14 DAO + 业务逻辑 + UI 入口全部搬入**，不做裁剪；`help/ai/*` 全量业务与 `ui/book/character/*`、`AiChatActivity` 等对应页面一并搬入。
 11. **搬迁后单元测试门禁（用户附加要求）**：每个关键模块搬迁完成后，必须针对其核心功能编写并运行单元测试（`./gradlew test`），迁移后行为与预期一致、不依赖真机即可发现回归；单元测试通过为该模块"完成"的前置条件。
+12. **查漏补缺（2026-08-21 新增）**：Phase 5 编译门禁 ≠ 运行时已引用 Archive UI。补齐 Archive 有而本项目缺的页面：config 管理页群（云存储/书库容器 S3、封面图库、书籍信息、导航栏、顶栏、中转、在线导入）、现代发现套件 DiscoverySuite、书架标签管理、我的设置聚合屏、在线导入/协议导入体系、关于页；并把规则订阅/详情 ExploreShow/目录规则/换源对话框等本项目旧实现更新为 Archive Compose 版。详见 `design.md` §1.7 与 `tasks.md` §7.11。
+13. **子页面/弹框内部 Compose 对齐（2026-08-21 深层审查）**：针对"很多子页面仅头部 Compose 化、内置仍是 View"补齐——弹框统一 `ComposeDialogFragment`、列表统一 `LazyColumn`/`AppManagementScaffold`、半迁移 `Fragment` 壳升级 `ComposeSettingFragment`、特色功能弹框统一外观（详见 `design.md` §1.9、`spec.md` FR-15、`tasks.md` §7.11 E 类）。
 
 ### 不在范围内（Out of Scope）
 
@@ -97,6 +99,13 @@
 - **FR-11 高亮体系**：正文高亮规则（本项目特色）保留可用（P1）。
 - **FR-12 项目标识**：应用名、logo、仓库地址、开发者改回本项目。
 - **FR-13 UI 标准**：迁移完成时产出 `docs/project-flow/ui-standards/` 标准文档。
+- **FR-14 遗漏页面补齐**：Archive 有而本项目缺/未对齐的页面全部补齐或明确"本项目增强保留"（覆盖 `design.md` §1.7 清单）：云存储/书库容器、封面图库、书籍信息管理、导航栏/顶栏管理、中转、在线导入、现代发现套件、书架标签管理、我的设置、协议/主题包在线导入、关于页更新加速器等管理页；规则订阅、详情 ExploreShow、目录规则、换源对话框更新为 Archive Compose 版。
+- **FR-15 子页面/弹框内部 Compose 对齐（2026-08-21 深层审查，覆盖 `design.md` §1.9）**：本项目大量子页面仅头部 Compose 化、内置仍旧 View（实测旧 RecyclerView/Adapter 文件 50 个、旧 `lib.dialogs` 弹框文件 95 个）。除本项目特有功能（视频/图片播放器+RSS 搜索+高亮+自动任务+UrlRecord+统计 MetricGrid+AITool 等）外，逐项对齐 Archive：
+  - **E1 弹框**：分组弹框（`book/group/GroupEdit/GroupSelect/GroupManage`、`replace/GroupManageDialog`）、association 7 个导入弹框 + `OnLineImportActivity`、阅读相关弹框（`manga/config/*`、`ServerConfigDialog`、`BookmarkDialog`、`AudioSkipCredits`）、配置/字典弹框（`CheckSourceConfig`/`CoverRuleConfigDialog`/`DirectLinkUploadConfig`/`DictRuleEditDialog`）、关于 `UpdateDialog`、目录规则 `TxtTocRuleEditComposeDialog` → 统一 `ComposeDialogFragment`/`AppComposeDialogs`。
+  - **E2 列表/主内容**：`ReplaceRuleActivity`、`SearchActivity`、`CacheActivity` 去除残留 `RecyclerView`/`Adapter`/`AlertDialog`，对齐 `AppManagementScaffold`/`LazyColumn`；`ExploreFragment` 接入现代/套件模式。
+  - **E3 半迁移壳层**：`CoverConfigFragment`/`ThemeConfigFragment`/`WelcomeConfigFragment`/`BackupConfigFragment`/`OtherConfigFragment`（纯 `PreferenceFragment`）升级为 `ComposeSettingFragment`。
+  - **E4 特色功能弹框统一外观**：`highlight`/`autoTask`/`widget/dialog/TextListDialog`/`CheckRssSourceConfig` 等特色旧弹框功能保留、外观升级到 Compose 组件库。
+  - **E5 骨架补缺**：补 `BookshelfConfigDialog` 替换旧书中配置弹框；`SourceSelectDialog`/`WaterfallCardMetrics` 作用域复核。
 
 ### 非功能需求（NFR）
 

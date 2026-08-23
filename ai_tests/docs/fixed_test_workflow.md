@@ -24,6 +24,8 @@
 | 6. 批量源遍历 | `batch_source_test.py` | 自动遍历多个RSS源检测修复点触发（全程脱敏） | `python ai_tests/scripts/batch_source_test.py [起始编号] [结束编号]` |
 | 7. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
 | 8. AppLog日志获取 | `collect_app_log.py` | 按模块Tag过滤logcat+拉取文件日志（logging-audit新增） | `python ai_tests/scripts/collect_app_log.py [--tag TAG\|--file\|--all]` |
+| 9. 订阅形态切换验证 | `verify_rss_mode_switch.py` | 6.8 新版/经典订阅切换真机验证（打开配置页→切换→查prefs→回订阅页验形态） | `python ai_tests/scripts/verify_rss_mode_switch.py --full`（`--discovery` 验发现-订阅配置页） |
+| 10. 多媒体书检查 | `check_video_books.py` | 检查 MyFeatureBooksActivity 是否有视频/图片书（VideoPagerAdapter 回归前置） | `python ai_tests/scripts/check_video_books.py` |
 
 ### ⚠️ 重要：签名配置（步骤1前置条件）
 
