@@ -40,10 +40,25 @@ def run_cmd(cmd, cwd=None, timeout=300, check=False):
     return result
 
 
+def cleanup_daemons():
+    """打包后清理 Gradle/Kotlin daemon，避免频繁打包打爆内存"""
+    print("\n=== 清理构建 daemon ===")
+    bat = PROJECT_ROOT / "stop-daemons.bat"
+    if bat.exists():
+        # 复用根目录 stop-daemons.bat（gradlew --stop + 强杀本项目残留 Kotlin daemon）
+        result = run_cmd(f'call "{bat}"', cwd=str(PROJECT_ROOT), timeout=180)
+    else:
+        # 兜底：只停 Gradle daemon
+        result = run_cmd(".\\gradlew.bat --stop", cwd=str(PROJECT_ROOT), timeout=180)
+    return result.returncode == 0
+
+
 def step1_build():
     """步骤1: 编译APK"""
     print("\n=== 步骤1: 编译APK ===")
     result = run_cmd(".\\gradlew.bat assembleAppDebug", cwd=str(PROJECT_ROOT), timeout=600)
+    # 编译结束立即清理 daemon（无论成败都清，防止 gradle/kotlin daemon 残留堆积）
+    cleanup_daemons()
     if result.returncode != 0:
         print("❌ 编译失败")
         return None
@@ -145,14 +160,27 @@ def step4_l1_verify():
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="快速编译+安装+L1验证（--skip-build 跳过编译，直接使用最新APK）")
+    ap.add_argument("--skip-build", action="store_true", help="跳过编译，直接使用 app/build/outputs/apk/app/debug 下最新APK")
+    args = ap.parse_args()
+
     print("=" * 60)
     print("Legado 快速编译+安装+L1验证")
     print("=" * 60)
 
-    # 步骤1: 编译
-    apk_path = step1_build()
-    if not apk_path:
-        sys.exit(2)
+    # 步骤1: 编译（--skip-build 时跳过）
+    if args.skip_build:
+        apks = sorted(APK_GLOB_DIR.glob("*.apk"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not apks:
+            print(f"❌ 未找到APK文件 in {APK_GLOB_DIR}")
+            sys.exit(2)
+        apk_path = str(apks[0])
+        print(f"✅ 跳过编译，使用最新APK: {Path(apk_path).name} ({apk_path and (apks[0].stat().st_size // 1024 // 1024)}MB)")
+    else:
+        apk_path = step1_build()
+        if not apk_path:
+            sys.exit(2)
 
     # 步骤2: 启动MEmu
     if not step2_start_memu():

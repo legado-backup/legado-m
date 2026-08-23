@@ -88,6 +88,108 @@
 | ⑥ | `SearchBookMergeUtils` / `VideoBookPreloader`（2 工具类） | ExploreShowViewModel.kt、SearchViewModel.kt | 编译失败 → Phase 0 复制 |
 | ⑦ | 4 个 Compose 生态依赖（miuix/reorderable/lazyColumnScrollbar/liquidglass） | widget/compose 全库 + MainActivity（StableLiquidGlassView） | 编译失败 → Phase 0 补 |
 
+### 1.7 未搬入 UI 缺口总表（2026-08-21 查漏补缺复核，rev2 基础上新增）
+
+> **背景**：Phase 5 各模块"编译门禁通过"≠"运行时已引用 Archive UI"。对两端 `ui/` 文件集合做差集（Archive 550 个 UI 文件 / 本项目 673 个；Archive 有而本项目缺 **55 个**），产出以下缺口。A 类是"后端/函数已搬入但 UI 管理页缺失"，B 类是"Archive 有 Compose 新版而本项目仍是旧 View/自研"，C 类为 Archive 增强组件。
+> 详细清单与门禁见 `tasks.md` §7.11。
+
+| 类别 | 缺口 | Archive 蓝本（参考） | 本项目后端就绪度 | 结论 |
+|------|------|------|:---:|------|
+| A-config | 云存储/书库容器管理页 | `config/LibraryContainerManageActivity`+`Screen`、`S3ContainerManageActivity`+`Screen` | 🟢 `help/book/library/*`、`lib/cloud/S3*` 已搬入 | **缺 UI 入口**，需补 Activity/Screen |
+| A-config | 封面图库管理页 | `config/CoverCollectionManageActivity`+`Screen`+`Detail` | 🟢 `help/config/CoverCollectionManager` 已搬入 | 缺 UI 入口 |
+| A-config | 书籍信息/导航栏/顶栏管理 | `BookInfoManageActivity`、`NavigationBarManageActivity`、`TopBarManageActivity`+`TopBarEditDialog` | 🟡 后端 `NavigationBarIconConfig`/`TopBarConfig` 已搬 | 缺 UI；MainActivity 可配置 5 tab 依赖导航栏管理页 |
+| A-config | 中转/在线导入 UI | `RelaySettingsActivity`、`ComposeDirectLinkUploadDialog`、`PackageManageUi` | 🔴 待判 | 缺 UI，需判定后端 |
+| A-发现套件 | 现代发现套件整体缺失 | `main/explore/DiscoverySuiteManageActivity`+`HomeScreen`+`Config`+`DiscoveryCachePolicy`、`DiscoverTagAdapter`、`ExploreModernListScreen`、`widget/WaterfallCardMetrics` | 🔴 后端也缺 | design §2.2 Phase 5"发现（含现代发现套件）"**未真正落地**，需整体搬入 |
+| A-书架 | 书架标签管理 | `BookshelfTagManageActivity`+`Screen`+`BookshelfConfigDialog` | 🟡 书架已有 Fragment | 缺 Archive 版标签管理页 |
+| A-我的 | 我的设置聚合屏 | `main/my/MySettingsScreen` | 🟡 本项目 `ProfileScreen3Level` | 判别保留/对齐 |
+| A-在线导入 | 协议/主题包在线导入体系 | `association/OnlineImportDownloader`+`OnlinePackageImportRoute`+`ImportDialogComponents`+`ImportRedThemeDialog`+`ImportResponseLimits`+`ParagraphRule*` | 🔴 仅 `VerificationCodeDialog` | 体系缺失，需搬入 |
+| A-关于 | 关于页/更新加速器 | `about/AboutFragment`+`UpdateAcceleratorDialog` | 🟡 本项目 `AboutScreen` 自研 | 判别保留/对齐 |
+| B-RuleSub | 规则订阅仍旧 View | `rss/subscription/RuleSubScreen`+`RuleSubEditComposeDialog` | 🟡 本项目 `RuleSubActivity`+旧 Adapter | **task 8.9 未做**，需换 Archive Compose |
+| B-ExploreShow | 详情仍自研 | `book/explore/ExploreShowComposeScreen`+`BookCallback`+`WaterfallAdapter` | 🟡 本项目 `ExploreShowScreen` 自研 | 判别对齐 Archive |
+| B-TocRule | 目录规则 Compose 对话框 | `book/toc/rule/TxtTocRuleEditComposeDialog` | 🔴 缺 | 7.5e 已标记，确认未补 |
+| B-换源 | 换源对话框主题 | `book/changesource/ChangeSourceDialogTheme` | 🔴 缺 | 待补 |
+| B-RssArticle | RSS 文章搜索两套 | `rss/article/RssSearchActivity` | 🟢 本项目特色 `ui/rss/search/RssSearchActivity` | 判别并入 |
+| C-导入/缓存/组件 | 增强组件与适配器 | `book/import/local/ImportBookAdapter`+`remote/RemoteBookAdapter`、`book/cache/AudioCache*`+`CacheChapter*`、`widget/SourceSelectDialog` | 🟡 `CacheActivity` 为本项目增强替代 | 作用域复核 |
+
+> **要点**：A 类"后端已搬仅缺 UI"是最优先、可批量并行补齐的缺口（云存储 S3/书库容器、封面图库、导航栏/顶栏、书籍信息管理等管理页）；发现套件 DiscoverySuite 属于功能整体缺失需整体搬入；B 类要求把本项目旧实现更新为 Archive Compose 版。
+
+### 1.8 全面再审查补充（2026-08-21，用户定调"除本项目特有功能外完全对齐 Archive"）
+
+> **基调修正**：此前设计多次以"本项目增强/更先进/不盲覆盖 Archive"为由保留自研实现，用户明确否决——**UI 默认完全采用/学习 Archive 样式，仅本项目特有功能（视频/图片播放器+RSS 搜索+高亮+自动任务+UrlRecord+统计 MetricGrid+AITool 等）例外**。以下为据此重审结论（对应 tasks §7.11 之 7.11u~z）。
+
+**A. 「我的」页回退 Archive（本项目当前仍为自研）**
+- 项目现状：`ui/main/my/MyFragment.kt` 用 `GlassTopAppBar` + 自研 `ProfileScreen3Level`（MetricGrid 统计卡 + SettingsCard 三级），无设置搜索栏，缺 cache/relay/file 入口。
+- Archive 现状：`MyFragment`（View 壳 + **SearchView 设置搜索栏** + 解析 pref_config_* XML 跨项精准跳转）+ `MySettingsScreen`（**内容/外观/同步/工具 4 分组** + themeMode 快速切换行 + webService 运行态弹窗），完整入口含 `CacheManageActivity`/`RelaySettingsActivity`/`FileManageActivity`。
+- 判定：**回退 Archive MyFragment+MySettingsScreen**，删/停用自研 `ProfileScreen3Level`；需同时补 Archive MyFragment 依赖的三个目标页（已在 §1.7 A 类：CacheManage/RelaySettings/FileManage）+ 设置搜索栏 + themeMode 快速切换 + webService 弹窗。
+
+**B. 头部布局对齐 Archive（书架/订阅/发现顶栏，用户明确质疑点在）**
+- 项目现状：三 tab 顶栏全用自研 Compose `GlassTopAppBar`（标题+搜索+MoreVert 折叠），分组切换依赖下拉，无置顶分组标签栏；发现页无 Archive 的现代发现/发现套件。
+- Archive 现状：统一 `MainTopBarView(Mode.{BOOKSHELF,DISCOVERY,RSS})`——书架=置顶分组标签栏（setPrimaryItems+showTags+标题切分组）、订阅=搜索/星标/刷新/登录常驻按钮+分组标签栏、发现=默认/现代(`ExploreModernListScreen`)/发现套件(`DiscoverySuiteHomeScreen`)三模式。
+- 判定：**三 tab 顶栏对齐 Archive**（保留共享的 `MainTopBarView` widget，改各 Fragment 顶栏初始化），补现代发现/发现套件顶栏生态（DiscoverySuite* 文件，§1.7 A 类）。
+
+**C. 保留项重审（默认对齐 Archive，个别两端同构保留）**
+| 项 | 项目现状 | Archive | 重审判定 |
+|---|---|---|---|
+| 我的信息页 | `ProfileScreen3Level` 自研 | `MySettingsScreen` | **改 Archive**（见 A） |
+| 关于页 | `AboutScreen` 自研 | `AboutFragment`（含内测/更新加速入口） | **改 Archive** |
+| 配置页顶栏 | `GlassTopAppBar` 自研 | `ConfigTopBar`+`MenuProvider` | **改 Archive** |
+| 主题管理 | `ThemeManageActivity`（两端同构，保留）；`ThemeConfigScreen` 自研 | `ComposeSettingFragment`/`SettingPageSpec` | Activity 保留；**ThemeConfigScreen 改 Archive 组件库** |
+| 书架旧适配器 | `style1/style2/BooksAdapter*`+`BooksFragment`（旧 RecyclerView） | 无独立 adapter（逻辑内嵌） | **删死代码**（书架 Compose 化不退回 View） |
+| 配置页其它自研子页 | `CoverConfigScreen`/`PreciseManage*`/`WelcomeConfigScreen` 等 | Archive 用 pref ConfigActivity 分组 | 逐项对齐/合并（本项目特有检索类保留） |
+
+**D. 上游可复用结论**：`MainTopBarView.kt`、`MainActivity.kt` 两版逐字节一致，仅三 tab Fragment 未接入；「我的」/关于/配置顶栏均为"自研壳层挡在 Archive 组件库前"，移除壳层即可暴露 Archive 组件与入口。
+
+### 1.9 子页面内部实现再审查（2026-08-21 深层审查：弹框/列表项/半迁移壳层）
+
+> **背景**：§1.7/§1.8 按 `ui/` 文件集合差集（Archive 550 / 本项目 673，Archive 有本项目缺 55 个）识别"缺页面缺失"。但用户指出大量子页面**仅头部 Compose 化、内置仍是旧 View**，或弹框仍是旧 MaterialDialog。本次对 4 大模块（main / book / rss-config / others）逐目录逐文件比对两端技术栈（Compose 组件 vs `RecyclerView.Adapter` vs `lib.dialogs`/`BaseDialogFragment`）。**实测基数**：本项目旧 RecyclerView/Adapter 的 UI 文件 **50 个**（Archive 32）；旧 `lib.dialogs` 弹框文件 **95 个**（Archive 77）。Archive 已全面 Compose 化（`AppManagementScaffold`/`LazyColumn`/`ComposeDialogFragment`/`AppComposeDialogs`），本项目大量对应文件仍是 `BaseDialogFragment`+viewBinding 旧弹框、`RecyclerView`+Adapter 旧列表、或"Fragment 壳 + 内部 Compose"半迁移。据此新增以下子页面/弹框对齐缺口（对应 `tasks.md` §7.11 E 类，逐项需搬入/对齐/保留）。
+
+**E1. 弹框层需对齐（Archive 已 `ComposeDialogFragment`/Compose 弹框，本项目仍旧弹框）**
+
+| 模块 | 文件 | 本项目实现 | Archive 实现 |
+|------|------|------|------|
+| book/group | `GroupEditDialog`/`GroupSelectDialog`/`GroupManageDialog`（book/group 路径） | 旧 `lib.dialogs` alert/selector | `ComposeDialogFragment` |
+| replace | `GroupManageDialog`（replace 路径） | 旧 `BaseDialogFragment`+`RecyclerAdapter`+`lib.dialogs` | `ComposeDialogFragment`+`ComposeGroupManageDialogContent` |
+| association | 导入 7 弹框 `ImportBookSourceDialog`/`ImportDictRuleDialog`/`ImportHttpTtsDialog`/`ImportReplaceRuleDialog`/`ImportRssSourceDialog`/`ImportThemeDialog`/`ImportTxtTocRuleDialog` + `OnLineImportActivity` | 旧 `BaseDialogFragment(dialog_import_sheet)`+`lib.dialogs` | `ComposeDialogFragment`（配套 §1.7 A-在线导入体系） |
+| config | `CheckSourceConfig`/`CoverRuleConfigDialog`/`DirectLinkUploadConfig`（→ Archive `ComposeDirectLinkUploadDialog`） | 旧 `BaseDialogFragment` | `ComposeDialogFragment` |
+| about | `UpdateDialog` | 旧 `BaseDialogFragment` | `ComposeDialogFragment` |
+| manga/config | `MangaColorFilterDialog`/`MangaEpaperDialog`/`MangaFooterSettingDialog` | 旧 `BaseDialogFragment`+viewBinding | `ComposeDialogFragment`（AppDialogSlider 等） |
+| import/remote | `ServerConfigDialog` | 旧 `BaseDialogFragment`+Toolbar 表单 | `ComposeDialogFragment`+`AppDialogFrame` |
+| bookmark | `BookmarkDialog` | 旧 `BaseDialogFragment`+viewBinding | `ComposeDialogFragment` |
+| audio/config | `AudioSkipCredits` | 旧 viewBinding 弹框 | `ComposeDialogFragment`（AppDialogSlider*） |
+| dict/rule | `DictRuleEditDialog` | 旧 `lib.dialogs` | `ComposeDialogFragment`+`AppDialogFrame`/`AppRuleTextField` |
+| toc/rule | **缺** `TxtTocRuleEditComposeDialog` | 仅旧 `TxtTocRuleEditDialog`(View) | Compose 编辑弹框（需搬入） |
+
+**E2. 列表项/主内容需对齐（Archive 已 `LazyColumn`/`AppManagementScaffold`，本项目仍 `RecyclerView`/`Adapter`）**
+
+| 模块 | 文件 | 本项目实现 | Archive 实现 |
+|------|------|------|------|
+| replace | `ReplaceRuleActivity` | 顶栏 Compose + **列表旧 RecyclerView/Adapter** | `AppManagementScaffold` 全量 Compose，`ReplaceRuleAdapter` 已成死代码 |
+| explore | `ExploreFragment` | 主列表旧 `rvFind`/`ExploreAdapter` | 现代/套件模式：`ExploreModernListScreen`+`DiscoverySuite*`（§1.7 A 发现套件） |
+| search | `SearchActivity` | **半迁移**：结果列表仍旧 `RecyclerView`+`SearchAdapter`+`AlertDialog` | 纯 Compose |
+| cache | `CacheActivity` | Compose 残留旧 `RecyclerView`/`AlertDialog` 段 | 本项目增强（Archive 纯旧 View），需清理残留 |
+| bookshelf/style1/books | `BooksFragment` | 旧 View（`FragmentBooksBinding`+Adapter，且已无外部引用） | Compose（LazyColumn/Grid）；配套 8 个旧 Adapter 待清理（并入 7.11z） |
+
+**E3. 半迁移壳层需升级（内容已 Compose，Fragment 壳未升 `ComposeSettingFragment`/`ComposeDialogFragment`）**
+
+| 文件 | 本项目实现 | Archive 实现 |
+|------|------|------|
+| config/`CoverConfigFragment`/`ThemeConfigFragment`/`WelcomeConfigFragment` | `Fragment` 壳 + 内部 Compose Screen | `ComposeSettingFragment` |
+| config/`BackupConfigFragment`/`OtherConfigFragment` | **仍是纯 `PreferenceFragment`（非 Compose，差异最大）** | `ComposeSettingFragment` |
+
+**E4. 本项目特色功能旧弹框统一外观（功能保留，外观升级到 Compose 组件库，Archive 无对标）**
+- `highlight`/：`HighlightRuleGroupManageDialog`、`edit/HighlightRuleEditDialog`、`HighlightPresetRuleDialog`（旧 `lib.dialogs`/`BaseDialogFragment`）→ 用 `GroupManageComposeDialog`/`AppEditDialog` 统一
+- `autoTask/`：`AutoTaskLogDialog`、`ImportAutoTaskDialog`（旧弹框）
+- `widget/dialog/TextListDialog`（本项目独有旧弹框）
+- `config/CheckRssSourceConfig`（本项目增强检索类旧弹框）
+- 特色模块（video/image/rss-search/urlrecord）内部旧弹框统一走 `widget/components` 或 `widget/compose`
+
+**E5. 骨架/弹框新增（Archive 有 Compose 版，本项目缺或未用）**
+- `bookshelf/BookshelfConfigDialog`（Compose 书中单/列表/网格配置弹框）→ 替换 `BaseBookshelfFragment` 旧 `DialogBookshelfConfigBinding`
+- `widget/SourceSelectDialog`、`widget/WaterfallCardMetrics`（Archive 独有，作用域复核）
+- `book/cache/*`（`CacheManageActivity`/`CacheChapter*`/`AudioCache*`）→ 疑似本项目 `CacheActivity` 合并，判别保留（§1.7 C 类）
+
+> **要点**：E1（弹框）与 E3（半迁移壳层）是用户痛点（"只有头部 Compose 化、内置仍是 View"）的精确对应，与 A 类缺页一并纳入查漏补缺批量清单；E4 特色功能保留但统一外观，避免风格割裂。**子代理实测明细**见 `docs/temp-analysis/archive-gap-{main,book,rss-config,others}.md`。
+
 ---
 
 ## 二、Technical Approach
