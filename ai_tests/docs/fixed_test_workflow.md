@@ -26,6 +26,7 @@
 | 8. AppLog日志获取 | `collect_app_log.py` | 按模块Tag过滤logcat+拉取文件日志（logging-audit新增） | `python ai_tests/scripts/collect_app_log.py [--tag TAG\|--file\|--all]` |
 | 9. 订阅形态切换验证 | `verify_rss_mode_switch.py` | 6.8 新版/经典订阅切换真机验证（打开配置页→切换→查prefs→回订阅页验形态） | `python ai_tests/scripts/verify_rss_mode_switch.py --full`（`--discovery` 验发现-订阅配置页） |
 | 10. 多媒体书检查 | `check_video_books.py` | 检查 MyFeatureBooksActivity 是否有视频/图片书（VideoPagerAdapter 回归前置） | `python ai_tests/scripts/check_video_books.py` |
+| 11. 详情页无 null 弹框 | `verify_book_info_no_null.py` | 书架长按进详情页，验证无 "book is null" toast + 更多菜单正常（含拷贝书籍URL） | `python ai_tests/scripts/verify_book_info_no_null.py` |
 
 ### ⚠️ 重要：签名配置（步骤1前置条件）
 
