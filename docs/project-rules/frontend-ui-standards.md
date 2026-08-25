@@ -1,0 +1,94 @@
+# 前端 UI 规范（archive 迁移后）
+
+> 适用范围：所有涉及 UI 的新功能开发、页面迁移、样式统一、主题接入。
+> 定位：在"迁移学习 archive 前端 UI"接近尾声后（2026-08-24，bugfix-ui-20260824 ⑨）沉淀的一套统一前端规范，作为新开发/改造的**强制基线**。
+> 关联规范：`docs/project-rules/ui-standards.md`（静态设计基线）、`docs/specs/bugfix-ui-20260824/design.md`（本批 UI 修复设计）。
+> 涉及 Compose 编写/审查/迁移时，**动手前必须先读 skill：`compose-ui-engineering`**（Legado Compose 专项）。
+
+---
+
+## 1. 设计 Token（全局基线）
+
+### 1.1 圆角 Token（Compose：`AppShapes`）
+收敛来源 `app/src/main/java/io/legado/app/ui/widget/components/AppShapes.kt`，**新代码一律引用本 token，禁止再硬编码 `RoundedCornerShape(N.dp)`**。
+
+| Token | 值 | 用途 |
+|------|----|------|
+| `AppShapes.Card` | 18dp | 卡片容器（SettingsCard/卡片化条目/弹窗大容器） |
+| `AppShapes.Button` | 12dp | 按钮（M3 默认圆角） |
+| `AppShapes.Search` | 18dp | 搜索框（统一 archive 订阅头部 searchEntry 口径，本批 ② 新增） |
+| `AppShapes.SheetTop` | 16dp | 底部弹层顶角（ModalBottomSheet） |
+| `AppShapes.IconContainer` | 10dp | 图标容器（MetricTile 图标底/小功能图标） |
+| `AppShapes.Chip` | 8dp | 小标签/Chip/缩略小图 |
+| `AppShapes.Tiny` | 4dp | 极小块状元素（进度标/点状装饰） |
+
+### 1.2 View 侧圆角（`UiCorner`）
+View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`/`actionRadius`/`scaledDp`/`searchRadius` 等，受 UI 圆角倍率 `uiCornerScale` 控制）。Compose 侧与 View 侧口径对齐：**搜索框两者均 18dp**（本批 ② 已统一）。
+
+### 1.3 字号与间距
+- 全局字号刻度基线 `text_14sp`（`res/values/dimens.xml`）；Compose 正文统一 `MaterialTheme.typography.bodyMedium`（14sp，对齐 `text_14sp`），由主题统一管理，禁止页面内散落魔数字号。
+- 顶部栏常用高度：`bookshelf_title_select_height` 42dp、`top_bar_regular_action_size`（现代形态动作按钮）、`bookshelf_tag_bar_height` 38dp。
+
+### 1.4 颜色与主题
+- **三套主题概念分工（勿混）**：`LegadoTheme`（Compose 主题）/ `ThemeSpec`（可配置主题规格）/ `TopBarConfig`（顶栏管理专属配置）。
+- 满足用户的"顶栏管理设色→主界面所有头部生效"，遵循本批 ③ 的 **局部读配色** 范式：`MainTopBarView` 天然读 `TopBarConfig`；传统 `TitleBar` 如需读顶栏配色，置 `app:topBarColorManaged="true"` 并实现 `refreshTopBarAppearance()`（影响面收窄到主界面头部，保留内联搜索/动态菜单）。
+- 搜索框浅底统一用 `surfaceVariant`（Compose）或 `TopBarSearchStyle.surfaceColor()`（View）。
+
+---
+
+## 2. 页面骨架（自 archive 迁移后的统一分型）
+
+| 分型 | 骨架 | 说明 |
+|------|------|------|
+| S1 主框架 | `PillNavigationBar` 底部导航 | 书签/发现/订阅/我的 等 Tab 主框架 |
+| S2 列表管理页 | `GlassTopAppBar` + `SettingsSearchBar` | 书源管理/订阅管理/自动任务等（见 `AppManagementScaffold`） |
+| S3 表单编辑页 | 分区卡片表单 | 编辑类页面 |
+| S4 详情页 | 现代 Compose 详情 | 书籍详情等 |
+| S5 阅读器 | **View 内核，红线** | 阅读器保留 View 实现，禁止无评估迁移 Compose |
+| S6 弹层 | `ComposeDialog` 家族 | 帮助/日志/编辑/单选/确认 等全部 Compose 化 |
+
+---
+
+## 3. 组件六族与选用规则
+
+| 族 | 组件 | 选用要点 |
+|----|------|---------|
+| 顶部栏 | `MainTopBarView` / `TitleBar` | 主界面现代页（书架/发现现代/订阅/阅读记录）用 `MainTopBarView` 读顶栏配置；子页面/经典头用 `TitleBar`；主界面经典头需读配色按 §1.4 `topBarColorManaged`。`TitleBar` 承载动态度量（内联搜索/动态菜单）时不要盲目换成 `MainTopBarView`（会破坏功能，ADR-01） |
+| 搜索框 | `SettingsSearchBar` / `TopBarSearchStyle` | **统一 18dp 圆角浅底**。Compose 用 `SettingsSearchBar`（40dp+surfaceVariant+`AppShapes.Search`）；View 搜索框背景对齐 `TopBarSearchStyle`/`bg_searchview`(18dp)，不要再出现 35dp 全胶囊等发散圆角 |
+| 卡片 | `LegadoMiuixCard` / `SettingsCard` | 卡片化条目/面板统一 18dp 圆角 |
+| 列表项 | 列表/单列/双列/三列/瀑布 | 封面图**四角圆弧统一 `FilletImageView`(12dp)**；瀑布流用 `CardView` + `android:clipToOutline="true"`（引用 `compose-ui-engineering` 相关段落） |
+| 菜单 | `ModernActionPopup` | 右上角三点等弹出菜单 |
+| 弹窗 | `ComposeDialog` 家族（`AppDialogFrame`/`ConfirmDialog`/`AppEditDialog`/`SingleChoiceDialog`/`ComposeChoiceListDialog`/`GroupManageComposeDialog` 等） | 帮助/日志/编辑/单选/确认等一律 Compose 化 |
+
+---
+
+## 4. View 与 Compose 混用红线
+
+1. **阅读器内核（S5）= View，禁止迁移**。
+2. **WebView 操作必须 UI 线程**：`destroy/setLayoutParams` 等一系列 WebView 调用必须在主线程（`shouldInterceptRequest` 在工作线程调 `destroy` 会抛异常）。
+3. `SettingsSearchBar`（Compose）与 `view_search.xml`（View）并存场景：改样式须两端同步口径（本批 ② 已统一 18dp），不能用一边改一边漏。
+4. Compose 页面内嵌 `AndroidView`/`View` 时注意 z 序与触摸事件拦截。
+
+---
+
+## 5. 新页面/改造检查清单（门禁）
+
+动手前逐项确认，防止改 A 破 B（对照本批 ⑨ 沉淀）：
+
+- [ ] 圆角统一走 `AppShapes`/`UiCorner`，无散落 `RoundedCornerShape(N.dp)` 魔数
+- [ ] 搜索框按 §3 搜索框规范（18dp/浅底/高度对齐），View/Compose 两端一致
+- [ ] 主界面头部是否需读顶栏配置 → `MainTopBarView` 或 `TitleBar`+`topBarColorManaged`
+- [ ] 列表项封面图圆角：`FilletImageView`(12dp) 或 `CardView`+`clipToOutline`
+- [ ] 弹层用 `ComposeDialog` 家族，不新建 View 弹框
+- [ ] 样式中是否用了 `TopBarConfig`/`ThemeSpec` 而非硬编码 `MaterialTheme` 取色
+- [ ] Compose 代码：状态管理/重组/Modifier 符合 `compose-ui-engineering` skill
+- [ ] 改动后按 AGENTS.md「AI 自动端到端测试」真机/模拟器验证，禁止只改不测
+
+---
+
+## 6. 已知坑速查
+
+- `AppShapes.Button`(按钮 12dp) ≠ `AppShapes.Search`(搜索框 18dp)：做搜索 UI 别误用按钮 token。
+- `bg_searchview.xml` 曾有 35dp 全胶囊形，已统一 18dp；新增 View 搜索框勿复制旧值。
+- 顶栏"全面迁移 MainTopBarView"会破坏 `view_search` 内联过滤 / `menu_group` 动态菜单（ADR-01 结论），遇主界面经典头优先"局部读配色"。
+- Compose 搜索框默认高可能 72dp（M3 TextField+padding），缩至 40dp 输入区（对齐 `SettingsSearchBar`）。
