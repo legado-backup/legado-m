@@ -30,6 +30,7 @@
 | 真机测试流程复用 | [project-rules/real-device-test-reuse.md](./project-rules/real-device-test-reuse.md) | 可用脚本清单+测试流程模板+问题闭环+数据库验证（WAL�?校验必须触发真实路径 |
 | 包名规范 | [project-rules/package-naming.md](./project-rules/package-naming.md) | 构建APK包名配置+与原版共�?|
 | 延伸版本参�?| [project-rules/forks-reference.md](./project-rules/forks-reference.md) | 网络�?前端/协程/WebView/数据管理组件优化或功能借鉴任务的方法论 |
+| 前端UI规范 | [project-rules/frontend-ui-standards.md](./project-rules/frontend-ui-standards.md) | archive迁移后前端统一基线：设计Token(AppShapes/UiCorner)+页面骨架分型+组件六族选用+View/Compose混用红线+改造检查清单+已知坑 |
 
 ---
 
@@ -108,9 +109,20 @@
 
 | 文档 | 说明 |
 |------|------|
+| [specs/rss-image-load-optimization/](./specs/rss-image-load-optimization/README.md) | 图片订阅源加载优化（参考书源加载机制：URL 解析结果缓存跳过网络请求+WebView 嗅探 / 图集模式按屏幕采样解码 / 前 3 张并发预下载，显著缩短首图出现与切图时间） 🔄 开发中（编译验证后转已完成） |
+| [specs/folder-cover-replace-bugfix/](./specs/folder-cover-replace-bugfix/README.md) | 文件夹封面替换回归修复（订阅源/书架文件夹自定义封面替换后不生效：根因为订阅文件夹 Compose 化迁移后替换/恢复入口只更新 View 版 Adapter、漏更新 `folderComposeCovers` 状态源致 Compose 不重组；书架待真机确认） 🔄 设计中 |
+| [specs/folder-cover-ratio-archive-align/](./specs/folder-cover-ratio-archive-align/README.md) | 文件夹封面比例对齐 Archive（书架/发现页/View版文件夹封面宽高比 0.7 → 0.75，对齐阅读Archive CoverImageView 的 4:3，消除方形/横版封面的"拉长"失真与不协调观感） 🔄 设计中 |
+| [specs/tag-mode-unify/](./specs/tag-mode-unify/README.md) | 书架订阅标签样式统一（书架 style1 分组切换由 Compose ScrollableTabRow 改为 MainTopBarView 顶栏标签体系：titleSelect 分组名+向下箭头弹出分组菜单 / primaryBar 分组胶囊 / tagsBar 书本标签多级过滤 / filterToggleButton 右侧向下展开，与订阅共用 RoundedTagBarView 实现观感统一，对齐 Rimchars archive） 🔄 设计中 |
+| [specs/my-topbar-unify/](./specs/my-topbar-unify/README.md) | 我的页头部统一（「我的」页头部从 TitleBar 迁移到 MainTopBarView 新增 Mode.MY，与书架/订阅/发现同一组件、观感一致，样式可被顶栏设置/主题设置/样式管理全量管理；保留设置项就地搜索能力） ✅ 实施完成（待真机 L2 验证） |
+| [specs/rss-folder-subtag-fix/](./specs/rss-folder-subtag-fix/README.md) | 订阅文件夹样式头部误显标签/箭头修复（点进文件夹后头部误显二级源标签+向下箭头；根因 renderRssSecondaryTags 无条件 showTags(true)；修复为仅标签样式展示） 🔄 设计中 |
+| [specs/subpage-topbar-unify/](./specs/subpage-topbar-unify/README.md) | 子页面头部统一（全 App TitleBar 子页迁移 MainTopBarView，新增 Mode.SUB 支持返回/菜单/副标题/内容插槽，子页头部全量受顶栏/主题/样式管理，批量分 3 批迁移） 🔄 设计中 |
 | [specs/INDEX.md](./specs/INDEX.md) | 项目状态面�?功能状�?|
 | [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
+| [specs/video-player-theme-unify/](./specs/video-player-theme-unify/) | 视频播放器主题统一（消除内置播放器孤儿样式：控制条深色悬浮层+主题高亮、倍速/选集/画面比例/音轨弹框动态设色接入 ThemeStore+UiCorner、旧模式功能区/调试面板硬编码色清理、硬编码中文迁移 strings.xml、主题切换 RECREATE 刷新 View 侧） 🔄 设计中 |
 | [specs/archive-ui-migration-202608/](./specs/archive-ui-migration-202608/) | Archive 前端 UI 迁移整合（放弃自研增量 Compose 化，整体迁移 Rimchars/legado 最新 tag archive-v3-3.26.08172114 UI 层替换本项目 UI；Cronet 150→500.0.1 cronet-bundled 去内部打包减体积；深度差异分析=后端 WebBook 11/12 兼容+编译硬约束 3 点+主题系统 32 字段/~68 key 重做+数据库 v104 并入 25 实体 5 批迁移+特色功能 A/B 分级 P0/P1/P2 整合；10 阶段迁移流水线+UI 标准实时沉淀+项目标识还原+独立项目实施） 🔄 设计中 |
+| [specs/bugfix-20260824/](./specs/bugfix-20260824/) | 20260824 UI/功能反馈 11 项修复（① 订阅图片四角圆角 ② 搜索框样式统一 ③ 顶栏管理颜色经典头部未生效 ④ 订阅分组视图设置未生效+分组→文件夹改名 ⑤ 新版切经典头部残留标签 ⑥ 我的页文件管理重复入口 ⑦ 关于页应用名 ⑧ 欢迎页文案 ⑨ 前端 UI 规范沉淀子规范 ⑩ APK 体积精简分析 ⑪ 订阅页分组管理入口） 🔄 设计中 |
+| [specs/video-download-manager/](./specs/video-download-manager/README.md) | 视频下载与下载管理整合（播放器右栏全屏/收藏/设置旁新增下载按钮，一键下载当前视频默认以标题命名；自研 IDM 式多线程 Range 分片引擎替代系统 DownloadManager；m3u8 分片下载→合并→平台 MediaExtractor/MediaMuxer 重封装 mp4→清理分片；下载管理页复用展示正在/完成分类） ✅ 实施完成（编译通过，待真机验证） |
+| [specs/download-manager-maturity/](./specs/download-manager-maturity/README.md) | 下载器成熟化改造（盘点全量下载入口 7 处：播放器/网页弹窗/RSS/WebView/更新包发起 + 精准管理/管理页入口；分级补齐缺口：Room 任务持久化+崩溃恢复、直链/m3u8 断点续传、真实暂停/恢复、并发上限+FIFO 排队、失败指数退避重试、错误码、通知 id 稳定映射；根治"任务无故消失"） 🔄 设计中 |
 | [specs/bugfix-20260822/](./specs/bugfix-20260822/) | 20260822 真机反馈 Bug 修复（六条反馈 + Downloadslogs 全量日志 12 FATAL 深度分析：备份页 Compose 化对齐 Archive/统计框隐藏不删码/订阅页新版经典切换 modernRssPage 无消费方/主题顶栏对齐/BookSourceActivity 递归环/VideoPagerAdapter 越界/两 Activity Manifest 缺注册/ClassCast+NPE 缺陷） ✅ 实施完成（测试包 3.26.082301，待真机验证） |
 | [specs/sniff-stability-enhance-20260731/](./specs/sniff-stability-enhance-20260731/) | 嗅探稳定性增强（基于logs(8)真机日志深度分析9个优化点：P0 R5嗅探去重�?1%浪费消除/P1 DoH负缓�?0s�?0s+健康检�?视频流强制HTTP/1.1+favicon.ico缓存/P2 StreamReset重用NonCancellable+日志采样+证书错误记忆/P3 play.php预解�?window.__videoUrls__容错�?🔄 设计�?|
 | [specs/bugfix-20260730-batch1/](./specs/bugfix-20260730-batch1/) | 真机测试Bug修复批次1�?个BUG：图片头部遮�?播放器UI入口缺失+CDN缓存清除+"未找到订�?提示+ExoPlayer LoadControl共享线程错误+DoH DNS冷启�?Cronet降级+InsetsSource警告�?🔄 设计�?|
