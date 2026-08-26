@@ -30,7 +30,7 @@ flowchart LR
 ## 2. Architecture Decisions（ADR Y-Statement）
 
 ### AD-01: 任务状态用 Room 持久化而非纯内存
-- **Context**: 现 `DownloadState` 是 `MutableStateFlow`，进程被杀/崩溃任务即丢。铁证 MP4WtrVidTrkThr SIGABRT 杀进程后"下一半没了"。
+- **Context**: 现 `DownloadState` 是 `MutableStateFlow`，进程被杀/崩溃任务即丢。链路：任务完成/失败 → `finally{downloads.remove; isEmpty→stopSelf}` → 前台服务停 → 进程被系统回收 → 静态 `DownloadState` 重置空 map → 管理页 `queryAllTaskStatus()` 返回空 = "进去就没了"。铁证 MP4WtrVidTrkThr SIGABRT 杀进程后"下一半没了"。
 - **Concern**: 任务被系统杀掉或应用崩溃后，用户已下载的进度无法恢复。
 - **Decision**: 新增 Room 下载任务表（`DownloadTaskEntity`），`DownloadState` 以 Room 为主存、StateFlow 为缓存，服务启动 `resumeFromDb()` 恢复。
 - **Goal**: 崩溃/杀进程后任务仍在、可续传，杜绝"任务凭空消失"。
@@ -76,6 +76,22 @@ flowchart LR
 - **Goal**: 杜绝 native 崩导致下载任务消失。
 - **Tradeoff**: 校验逻辑增加；原生能力可能被低估保守回退。
 - **Status**: Accepted（csd 校验已实施，本条固化为纪律）
+
+### AD-07: 下载产物写入用户可访问的公有目录
+- **Context**: 现 `resolveTargetDir` 用 `getExternalFilesDir(DIRECTORY_DOWNLOADS)`（app 私有，Android 11+ 文件管理器不可见）。用户反馈"下载目录不在有权限的根目录，找不到文件"。
+- **Concern**: 下载产物藏私有目录，用户无法在系统文件管理器查看/重命名/移动，体验非生产级。
+- **Decision**: 目标目录改为可选配置，默认公有 Downloads/Legado；Android 11+ 走 MANAGE_EXTERNAL_STORAGE（跳系统设置授权）或 SAF 让用户授权目标目录，落库持久化。
+- **Goal**: 文件用户可见可管理，符合成熟下载器预期。
+- **Tradeoff**: 需权限申请流程 + 目录配置持久化；旧已在私有目录的存量文件需迁移/提示。
+- **Status**: Proposed
+
+### AD-08: 删除区分「仅删任务」与「删任务+清理文件」
+- **Context**: 现 `clearCompletedTasks` 仅清记录（保留文件），`cancelTask` 经 `IntentAction.stop` 会连文件一起删，语义不一致且不可选。
+- **Concern**: 用户可能只想清列表记录、保留已下文件，也可能想连文件一起清；无二次确认易误删。
+- **Decision**: 管理页提供两种删除操作并二次确认：`仅删除任务（保留文件）` 与 `删除任务并清理文件`；删除后同步清 Room 记录与查询列表。
+- **Goal**: 删除语义清晰、不误删用户文件。
+- **Tradeoff**: 多入口/状态，需在列表项操作菜单显性标注提示语。
+- **Status**: Proposed
 
 ## 3. Data Flow
 
