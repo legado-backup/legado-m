@@ -369,6 +369,10 @@ Debug 构建签名说明：
 - 若 `local.properties` 已配置签名信息（`RELEASE_STORE_FILE` 等），Debug 包会使用与 Release 包相同的正式签名（`signingConfigs.myConfig`），确保三包签名一致
 - 若未配置签名信息，Debug 构建使用默认 debug 签名（`CN=Android Debug`）
 
+> **🔴 三包统一签名铁律（2026-08-25）**：`local.properties` 已配置正式签名时，`app/build.gradle` 的 **debug 块也必须加载 `signingConfigs.myConfig`**（与 release 一致）。
+> 历史铁证：commit `3d7671c14`（2026-08-25）误删 debug 块 `signingConfig signingConfigs.myConfig`，导致新打的测试包回落为 `CN=Android Debug` 签名，与用户手机上历史已装的正式签名测试包签名不一致，覆盖安装报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
+> **修复/改签名/迁移 debug/release signingConfig 时，必须让 buildTypes.debug 保持与 release 相同的 `myConfig`，禁止借"避免耦合/混淆"为由删 debug 签名。**
+
 ### 4.2 Release 构建（正式发布）
 
 ```powershell

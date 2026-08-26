@@ -24,12 +24,14 @@ Compose 是函数式 UI 描述：`@Composable` 函数会被运行时重复执行
 
 | 文档 | 内容 | 何时读 |
 |------|------|--------|
-| `docs/specs/ui-redesign-m3/ui-standards.md` | 设计基石/骨架六类/组件目录/状态管理/检查清单/KPI | 任何 Compose 页改造前 |
+| `docs/project-rules/frontend-ui-standards.md` | **archive 迁移后强制基线**：设计 Token(AppShapes/UiCorner)+页面骨架分型+组件六族选用+View/Compose 混用红线+改造检查清单+已知坑 | 任何 Compose 页改造前（一级规范） |
+| `docs/project-flow/ui-standards/` | archive 迁移源核验参考：components/color/间距/骨架/dialog/迁移登记 | 组件归属/迁移状态核实时 |
+| `docs/specs/ui-redesign-m3/ui-standards.md` | 历史 Compose 化工程详规：设计基石/骨架六类/组件精确真值表/检查清单/KPI（自研增量阶段产物，**归档为历史参考**，仅作组件规格真值溯源） | 组件精确规格（真值表/槽位）溯源时 |
 | `docs/specs/ui-redesign-m3/pages-inventory.md` | 84 页功能点清单 | 定位要改造的页面时 |
 | `docs/specs/ui-redesign-m3/tasks.md` | 任务进度 + 实施回执 | 改造完成后填回执 |
 | `.trae/memory/ai_memory_main.md` | 项目记忆/已交付状态 | 开工前了解当前进度 |
 
-**快速路径**：改造任何页面 → 先读 `ui-standards.md` §7 检查清单 + 目标页面对应骨架样板（S1-S6，见 ui-standards §2）→ 遵循本 skill 的工程决策 → 填回执。
+**快速路径**：改造任何页面 → 先读 `frontend-ui-standards.md` §5 检查清单 + `frontend-ui-standards.md` §2 骨架分型（S1-S6，规范统一口径以后者与 `docs/project-flow/ui-standards/page-skeleton.md` 为准）→ 组件契约/真值溯源读 ui-redesign-m3/ui-standards.md §3.4 → 遵循本 skill 的工程决策 → 填回执。
 
 ## 决策框架
 

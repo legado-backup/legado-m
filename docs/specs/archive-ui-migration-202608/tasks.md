@@ -13,7 +13,7 @@
 - [x] 0.4 当前 Compose 迁移 WIP 快照分支 `test_compose_self_20260818` 提交并推送远端 — ✅ 已完成（commit 86ac9a802，53 文件）
 - [x] 0.5 四文档修订 v2（README/spec/design/tasks 基于 rev2 分析 + 用户调整意见）— ✅ 已完成，**检查点 1 已通过**（用户确认：文档通过 + AI 完整搬入 + EPub 搬入 + 迁移分支确认 + 单元测试门禁）
 - [x] 0.6 从 master 干净点（aa1170a08）创建迁移分支 `migration-archive-ui` 并推送远端 — ✅ 已完成（cherry-pick 设计文档 429168283 + .gitignore 忽略 archive-ref/temp-analysis 1bd1e94a0）
-- [ ] 0.7 登记迁移 UI 标准基线（组件清单初版）到 `docs/project-flow/ui-standards/`
+- [x] 0.7 登记迁移 UI 标准基线（组件清单初版）到 `docs/project-flow/ui-standards/` — ✅ 已建成（README/components/color/spacing-corner-typography/page-skeleton/dialog-shell/migration-registry 7 文档，2026-08-21 起源码核验型建设，回勾 2026-08-25）
 
 ## 1. Cronet 升级（子任务 1，方案 1 `cronet-bundled` 已确认）
 - [x] 1.1 确认 `500.0.1` 构件结构（`cronet` / `cronet-bundled` / `play-services-cronet` 在 Google Maven 坐标与大小）— 已完成
@@ -171,9 +171,9 @@
     - [ ] 7.11aj `explore/ExploreFragment` 主列表接入现代/套件模式（并入 7.11h，唯一搬入 owner 于 7.11h）
     - **E3 半迁移壳层升级（`Fragment` 壳 → `ComposeSettingFragment`）**
     - [x] 7.11ak config `CoverConfigFragment`/`ThemeConfigFragment`/`WelcomeConfigFragment` 升 `ComposeSettingFragment`
-    - [ ] 7.11al config `BackupConfigFragment`/`OtherConfigFragment`（纯 `PreferenceFragment`，差异最大）→ `ComposeSettingFragment`（**纠正 7.7a「备份已对齐」表述：实测 OtherConfigFragment 已升 ComposeSettingFragment，BackupConfigFragment 仍为 PreferenceFragment 未 Compose 化**）
+    - [x] 7.11al config `BackupConfigFragment`/`OtherConfigFragment`（纯 `PreferenceFragment`，差异最大）→ `ComposeSettingFragment` — ⚠️ **2026-08-25 源码核验：已实际完成但此前未勾**（BackupConfigFragment:64 + OtherConfigFragment:55 均已继承 ComposeSettingFragment，7.7a 纠错表述已过期），补勾并更新 migration-registry
     - **E4 特色功能旧弹框统一外观（功能保留，仅升级组件库）**
-    - [x] 7.11am `highlight/` 旧弹框（GroupManage/Edit/PresetRule）→ `GroupManageComposeDialog`/`AppEditDialog`
+    - [ ] 7.11am `highlight/` 旧弹框（GroupManage/Edit/PresetRule）→ `GroupManageComposeDialog`/`AppEditDialog` — ⚠️ **2026-08-25 源码核验：此前误勾（超前），实际三弹框仍为 BaseDialogFragment + dialog_highlight_* XML，回退为未完成，待 E4 实施**
     - [ ] 7.11an `autoTask/`（AutoTaskLogDialog/ImportAutoTaskDialog）+`widget/dialog/TextListDialog`+`config/CheckRssSourceConfig` 统一外观
     - [ ] 7.11an2 `video/`（播放器内部旧弹框）+`image/`（图片浏览旧弹框）+`urlrecord/`（访问记录旧弹框）→ 统一到 widget/components（8.1/8.4 标注的落点）
     - **E5 骨架/弹框补缺（Archive 有 Compose 版本项目缺）**
@@ -200,12 +200,12 @@
 - [ ] 8.12 **接线点回归验证（2026-08-21 新增；作为 8.10 的防回归子项，避免重复执行）**：任务 7 A-E 实施后，Git diff + 真机核对所有特色接线点仍可达（订阅顶栏全局搜索、发现/订阅分组、我的页特色入口、视频/图片 type 分派、阅读高亮）；防 Archive 覆盖导致特色入口丢失
 
 ## 9. UI 标准建设（Phase 7，迁移全程实时沉淀）
-- [ ] 9.1 建设 `docs/project-flow/ui-standards/`：组件目录（ui/widget/compose 全量清单 + **widget/components 本项目增强组件目录与用量规范**，承载 E4 特色弹框统一外观落点）
-- [ ] 9.2 取色规范（ThemeUiPalette key 表 + R.color 兜底）
-- [ ] 9.3 间距/圆角/字体规范（ComposeUiCorner + uiCornerScale + UiTypography）
-- [ ] 9.4 页面骨架规范（AppManagementScaffold / AppSettingComponents / AppComposeDialogs 用法）
-- [ ] 9.5 **弹框与壳层规范（2026-08-21 新增）**：ComposeDialogFragment / AppComposeDialogs / ComposeSettingFragment 用法 + `lib.dialogs`/`BaseDialogFragment` 淘汰边界，承接 E1 弹框 / E3 半迁移壳 / E4 特色统一外观
-- [ ] 9.6 迁移登记表（每模块替换状态 + 特色接线点 + 组件使用记录 + §7.11 E 类实施进度）
+- [x] 9.1 建设 `docs/project-flow/ui-standards/`：组件目录（ui/widget/compose 全量清单 + **widget/components 本项目增强组件目录与用量规范**，承载 E4 特色弹框统一外观落点）— ✅ 已建成（components.md，2026-08-21，回勾 2026-08-25）
+- [x] 9.2 取色规范（ThemeUiPalette key 表 + R.color 兜底）— ✅ 已建成（color.md，回勾 2026-08-25）
+- [x] 9.3 间距/圆角/字体规范（ComposeUiCorner + uiCornerScale + UiTypography）— ✅ 已建成（spacing-corner-typography.md，回勾 2026-08-25）
+- [x] 9.4 页面骨架规范（AppManagementScaffold / AppSettingComponents / AppComposeDialogs 用法）— ✅ 已建成（page-skeleton.md，回勾 2026-08-25）
+- [x] 9.5 **弹框与壳层规范（2026-08-21 新增）**：ComposeDialogFragment / AppComposeDialogs / ComposeSettingFragment 用法 + `lib.dialogs`/`BaseDialogFragment` 淘汰边界，承接 E1 弹框 / E3 半迁移壳 / E4 特色统一外观 — ✅ 已建成（dialog-shell.md，回勾 2026-08-25）
+- [x] 9.6 迁移登记表（每模块替换状态 + 特色接线点 + 组件使用记录 + §7.11 E 类实施进度）— ✅ 已建成（migration-registry.md，回勾 2026-08-25；E 类完成度以迁移登记表实际核对为准）
 
 ## 10. 项目标识还原（Phase 8）
 - [ ] 10.1 strings.xml 应用名改回本项目

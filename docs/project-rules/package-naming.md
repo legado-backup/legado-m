@@ -133,6 +133,10 @@ RELEASE_KEY_PASSWORD=<你的密码>
 
 构建时 `app/build.gradle` 会自动读取 `local.properties` 中的签名配置，应用到 release 包。`debug` 和 `release` 构建类型共用同一 `signingConfigs.myConfig`，确保三个包签名一致。
 
+> **🔴 三包统一签名铁律（2026-08-25）**：`app/build.gradle` 的 **buildTypes.debug 必须与 release 一样加载 `signingConfigs.myConfig`**（当 `storeFilePath != null` 时）。
+> 历史铁证：commit `3d7671c14` 误删 debug 块签名配置，测试包回落为 `CN=Android Debug`，与已装的正式签名测试包签名不一致，覆盖安装报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（用户 2026-08-25 反馈"打的测试包不能覆盖安装"）。
+> **禁止**以"测试包避免与发布签名耦合/混淆"为由删 debug 签名；改/迁/重构 signingConfig 必须保证 debug 与 release 签名一致。
+
 ### 4. 验证签名
 
 ```bash
