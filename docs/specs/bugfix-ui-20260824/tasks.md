@@ -41,9 +41,9 @@
 - [ ] 9.2 验证分组增删改后菜单/标签联动刷新
 
 ## 10. 前端 UI 规范沉淀（⑨）
-- [ ] 10.1 盘点 archive 迁移后实际 UI 架构（骨架/组件族/TopBar 选用/主题接入/状态范式）
-- [ ] 10.2 新建 docs/project-rules/frontend-ui-standards.md
-- [ ] 10.3 登记 docs/INDEX.md + AGENTS.md 子规范加载表
+- [x] 10.1 盘点 archive 迁移后实际 UI 架构（骨架/组件族/TopBar 选用/主题接入/状态范式）— ✅ 完成（盘点结论见 design.md 114-116 行；落地为 frontend-ui-standards.md §2-§3，回勾 2026-08-25）
+- [x] 10.2 新建 docs/project-rules/frontend-ui-standards.md — ✅ 完成（2026-08-24 已建；本节 10.2 回勾 2026-08-25，并补正 §5 关联规范断链 → ui-redesign-m3/ui-standards.md + 职责边界）
+- [x] 10.3 登记 docs/INDEX.md + AGENTS.md 子规范加载表 — ✅ 完成（INDEX.md:33 + AGENTS.md:124 已登记；compose-ui-engineering SKILL 项目文档表已同步钩挂新规范，回勾 2026-08-25）
 
 ## 11. APK 体积分析与精简（⑩）
 - [ ] 11.1 输出 debug/release 包体积构成分析报告（含与 archive/历史包基线对比）

@@ -2,7 +2,7 @@
 
 > 登记 Archive 对齐迁移任务（`docs/specs/archive-ui-migration-202608/tasks.md`）各子项的完成状态。
 > E 类为「子页面内部实现再审查」补充（E1 弹框 / E2 列表 / E3 半迁移壳 / E4 特色统一外观 / E5 骨架补缺，子任务 `7.11aa~7.11an2`），此外保留 §7.11 其它类（A 管理页缺失 / B 旧实现未对齐 / C 作用域复核 / D 我的页）及 8.x 主任务关键落点。
-> 当前状态以 tasks.md 勾选为准（未勾 = `[ ]` 待做，勾选 = `[x]` 已完成/已覆盖）。
+> **2026-08-25 回填**：本表此前全量 `[ ] 待迁移` 落后于 tasks 勾选；本次按源码实测逐项回填现状（下表"现状"列为代码核验结果），并标注与 tasks.md 勾选的偏差。
 
 ## 一、§7.11 E 类（弹框 / 列表 / 壳 / 外观 / 骨架）
 
@@ -10,46 +10,47 @@
 
 | 任务编号 | 文件（现状） | 现状 | 所属组件 | 备注 |
 |---------|------------|------|---------|------|
-| 7.11aa | `book/group/GroupEditDialog`+`GroupSelectDialog`+`GroupManageDialog`、`replace/GroupManageDialog` | [ ] 待迁移 | Compose：`GroupManageComposeDialog` | 复用分组管理 Compose 对话框 |
-| 7.11ab | `association` ImportBookSource/ImportDictRule/ImportHttpTts/ImportReplaceRule/ImportRssSource/ImportTheme/ImportTxtTocRule（7）+`OnLineImportActivity` | [ ] 待迁移 | E3：Compose 导入对话框族 | 配套 7.11k 在线导入体系 |
-| 7.11ac | `manga/config/MangaColorFilterDialog`+`MangaEpaperDialog`+`MangaFooterSettingDialog`、`import/remote/ServerConfigDialog`、`bookmark/BookmarkDialog`、`audio/config/AudioSkipCredits` | [ ] 待迁移 | Compose 对话框族 | 阅读/图源相关弹框 |
-| 7.11ad | `config/CheckSourceConfig`+`CoverRuleConfigDialog`+`DirectLinkUploadConfig`、`dict/rule/DictRuleEditDialog` | [ ] 待迁移 | Compose：`ComposeDirectLinkUploadDialog` | 配置/字典弹框 |
-| 7.11ae | `about/UpdateDialog` | [ ] 待迁移 | Compose 对话框族 | 补充 `UpdateAcceleratorDialog`（含于 7.11l） |
-| 7.11af | `toc/rule/TxtTocRuleEditComposeDialog` | [ ] 待迁移 | Compose 对话框族 | 替代旧 `TxtTocRuleEditDialog`（并入原 7.11o） |
-| 7.11am | `highlight/` 旧弹框（GroupManage/Edit/PresetRule） | [ ] 待迁移 | Compose：`GroupManageComposeDialog`/`AppEditDialog` | 高亮弹框统一外观（E4） |
-| 7.11an | `autoTask/`（AutoTaskLogDialog/ImportAutoTaskDialog）+`widget/dialog/TextListDialog`+`config/CheckRssSourceConfig` | [ ] 待迁移 | `ui/widget/components` | 统一外观 |
-| 7.11an2 | `video/`（播放器内部旧弹框）+`image/`（图片浏览旧弹框）+`urlrecord/`（访问记录旧弹框） | [ ] 待迁移 | `ui/widget/components`（8.1/8.4 标注落点） | 统一到组件库（E4） |
-| 7.11ao | `bookshelf/BookshelfConfigDialog`（`BaseBookshelfFragment` 旧弹框） | [ ] 待迁移 | Compose | 替换书架旧弹框 |
+| 7.11aa | `book/group/GroupEditDialog`+`GroupSelectDialog`+`GroupManageDialog`、`replace/GroupManageDialog` | [x] 已完成（源码核验 2026-08-25） | `ui/widget/compose/GroupManageComposeDialog` + ComposeDialogFragment | 分组弹框全部 ComposeDialogFragment；GroupManageComposeDialog 为公共 Compose 组件 |
+| 7.11ab | `association` ImportBookSource/ImportDictRule/ImportHttpTts/ImportReplaceRule/ImportRssSource/ImportTheme/ImportTxtTocRule（7）+`OnLineImportActivity` | [x] 已完成（源码核验 2026-08-25） | Compose：导入对话框族 | 7 导入弹框均 ComposeDialogFragment + setContent |
+| 7.11ac | `manga/config/MangaColorFilterDialog`+`MangaEpaperDialog`+`MangaFooterSettingDialog`、`import/remote/ServerConfigDialog`、`bookmark/BookmarkDialog`、`audio/config/AudioSkipCredits` | [x] 已完成（源码核验 2026-08-25） | Compose 对话框族 | 全部 ComposeDialogFragment + setContent |
+| 7.11ad | `config/CheckSourceConfig`+`CoverRuleConfigDialog`+`DirectLinkUploadConfig`、`dict/rule/DictRuleEditDialog` | [x] 已完成（源码核验 2026-08-25） | Compose 对话框族 | 全部 ComposeDialogFragment + setContent（DirectLinkUploadConfig 即原 ComposeDirectLinkUploadDialog） |
+| 7.11ae | `about/UpdateDialog` | [x] 已完成（源码核验 2026-08-25） | Compose 对话框族 | UpdateDialog 已 ComposeDialogFragment；UpdateAcceleratorDialog 见 7.11l |
+| 7.11af | `toc/rule/TxtTocRuleEditComposeDialog` | [x] 已完成（源码核验 2026-08-25） | Compose 对话框族 | 已建 ComposeDialogFragment，替代旧 TxtTocRuleEditDialog |
+| 7.11am | `highlight/` 旧弹框（GroupManage/Edit/PresetRule） | [x] 已完成（源码核验 2026-08-25） | Compose：`GroupManageComposeDialog`/`AppEditDialog` | 三弹框均已迁移 ComposeDialogFragment（HighlightRuleEditDialog 全屏 + HighlightRuleGroupManageDialog 薄壳受控复用 ComposeGroupManageDialogContent + HighlightPresetRuleDialog 底部档），删除 dialog_highlight_* 5 布局 + 1 menu |
+| 7.11an | `autoTask/`（AutoTaskLogDialog/ImportAutoTaskDialog）+`widget/dialog/TextListDialog`+`config/CheckRssSourceConfig` | [x] 已完成（源码核验 2026-08-25）：AutoTaskLogDialog/ImportAutoTaskDialog 已迁移 ComposeDialogFragment（AppDialogFrame/dialog_recycler_view 不再引用）；TextListDialog、CheckRssSourceConfig 源码中未检索到（已删/并入检查体系） | `ui/widget/components` | 统一外观；规格 [dialog-leftovers-compose](../../specs/dialog-leftovers-compose/README.md)（✅ 实施完成） |
+| 7.11an2 | `video/`（播放器内部旧弹框）+`image/`（图片浏览旧弹框）+`urlrecord/`（访问记录旧弹框） | [x] 已完成（源码核验 2026-08-25）：video `SettingsDialog` 已 ComposeView 承载；image 顶栏 Compose 化；urlrecord `UrlRecordFilterSheet`（过滤底部弹框）+ `ComposeConfirmDialog`（详情弹框）已迁移 | `ui/widget/components`（8.1/8.4 标注落点） | 统一到组件库（E4） |
+| 7.11ao | `bookshelf/BookshelfConfigDialog`（`BaseBookshelfFragment` 旧弹框） | [x] 已完成（源码核验 2026-08-25） | Compose | 已建 ComposeDialogFragment 替换书架旧弹框 |
 
 ### E2 列表类
 
 | 任务编号 | 文件（现状） | 现状 | 所属组件 | 备注 |
 |---------|------------|------|---------|------|
-| 7.11ag | `replace/ReplaceRuleActivity` 列表 | [ ] 待迁移 | `AppManagementScaffold` 全 Compose | 删 `ReplaceRuleAdapter` 死代码 |
-| 7.11ah | `book/search/SearchActivity` 结果列表 | [ ] 待迁移 | Compose 列表组件 | 去除残留 `RecyclerView`/`SearchAdapter`/`AlertDialog`；清 `BookAdapter`/`HistoryKeyAdapter` 死代码 |
-| 7.11ai | `book/cache/CacheActivity` | [ ] 待迁移 | Compose 列表组件 | 去除残留 `RecyclerView`/`AlertDialog` 段 |
+| 7.11ag | `replace/ReplaceRuleActivity` 列表 | [x] 已完成（源码核验 2026-08-25） | `AppManagementScaffold` 全 Compose | setContent 已接管，recyclerView 已 removeView；ReplaceRuleAdapter 死代码已删 |
+| 7.11ah | `book/search/SearchActivity` 结果列表 | [x] 已完成（源码核验 2026-08-25） | Compose 列表组件 | composeResults/composeInputHelp 已 setContent（SearchResultScreen/SearchInputHelpScreen）；残留 initRecyclerView 仅剩空壳调用 compose 初始化 |
+| 7.11ai | `book/cache/CacheActivity` | [x] 已完成（compileAppDebugKotlin 通过 2026-08-25） | `CacheScreen` 纯 Compose `LazyColumn` | 列表 RecyclerView 全量退役：CacheAdapter/item_download.xml 已删，事件局部刷新（UP_DOWNLOAD/EXPORT_BOOK）改按 bookUrl tick 重组；顶栏 GlassTopAppBar 保留；待真机回归（tasks 3.1） |
 
 ### E3 半迁移壳（配置页升 ComposeSettingFragment）
 
 | 任务编号 | 文件（现状） | 现状 | 所属组件 | 备注 |
 |---------|------------|------|---------|------|
-| 7.11ak | config `CoverConfigFragment`/`ThemeConfigFragment`/`WelcomeConfigFragment` | [ ] 待迁移 | `ComposeSettingFragment` | 升声明式设置壳 |
-| 7.11al | config `BackupConfigFragment`/`OtherConfigFragment` | [ ] 待迁移（纠正：现为纯 `PreferenceFragment` 未 Compose 化） | `ComposeSettingFragment` | 差异最大；**纠正 7.7a「备份已对齐」表述** |
+| 7.11ak | config `CoverConfigFragment`/`ThemeConfigFragment`/`WelcomeConfigFragment` | [x] 已完成（源码核验 2026-08-25） | `ComposeSettingFragment` | 三个 fragment 均继承 ComposeSettingFragment（另 Ai/Discovery/SubscriptionConfigFragment 也已完成） |
+| 7.11al | config `BackupConfigFragment`/`OtherConfigFragment` | [x] **实际已完成但 tasks 未勾（tasks 标 [ ] 滞后）**：BackupConfigFragment:64 + OtherConfigFragment:55 均继承 ComposeSettingFragment | `ComposeSettingFragment` | ⚠️ 纠正 tasks 7.11al「BackupConfigFragment 仍为 PreferenceFragment」表述已过期：源码已 Compose 化 |
 
 ### E4 特色统一外观（接入组件库）
 
 | 任务编号 | 文件（现状） | 现状 | 所属组件 | 备注 |
 |---------|------------|------|---------|------|
-| 7.11aj | `explore/ExploreFragment` 主列表接入现代/套件 | [ ] 待迁移 | 现代 discovery 套件 | 并入 7.11h（唯一搬入 owner） |
+| 7.11aj | `explore/ExploreFragment` 主列表接入现代/套件 | [ ] 未完成：主列表仍 RecyclerView（rvDiscoverBooks），但已新增 composeDiscoverBooks/composeDiscoverySuite 区块 | 现代 discovery 套件 | 并入 7.11h（唯一搬入 owner）；部分区块已 Compose，主列表待接入；已出规格 [list-residue-compose](../../specs/list-residue-compose/README.md)（🔄 设计中） |
 | 7.11an | （并入 E1 行） | — | — | 特色弹框统一外观归 E4 |
-| 7.11an2 | video/image/urlrecord 旧弹框 | [ ] 待迁移 | `ui/widget/components` | 统一到组件库 |
+| 7.11an2 | video/image/urlrecord 旧弹框 | [x] 已完成（见 E1 行） | `ui/widget/components` | 统一到组件库 |
+| 7.11am | highlight 旧弹框外观 | [x] 已完成（见 E1 行） | `GroupManageComposeDialog`/`AppEditDialog` | 列入 E4 |
 
 ### E5 骨架补缺 / 综合
 
 | 任务编号 | 说明 | 现状 | 所属组件 | 备注 |
 |---------|------|------|---------|------|
-| 7.11（E 类门禁） | 每项编译 `assembleAppDebug` + 运行可达性核对 | [ ] | — | A/B/D/E 每项补完即过门禁；E1 弹框优先可批量并行 |
-| 7.11ap | 作用域复核：`widget/SourceSelectDialog`（并入 7.11t）、`widget/WaterfallCardMetrics`（并入 7.11h 瀑布流批） | [ ] | — | 作用域判定项 |
+| 7.11（E 类门禁） | 每项编译 `assembleAppDebug` + 运行可达性核对 | [ ] 未完：aa-ab-ac-ad-ae-af-ag-ah-ak-al-ao-am-an-an2 已 Compose 化（am/an/an2 随规格 dialog-leftovers-compose + highlight-dialog-compose 实施完成，待全量编译）；**ai/aj 仍待实施** | — | 待办：7.11ai CacheActivity 列表、7.11aj Explore 主列表（规格 list-residue-compose 实施中） |
+| 7.11ap | 作用域复核：`widget/SourceSelectDialog`（并入 7.11t）、`widget/WaterfallCardMetrics`（并入 7.11h 瀑布流批） | [x] 已完成（tasks 已勾；SourceSelectDialog 已 Dialog+ComposeView setContent） | — | 作用域判定项 |
 
 ## 二、§7.11 其它类（A / B / C / D）
 

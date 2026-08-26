@@ -2,7 +2,10 @@
 
 > 适用范围：所有涉及 UI 的新功能开发、页面迁移、样式统一、主题接入。
 > 定位：在"迁移学习 archive 前端 UI"接近尾声后（2026-08-24，bugfix-ui-20260824 ⑨）沉淀的一套统一前端规范，作为新开发/改造的**强制基线**。
-> 关联规范：`docs/project-rules/ui-standards.md`（静态设计基线）、`docs/specs/bugfix-ui-20260824/design.md`（本批 UI 修复设计）。
+> 关联规范：
+> - `docs/specs/ui-redesign-m3/ui-standards.md`（历史 Compose 化工程详规：设计基石/骨架六类/组件精确真值表/检查清单/KPI）——自研增量 Compose 化阶段的产物，**归档为历史参考**，仅作组件规格真值溯源；本项目 UI 改造以**本文件（frontend-ui-standards.md）为强制基线**。
+> - `docs/project-flow/ui-standards/`（archive 迁移后的源核验参考文档：components/color/间距/骨架/dialog/迁移登记）
+> - `docs/specs/bugfix-ui-20260824/design.md`（本批 UI 修复设计）。
 > 涉及 Compose 编写/审查/迁移时，**动手前必须先读 skill：`compose-ui-engineering`**（Legado Compose 专项）。
 
 ---
