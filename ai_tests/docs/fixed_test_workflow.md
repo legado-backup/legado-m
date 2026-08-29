@@ -30,6 +30,7 @@
 | 12. 播放器会话复用重置 | `verify_player_session_reset.py` | singleTask 旧会话驻留后台后新播放请求是否正确重置（下载视频→新播放意图切换；验证 onNewIntent 重置日志+UI标题切换+无崩溃） | `python ai_tests/scripts/verify_player_session_reset.py` |
 | 13. 订阅源嗅探回归 | `verify_rss_sniff_after_download.py` | 下载视频→订阅源嗅探播放完整用户场景回归（嗅探链路 AppLog 标记+onNewIntent 重置+无旧会话残留；自动从 DB 选启用源视频文章） | `python ai_tests/scripts/verify_rss_sniff_after_download.py <legado.db>` |
 | 14. 订阅源/DB 脱敏查询 | `query_rss_video_sources.py` | 脱敏查询模拟器 DB（只输出 id/计数/类型技术字段，不输出源名称/URL） | `python ai_tests/scripts/query_rss_video_sources.py <db_path>` |
+| 15. 双包无崩溃验证 | `verify_no_crash.py` | 安装指定包→启动→进发现页→二轮重启复现缓存读取→logcat 崩溃模式分析（no-crash 2026-08-29 新增） | `python ai_tests/scripts/verify_no_crash.py --type debug\|release` |
 
 ### ⚠️ 重要：签名配置（步骤1前置条件）
 
