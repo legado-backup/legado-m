@@ -145,6 +145,25 @@ else
 fi
 ```
 
+## 单元测试（基础设施自测）
+
+覆盖 `ai_tests/tests/` 下测试文件（编排/解析/执行/证据/报告/控制器/取色门禁等层），当前基线 **295 passed**。
+
+```bash
+# 项目根目录执行（推荐）
+ai_tests\venv\Scripts\python.exe -m pytest ai_tests/tests -q
+
+# 或 ai_tests 目录下执行
+cd ai_tests
+venv\Scripts\python.exe -m pytest -q
+```
+
+- 配置：`ai_tests/pytest.ini`（testpaths + 告警过滤）
+- 路径引导：`ai_tests/tests/conftest.py`（自动注入项目根到 sys.path，免设 PYTHONPATH）
+- 每个文件也支持直接运行：`python ai_tests/tests/test_run_e2e.py`
+- pytest 已加入 `requirements.txt`；新环境安装依赖后即可运行
+
+
 ## 架构概览
 
 ```

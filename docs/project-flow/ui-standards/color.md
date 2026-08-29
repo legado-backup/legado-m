@@ -58,3 +58,23 @@ colors.xml 中与 UI 面颜色相关的兜底色（`background`、`background_ca
 2. 运行时推导（如 `dividerColor` 依据面明暗推导、自定义面判定）。
 3. `ContextCompat.getColor(R.color.*)` 兜底。
 4. 注意夜间模式统一使用 `*N` 后缀 key（由 `AppConfig.isNightTheme` 决定读取哪套）。
+
+## 四、设置类主取色链（AI 开发取色唯一入口，2026-08-27 补充）
+
+> 页面级 UI（设置/管理/功能页、Compose 组件）取色**第一优先走下列入口**，`ThemeUiPalette` 与 `R.color` 兜底仅作为低层能力：
+
+| 取色入口 | 用途 | 关键来源 |
+|---------|------|---------|
+| `rememberAppSettingPalette()` → `palette.settings.page / row / primaryText / secondaryText / accent / danger / border / panelRadiusPx` | 页面背景 / 行 / 文字 / 强调（**page = `Color(context.backgroundColor)` = ThemeStore 直读**） | `ui/widget/compose/AppSettingComponents.kt` |
+| `rememberAppDialogStyle()`（`AppDialogStyle` + `AppDialogFrame`） | 弹框 / 菜单面板（背景图 / 圆角 / 透明度 / 边框） | `ui/widget/compose/AppComposeDialogs.kt` |
+| `UiCorner.panelRadius / actionRadius / layoutAlpha / panelImageDrawable / panelBorder*` | 圆角 / 透明度 / 面板背景图（全局 UI 圆角缩放） | `lib/theme/UiCorner.kt` |
+| `Context.backgroundColor`（View 层 `ThemeStore.backgroundColor()`） | 页面根背景直色 | `lib/theme/ThemeStore.kt` |
+| `Color(context.primaryColor)` | 顶栏容器色（GlassTopAppBar 主色） | `lib/theme/ThemeStore.kt` |
+
+## 五、M3 派生色禁令（H9/H11 教训，2026-08-27 硬约束）
+
+- **禁止**：Compose 页面级 / 卡片级视觉取色使用 `MaterialTheme.colorScheme.surface / surfaceVariant / onSurface / background`。
+  - 原因：M3 `surface = lerp(bg, neutral, 4~10%)`、`surfaceVariant = lerp(bg, onBg, 5~14%)` 是**派生偏移色**，用户自定义主题背景/卡片色后与 `backgroundColor` 直读明显偏色（H9 精准管理页根背景 + H10/H11 列表项卡片 M3 surface 实锤，见 `docs/specs/ui-style-unify-deep-fix/issue-list.md`）。
+- **允许的例外（须登记）**：确需"中性灰浮层/遮罩"语义处（多选底栏遮罩、调试工具输入框）；媒体画布 / 阅读正文可配置色 / 视频控制层（主题体系外清单）。
+- **正例**：页面根背景一律 `palette.settings.page`；卡片 `UiCorner.surfaceColor(themeUiPalette.cardColor)`；文字 `palette.primaryText / secondaryText`。
+- **门禁**：新增 Compose 页面出现 `colorScheme.surface`（页面/卡片级）→ 代码审查拒绝返回。

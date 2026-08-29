@@ -35,7 +35,7 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 ### 1.4 颜色与主题
 - **三套主题概念分工（勿混）**：`LegadoTheme`（Compose 主题）/ `ThemeSpec`（可配置主题规格）/ `TopBarConfig`（顶栏管理专属配置）。
 - 满足用户的"顶栏管理设色→主界面所有头部生效"，遵循本批 ③ 的 **局部读配色** 范式：`MainTopBarView` 天然读 `TopBarConfig`；传统 `TitleBar` 如需读顶栏配色，置 `app:topBarColorManaged="true"` 并实现 `refreshTopBarAppearance()`（影响面收窄到主界面头部，保留内联搜索/动态菜单）。
-- 搜索框浅底统一用 `surfaceVariant`（Compose）或 `TopBarSearchStyle.surfaceColor()`（View）。
+- 搜索框底色统一走 **`ThemeUiPalette.searchFieldBackgroundColor`**（`themeSearchFieldBackgroundColor` 自定义 key → `background_menu` 兜底）+ alpha（日 0.18/夜 0.42）+ 1dp 描边，Compose 侧与 View 侧 `TopBarSearchStyle.surfaceColor()` 同源对齐（topbar-search-entry-align v3，2026-08-28 修订；**旧条款"Compose 用 surfaceVariant"已废止**——M3 派生色违反 `ui-standards/color.md` §五禁令，禁止回引）。
 
 ---
 
@@ -57,11 +57,21 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 | 族 | 组件 | 选用要点 |
 |----|------|---------|
 | 顶部栏 | `MainTopBarView` / `TitleBar` | 主界面现代页（书架/发现现代/订阅/阅读记录）用 `MainTopBarView` 读顶栏配置；子页面/经典头用 `TitleBar`；主界面经典头需读配色按 §1.4 `topBarColorManaged`。`TitleBar` 承载动态度量（内联搜索/动态菜单）时不要盲目换成 `MainTopBarView`（会破坏功能，ADR-01） |
-| 搜索框 | `SettingsSearchBar` / `TopBarSearchStyle` | **统一 18dp 圆角浅底**。Compose 用 `SettingsSearchBar`（40dp+surfaceVariant+`AppShapes.Search`）；View 搜索框背景对齐 `TopBarSearchStyle`/`bg_searchview`(18dp)，不要再出现 35dp 全胶囊等发散圆角 |
+| 搜索框 | `SettingsSearchBar` / `TopBarSearchStyle` | **统一 18dp 圆角 + palette 槽位取色**（§1.4，禁止 surfaceVariant）。Compose 用 `SettingsSearchBar`（40dp + `ThemeUiPalette.searchFieldBackgroundColor` + alpha/描边 + `AppShapes.Search`）；View 搜索框背景对齐 `TopBarSearchStyle`/`bg_searchview`(18dp)，不要再出现 35dp 全胶囊等发散圆角 |
 | 卡片 | `LegadoMiuixCard` / `SettingsCard` | 卡片化条目/面板统一 18dp 圆角 |
 | 列表项 | 列表/单列/双列/三列/瀑布 | 封面图**四角圆弧统一 `FilletImageView`(12dp)**；瀑布流用 `CardView` + `android:clipToOutline="true"`（引用 `compose-ui-engineering` 相关段落） |
 | 菜单 | `ModernActionPopup` | 右上角三点等弹出菜单 |
 | 弹窗 | `ComposeDialog` 家族（`AppDialogFrame`/`ConfirmDialog`/`AppEditDialog`/`SingleChoiceDialog`/`ComposeChoiceListDialog`/`GroupManageComposeDialog` 等） | 帮助/日志/编辑/单选/确认等一律 Compose 化 |
+
+### 3.1 主 Tab 头部搜索入口形态（topbar-search-entry-align，2026-08-28 新增）
+
+书架 / 发现 / 订阅 / 我的 四主 Tab 头部搜索入口**统一形态 = 标题区（titleSelect）+ 搜索按钮（searchButton，点击打开新搜索页）**：
+
+1. **禁止** searchEntry 胶囊式"伪输入框"（视觉像输入框实际点击跳页，误导用户）——宿主一律 `setSearchEntryVisible(false)`。
+2. **禁止** 就地展开搜索框过滤（对齐"点搜索按钮 → 新页面"交互）。
+3. **互斥关系**：regular 顶栏风格下 `searchEntry` 与 `titleSelect` 互斥（`MainTopBarView.applyRegularStyle`）——关胶囊后 titleSelect（标题+下拉箭头）自动回归，点击弹源选择菜单/弹窗（各宿主既有绑定）。
+4. 各页搜索行为：书架/发现 → `SearchActivity`（发现带当前源 searchScope）；订阅 → `RssSearchActivity`（按分组/类型 buildSearchScope）；我的 → `SettingsSearchActivity`。
+5. `MainTopBarView` 组件本体保留 searchEntry 能力（不删除），仅宿主侧关闭。
 
 ---
 

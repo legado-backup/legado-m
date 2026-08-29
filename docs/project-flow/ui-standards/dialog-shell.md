@@ -41,6 +41,21 @@
 
 > 另 `GroupManageComposeDialog.kt`（分组管理）、`ComposeChoiceListDialog.kt`（选择列表）同位于 `ui/widget/compose/`，分别供 E1 分组弹框与单选列表复用。
 
+### AppDialogFrame 滚动嵌套契约（禁令，2026-08-28 铁证新增）
+
+**崩溃模式**：`AppDialogFrame` 默认 `scrollContent = true`，content 外包 `Column(verticalScroll)`——外层自身有 `heightIn(max = 520.dp)` 有界，但它给**子项传无限高度**（verticalScroll 语义）。若 content 内再出现**无高度约束**的垂直滚动组件（`LazyColumn` / 根级自带 `.verticalScroll()` 的组件），内层收到 `maxHeight = Infinity` → `checkScrollableContainerConstraints` 抛 `IllegalStateException`，弹框一测量即闪退。
+
+**铁证**：2026-08-28 高亮规则编辑（`HighlightRuleEditDialog` 内嵌 `HighlightStyleSheet`）与预设规则（`HighlightPresetRuleDialog` 内嵌无约束 `LazyColumn`）两处点开即闪退。
+
+**二选一范式（混用 = 崩溃）**：
+
+| 场景 | 范式 | 参考实现 |
+|------|------|---------|
+| 表单 + 面板混排，整体滚动 | 保持默认 `scrollContent = true`；content 内**禁止**任何自带滚动的组件。可复用滚动组件必须参数化：加 `scrollable: Boolean = true` 形参，被嵌入时传 `false` | `HighlightStyleSheet(scrollable = false)` |
+| 列表为主体 | `scrollContent = false` + 内层 `LazyColumn` 必须 `heightIn(max = 420.dp)` 有界自滚 | `HighlightPresetRuleDialog`、AppComposeDialogs 内三个 LazyColumn 弹框 |
+
+**可复用组件自保护红线**：根级 `verticalScroll` 必须参数化（scrollable 形参）**或** `heightIn(max=…)` 前置于 `.verticalScroll()` 之前（heightIn 会把传入的 Infinity 钳制为有界，任意宿主均不崩）；禁止「裸 `verticalScroll` 直连根 modifier 且无任何高度钳制」。判定口诀：**两个垂直滚动组件之间必须有有界高度隔离**（heightIn / weight / fillMaxHeight 固定界）。
+
 ## 三、`ComposeSettingFragment` — 统一设置壳（配置页声明式）
 
 **文件**：`app/src/main/java/io/legado/app/ui/config/compose/ComposeSettingFragment.kt`
@@ -62,10 +77,12 @@
 - `abstract class BaseDialogFragment(@LayoutRes layoutID: Int, adaptationSoftKeyboard: Boolean = false) : DialogFragment(layoutID)`。
 - 职责：XML 布局对话框约束下的通用能力（`onDismissListener`、e-ink 边框 `applyEInk`、重力调整时机编排、软键盘适配标志）。
 
-### 淘汰边界（migration 判定）
-- **继续使用**：既有 `lib/dialogs/`（`AndroidDialogs.kt` 提供 `Context/Fragment.alert(...)`、`progressDialog`、`AlertBuilder` 等）与 `base/BaseDialogFragment` 用于**存量 View 对话框**，在未迁移前保持可运行，属合理存量。
-- **淘汰原则**：新写对话框一律优先 Compose 对话框族（`AppComposeDialogs` + `ComposeDialogFragment`）或 `ui/widget/components/` 对话框族（`AppConfirmDialog`/`AppEditDialog`/`SingleChoiceDialog`/`AppTextDialog`），不再新建基于 `/XML layout` 的 `BaseDialogFragment` 子类。
-- **迁移落点**：`archive-ui-migration-202608` E1 弹框类（7.11aa~an2）将旧 XML 弹框逐项收敛到 Compose 对话框族；`lib/dialogs` 与 `BaseDialogFragment` 仅在对应页面未迁移时保留，随页面迁移逐步退役（非一刀切删除，避免编译/运行回归）。
+### 迁移判定（2026-08-27 ui-style-unify-deep-fix 更新）
+- **旧壳全面退役（✅ 实施收口 2026-08-28）**：`base/BaseDialogFragment`（36 子类 + BasePrefDialogFragment 2）**不再视为"合理存量"**——评审撤销上轮 G6 存量判定，**全量入 ComposeDialogFragment 迁移队列并已实施完成**：35 个迁移（P0 高可见：Servers/EffectiveReplaces/AddToBookshelf/SourcePicker/换源双弹框/SourceLogin/ReadAloudConfig 等，含 8 个超大弹框专项重写；名单外 IconDialog/KeyboardAssistsConfig 亦已迁）+ 复杂定制型登记保留（tasks 2.3.4）；**收口门禁 = `ui/` 下 BaseDialogFragment/BasePrefDialogFragment 子类 grep=0**（2026-08-28 实测通过）。迁移范式 = `ComposeDialogFragment` + `AppDialogFrame` + `collectAsState`/`DisposableEffect`(LiveData)。
+- **系统 AlertDialog（`alert{}` DSL 71 文件 162 处 + 内联 9 处）**：高频确认/选择/输入点 → `ComposeConfirmDialog`/`ComposeSingleChoiceDialog`/`ComposeTextInputDialog` 收敛（AppComposeDialogs.kt 已具备）。✅ **可转型已收口（2026-08-28）**：累计转换约 90 处（含 selector 单选与 TextInput）；剩余 alert import = 25 文件（实测），均为 customView/进度/协程引用等复杂型登记保留。
+- **M3 @Composable 弹框 5 个**（AppConfirmDialog/AppEditDialog/AppTextDialog/SingleChoiceDialog/ConfirmDialog）：D3 对齐 `AppDialogStyle`（补面板背景图/圆角倍率/透明度）。✅ Import 系 3 对话框已迁（2026-08-27）。
+- **散点 13 个**（raw Dialog/BottomSheet/ComponentDialog/AlertDialog+ViewBinding）：D4 迁移或登记。✅ 已完成（2026-08-27：纯展示型补取色/承载类实况随主题/复杂型登记保留）。
+- **新写弹框一律**：`AppComposeDialogs` 工厂 + `ComposeDialogFragment`；**禁止**新建基于 XML layout 的 `BaseDialogFragment` 子类、禁止新建 `alert{}` DSL。
 
 ## 五、层级小结
 

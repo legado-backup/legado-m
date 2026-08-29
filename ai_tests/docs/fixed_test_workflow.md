@@ -27,6 +27,9 @@
 | 9. 订阅形态切换验证 | `verify_rss_mode_switch.py` | 6.8 新版/经典订阅切换真机验证（打开配置页→切换→查prefs→回订阅页验形态） | `python ai_tests/scripts/verify_rss_mode_switch.py --full`（`--discovery` 验发现-订阅配置页） |
 | 10. 多媒体书检查 | `check_video_books.py` | 检查 MyFeatureBooksActivity 是否有视频/图片书（VideoPagerAdapter 回归前置） | `python ai_tests/scripts/check_video_books.py` |
 | 11. 详情页无 null 弹框 | `verify_book_info_no_null.py` | 书架长按进详情页，验证无 "book is null" toast + 更多菜单正常（含拷贝书籍URL） | `python ai_tests/scripts/verify_book_info_no_null.py` |
+| 12. 播放器会话复用重置 | `verify_player_session_reset.py` | singleTask 旧会话驻留后台后新播放请求是否正确重置（下载视频→新播放意图切换；验证 onNewIntent 重置日志+UI标题切换+无崩溃） | `python ai_tests/scripts/verify_player_session_reset.py` |
+| 13. 订阅源嗅探回归 | `verify_rss_sniff_after_download.py` | 下载视频→订阅源嗅探播放完整用户场景回归（嗅探链路 AppLog 标记+onNewIntent 重置+无旧会话残留；自动从 DB 选启用源视频文章） | `python ai_tests/scripts/verify_rss_sniff_after_download.py <legado.db>` |
+| 14. 订阅源/DB 脱敏查询 | `query_rss_video_sources.py` | 脱敏查询模拟器 DB（只输出 id/计数/类型技术字段，不输出源名称/URL） | `python ai_tests/scripts/query_rss_video_sources.py <db_path>` |
 
 ### ⚠️ 重要：签名配置（步骤1前置条件）
 
@@ -111,6 +114,16 @@ python ai_tests/scripts/xxx.py
 2. **抓取日志**：`python ai_tests/scripts/swipe_test_log.py capture`
 3. **分析日志**：`python ai_tests/scripts/swipe_test_log.py analyze`
 4. **验证通过后移除**：所有 SwipeTest 日志必须在验证通过后移除
+
+## UI 全量用例复测协议（F-UI-THEME，2026-08-26 新增）
+
+> 用户强制：复测必须按脚本跑、按修复点精准选用例，**禁止手动 adb 导航猜页面**。
+
+1. **用例筛选**：`run_e2e.py --tc TC-xxx`（单值）按修复面挑相关用例；修复面=订阅链 → TC-113/052/051；视频 → TC-060/114；图片 → TC-115；主题设置 → TC-001~011。不允许全量跑兜底。
+2. **verdict=manual 是正常现象**：F-UI-THEME 多为 VL 判定型预期，analyzer 无规则可判自动标 manual，但**步骤已如实执行、证据（screenshot/xml/logcat/activity_stack/meminfo）完整落盘**，最终判定走 `ui_visual_verify.py --evidence <report根> --v0 issue-list-v0.md` 的 VL 聚合（observations + vl_new_candidates）。
+3. **logcat 针对性计数**：修复点相关异常关键词计数=0 才算过（例：CursorWindow/SQLiteBlobTooBig 溢出修复 → `logcat -d | Select-String CursorWindow|SQLiteBlobTooBig|获取数据失败` = 0）。
+4. **报告**：三要素齐全（证据落盘 + VL 观察 + logcat 计数）后，问题结论登记 issue-list-v1；无新问题则记录"验证过"。
+5. **禁忌**：不要用 `uiautomator dump` 猜订阅入口往返；确定性入口（如收藏页 `am start ...RssFavoritesActivity`）仅用于补充覆盖，仍要结论 + 计数。
 
 ## 脚本维护规则
 
