@@ -46,6 +46,15 @@ class UiExecutor:
         (re.compile(r'^desc\s*=\s*(.+)$', re.I), "description"),
     ]
 
+    # 主界面底部 Tab（content-desc 定位，case.md 已核锚点）
+    # 用例常"二级页设置→直接切 Tab"，此时当前页无 Tab→click 失败；
+    # 命中白名单时自动连续 back 回主界面后再找（对用例零改动）
+    MAIN_TABS = ("书架", "发现", "订阅", "统计", "我的", "搜索")
+
+    # 泛化列表项锚点：真实列表项名为动态数据（订阅源/文章/书名），
+    # 文本锚点必然失败；命中后点击当前页主列表首个可点项（click_first_list_item）
+    GENERIC_ITEM_PATTERNS = ("一个订阅源", "一个视频订阅源文章", "文章项", "书架书籍项", "第一项", "列表项")
+
     # 已知阻塞屏幕（持续迭代层：基于实测扩展）
     # 元组结构：(name, detect_type, detect_value, dismiss_type, dismiss_value)
     # detect_type/dismiss_type: "text" 或 "resource-id"
@@ -260,11 +269,20 @@ class UiExecutor:
                 return el
         return None
 
+    def _has_main_nav(self) -> bool:
+        """当前页是否含主界面底部导航（content-desc=书架 存在）"""
+        try:
+            return 'content-desc="书架"' in self.d.dump_hierarchy()
+        except Exception:
+            return True  # dump 失败时保守走滚动查找
+
     def _scroll_find(self, target: str, max_scrolls: int = SCROLL_SEARCH_MAX) -> Any:
         """滚动查找元素：向下滚动 N 次，每次后检测 target 是否出现
 
         click 找不到元素时调用，解决 PreferenceScreen 长列表元素在屏幕外不可见问题。
         检测顺序与 _get_element 一致：含中文先 text 后 description，纯英文先 text 后 resourceId。
+        主界面 Tab 命中且当前页无底部导航（二级设置页）→ 跳过滚动直接返回 None，
+        由 click 的 _back_to_main_then_click 回退主界面（省无效滚动 ~20s/次）。
 
         简化说明：仅向下滚动 | 已知上限：元素在上方时找不到，不双向 | 升级路径：双向滚动查找（V4）
 
@@ -274,6 +292,8 @@ class UiExecutor:
         Returns:
             找到的元素（u2 selector），未找到返回 None
         """
+        if target in self.MAIN_TABS and not self._has_main_nav():
+            return None
         kwargs = self._resolve_selector(target)
         if not kwargs:
             return None
@@ -331,7 +351,7 @@ class UiExecutor:
     # === 任务 6.2-6.6：基础操作 ===
 
     def click(self, target: str, timeout: int = 10, scroll_search: bool = True) -> bool:
-        """点击元素（4 种定位 + 滚动查找）
+        """点击元素（4 种定位 + 滚动查找 + 泛化列表项）
 
         Args:
             target: 元素描述（resource-id=xxx / text=xxx / xpath=xxx / desc=xxx / 启发式）
@@ -340,7 +360,17 @@ class UiExecutor:
         Returns: True 点击成功
         """
         try:
+            # 泛化列表项（"点击一个订阅源/文章项/书架书籍项"）：真实名动态，点列表第一项
+            if self._is_generic_item(target):
+                if self.click_first_list_item(timeout=timeout):
+                    return True
+                logger.warning(f"click: 泛化列表项未找到可点项: {target}")
+                return False
             el = self._get_element(target, timeout=timeout, scroll_search=scroll_search)
+            if el is None and target.strip() in self.MAIN_TABS:
+                # 主界面 Tab 而当前页无 Tab（二级设置页）→ 自动 back 回主界面再点
+                if self._back_to_main_then_click(target, timeout):
+                    return True
             if el is None:
                 logger.warning(f"click: 元素未找到: {target}")
                 return False
@@ -350,6 +380,103 @@ class UiExecutor:
         except Exception as e:
             logger.warning(f"click 异常: {target}: {e}")
             return False
+
+    def _is_generic_item(self, target: str) -> bool:
+        """判断 target 是否为泛化列表项锚点（真实名为动态数据）"""
+        t = target.strip()
+        return any(t == p or p in t for p in self.GENERIC_ITEM_PATTERNS)
+
+    @staticmethod
+    def _parse_bounds(bounds_str: str):
+        """解析 u2 bounds 字符串 '[x1,y1][x2,y2]' → (x1,y1,x2,y2)"""
+        m = re.findall(r"\[(\d+),(\d+)\]", bounds_str)
+        if len(m) >= 2:
+            return int(m[0][0]), int(m[0][1]), int(m[1][0]), int(m[1][1])
+        return None
+
+    def click_first_list_item(self, timeout: int = 8) -> bool:
+        """点击当前页主列表的第一项（找面积最大列表容器内的首个可点项）
+
+        用于泛化锚点（"点击一个订阅源/文章项/书架书籍项"）：真实列表项名称为动态，
+        文本锚点必然失败。基于 XML 按布局定位：
+        1) 优先找面积最大的列表容器（RecyclerView/ListView，若有多个且页面含分类 chips
+           → 选面积最大的主列表，避免误点顶部分类标签行）
+        2) 无列表容器时回退整页候选（排除顶栏 y<10%h、右上角三点/搜索、底栏 y>86%h）
+        3) 取候选（容器内）y 最小者为列表第一项
+        """
+        if self._has_main_nav():
+            time.sleep(1.0)  # 等待列表内容渲染
+        try:
+            w, h = self.d.window_size()
+            xml = self.d.dump_hierarchy()
+        except Exception as e:
+            logger.warning(f"click_first_list_item dump 失败: {e}")
+            return False
+
+        # 1. 收集列表容器（面积过滤：至少 300x100）
+        containers = []
+        for m in re.finditer(
+                r'<node[^>]*class="([^"]*(?:RecyclerView|ListView)[^"]*)"[^>]*bounds="(\[[0-9,\[\]]+)"', xml):
+            b = self._parse_bounds(m.group(2))
+            if not b:
+                continue
+            x1, y1, x2, y2 = b
+            if (x2 - x1) * (y2 - y1) < 300 * 100:
+                continue
+            containers.append((x1, y1, x2, y2))
+        if containers:
+            # 主列表 = 面积最大
+            cx1, cy1, cx2, cy2 = max(containers, key=lambda c: (c[2] - c[0]) * (c[3] - c[1]))
+        else:
+            cx1, cy1, cx2, cy2 = 0, int(h * 0.10), w, int(h * 0.86)
+
+        # 2. 取主列表/整页内 y 最小可点项
+        cands = []
+        for m in re.finditer(r'<node[^>]*clickable="true"[^>]*bounds="(\[[0-9,\[\]]+)"', xml):
+            b = self._parse_bounds(m.group(1))
+            if not b:
+                continue
+            x1, y1, x2, y2 = b
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            if not (cx1 <= cx <= cx2 and cy1 <= cy <= cy2):
+                continue
+            # 排除底部导航区（防误触）
+            if cy > int(h * 0.86):
+                continue
+            # 排除过小节点（分割线/占位）
+            if y2 - y1 < 10 or x2 - x1 < 10:
+                continue
+            cands.append((y1, cx, cy))
+        if not cands:
+            logger.warning("click_first_list_item: 无可点击项")
+            return False
+        cands.sort()
+        _, cx, cy = cands[0]
+        logger.info(f"click_first_list_item: 点击主列表第一项 ({cx},{cy})")
+        self.d.click(cx, cy)
+        return True
+
+    def _back_to_main_then_click(self, target: str, timeout: int = 10) -> bool:
+        """从二级页连续 back 回主界面后点击目标 Tab（最多 3 次）
+
+        用例模式"主题设置→切书架/订阅"缺回主界面步骤；对 MAIN_TABS 白名单生效。
+        每次 back 后检查 Tab 是否出现（desc 优先），出现即点击。
+        """
+        for _ in range(3):
+            if self.d(description=target).exists(timeout=0.5) or self.d(text=target).exists(timeout=0.5):
+                break
+            self.d.press("back")
+            time.sleep(1.0)
+        if self.d(description=target).exists(timeout=timeout):
+            self.d(description=target).click()
+            logger.info(f"click: {target} (desc, 返回主界面后)")
+            return True
+        if self.d(text=target).exists(timeout=0.5):
+            self.d(text=target).click()
+            logger.info(f"click: {target} (text, 返回主界面后)")
+            return True
+        logger.warning(f"click: 返回主界面后仍未找到 Tab: {target}")
+        return False
 
     def input_text(self, target: str, value: str, timeout: int = 10) -> bool:
         """输入文本（先 click 聚焦再 set_text）"""

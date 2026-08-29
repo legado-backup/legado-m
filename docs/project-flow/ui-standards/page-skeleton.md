@@ -85,3 +85,10 @@ AppManagementScaffold(
 | 全屏管理页（顶栏+列表+批量栏） | `AppManagementScaffold` + `AppManagementLazyColumn/ListRow/Card` |
 | 配置/设置类页面（分区卡片） | `ComposeSettingFragment` + `SettingSpecScreen`（见 dialog-shell.md § 二）+ `AppSettingSectionTitle` |
 | 弹层/对话框 | `ComposeDialogFragment` 子类 + `AppDialogFrame`（见 dialog-shell.md） |
+
+## 五、根背景规则（2026-08-27 硬约束）
+
+- **页面根容器背景**：`rememberAppSettingPalette().settings.page`（Compose）/ `ThemeStore.backgroundColor()`（View）；**禁止** `MaterialTheme.colorScheme.surface / background` 做页面根背景（M3 派生色，H9/H11 实测偏色）。**实施状态（2026-08-27 实况核查）**：PreciseManage 根背景已归 page ✅；AutoTask/TxtTocRule/AllBookmark/Highlight/DictRule/RecycleBin 6 页列表项卡片已有 5/6 归 `palette.settings.row`（**仅剩 TxtTocRuleScreen**，实施状态以 issue-list/tasks.md 为准）。
+- **卡片 / 行底色**：`UiCorner.surfaceColor(themeUiPalette.cardColor)`（settings）或 `palette.settings.row`（management）；**禁止** SettingsCard/ListCard M3 默认 surface（H9/H10）。
+- **顶栏容器色**：`Color(context.primaryColor)`（GlassTopAppBar 默认）；管理页随 `immersiveManageBar` 切 backgroundColor/primaryColor。
+- **检查点**：新建 Compose 页面 Grep `colorScheme.surface` 自检；页面根容器与同屏同类页背景一致。

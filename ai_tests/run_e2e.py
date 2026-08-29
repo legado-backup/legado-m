@@ -20,6 +20,7 @@ import argparse
 import logging
 import re
 import sys
+import time  # noqa: F401（用例前置重置 sleep）
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -342,7 +343,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     print("[5] 解析用例...")
     parser = CaseParser()
     cases = parser.parse_directory(str(DOCS_TESTS_DIR))
-    cases += parser.parse_directory(str(AI_TESTS_CASES_DIR))
+    # 修复：遍历 ai_tests/cases/{module}/*.md（原 parse_directory 只扫顶层 *.md，漏掉全部模块子目录，含 F-UI-THEME 与既有 F-P0-*）
+    if AI_TESTS_CASES_DIR.exists():
+        for _case_dir in sorted(AI_TESTS_CASES_DIR.iterdir()):
+            if _case_dir.is_dir() and not _case_dir.name.startswith("__"):
+                cases += parser.parse_directory(str(_case_dir))
     print(f"    解析到 {len(cases)} 个用例")
 
     # 路径式步骤拆分（编排层预处理，非固化层 M3/M4）
@@ -435,6 +440,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             # 截图/XML 保存到子目录，与 evidence_collector.collect_screenshot/collect_ui_xml 期望路径一致
             screenshot_dir = tc_dir / "screenshot"
             xml_dir = tc_dir / "xml"
+            # 每用例前置：冷启动回主界面（隔离用例间状态；页面无关用例依赖主 Tab 导航）
+            try:
+                memu.adb("shell", "am", "force-stop", PACKAGE, timeout=20)
+                time.sleep(1)
+                memu.adb("shell", "am", "start", "-n",
+                         f"{PACKAGE}/io.legado.app.ui.main.MainActivity", timeout=20)
+                # 等待主界面 Tab 就绪（App 冷启动可能 5-10s）
+                for _ in range(20):
+                    try:
+                        if device(description="我的").exists(timeout=1.0):
+                            break
+                    except Exception:  # noqa: BLE001
+                        pass
+                    time.sleep(1)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"用例前置重置失败，继续执行: {e}")
             _execute_steps_with_skip(ui, tc.steps, screenshot_dir, xml_dir)
 
             # 8 类证据收集

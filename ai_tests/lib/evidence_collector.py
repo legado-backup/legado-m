@@ -145,6 +145,16 @@ class EvidenceCollector:
         "UiAutomationService",  # already registered
     )
 
+    # 系统级/模拟器固有噪声异常（非 App 异常，忽略以免误报 warning）
+    # - InputMethodManagerService RemoteException：输入法服务通知，模拟器常见无害
+    # - KernelUidCpuTimeReader /proc/uid_cputime FileNotFound：模拟器内核未实现该节点
+    NOISE_MARKERS = (
+        "InputMethodManagerService",
+        "KernelUidCpuTimeReader",
+        "/proc/uid_cputime",
+        "system_server",
+    )
+
     def extract_anomalies(self, log_text: str) -> List[Dict[str, str]]:
         """从 logcat 文本提取异常模式（FATAL/ANR/CRASH/OOM/ClassNotFound/Other）
 
@@ -170,6 +180,9 @@ class EvidenceCollector:
                 if matched_type:
                     break
             if matched_type:
+                # 系统级/模拟器固有噪声异常（InputMethod 服务/内核节点缺失等）→ 忽略
+                if any(m in line for m in self.NOISE_MARKERS):
+                    continue
                 # 检查后续 15 行窗口是否属于 uiautomator2 框架崩溃
                 # logcat 每行都带时间戳前缀，无法用时间戳判断块边界，改用滑动窗口
                 window = "\n".join(lines[i:min(i + 15, len(lines))])

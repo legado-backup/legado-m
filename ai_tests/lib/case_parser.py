@@ -232,6 +232,9 @@ class CaseParser:
         m = re.match(r'^([FPA]-P[01]-\d+)', fname)
         if m:
             current_module = m.group(1)
+        elif path.parent.name and path.parent.name.lower() != "cases":
+            # 兜底：文件名无模块前缀时用所在目录名（F-UI-THEME/case.md → F-UI-THEME）
+            current_module = path.parent.name
 
         for line_no, line in enumerate(text.splitlines(), 1):
             line_rstrip = line.rstrip()

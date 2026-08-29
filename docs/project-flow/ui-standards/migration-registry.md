@@ -69,8 +69,93 @@
 - **依赖衔接**：8.5 全局搜索入口依赖 7.11v 订阅顶栏对齐；8.6 分组入口依赖 7.11a-p 管理页 + 7.11v；8.1/8.4 特色弹框外观统一归 E4。
 - **门禁**：A/B/D/E 每项补完 = 编译 + 运行可达性；C 类不单独设编译门禁。
 
-## 四、填写说明（维护者）
+## 四、ui-theme-gap-audit 审计产出登记（2026-08-26）
+
+> 来源：`docs/specs/ui-theme-gap-audit/`（问题清单 v0 → v2）。本任务为「主题管理缺口」专项审计 + 修复，与 §7.11 迁移表互补：§7.11 管 Archive 对齐迁移，本表管主题联动/风格统一缺口。
+
+| 编号 | 问题 | 处置 | 落点 |
+|------|------|------|------|
+| G1 | 字号硬编码 678 处未随字号缩放 | typography token 化（保留 3 处刻意豁免：8sp 迷你角标×2/49sp 品牌标题×1） | `ui/theme/LegadoTheme.kt`（labelXSmall..titleLargeX 扩展 token） |
+| G2 | 圆角 token 未覆盖 | AppShapes 增补 Circle/Capsule/CornerZero，倍率动态缩放全局收口 | `ui/widget/components/AppShapes.kt` |
+| G3 | 视频 UI 硬编码色 | 并 video-player-theme-unify（控制条/进度条/弹框接入 ThemeStore+UiCorner；深色悬浮层白字=AD-01 例外保留） | `help/gsyVideo/VideoPlayer.kt` 等 |
+| G4 | 调试工具 7 页主题联动盲区 | 抽 DebugBaseActivity 公共基类（ThemeSync RECREATE 订阅 + Compose 系统栏），7 页全继承 | `ui/debug/DebugBaseActivity.kt`（新增） |
+| G5 | View 型弹窗未包 LegadoTheme | ComposeView 型 5 个（SpeakerGroupManage/SpeakEngine/BgTextConfig/PageKey/HttpTtsEdit）包 LegadoTheme；纯 View 型 5 个=合理存量 | `ui/book/read/config/*Dialog.kt` |
+| G6 | BaseDialogFragment 残留 ~20 个 | ⚠️ **判定撤销（2026-08-27）**：实测 36 子类(+pref2) 仅 `setBackgroundColor(ThemeStore)` 联动背景、控件硬编码，**不再视为合理存量**；全部入 ui-style-unify-deep-fix D1 迁移队列（P0 高可见优先，特殊复用型登记过渡期保留但入队） | `base/BaseDialogFragment.kt`（待迁移） |
+| G7 | PopupMenu 双风格 | 9 处迁移 ModernActionPopup；SelectActionBar 改走 showSelMenu | `ui/widget/ModernActionPopup.kt` / `SelectActionBar.kt` |
+| G8 | 书源编辑/调试头旧 TitleBar | 两页均 MainTopBarView(Mode.SUB) + ModernActionPopup.showFromMenu | `ui/book/source/edit/BookSourceEditActivity.kt` / `debug/BookSourceDebugActivity.kt` |
+| G9 | Kotlin 硬编码色 | 残余 27 处核验=全豁免类（语义 Danger/封面打底/高亮/ThemeSpec 定义源/阅读配置色） | 登记仅观察 |
+| G10 | XML 布局硬编码色 | 残余核验=全豁免类（scrim 遮罩/媒体画布/视频控制层/小组件固定色） | 登记仅观察 |
+| G11 | 图标品牌色/几何色 | 矢量固有属性 + TintHelper 例外 | 登记仅观察 |
+
+> 复测证据：R2 全量 report_20260826_204811（52 条 fail=0/warning=0/VL 无新候选）、logcat 针对性计数=0；R3 修复面专项 TC-071/041/081 步骤全过。
+
+## 五、填写说明（维护者）
 
 - 「现状」列：勾选 `[x]` 表示已完成/已覆盖决策；`[ ]` 待做。以 authority tasks.md 勾选为准。
 - 「所属组件」列：最终 Compose/组件化落点（`ui/widget/compose/` 或 `ui/widget/components/`）。
 - 每完成一项，同步更新本表 + tasks.md 勾选 + 实施回执。
+
+## 六、ui-style-unify-deep-fix 组件体系统一登记（2026-08-27）
+
+> 来源：`docs/specs/ui-style-unify-deep-fix/`（issue-list H1-H14 / D1-D4 / S1-S6 + tasks.md + design AD-07/08）。本批次管「组件单一来源治理」，与 §7.11（Archive 对齐）、ui-theme-gap-audit（G 系列微观 token）互补——本批管宏观组件/取色来源统一。**迁移状态权威源 = issue-list/tasks.md，本表为登记镜像。**
+
+| 编号 | 问题 | 处置 | 状态 |
+|------|------|------|------|
+| H6 | ConfigActivity 头部黑色 + 系统菜单（用户实锤） | ConfigTopBar 增背景 + MenuProvider → AppDropdownMenu（渲染层对齐基线）；**补记（topbar-icon-semantics-fix 2026-08-28）：本项改造曾静默收拢原 always 一级图标（备份页问号等），已由 MenuAction.alwaysShow 分级渲染修复** | [x] ✅ 已完成（2026-08-27） |
+| H7 | 系统菜单可见点 + 管理页残存 | 漫画登记豁免（沉浸红线）+ 发现经典「分组」→ ModernActionPopup（main_explore 移除 `<menu/>`）+ 死 menu XML 38 个删除 | [x] ✅ 已完成（2026-08-27，H17 补清 2026-08-28） |
+| H8 | AppDropdownMenu M3 体系（38 文件，实测 44）与 ModernActionPopup 不符（用户实锤） | 渲染层对齐基线（调用点零改动）；死代码已删；剩余头部接入 TopBarConfig 评估完成（替换净化=AppManagementTopBar 已接 / 字典=GlassTopAppBar 已接，无需再动） | [x] ✅ 全链收口（2026-08-28） |
+| H9 | 精准管理页背景 M3 surface + SettingsCard/ClickRow M3 派生色（用户实锤） | 根背景 → palette.page；组件取色归位直色（5 文件 13 处） | [x] ✅ 已完成（2026-08-27） |
+| H10 | 列表项 M3 派生色（Dict/Highlight/Download + ListCard） | → palette.settings.row / 调色板入参 | [x] ✅ 已完成（2026-08-27） |
+| H11 | 6 页**列表项卡片** M3 surface（AutoTask/TxtTocRule/AllBookmark/Highlight/DictRule/RecycleBin） | → `palette.settings.row`（与 H10 同源；根背景 M3 surface 仅 PreciseManage 1 页归 page）；TxtTocRuleScreen 底部操作栏 L268 palette.row 已归位（源码亲核 2026-08-28） | [x] ✅ **6/6 完成（2026-08-28 收口）** |
+| H12 | Debug 8 页 M3 TopAppBar secondary 色 | 7 页中 6 页早已 GlassTopAppBar，补 PingTestScreen 归位；MyFeatureBooks 并入 H3 | [x] ✅ 已完成（2026-08-27） |
+| H13 | GlassTopAppBar 不消费 TopBarConfig | **已实施（2026-08-27 用户裁决后）：接入 TopBarConfig**，STYLE_REGULAR 消费壁纸/圆角/背景色 | [x] ✅ 已完成 |
+| H14 | 角色系列 4 页底色硬编码（page 黑白 + card/cardAlt/stroke 十六进制） | → palette 直读（page→palette.page、card→UiCorner.surfaceColor(themeUiPalette.cardColor)、stroke→palette.divider） | [x] ✅ 已完成（2026-08-27） |
+| H15 | 自绘头部未接入 TopBarConfig 族（AppManagementTopBar + 5 同类，11 页） | AppManagementTopBar 接入 TopBarConfig + AiProvider/AiImageProvider/双容器/人物志 5 处换 GlassTopAppBar；Toc/AiChat 豁免 KDoc | [x] ✅ 已完成（2026-08-28，tasks 2.2.0i） |
+| H16 | AppDropdownMenu vs ModernActionPopup 实现差异 6 项（47 文件感知主因） | 6 项对齐（字体/0dp 海拔/条件描边/LegadoMiuixChoiceRow/42dp 行高/124-244dp 宽度），调用点签名零改动 | [x] ✅ 已完成（2026-08-28，tasks 2.2.0j） |
+| H17 | 菜单漏网 4+1 处 + 死代码清理 | CurlTest→AppDropdownMenu/ReplaceRule inflate 删除/Explore 经典 ModernActionPopup/LibraryContainer menu.add 清理/ReadRecordFragment 死链删除+死 menu XML 38 个删除 | [x] ✅ 已完成（2026-08-28，tasks 2.2.0k） |
+| D1 | BaseDialogFragment 36(+pref2) 旧弹框（撤销 G6） | **全量收口（2026-08-28）**：35 个迁移 ComposeDialogFragment（含 P0 换源/SourceLogin/ReadAloudConfig 等 8 超大弹框）+ 复杂型登记保留；`ui/` 下 BaseDialogFragment 子类 grep=0 | [x] ✅ 已完成（tasks 2.3.1/2.3.4） |
+| D2 | alert{} DSL 71 文件 162 处（复核 import=76 文件） | **累计转换约 90 处**（确认/单选/多选/TextInput/selector 全收敛）+ 剩余 25 文件 import 为 customView 复杂型登记保留（实测 2026-08-28 import=25 文件） | [x] ✅ 可转型全收口（tasks 2.3.2） |
+| D3 | M3 @Composable 5 组件 + Import 系 7 | Import 3 对话框 alertCustomGroup → showComposeTextFormDialogWithChecks；M3 组件经 H8/H16 渲染层对齐 | [x] ✅ 已完成（2026-08-27，tasks 2.3.3） |
+| D4 | 散点弹框 13 | 纯展示型补主题取色；WebView/BottomSheet 承载类实况已随主题；复杂定制表单登记保留 | [x] ✅ 已完成（2026-08-27，tasks 2.3.5） |
+| S1-S6 | 订阅页经典/新版切换 6 遗留 | 状态机修复（guard/重置/事件/ViewModel 隔离）——**已完成（2026-08-27，tasks 2.1.1-2.1.5 全勾，编译门禁通过）** | [x] ✅ 已完成 |
+
+> 组件层根因复盘（防回潮依据）：①同类页面不同组件（顶栏 8 形态/菜单 4 体系/弹框 5 家族/卡片列表 3 套）②M3 派生色 vs 直色双取色来源（C5 判据漏洞）③逐项豁免无登记（G6 教训）。四阶段路线图（AD-08）：取色源统一 → 根背景+顶栏收敛 → 弹框分批迁移 → 机制防回潮（本 ui-standards 目录 + 代码门禁即 Phase4 常驻部分）。
+
+## 六.1 顶栏图标语义处置登记（topbar-icon-semantics-fix，2026-08-28）
+
+> 起源：H6 改造链路（菜单下沉范式 → 搬壳不搬语义 → 数据+渲染双向降维）静默收拢原版 `showAsAction="always"` 一级图标，全量普查实锤 18 页/25 项回归。修复与裁决权威源 = `docs/specs/topbar-icon-semantics-fix/showasaction-audit.md`（本节为登记镜像）。
+>
+> **维护者必读**：今后任何 TopBar 迁移/重构登记，必须在登记行附「原 showAsAction 处置」说明（取值：一级恢复 / 下拉收拢 / 有意进化，需注理由）——防静默降级重犯。新增一级图标按 how-to.md §2.2.1 分级标准接入取色权威源。
+
+| 类别 | 页面/范围 | 原 showAsAction 处置 | 状态 |
+|------|----------|---------------------|------|
+| ConfigTopBar 系 | 备份恢复页 Help / 主题设置页 DarkMode | always → `MenuAction.alwaysShow=true` 一级恢复 | [x] ✅ 已完成（2026-08-28） |
+| GlassTopAppBar 系 | 订阅源编辑(代码/保存/调试) / 替换编辑(代码/保存) / txt_toc 新增 / dict 新增 / WebDav 刷新 / 本地导入选目录 / 收藏夹分组 | always → actions 槽分级直出一级 IconButton | [x] ✅ 已完成（2026-08-28） |
+| MainTopBarView 系 | 我的 tab 帮助 / 订阅 tab 历史+分组+设置 | always → `addActionButton` 一级恢复（moreButton 无剩余项隐藏） | [x] ✅ 已完成（2026-08-28） |
+| View TitleBar 系 | 书源编辑(代码/保存/调试) | always → `addActionButtons` 一级恢复 + 弹出菜单重复项隐藏 | [x] ✅ 已完成（2026-08-28） |
+| 豁免（已达标） | 缓存页分组（实为一级图标+子菜单） | always 语义等价保留 | [x] ✅ 核验豁免 |
+| 有意进化（维持） | 书信息页 ifRoom×6 / 视频浮窗（动态）/ 发现 tab modern 分组 / 换源筛选（页内搜索条）/ 排序平铺项收敛下拉 | ifRoom/动态无 Compose 直接映射，进化形态功能可达，登记不回退 | [x] ✅ 裁决登记 |
+
+## 六.2 主 Tab 搜索入口形态与搜索框取色登记（topbar-search-entry-align，2026-08-28）
+
+> 权威源 = `docs/specs/topbar-search-entry-align/`（spec/design/tasks）；规范落点 = `project-rules/frontend-ui-standards.md` §1.4（取色修订）+ §3.1（入口形态新条款）+ `architecture.md` 顶栏族。
+
+| 部件 | 文件 | 变更 | 状态 |
+|------|------|------|------|
+| A 发现页 | `ExploreFragment.kt` | `setSearchEntryVisible(false)` + `updateDiscoverSearchButtonState` regular 按钮可见 + 删胶囊点击绑定（titleSelect 源选择入口回归） | [x] ✅ |
+| B 订阅页（用户裁决纯按钮） | `RssFragment.kt` | 删 `selectSource` 的 `setSearchEntryVisible(hasSearch)` 覆盖调用 + `searchButton.isVisible = hasSearch`（regular 可见）+ 清胶囊 isEnabled/alpha 残留 | [x] ✅ |
+| C Compose 取色 v3 | `SettingsSearchBar.kt` | 背景消费 `ThemeUiPalette.searchFieldBackgroundColor`（key→background_menu 兜底）+ alpha 0.18/0.42 + 1dp 描边；**清除 surfaceVariant**（修正 M3 派生色违规）；14 调用点自动联动 | [x] ✅ |
+| D 规范 | `frontend-ui-standards.md`/`architecture.md`/本表 | §1.4 取色矛盾条款修订（B9）+ §3.1 入口形态新条款 + 顶栏族形态约束 + 本登记 | [x] ✅ |
+
+> 验证范围（用户裁决 2026-08-28）：仅编译通过（compileAppDebugKotlin），不打包不真机；真机验证归后续会话按 tasks.md §6 执行。
+
+## 六.3 书架取色归位与遮罩豁免登记（config-needs-restart-fix，2026-08-29）
+
+> 权威源 = `docs/specs/config-needs-restart-fix/`；规范落点 = `how-to.md` 严禁清单 13/14 条（配置快照禁令 + collector 泄漏禁令）。
+
+| 项 | 文件 | 处置 | 状态 |
+|----|------|------|------|
+| M3 派生色归位 | `BookshelfScreen.kt` | surfaceContainerHigh→UiCorner.surfaceColor(cardColor)；outline/onSurfaceVariant→palette.secondaryText；primary→palette.accent；surfaceVariant track→cardColor；RoundedCard→palette.settings.row（基线 B） | [x] ✅ |
+| **遮罩白字豁免（登记）** | `BookshelfScreen.kt` 书名遮罩（showBookname==2）+ ShelfStatusBadge 角标白字 | 对齐 archive 纯白字叠印/白字角标，属 color.md「中性灰浮层/遮罩」语义豁免（Color.White 仅用于深底遮罩/角标上前景，非页面级取色） | [x] ✅ 已登记 |
+| 范围外遗留（登记不处置） | `BookshelfItems.kt` GeneratedCover（MaterialTheme.primary/onPrimary） | 非本次改动文件，后续同型归位批次处理 | [ ] 登记 |
+| 真机 L2 场景 A-F | 订阅 modern→classic 顶栏 / 书架配置即时生效 / K7 迁移 | 用户裁决延后，归 R2 复测 | [ ] 待测 |

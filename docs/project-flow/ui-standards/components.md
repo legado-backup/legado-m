@@ -79,3 +79,27 @@
 
 - **`components/`**：抽象度高的**受控**可复用组件，强调「复用 + 接线」，面向通用场景（设置行、空态、骨架、菜单、对话框等）。
 - **`compose/`**：含**运行期骨架**（管理壳、设置壳）与**对话框族**（ComposeDialogFragment 及其子类），与主题/调色板桥接更紧密，部分为 Archive 对齐迁移（E4）的具体落点。
+
+## 四、状态标注（2026-08-27 ui-style-unify-deep-fix 深度审计）
+
+> 依据：`docs/specs/ui-style-unify-deep-fix/issue-list.md`（H1-H14/D1-D4）+ `docs/temp-analysis/ui-page-matrix.md`（125 页矩阵）。状态：🟢基线（用）｜🟡待对齐（改）｜🔴弃用/死代码（删）｜🟠待迁移（旧存量）。
+
+| 组件 | 文件 | 状态 | 处置 |
+|------|------|------|------|
+| `MainTopBarView` | `ui/widget/MainTopBarView.kt` | 🟢 **View 顶栏基线**（消费 TopBarConfig） | 保留 |
+| `GlassTopAppBar` | `ui/widget/components/GlassTopAppBar.kt` | 🟢 **Compose 顶栏基线** | 保留；**H13 已完成（2026-08-27）接入 TopBarConfig**（STYLE_REGULAR 消费壁纸/圆角/背景色） |
+| `AppManagementScaffold/AppManagementTopBar` | `ui/widget/compose/AppManagementScaffold.kt` | 🟢 **管理页顶栏基线** | 保留 |
+| `ConfigTopBar` | `ui/config/ConfigActivity.kt` | 🟢 **已纳管（H6 完成 2026-08-27）** | ConfigTopBar 已带背景（TopBarConfig/壁纸/透明度），菜单已改 AppDropdownMenu |
+| `TitleBar` | `ui/widget/TitleBar.kt` | 🟠 残留 ~20 | H4 迁移双基线 |
+| `AppDropdownMenu`（M3 DropdownMenu） | `ui/widget/components/AppDropdownMenu.kt` | 🟢 **渲染层已对齐基线（H8 完成 2026-08-27，实测使用 44 文件）** | 条目 → 自绘 Surface+点击行（调用点零改动） |
+| `ModernActionPopup` | `ui/widget/ModernActionPopup.kt`（View 版） | 🟢 **菜单视觉基线** | 保留 |
+| `ModernActionPopup` | `ui/widget/components/ModernActionPopup.kt`（Compose 版） | 🟢 **已删除（2026-08-27 Phase 1）** | 0 调用死代码，消除同名双实现 |
+| `ComposeDialogFragment` + `AppDialogFrame`/`AppDialogStyle` + `AppComposeDialogs`（9 工厂） | `ui/widget/compose/*` + `AppComposeDialogs.kt` | 🟢 **弹框基线** | 保留；AppDialogFrame 补面板背景图支持（D3 配套） |
+| `AppConfirmDialog/AppEditDialog/AppTextDialog/SingleChoiceDialog/ConfirmDialog` | `ui/widget/components/*.kt` | 🟡 **M3 @Composable** | D3：对齐 AppDialogStyle（补面板背景/圆角/透明度） |
+| `SettingsCard/SettingsClickRow/SettingsToggleRow` | `ui/widget/components/*.kt` | 🟢 **已归位直色（H9 完成 2026-08-27）** | containerColor → Color(palette.row)、文字 → primaryText/secondaryText、标题 → accent |
+| `ListCard` | `ui/widget/components/ListCard.kt` | 🟢 **已归位（H10 完成 2026-08-27）** | containerColor 默认 → palette.row 直色 |
+| `AppModalBottomSheet/AppMenuSheet` | `ui/widget/components/*.kt` | 🟢 底部弹层基线 | 保留 |
+| `ui/widget/dialog/*`（TextDialog 等 ComposeDialogFragment 子类） | `ui/widget/dialog/*.kt` | 🟢 基线子类 | 保留 |
+| `base/BaseDialogFragment` 36 子类 + pref 2 | `base/BaseDialogFragment.kt` | 🟠 **待迁移** | D1：全部入 ComposeDialogFragment 迁移队列（撤销 G6 存量判定） |
+| `lib/dialogs/AndroidDialogs.kt`（alert{} DSL） | `lib/dialogs/*.kt` | 🟠 71 文件 162 处（主代理复核 `import lib.dialogs.alert` = 76 文件，实施前 grep 复核） | D2：收敛 ComposeConfirmDialog 族 |
+| 散点（raw Dialog/BottomSheet/ComponentDialog/AlertDialog+ViewBinding） | 13 文件 | 🟠 待处置 | D4：迁移或登记 |

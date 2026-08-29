@@ -70,6 +70,32 @@
   - `applyUiSubtleButtonStyle`：14sp + minHeight 40dp。
   - `applyUiInputStyle(minLines)`：15sp，minLines=1 → minHeight 44dp、maxLines 2；minLines>1 → minHeight 92dp、maxLines 8；内边距 (12, 8/10)。
 
+### 顶栏标题排版基线（2026-08-28 全顶栏普查沉淀，AD-19 既有基线）
+
+**全 App 顶栏标题统一 `LegadoTypography.titleLarge` = 20sp / Medium(500)**。禁止在顶栏组件内覆写 fontSize/fontWeight。豁免：阅读器/视频播放器顶栏（T7）、欢迎页 49sp 品牌大字、弹框/卡片标题。
+
+普查终版（书架 24sp / ConfigTopBar SemiBold / AppManagementScaffold 19sp+SemiBold 三处漂移已由 spec `bookshelf-refresh-and-title-font` 修复归位）：
+
+| 顶栏组件 | 覆盖页面 | 标题来源 |
+|---------|---------|---------|
+| `MainTopBarView` | 主 Tab（书架/订阅/我的/阅读记录/发现） | View 端 20sp 硬编码（勿再分 Mode 特判） |
+| `GlassTopAppBar` | 一般 Compose 子页 | `MaterialTheme.typography.titleLarge` |
+| `ConfigTopBar`（ConfigActivity） | 全部设置子页 | `MaterialTheme.typography.titleLarge` |
+| `AppManagementScaffold` | 书源/订阅源/替换规则/订阅规则/书架分组 5 管理页 | `MaterialTheme.typography.titleLarge` |
+| `TitleBar`（View 子页） | 传统子页 | MaterialToolbar 默认 ToolbarTitle 20sp，勿覆写 textAppearance |
+
+### 顶栏右侧图标按钮基线（2026-08-28 普查沉淀，用户裁决"统一 20dp"）
+
+**图标绘制尺寸统一 20dp 档**；IconButton 容器随顶栏行高弹性（热区不受图标缩小影响）。豁免：主 Tab `MainTopBarView` 图标按钮（`dimen/bookshelf_action_button_size` = 34dp 容器 + 8dp padding ≈ 18dp 图标，Archive 对齐既定值）。
+
+| 顶栏组件 | 按钮容器 | 图标绘制 |
+|---------|---------|---------|
+| `GlassTopAppBar` / `ConfigTopBar` | M3 IconButton 48dp | **`Modifier.size(20.dp)`**（新基准，禁省略回落 M3 默认 24dp） |
+| `AppManagementIconAction` | 36dp | 20dp |
+| `MainTopBarView.actionButton` | 34dp（豁免） | ~18dp（豁免） |
+
+**已知差异（登记专项）**：图标"粗细"= 资产描边差异（自绘 ic_*.xml 描边宽度各异 vs M3 Icons 标准描边），统一需全量梳理图标资产，属独立专项（见 issue-list），新增自绘图标时描边宽度对齐 M3 视觉重量。
+
 ## 四、对话框宽度档位（补充）
 
 `AppDialogSize`（AppUiTokens.kt）：`Confirm`(0.92/620dp)、`Form`(0.94/660dp)、`Management`(0.96/700dp)、`Wide`(0.98/760dp)，内容类型决定宽度档位，手机宽度比例 + 平板上限（详见 dialog-shell.md）。
