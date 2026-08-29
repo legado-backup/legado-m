@@ -102,9 +102,56 @@ def crash_report(ctrl: MemuController) -> dict:
     return result
 
 
+def taint_discovery_cache(ctrl: MemuController, pkg: str) -> int:
+    """注入脏缓存模拟旧混淆版写入（顶层字段名混淆化+books 指向非法结构），验证加固后自愈不崩"""
+    import json
+    import sqlite3
+    db_remote = f"/data/data/{pkg}/databases/legado.db"
+    db_local = Path(__file__).parent.parent / "reports" / "verify_no_crash_cache.db"
+    db_local.parent.mkdir(parents=True, exist_ok=True)
+    for suffix in ("", "-wal", "-shm"):
+        f = Path(str(db_local) + suffix)
+        if f.exists():
+            f.unlink()
+    sh(ctrl, "pull", db_remote, str(db_local), timeout=60)
+    if not db_local.exists():
+        print("  [taint] DB pull 失败，跳过注入")
+        return 0
+    con = sqlite3.connect(str(db_local))
+    n = 0
+    try:
+        rows = con.execute(
+            "select key, value from caches where key like 'discovery_modern_result_%'"
+        ).fetchall()
+        if not rows:
+            print("  [taint] 未发现发现页缓存行（App 未写入），跳过注入")
+            return 0
+        for key, value in rows:
+            try:
+                data = json.loads(value)
+            except Exception:
+                data = {}
+            # 模拟旧混淆版脏数据：顶层字段名替换为单字母别名；books 注入非法元素结构
+            tainted = {"a": data.get("sourceUrl", ""), "b": data.get("tagUrl", ""),
+                       "books": [{"evil": 1}, {"evil": 2}], "e": 2, "f": True, "g": 0}
+            con.execute("update cache set value=? where key=?", (json.dumps(tainted), key))
+            n += 1
+        con.commit()
+        print(f"  [taint] 已注入脏缓存 {n} 行")
+    finally:
+        con.close()
+    sh(ctrl, "shell", "am", "force-stop", pkg)
+    time.sleep(1)
+    sh(ctrl, "push", str(db_local), db_remote, timeout=60)
+    for suffix in ("-wal", "-shm"):
+        sh(ctrl, "shell", "rm", "-f", db_remote + suffix)
+    return n
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--type", choices=["debug", "release"], default=BUILD_TYPE)
+    parser.add_argument("--taint", action="store_true", help="注入脏缓存复现旧数据场景")
     args = parser.parse_args()
 
     pkg = f"io.legado.miss.app.{args.type}"
@@ -132,12 +179,24 @@ def main() -> int:
     time.sleep(2)
     ok2 = launch_and_open_discovery(ctrl, pkg, MAIN_ACTIVITY, 2)
 
+    ok3 = True
+    if args.taint:
+        print("== 3b. 脏缓存注入（模拟旧混淆版数据）+ 三轮读取验证自愈")
+        n = taint_discovery_cache(ctrl, pkg)
+        if n > 0:
+            sh(ctrl, "logcat", "-c")
+            ok3 = launch_and_open_discovery(ctrl, pkg, MAIN_ACTIVITY, 3)
+            counts_extra = crash_report(ctrl)
+            for name, c in counts_extra.items():
+                print(f"   taint-{name}: {c}")
+            ok3 = ok3 and all(c == 0 for c in counts_extra.values())
+
     print("== 4. logcat 崩溃模式分析（3 轮全量窗口）")
     counts = crash_report(ctrl)
     for name, c in counts.items():
         print(f"   {name}: {c}")
 
-    nav_ok = ok1 and ok2
+    nav_ok = ok1 and ok2 and ok3
     crash_ok = all(c == 0 for c in counts.values())
     verdict = "PASS" if (nav_ok and crash_ok) else "FAIL"
     print(f"== 判定: {verdict} (导航={nav_ok}, 崩溃模式全零={crash_ok})")
