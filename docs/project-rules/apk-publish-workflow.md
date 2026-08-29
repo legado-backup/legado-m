@@ -166,7 +166,8 @@ gh release delete-asset <tag> <asset_name> -R syq17496152/legado --yes
 
 1. **构建三包**：`gradlew assembleDebug` + `gradlew assembleRelease` + `gradlew assembleCoexist`
 2. **更新日志**：编译前更新 `app/src/main/assets/updateLog.md`
-3. **libcronet.so 动态下载验证（强制）**：每包构建后必须验证 APK 不含 libcronet.so（动态下载模式），含 so 则禁止发布
+3. **libcronet.so 内置校验（强制，cronet-bundled 架构）**：每包构建后必须验证 APK **含** libcronet.so（cronet-bundled 单体 AAR 内置模式：API+实现+so 随 AAR 打包，安装时系统按 ABI 自动提取，CronetLoader 已退化为无操作存根）。若 APK 不含 so 说明依赖被错误排除，禁止发布
+   > 历史变更：Cronet 150 时代为"动态下载模式"（APK 必须不含 so），升级 cronet-bundled 500.0.1 后架构翻转，详见 `CronetLoader.kt` 头注释
    ```powershell
    # 验证脚本（每个 APK 都需验证）
    Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -174,10 +175,10 @@ gh release delete-asset <tag> <asset_name> -R syq17496152/legado --yes
    Copy-Item "<APK路径>" $tmpZip -Force
    $zip = [System.IO.Compression.ZipFile]::OpenRead($tmpZip)
    $so = $zip.Entries | Where-Object { $_.FullName -like "lib/arm64-v8a/libcronet*" }
-   if ($so) { Write-Host "[FAIL] libcronet.so found in APK!"; exit 1 } else { Write-Host "[OK] No libcronet.so (dynamic download mode)" }
+   if (-not $so) { Write-Host "[FAIL] libcronet.so missing in APK!"; exit 1 } else { Write-Host "[OK] libcronet.so bundled (cronet-bundled mode)" }
    $zip.Dispose(); Remove-Item $tmpZip -Force
    ```
-   > 🔴 **强制要求**：三包（test/release/coexist）都必须不含 libcronet.so（动态下载模式），so 在运行时从远程下载到应用私有目录。详见 [package-naming.md "libcronet.so 动态下载规范"](./package-naming.md)
+   > 🔴 **强制要求**：三包（test/release/coexist）都必须含 libcronet.so（cronet-bundled 内置模式）。详见 `gradle/libs.versions.toml` cronetBundled 注释
 4. **dry-run 预览**：`python scripts/publish_release.py --dry-run`
 5. **实际发布**：
    - GitHub：`python scripts/publish_release.py --platform github`
