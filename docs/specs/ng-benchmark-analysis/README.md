@@ -1,6 +1,6 @@
 # ng-benchmark-analysis — 阅读NG（legado_NG）深度对标调研
 
-> 状态：🔄 设计中（调研报告已生成，待用户审查）
+> 状态：✅ 设计完成（2026-08-30 检查点 1 经五轮审查验收通过；用户裁决**P0 安全加固先行**，各分期实施按 migration-designs 另立实施 spec 推进）
 > 生成日期：2026-08-30
 
 ## 功能概述
@@ -30,17 +30,19 @@
 | [evidence-pack.md](./evidence-pack.md) | 8 轮子代理分析统一事实源（网络/规则引擎/数据层/UI/AI/听书/视觉/工程安全，全带文件:行证据） |
 | [tasks.md](./tasks.md) | 调研与设计任务清单 + AOAdapt 日志 |
 
-### 实施级迁移设计（migration-designs/，设计前置，未审查不实施）
+### 实施级迁移设计（migration-designs/，函数/代码级深化版，未审查不实施）
 
-| 分期 | 文档 | 覆盖 |
-|------|------|------|
-| P0 | [P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | 书源安全加固 5 项（文件沙箱/缓存命名空间/弹窗拦截/类策略灰度/状态写保护） |
-| P1 | [P1-ai-foundation.md](./migration-designs/P1-ai-foundation.md) | AI 供应商抽象（配置融合路线）+ 上下文压缩 + DB v109 |
-| P2 | [P2-mcp-service.md](./migration-designs/P2-mcp-service.md) | 外部 MCP 服务端（四模块拆分+工具目录适配+四层安全） |
-| P3 | [P3-tts-multirole.md](./migration-designs/P3-tts-multirole.md) | 多角色听书一期（TTS 引擎 V2+五级路由+手动绑定+DB v110） |
-| P5 | [P4-visual-patterns.md](./migration-designs/P4-visual-patterns.md) | 视觉三模式融入 ui-standards（材质角色/调度点/快照取色） |
+| 分期 | 文档 | 深度 | 覆盖 |
+|------|------|------|------|
+| P0 | [P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | 605 行 | 书源安全加固 5 项：逐函数解读+6 新类 kotlin 骨架+16 边界+21 单测方法+D1-D16 |
+| P1 | [P1-ai-foundation.md](./migration-designs/P1-ai-foundation.md) | 601 行 | AI 供应商融合（AiProviderConfig v2 30 字段草案+J1-J9 注入点）+压缩 4 类+DB v109 DDL |
+| P2 | [P2-mcp-service.md](./migration-designs/P2-mcp-service.md) | 403 行 | MCP 四模块拆分（NG 行号→模块映射表）+69 工具规格表+四层安全代码级 |
+| P3 | [P3-tts-multirole.md](./migration-designs/P3-tts-multirole.md) | 446 行 | 多角色听书一期：五级路由 kotlin 草案+LocalDialogueSegmenter+7 段 diff 改造+6 新表 DDL+前端对齐 ui-standards |
+| P5 | [P4-visual-patterns.md](./migration-designs/P4-visual-patterns.md) | 547 行 | 视觉三模式：快照四 data class+MaterialSurface 三分支+18 处直读清单+与 ui-style-unify-deep-fix 衔接 |
+
+注：P5 期载体文件名为 P4-visual-patterns.md（延续创建序命名），期号以本表分期列为准
 
 ## 状态标记
 
-- 🔄 设计中：调研报告已生成，等待用户审查（检查点 1）
-- 后续：用户裁决迁移范围 → 按裁决结果生成各迁移项的独立实施 spec
+- ✅ 设计完成：调研+设计前置验收通过（五轮审查：①通过 ②补双向对比 ③设计前置重构 ④函数级深化 ⑤B 类疑惑关闭 11 条+自评验收+P0 先行裁决）
+- 实施阶段：P0 → P1 → P2 → P3 → P5 分期推进，每期另立实施 spec（引用本目录设计文档为权威依据）；实施中偏离设计须先回写本文档再改代码（AD-02 门禁）
