@@ -162,20 +162,20 @@
 
 ## 三、功能设计（docs/specs/）
 
-> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 62 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
+> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 63 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
 
-### 活跃 Specs（62 个）
+### 活跃 Specs（63 个）
 
 | Spec | 状态 | 说明 |
 |------|------|------|
 | [bookshelf-refresh-and-title-font](./specs/bookshelf-refresh-and-title-font/README.md) | ✅ | 书架下拉刷新转圈不消失+顶栏标题字号不统一修复 |
 | [bugfix-20260822](./specs/bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
-| [build-release-automation](./specs/build-release-automation/README.md) | 🔄 | 打包发布体系优化：publish_release.py 一键发布编排器（对标 NG 自动化，选项 1 本地全自动增强） |
+| [build-release-automation](./specs/build-release-automation/README.md) | ✅ | 打包发布体系优化：publish_release.py 一键发布编排器（L3 真实发版成功，Release 三包齐全+tag 锚点） |
 | [bugfix-ui-20260824](./specs/bugfix-ui-20260824/README.md) | 🔄 | 20260824 用户反馈 11 项 UI/功能修复（图片圆角/搜索框/顶栏/分组/入口/文案等） |
 | [cache-entry-relocate](./specs/cache-entry-relocate/README.md) | 🔄 | 「我的」页功能归堆重构（内容与规则/外观/同步/工具/精准管理/关于 6 组框架） |
 | [enhance-switch-governance-fix](./specs/enhance-switch-governance-fix/README.md) | 🔄 | 画质增强治理修复（总开关失灵/预设脱节/无长度响应 OOM/滑条帧级开销） |
 | [cache-toggle-rename-rss-all-label](./specs/cache-toggle-rename-rss-all-label/README.md) | ✅ | 文案调整：视频缓存开关改名「播放时缓存」+订阅「全部」分组标签缩短 |
-| [compose-migration-status-audit](./specs/compose-migration-status-audit/README.md) | 🔄 | 前端 Compose 化进度全景审计（页级 69 类总表）+推进设计定稿（B0-B5 批次，D4 Rss 列表旗舰，AD-01~08） |
+| [compose-migration-status-audit](./specs/compose-migration-status-audit/README.md) | 🔄 | 前端 Compose 化进度全景审计+推进设计（页级 69 类总表+B0-B5 批次+4 实施级分册，5 轮交叉审核 ACCEPT-WITH-NOTES，设计完成待实施） |
 | [config-needs-restart-fix](./specs/config-needs-restart-fix/README.md) | ✅ | 配置修改需重启生效统一修复（订阅顶栏残留+书架布局不生效）+视效对齐 archive |
 | [cookie-management-fix](./specs/cookie-management-fix/README.md) | ✅ | Cookie 管理链路修复（WebView/CookieStore/OkHttp 同步断裂 6 问题） |
 | [cronet-global-enable-20260731](./specs/cronet-global-enable-20260731/README.md) | 🔄 | Cronet 默认自动启用与扩展使用方案（P0 全局启用已落地） |
@@ -203,6 +203,7 @@
 | [memory-mechanism-redesign](./specs/memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
 | [multiline-on-demand-extraction](./specs/multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
 | [my-topbar-unify](./specs/my-topbar-unify/README.md) | 🔄 | 「我的」页头部迁移 MainTopBarView（与书架/订阅/发现观感统一） |
+| [legadoc-benchmark-analysis](./specs/legadoc-benchmark-analysis/README.md) | ✅ | 阅读C（legadoC）深度对标调研+迁移设计前置（朗读原语化/多媒体插入/合集书架/AI 净化四分期+快速修复包 C0，七轮验证含红队，待分期实施） |
 | [ng-benchmark-analysis](./specs/ng-benchmark-analysis/README.md) | ✅ | 阅读NG（legado_NG）深度对标调研+迁移设计前置（8 维全景+决策表 15 项+五份函数级分期设计 P0-P5，设计验收通过，P0 先行，实施另立 spec） |
 | [network-perf-stability](./specs/network-perf-stability/README.md) | 🔄 | 网络性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密） |
 | [p0-bugfix-round1](./specs/p0-bugfix-round1/README.md) | ✅ | P0 核心 Bug 修复第一轮（2026-07-08 改动发现的 4 项） |

@@ -10,6 +10,7 @@
 |------|------|------------|
 | [bookshelf-refresh-and-title-font](./bookshelf-refresh-and-title-font/README.md) | ✅ | 书架下拉刷新转圈不消失+顶栏标题字号不统一修复 |
 | [bugfix-20260822](./bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
+| [build-release-automation](./build-release-automation/README.md) | ✅ | 打包发布体系优化：publish_release.py 一键发布编排器（L3 真实发版成功，Release 三包齐全+tag 锚点） |
 | [bugfix-ui-20260824](./bugfix-ui-20260824/README.md) | 🔄 | 20260824 用户反馈 11 项 UI/功能修复（图片圆角/搜索框/顶栏/分组/入口/文案等） |
 | [cache-entry-relocate](./cache-entry-relocate/README.md) | 🔄 | 「我的」页功能归堆重构（内容与规则/外观/同步/工具/精准管理/关于 6 组框架） |
 | [enhance-switch-governance-fix](./enhance-switch-governance-fix/README.md) | 🔄 | 画质增强治理修复（总开关失灵/预设脱节/无长度响应 OOM/滑条帧级开销） |
