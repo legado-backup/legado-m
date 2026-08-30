@@ -9,6 +9,9 @@
 | 强制重新打包（修改签名/strings.xml 后必用） | `./gradlew assembleAppRelease --rerun-tasks` |
 | 构建共存包（原版包名） | `build-legado.bat debug io.legado.app` |
 | 一键脚本打包（自动配置环境） | `build-legado.bat [debug\|release] [package_name]` |
+| 一键发布（构建→校验→Release→tag 五阶段） | `publish.bat` 或 `ai_tests\venv\Scripts\python.exe scripts\publish_release.py` |
+| 发布预览（全流程模拟，无副作用） | `publish.bat --dry-run` |
+| 版本回滚（tag = 版本号） | `git checkout <版本号>` |
 | 运行测试 | `./gradlew test` |
 | Lint 检查 | `./gradlew lint` |
 | 清理构建 | `./gradlew clean` |

@@ -1,4 +1,4 @@
-﻿﻿# 文档索引
+﻿# 文档索引
 
 > 项目所有文档的统一入口，覆盖项目规范、项目流程、功能设计、核心 Skill 五类文档。最后更新：2026-08-30（文档规整重建，历史 spec 已归档至 docs/specs/archive/）。
 
@@ -32,7 +32,7 @@
 | 延伸版本参考 | [forks-reference.md](./project-rules/forks-reference.md) | 延伸版本清单+活跃度快照+优先级矩阵（唯一权威数据源） |
 | 前端 UI 规范 | [frontend-ui-standards.md](./project-rules/frontend-ui-standards.md) | archive 迁移后前端统一基线：设计 Token（AppShapes/UiCorner）+页面骨架分型+组件六族选用+View/Compose 混用红线+改造检查清单+已知坑 |
 | Git 提交工作流 | [git-commit-workflow.md](./project-rules/git-commit-workflow.md) | Git 提交工作流 |
-| APK 发布工作流 | [apk-publish-workflow.md](./project-rules/apk-publish-workflow.md) | APK 正式发布流程 |
+| APK 发布工作流 | [apk-publish-workflow.md](./project-rules/apk-publish-workflow.md) | 一键发布编排器（publish.bat 五阶段：构建→校验→gh release→tag） |
 | 工作方法论 | [work-methodology.md](./project-rules/work-methodology.md) | 大型任务（10+ 文件/多 Issue）工作方法论 |
 
 ---
@@ -170,10 +170,12 @@
 |------|------|------|
 | [bookshelf-refresh-and-title-font](./specs/bookshelf-refresh-and-title-font/README.md) | ✅ | 书架下拉刷新转圈不消失+顶栏标题字号不统一修复 |
 | [bugfix-20260822](./specs/bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
+| [build-release-automation](./specs/build-release-automation/README.md) | 🔄 | 打包发布体系优化：publish_release.py 一键发布编排器（对标 NG 自动化，选项 1 本地全自动增强） |
 | [bugfix-ui-20260824](./specs/bugfix-ui-20260824/README.md) | 🔄 | 20260824 用户反馈 11 项 UI/功能修复（图片圆角/搜索框/顶栏/分组/入口/文案等） |
 | [cache-entry-relocate](./specs/cache-entry-relocate/README.md) | 🔄 | 「我的」页功能归堆重构（内容与规则/外观/同步/工具/精准管理/关于 6 组框架） |
 | [enhance-switch-governance-fix](./specs/enhance-switch-governance-fix/README.md) | 🔄 | 画质增强治理修复（总开关失灵/预设脱节/无长度响应 OOM/滑条帧级开销） |
 | [cache-toggle-rename-rss-all-label](./specs/cache-toggle-rename-rss-all-label/README.md) | ✅ | 文案调整：视频缓存开关改名「播放时缓存」+订阅「全部」分组标签缩短 |
+| [compose-migration-status-audit](./specs/compose-migration-status-audit/README.md) | 🔄 | 前端 Compose 化进度全景审计（页级 69 类总表）+推进设计定稿（B0-B5 批次，D4 Rss 列表旗舰，AD-01~08） |
 | [config-needs-restart-fix](./specs/config-needs-restart-fix/README.md) | ✅ | 配置修改需重启生效统一修复（订阅顶栏残留+书架布局不生效）+视效对齐 archive |
 | [cookie-management-fix](./specs/cookie-management-fix/README.md) | ✅ | Cookie 管理链路修复（WebView/CookieStore/OkHttp 同步断裂 6 问题） |
 | [cronet-global-enable-20260731](./specs/cronet-global-enable-20260731/README.md) | 🔄 | Cronet 默认自动启用与扩展使用方案（P0 全局启用已落地） |
