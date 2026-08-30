@@ -48,3 +48,12 @@
 | 2026-08-30 21:5x | 2.x 重写 | Write 全量重写 publish_release.py | 首轮 L1 dry-run 报 `gitee_publish is not defined` | 重写时误删 Gitee requests 层，已原样回补（Gitee 无 gh CLI 等价物必须保留） |
 | 2026-08-30 21:5x | 5.1 L1 | dry-run bump 版本无产物场景 | Stage3 产物缺失误拦截 dry-run | 调整分支顺序：dry-run 允许无产物仅模拟；真实发布保持 fail-fast |
 | 2026-08-30 21:5x | 编译 | gradlew 默认缓存 | transforms metadata.bin 损坏 | 改用项目规范 env（GRADLE_USER_HOME=F:\gh）编译通过；默认缓存损坏为历史遗留非本任务引入 |
+| 2026-08-30 22:3x | 3.1 触发器 | git add workflows | test.yml/web.yml 被 .gitignore L142 忽略（从未入库） | 远端本就零 CI（无 workflows 文件），幽灵触发器仅存在于本地遗留文件；本地注释已做双保险，不强制 -f 入库（尊重既有忽略决策） |
+| 2026-08-30 22:3x | 5.3 L3 | 首次实跑 Stage2 | bat so 校验拦截全部包：Expand-Archive 不支持 .apk 扩展名 | 死代码修复后校验首次真正运行即暴露第二层缺陷；改 .NET ZipFile 方案 |
+| 2026-08-30 22:4x | 5.3 L3 | 二跑 Stage2 | Expand-Archive 对 APK 内中日文 UTF-8 条目名崩溃（Illegal characters in path） | ZipFile.OpenRead 流式读取方案（不解压/无临时文件）根治 |
+| 2026-08-30 22:5x | 5.3 L3 | 三跑 Stage2 | 校验精确名 libcronet.so 全部 MISSING | cronet-bundled 迁移后 so 实为 libcronet.151.0.7922.47.so（带版本号）→ libcronet*.so 模式匹配；package-naming.md 待补此事实 |
+| 2026-08-30 22:5x | 5.3 L3 | 四跑 Stage2 | dist 目录历史包（迁移前动态下载模式无内置 so）被误拦 | 校验范围改 APK_BUILD_DIR（仅本次构建产物）；dist 历史归档不参与门禁 |
+| 2026-08-30 23:0x | 5.3 L3 | Stage3 R5 校验 | test/coexist 包 versionName=3.26.083022debug ≠ 期望 | debug 构建带 versionNameSuffix → 允许前缀匹配（基版本一致即通过）；release 精确匹配 |
+| 2026-08-30 23:1x | 5.3 L3 | 五跑全流程 | L3 成功：Release 创建+双 asset 上传+tag 推送，exit 0，3/3 | 门禁四连拦（扩展名/UTF-8/so 版本名/历史包范围/versionName 后缀）全部为门禁正确拦截既有缺陷，验证体系有效性 |
+| 2026-08-30 23:2x | 检查点3 | 用户质疑测试包未发布 | 用户裁决：恢复上传 test 包（原 R7 不上传系本任务设计收严） | R7/README/design 卡点表/apk-publish-workflow/ci-cd-pipeline 全部同步修订 |
+| 2026-08-31 00:0x | R7 补传 | 补传 test 包 | gh release upload 用文件原始名且不支持重命名 → 与 release asset 同名冲突拒绝；staging 复制为目标名后上传成功，Release 3.26.083022 三包齐全 | 另：跨午夜后 L2 证据当日门禁正确拦截昨日证据，当日复验后放行 |

@@ -28,7 +28,7 @@
 
 **包名禁用场景（强制）**：
 
-- 🔴 **test 包禁止上传到 Release**：一键编排器 Stage4 仅上传 release + coexist 两包，test 包仅本地归档（test/release 原始文件名相同，同 Release 会互相覆盖）
+- 🟡 **test 包上传带 `_debug` 后缀**：一键编排器 Stage4 三包全上传，test 包经 get_upload_name 重命名为 `legado_miss_app_debug_{version}.apk` 防与正式包同名覆盖（2026-08-30 用户裁决恢复上传）；上传前逐包包名断言防混发
 - 🔴 test 包仅用于代码优化开发测试；书源/订阅源 Skill 真机测试必须用**正式包**；与原版共存场景用**共存包**
 - 🔴 禁止同一模拟器实例同时操作多个包（Activity 抢占）
 
@@ -59,7 +59,7 @@ ai_tests\venv\Scripts\python.exe scripts\publish_release.py
 | Stage1 版本确认 | `--version` 显式传入，否则按公式 bump（3.yyMMddHH 型 6 位） | 与 build.gradle releaseTime() 同构 |
 | Stage2 三包构建 | subprocess 依次调 build-legado.bat（test/release/coexist），**显式版本第 3 参保证三包同版本** | 每包后 bat 内嵌 daemon 清场 |
 | Stage3 校验强化 | 三包齐全 / libcronet.so 内置 / apksigner 验签 / aapt2 包名版本一致性 / updateLog 当日条目 | **全部 fail-fast exit**；缺包从 WARN 升级为 exit；updateLog 缺当日条目直接拦截（无回退文案） |
-| Stage4 Release 发布 | GitHub 层走 gh CLI 上传 release + coexist（test 包仅本地归档，包名禁令）；Gitee 层仍走 requests | **L2 真机门禁**：交互确认默认 N |
+| Stage4 Release 发布 | GitHub 层走 gh CLI 上传三包（test 包带 `_debug` 后缀防同名冲突）；Gitee 层仍走 requests | **L2 真机门禁**：交互确认默认 N |
 | Stage5 git tag | tag = 版本号，push 前人工确认 | 版本回滚锚点 |
 
 ### 2.3 人工确认点
@@ -172,7 +172,7 @@ git checkout <版本号>    # 如 git checkout 3.26.083020
 ### 4.4 test 包与 release 包文件名冲突 → 已消除
 
 - **历史问题**：test 包和 release 包原始文件名都是 `legado_miss_app_{version}.apk`，上传同一 Release 互相覆盖（历史上传方案为 `get_upload_name` 给 test 包加 `_debug` 后缀）
-- **现状**：一键编排器 **test 包不再上传 Release**（仅本地归档），冲突自然消除
+- **现状**：test 包恢复上传（2026-08-30 用户裁决），经 get_upload_name 加 `_debug` 后缀重命名（`legado_miss_app_debug_{version}.apk`），与正式包不同名，冲突消除
 
 ### 4.5 read_config 平台 token 校验
 

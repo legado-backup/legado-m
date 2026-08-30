@@ -19,7 +19,7 @@
 1. **Stage 1 版本确认**：`--version` 显式传入或扫描 output/apk 现有最大版本 bump（`3.MM.ddHHmm` 公式），确认三包将共用同一版本号。
 2. **Stage 2 三包构建**：按 test → release → coexist 顺序 subprocess 调用 bat（release/coexist 传显式版本第 3 参），每包构建后内嵌等价 `:STOP_DAEMON` 清场（不可跳过步骤）。
 3. **Stage 3 校验强化**：fail-fast 分级校验（见 AD-03），并提取 updateLog 当日条目作为 Release body（缺失 = exit，不再回退默认文案）。
-4. **Stage 4 gh release 发布**：gh CLI 创建 Release（body=updateLog 条目）+ 上传 asset；test 包只归档不上 Release（包名禁令），release/coexist 正常上传。
+4. **Stage 4 gh release 发布**：gh CLI 创建 Release（body=updateLog 条目）+ 上传三包 asset（test 包经 get_upload_name 加 `_debug` 后缀防同名冲突），release/coexist 保持原文件名。
 5. **Stage 5 git tag 回滚锚点**：创建 tag=版本号，**push 前打印供人工确认**，确认后 `git tag` + `git push origin <tag>`。
 
 ### 1.3 编排时序图
@@ -204,7 +204,7 @@ flowchart LR
 | 1 | 真机测试门禁（步骤 5.5 / L2） | Stage 4 前交互确认默认 N，无任何 flag 跳过（AD-05） |
 | 2 | updateLog 人工校对 | 当日条目缺失从 WARN 升级 fail（exit）；脚本只提取不生成，文字合并/漏项由人审（AD-03） |
 | 3 | daemon 清场 | 每包构建后内嵌等价 `:STOP_DAEMON` 清场，作为不可跳过步骤（AD-02 继承 bat 已实证逻辑） |
-| 4 | 包名选择禁令 | 编排器按用途断言：Release 仅接受 release + coexist 产物，test 包只归档不上 Release |
+| 4 | 包名选择禁令 | 编排器逐包断言包名与包类型匹配（EXPECTED_PACKAGES 表，防混发）；test 包随发布上传但带 `_debug` 后缀命名防同名冲突（2026-08-30 用户裁决恢复上传） |
 | 5 | libcronet.so 校验 | 保持 exit 1 级硬门禁，迁移进校验层时禁止降级 WARN |
 | 6 | token/jks 安全 | 存放位置不变（config 已 gitignore、jks 本地持有）；输出维持 hide_token 脱敏；tag push 前打印人工确认（AD-04） |
 
