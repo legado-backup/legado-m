@@ -33,7 +33,7 @@
 **执行命令**：
 
 ```bash
-python ai_tests/scripts/run_e2e.py --diff HEAD~1
+python ai_tests/run_e2e.py --diff HEAD~1
 ```
 
 **执行逻辑**（M8 source_impact_analyzer）：
@@ -53,7 +53,7 @@ python ai_tests/scripts/run_e2e.py --diff HEAD~1
 **执行命令**：
 
 ```bash
-python ai_tests/scripts/run_e2e.py --apk auto
+python ai_tests/run_e2e.py --apk auto
 ```
 
 **执行逻辑**（M2 apk_deployer + M1 memu_controller）：
@@ -133,7 +133,7 @@ python ai_tests/scripts/run_e2e.py --apk auto
 **执行命令**：
 
 ```bash
-python ai_tests/scripts/run_e2e.py --feedback
+python ai_tests/run_e2e.py --feedback
 ```
 
 **执行逻辑**（M16 feedback_loop）：
@@ -218,7 +218,7 @@ AI agent（如 Claude/GPT）介入 manual 用例判定时，按以下流程：
 manual 判定完成后，若存在 fail：
 
 ```bash
-python ai_tests/scripts/run_e2e.py --feedback
+python ai_tests/run_e2e.py --feedback
 ```
 
 读取 `feedback_suggestions.md`，审阅后沉淀到 `known_issues.md` / `config.CRASH_PATTERNS` / `ai_prompt_template.j2`。

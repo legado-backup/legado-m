@@ -96,6 +96,8 @@ python ai_tests/run_e2e.py --feedback
 
 ## 报告输出
 
+> **目录现状（2026-08-30 如实描述）**：`ai_tests/reports/` 为**平铺证据文件 + `report_{timestamp}/` 目录并存**——根目录散落历史验证截图/UI XML/DB 等证据文件，另有 `bugfix-ui-20260824/`、`dbverify/`、`evidence/`、`session_reset_verify/`、`t_batch/` 等专项子目录；`run_e2e.py` 每次执行生成独立 `report_{timestamp}/` 七件套目录。
+
 执行后生成七件套报告（`ai_tests/reports/report_{timestamp}/`）：
 
 | 文件 | 说明 |
@@ -180,87 +182,24 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
   M8 源码影响分析器 → M9 源码→测试生成器
 ```
 
-## 脚本清单（ai_tests/scripts/）
+## 脚本族索引（ai_tests/scripts/）
 
-> 本节仅列出 RSS 批量优化阶段新增的验证 / 诊断 / 修复脚本。完整脚本清单见 `ai_tests/scripts/` 目录。所有脚本均通过 `ai_tests/venv/Scripts/python.exe` 执行。
+> 完整脚本清单以 [SOP 固定脚本表](./docs/fixed_test_workflow.md) 为准，本节仅按族分组给出口径。
 
-### RSS 真机 DB 验证脚本
-
-| 脚本 | 用途 | 用法 | 输出 |
-|------|------|------|------|
-| `real_db_sample_test.py` | 从真机 DB 抽样订阅源，用 Playwright 验证 sourceUrl 可访问性 / sortUrl 分类列表加载 / searchUrl 搜索功能 / ruleNextPage 下一页链接 / type=2 视频元素存在性 | `python ai_tests/scripts/real_db_sample_test.py` | `output/rss/v2_real_test_db_sample.json` |
-| `real_db_full_test_v2.py` | 在 v1 基础上扩展 DOM 选择器（list / pagination / categories / search_form），对全部源做全量验证（每源 5s 超时，每 20 源增量保存，支持 Ctrl+C 中断保存） | `python ai_tests/scripts/real_db_full_test_v2.py` | `output/rss/v2_real_test_db_sample_v2.json` |
-
-### DB 字段诊断与补全脚本
-
-| 脚本 | 用途 | 用法 | 输出 |
-|------|------|------|------|
-| `diagnose_db_fields.py` | 诊断 DB 中订阅源 `sortUrl` / `searchUrl` / `ruleNextPage` / `ruleArticles` 字段填充率，按 `type` 分组统计 | `python ai_tests/scripts/diagnose_db_fields.py` | `output/rss/db_field_diagnose_v3.json` |
-| `fix_image_source_fields.py` | 筛选 `type=1` 且 `sortUrl` 为空的源，用 Playwright 访问首页提取 `sortUrl` / `searchUrl` / `ruleArticles` / `ruleImage` / `ruleNextPage`（每 10 源增量保存） | `python ai_tests/scripts/fix_image_source_fields.py` | `output/rss/image_source_field_fix.json` |
-
-### 失败源重试脚本
-
-| 脚本 | 用途 | 用法 | 输出 |
-|------|------|------|------|
-| `retry_failed_rss_sources.py` | 读取真机 DB 全部源，用 Playwright 识别访问失败源，对每个失败源用 14 种技术手段（5 种 UA + 多种重试策略）依次重试，输出脱敏 JSON 报告 | `python ai_tests/scripts/retry_failed_rss_sources.py` | `output/rss/failed_source_retry_v2.json` + `failed_sources_list.json` + `retry_run.log` |
-
-### 输出安全约束
-
-上述脚本均内置脱敏机制，输出报告遵循以下约束：
-- 用 `源[idx]` 替代真实名称
-- URL 替换为 `[URL]`，域名替换为 `[DOMAIN]`，IP 替换为 `[IP]`
-- 异常消息正则脱敏，禁止输出 cookie / token / 分类名原文
+| 族 | 前缀 | 用途 |
+|------|------|------|
+| L2 验证族 | `l2_verify_*` | 功能点 L2 真机验证（视频/订阅/主题/高亮/文件夹等） |
+| 模式切换验证族 | `verify_*` | 用户场景回归验证（模式切换/会话重置/无崩溃/嗅探回归等） |
+| 导航辅助族 | `nav_*` / `goto_*` | 脱敏导航到目标页面（只输出编号不输出名称） |
+| 诊断族 | `diag_*` | 诊断辅助（已于 2026-08-30 ai-test-system-refinement 治理中清理，备份 `bak/ai-test-refinement-20260830/`） |
+| AI/VL 族 | `ai_*` / `vl_*` | 本地 VL 模型对截图做目标化视觉判定（截图审查拦截兜底通道） |
 
 ## 相关文档
 
-- [设计文档](../docs/specs/e2e-automated-testing/design.md)
-- [任务清单](../docs/specs/e2e-automated-testing/tasks.md)
-- [深度分析报告](../docs/specs/e2e-automated-testing/ai-testing-research-2026.md)
+- [设计文档（已归档）](../docs/specs/archive/e2e-automated-testing/design.md)
+- [任务清单（已归档）](../docs/specs/archive/e2e-automated-testing/tasks.md)
+- [深度分析报告（已归档）](../docs/specs/archive/e2e-automated-testing/ai-testing-research-2026.md)
 
 ## V5 订阅源批量优化脚本
 
-### V5 阶段脚本（ai_tests/scripts/）
-
-| 脚本 | 功能 |
-|------|------|
-| `v5_aggregator_split.py` | 集成站V2严格拆分（8项视频特征严格判定） |
-| `v5_inspect_sorturl.py` | sortUrl检查工具 |
-| `v5_video_deep_analyze.py` | 视频源深度分析 |
-| `v5_video_deepfix.py` | 视频源深度修复（118个源详情页深度分析） |
-| `v5_video_deepfix_mask.py` | 视频源脱敏 |
-| `v5_video_breakthrough.py` | 视频源6大突破手段（88个无证据源应用6策略） |
-| `v5_missing_fields_fix.py` | 135个缺字段源深度补全 |
-| `v5_hard_source_fix.py` | 67个难点源处理（CF盾/登录/弹框） |
-| `v5_cf_breakthrough.py` | CF盾4个破盾5大技术 |
-| `v5_spa_breakthrough.py` | 3个SPA站点5大技术突破 |
-| `v5_2_short_term_fix.py` | V5.2短期止损修复 |
-| `v5_2_rule_verify.py` | PC Playwright验证ruleArticles |
-| `v5_3_final_fix.py` | V5.3最终修复 |
-| `v5_3_real_device_verify.py` | V5.3真机验证 |
-
-### V5 工作流
-
-1. **V5阶段（深度优化）**：
-   - 分类扫描 → 导航站拆分 → 集成站V2严格拆分 → 视频源深度修复 → 视频源6大突破 → 缺字段补全 → 难点源处理 → CF盾破盾 → SPA突破
-2. **V5.1阶段（字段类型修复）**：
-   - 修复Gson严格类型解析错误 → 生成纯数组格式JSON
-3. **V5.2阶段（短期止损）**：
-   - 移除113个失效拆分子源 → 字段修复197处
-4. **V5.3阶段（最终修复）**：
-   - PC Playwright验证224源 → 修复6个规则问题源 → 标记153个网络层失败源enabled=false → 保留71个可用源
-
-### V5 输出JSON（output/rss/）
-
-| 文件 | 内容 |
-|------|------|
-| `optimized_v5_1_app_import_fixed.json` | V5.1最终版（328源，纯数组格式） |
-| `optimized_v5_2_stable.json` | V5.2短期止损版（224源） |
-| `optimized_v5_3_final.json` | V5.3最终版（224源，71启用+153禁用） |
-
-### V5 关键报告
-
-- `docs/specs/rss-batch-optimize-v2/v5_optimization_final_report.md` - V5优化最终成果报告
-- `output/rss/v5_1_real_device_verify_report.md` - V5.1真机验证报告
-- `output/rss/v5_1_field_diff_analysis.md` - V5.1字段差异分析
-- `output/rss/v5_2_rule_verify_report.md` - V5.2 PC Playwright验证报告
-- `output/rss/v5_3_final_verify_report.md` - V5.3最终验证报告
+> V5 站点攻坚期一次性脚本已于 2026-08-30 ai-test-system-refinement 治理中归档删除（备份 `bak/ai-test-refinement-20260830/`）。

@@ -24,7 +24,7 @@
 
 ## Level 1：编译验证
 
-### TC-01 编译通过验证
+### TC-P1-C4-01：编译通过验证
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -36,7 +36,7 @@
 - **实际结果**：✅ BUILD SUCCESSFUL（5m 56s），仅废弃警告（已有代码）
 - **状态**：通过
 
-### TC-02 failUrl API 适配验证
+### TC-P1-C4-02：failUrl API 适配验证
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -51,7 +51,7 @@
 - **实际结果**：✅ 4 处全部正确适配
 - **状态**：通过
 
-### TC-03 stringRuleCache API 适配验证
+### TC-P1-C4-03：stringRuleCache API 适配验证
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -65,7 +65,7 @@
 - **实际结果**：✅ 3 处全部正确适配，类型为 `List<SourceRule>`（非设计文档笔误的 `String`）
 - **状态**：通过
 
-### TC-04 ConcurrentRateLimiter.clearRecord 方法验证
+### TC-P1-C4-04：ConcurrentRateLimiter.clearRecord 方法验证
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -78,7 +78,7 @@
 - **实际结果**：✅ 方法位于 companion object，调用 `concurrentRecordMap.remove(key)`
 - **状态**：通过
 
-### TC-05 SourceHelp 删源清理验证
+### TC-P1-C4-05：SourceHelp 删源清理验证
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -96,7 +96,7 @@
 
 ## Level 3：真机端到端验证
 
-### TC-06 图片加载失败 URL 缓存 LRU 淘汰
+### TC-P1-C4-06：图片加载失败 URL 缓存 LRU 淘汰
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -111,7 +111,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-07 规则解析缓存 LRU 淘汰
+### TC-P1-C4-07：规则解析缓存 LRU 淘汰
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -125,7 +125,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-08 删源后并发限流记录清理
+### TC-P1-C4-08：删源后并发限流记录清理
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -140,7 +140,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-09 批量删源后并发限流记录清理
+### TC-P1-C4-09：批量删源后并发限流记录清理
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -155,7 +155,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-10 RSS 源删源后并发限流记录清理
+### TC-P1-C4-10：RSS 源删源后并发限流记录清理
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -170,7 +170,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-11 24 小时长跑内存稳定性
+### TC-P1-C4-11：24 小时长跑内存稳定性
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -189,7 +189,7 @@
 
 ## 边界值用例
 
-### TC-12 LruCache 达到上限时的淘汰行为
+### TC-P1-C4-12：LruCache 达到上限时的淘汰行为
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -202,7 +202,7 @@
 - **实际结果**：待真机验证
 - **状态**：待验证
 
-### TC-13 空 key 调用 clearRecord
+### TC-P1-C4-13：空 key 调用 clearRecord
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -214,7 +214,7 @@
 - **实际结果**：✅ 代码审查确认 `ConcurrentHashMap.remove` 对不存在的 key 安全
 - **状态**：通过
 
-### TC-14 删源时 key 为 null
+### TC-P1-C4-14：删源时 key 为 null
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -230,7 +230,7 @@
 
 ## 异常/非法输入用例
 
-### TC-15 并发删源时清理限流记录
+### TC-P1-C4-15：并发删源时清理限流记录
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
@@ -243,7 +243,7 @@
 - **实际结果**：✅ 代码审查确认 `ConcurrentHashMap` 线程安全
 - **状态**：通过
 
-### TC-16 LruCache.put 传入 null value
+### TC-P1-C4-16：LruCache.put 传入 null value
 
 **关联源码**：OkHttpStreamFetcher.kt, ConcurrentRateLimiter.kt, SourceHelp.kt, AnalyzeRule.kt
 **关联 Activity**：无（纯 Service/工具类）
