@@ -32,7 +32,7 @@
 
 ### Level 2：集成测试（编译通过 + 模块交互）
 
-#### TC-01 编译验证
+### TC-F-P1-8-01：编译验证
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -42,7 +42,7 @@
 - **预期结果**：BUILD SUCCESSFUL，无编译错误
 - **实际结果**：✅ BUILD SUCCESSFUL（4m 55s），仅有项目已有的 `bundleOf` deprecation 警告
 
-#### TC-02 菜单资源验证
+### TC-F-P1-8-02：菜单资源验证
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -52,7 +52,7 @@
 - **预期结果**：两个菜单文件均包含 `@+id/menu_view_mode`，图标为 `@drawable/ic_folder_outline`，`showAsAction="always"`
 - **实际结果**：✅ 已验证
 
-#### TC-03 字符串资源验证
+### TC-F-P1-8-03：字符串资源验证
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -64,7 +64,7 @@
 
 ### Level 3：端到端验证（真机操作）
 
-#### TC-04 书源 - 默认列表视图
+### TC-F-P1-8-04：书源 - 默认列表视图
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -74,7 +74,7 @@
 - **预期结果**：默认显示列表视图（LinearLayoutManager），与原有行为一致
 - **验证要点**：菜单按钮显示文件夹图标
 
-#### TC-05 书源 - 切换到文件夹视图
+### TC-F-P1-8-05：书源 - 切换到文件夹视图
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -88,7 +88,7 @@
   4. `AppConfig.sourceViewMode` 持久化为 1
 - **验证要点**：重新打开书源管理界面，应直接显示文件夹视图
 
-#### TC-06 书源 - 点击"全部"文件夹
+### TC-F-P1-8-06：书源 - 点击"全部"文件夹
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -100,7 +100,7 @@
   2. 搜索框清空，显示所有书源
   3. `AppConfig.sourceViewMode` 持久化为 0
 
-#### TC-07 书源 - 点击"未分组"文件夹
+### TC-F-P1-8-07：书源 - 点击"未分组"文件夹
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -112,7 +112,7 @@
   2. 搜索框显示"未分组"（或对应本地化文本）
   3. 列表显示未分组的书源
 
-#### TC-08 书源 - 点击分组文件夹
+### TC-F-P1-8-08：书源 - 点击分组文件夹
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -124,7 +124,7 @@
   2. 搜索框显示 `group:失效`
   3. 列表显示该分组下的书源
 
-#### TC-09 书源 - 文件夹视图分组数据实时更新
+### TC-F-P1-8-09：书源 - 文件夹视图分组数据实时更新
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -133,7 +133,7 @@
 - **测试步骤**：在另一个界面（如书源编辑）修改某书源的分组
 - **预期结果**：返回书源管理界面，文件夹视图自动更新分组列表
 
-#### TC-10 订阅源 - 文件夹视图全流程
+### TC-F-P1-8-10：订阅源 - 文件夹视图全流程
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -142,7 +142,7 @@
 - **测试步骤**：重复 TC-04 ~ TC-09 的操作
 - **预期结果**：行为与书源一致，`AppConfig.rssViewMode` 独立持久化
 
-#### TC-11 视图切换不丢失搜索状态
+### TC-F-P1-8-11：视图切换不丢失搜索状态
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -155,7 +155,7 @@
   1. 文件夹视图显示全部分组（忽略搜索关键词）
   2. 切换回列表视图时，搜索关键词保留，列表恢复筛选状态
 
-#### TC-12 文件夹视图下拖拽禁用
+### TC-F-P1-8-12：文件夹视图下拖拽禁用
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -166,7 +166,7 @@
 
 ## 4. 边界值测试
 
-#### TC-13 无分组数据
+### TC-F-P1-8-13：无分组数据
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -175,7 +175,7 @@
 - **测试步骤**：切换到文件夹视图
 - **预期结果**：只显示"全部"和"未分组"两个文件夹，无崩溃
 
-#### TC-14 空分组名
+### TC-F-P1-8-14：空分组名
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -186,7 +186,7 @@
 
 ## 5. 异常场景测试
 
-#### TC-15 文件夹视图下快速切换
+### TC-F-P1-8-15：文件夹视图下快速切换
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity
@@ -195,7 +195,7 @@
 - **测试步骤**：快速连续点击视图切换按钮 5 次
 - **预期结果**：最终视图模式与点击次数奇偶一致，无崩溃
 
-#### TC-16 文件夹视图下进程被杀
+### TC-F-P1-8-16：文件夹视图下进程被杀
 
 **关联源码**：BookSourceActivity.kt, RssSourceActivity.kt, SourceFolderAdapter.kt
 **关联 Activity**：BookSourceActivity

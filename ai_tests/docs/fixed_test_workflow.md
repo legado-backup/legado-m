@@ -30,6 +30,13 @@
 | 15. 双包无崩溃验证 | `verify_no_crash.py` | 安装指定包→启动→进发现页→二轮重启复现缓存读取→logcat 崩溃模式分析（no-crash 2026-08-29 新增） | `python ai_tests/scripts/verify_no_crash.py --type debug\|release` |
 | 16. 图片订阅源浏览链路 L2 | `l2_verify_image_gallery.py` | 自建最小图片源（本地 HTTP+合成 PNG+adb reverse）→RssSortActivity 确定性入口→图集页断言（进入/内容解析+图片下载/滑动 FATAL=0 前台存活）；sniff-regression-rss-image-crash Phase C 新增 | `python ai_tests/scripts/l2_verify_image_gallery.py` |
 | 17. 测试辅助：local.xml 操作 | `repair_local_prefs.py` / `set_flag_appcrash.py` | 重建损坏的 shared_prefs/local.xml（privacyPolicyOk/appCrash 等必需键）/ 切换 appCrash 标记（回灌链路验证用）；均走 base64 安全通道 | `python ai_tests/scripts/repair_local_prefs.py [--crash]` / `set_flag_appcrash.py true\|false` |
+| 16+. 订阅/主题头部联动验证 | `l2_verify_theme_rss_header_sync.py` | 订阅模式切换/发现布局即时生效/头部截图验证（theme-rss-header-layout-sync 新增） | `python ai_tests/scripts/l2_verify_theme_rss_header_sync.py --rounds 3` |
+| 16b. 头部日夜亮度判定 | `l2_verify_header_brightness.py` | 截图像素亮度差判定主题跟随（状态无关断言） | `python ai_tests/scripts/l2_verify_header_brightness.py` |
+| 16c. VL 兜底视觉判定 | `l2_vl_header_analysis.py` | 本地 Qwen3VL 对截图做目标化视觉判定（截图审查拦截兜底通道） | `python ai_tests/scripts/l2_vl_header_analysis.py` |
+| 16d. 高亮规则切换验证 | `l2_verify_highlight_toggle.py` | 高亮规则复选框切换即时刷新四项断言 | `python ai_tests/scripts/l2_verify_highlight_toggle.py` |
+| 16e. 文件夹封面弹框验证 | `l2_verify_rss_folder_cover_dialog.py` | 订阅文件夹封面弹框 L2 验证 | `python ai_tests/scripts/l2_verify_rss_folder_cover_dialog.py` |
+| 16f. 文件夹间距验证 | `l2_verify_rss_folder_margin.py` | 订阅文件夹间距/列数滑条实时生效验证 | `python ai_tests/scripts/l2_verify_rss_folder_margin.py` |
+| 16g. 播放器 UX 验证 | `l2_verify_video_ux_fixes.py` | 视频播放器五项 UX 修复 L2 | `python ai_tests/scripts/l2_verify_video_ux_fixes.py` |
 
 > 2026-08-30 文档规整：原步骤 5/6/8（`fix_coverage_check.py`/`batch_source_test.py`/`collect_app_log.py`）所引脚本已不存在于 `ai_tests/`，删除对应步骤；修复点覆盖验证按本文"L2 验证场景清单"（`error_patterns` 场景）与"L2 观测通道"章节执行。
 
@@ -245,3 +252,30 @@ def ensure_cronet_ready():
 1. **文件通道才是确定性观测面**：AppLog 内容在 recordLog 关闭时不落盘（仅 ERROR 级走 logcat），且 logcat 主缓冲在真机上约 10~15 秒即可被刷滚驱逐早期条目。验证"某日志是否产生"必须以**拉取 appLog 文件 grep** 为准，`logcat -d` 抓取窗口越早越好（必要时启动后 3~5 秒即 dump）
 2. **adb 输出落盘禁止 PowerShell `>` 重定向**：`adb shell cat xxx > local` 会产出损坏/截断文件（铁证：shared_prefs 拉取仅剩 51 字节，回写后损坏设备端默认 prefs）。必须走 **base64 通道**：设备端 `base64 <file>` → 本地 `[Convert]::FromBase64String` 解码；写回反向同理。与既有教训"git show > file 毁文件"同源（PowerShell 管道编码问题）
 3. **shared_prefs 直改风险分级**：`local.xml`（LocalConfig）与 `<pkg>_preferences.xml`（defaultSharedPreferences）是不同文件，改前必须先核实目标 key 所在文件（源码 object 声明处 `getSharedPreferences("name", ...)`）；回写损坏会造成该模拟器设置丢失（SharedPreferences 解析失败静默回退空表）
+4. **adb shell 多参数列表传参会拆散 su -c 命令**：subprocess 列表形式 `["su","-c","base64 <path>"]` 传给 adb shell 后，su 只吃到 "base64" 一个 token（-c 后内容被按空格拆散）；必须把整条命令作为**单个字符串**传给 adb shell（`sh("su -c 'base64 <path>'")`）。铁证：l2_verify_theme_rss_header_sync.py 修复前后 prefs 读取从全失败变全成功
+5. **shared_prefs 值在 value="..." 属性而非文本节点**：解析 `<pkg>_preferences.xml` 时布尔/整型是 `<boolean name="k" value="true"/>` 自闭合属性形式，字符串才是 `<string name="k">v</string>` 文本节点；正则需双模式匹配。铁证：仅匹配文本节点时 modernRssPage 读到空白
+
+## u2 交互陷阱（2026-08-30 theme-rss-header-layout-sync 沉淀）
+
+> uiautomator2（u2）在 Legado Compose 界面上的高频踩坑点，元素定位失败先对照本清单。
+
+1. **StaleObjectException**：u2 selector 持有的节点在 Activity 重建/重组后失效 → 改用 dump_hierarchy+正则取 bounds+input tap 坐标点击（dump→点击→重试闭环，参考 `l2_verify_theme_rss_header_sync.py` 的 `click_by`）
+2. **Compose Dialog 是独立窗口**：弹框开启期间 dump 拿不到主界面节点，锚点判定须放弹框关闭后
+3. **底部导航为 Compose 绘制**：dump 无文本节点 → 用 content-desc 或 resource-id（menu_rss）取坐标 tap，先 dump 真实 tab 顺序（顺序可配置）
+4. **toybox sed 经 su 多层 shell 传参**：表达式必须内层双引号包裹，否则被空格截断报 bad pattern
+5. **模拟器 screencap 陈旧帧**：截图前 sleep 或双帧对比；截图审查拦截时改用像素亮度分析（`l2_verify_header_brightness.py`）或 VL 判定（`l2_vl_header_analysis.py`）
+6. **包名带构建类型后缀**：debug 包=io.legado.miss.app.debug，am start/pm 命令须用实际安装包名（config.PACKAGE 动态拼接）
+
+## 像素亮度差判定方法论（2026-08-30 沉淀）
+
+对日/夜或主题 A/B 两态截图，裁剪目标区域（如顶栏 6%~14% 高度）计算灰度均值，**差值 ≥60 判定分化成立**；初始主题态未知时标签可能互换，用差值绝对值做状态无关断言；脚本模板 `l2_verify_header_brightness.py`。
+
+## L1/L2/L3 完成级别权威定义
+
+> 本节为**全项目唯一权威定义**，其他文档引用此处，禁止另行定义。
+
+| 级别 | 定义 | 判定标记 |
+|------|------|---------|
+| **L1 = 代码完成** | 文件存在 + 编译通过 | ⚠️ 不代表可用 |
+| **L2 = 功能验证** | 关键功能可运行 + 输出正确 | ⚠️ 不代表真实数据场景通过 |
+| **L3 = 场景验证** | 真机真实数据回测通过 | ✅ 交付级 |

@@ -198,10 +198,8 @@ def handle_v3_reserved_args(args: argparse.Namespace) -> Optional[int]:
         print("       降级路径：手动编写 ai_tests/cases/{module}/auto_{tc_id}.py")
         return 0  # 仅提示，不视为错误
 
-    # --feedback：M16 未实现（阶段 16）
-    if args.feedback:
-        print("[WARN] M16 feedback_loop 未实现（阶段 16），--feedback 暂不支持")
-        print("       降级路径：手动审阅 reports/*/feedback_suggestions.md")
+    # --feedback：M16 feedback_loop 已实现并于主流程 [9.6] 接入（ai-test-system-refinement 批次B）；
+    # 此处无需降级提示，参数校验通过后返回 None 继续执行
 
     return None
 
@@ -358,6 +356,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     # 5.5 V3 --diff 源码影响分析（M8）
     # 简化说明：--diff 与 --tc 互斥时优先 --diff | 已知上限：source_map.json 可能过时 | 升级路径：自动检测源码变化触发重建（V4）
     diff_tc_ids = None
+    diff_result = None  # ai-test-system-refinement 批次B：提升为函数级变量供报告生成传递
     if args.diff:
         from ai_tests.lib.source_impact_analyzer import SourceImpactAnalyzer
         print(f"[5.5] V3 源码影响分析: --diff {args.diff}")
@@ -526,14 +525,35 @@ def main(argv: Optional[List[str]] = None) -> int:
         r["feedback_signal"] for r in results
         if r.get("feedback_signal")
     ]
-    # V3 affected_modules 需要 M8 实现（暂为 None）
+    # V3 affected_modules：M8 已实现，--diff 时传递分析结果（ai-test-system-refinement 批次B）
     rg.generate_all(
         results,
         env=env,
         apk_info=apk_info,
-        affected_modules=None,
+        affected_modules=diff_result if diff_result else None,
         feedback_signals=feedback_signals if feedback_signals else None,
     )
+
+    # [9.6] M16 经验回流：--feedback 时消费 report.json 生成 4 类反馈建议
+    # （ai-test-system-refinement 批次B 接入；异常全隔离，不阻塞主流程不改退出码）
+    if args.feedback:
+        import json as _json
+
+        from ai_tests.lib.feedback_loop import FeedbackLoop
+
+        try:
+            report_dict = _json.loads(
+                (rg.report_dir / "report.json").read_text(encoding="utf-8")
+            )
+            fl_result = FeedbackLoop().process(report_dict)
+            print(
+                f"[9.6] 经验回流: known_issue={len(fl_result['known_issue_suggestions'])} "
+                f"rule={len(fl_result['rule_suggestions'])} "
+                f"prompt={len(fl_result['prompt_suggestions'])} "
+                f"regression 已追加 regression_history.md"
+            )
+        except Exception as e:  # 隔离：经验回流失败不阻塞测试主流程
+            print(f"[WARN] feedback_loop 执行失败，跳过经验回流: {e}")
 
     # 11.5 AI-LLM-Testing：--ai-verify 自动判定 manual 用例并回填 ai_verdict
     if args.ai_verify:

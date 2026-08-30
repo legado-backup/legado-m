@@ -113,7 +113,7 @@ verdict == fail（5.5.5 规则判定失败）
 触发反馈闭环（5.5.8，见第四章）
   ↓
 AI 修复代码 → 重新运行复测：
-  python ai_tests/scripts/run_e2e.py --tc {失败TC-ID}
+  python ai_tests/run_e2e.py --tc {失败TC-ID}
   ↓
 复测通过 → 关闭失败；复测仍失败 → 继续反馈闭环
 ```
@@ -125,7 +125,7 @@ AI 修复代码 → 重新运行复测：
 ### 4.1 触发
 
 ```bash
-python ai_tests/scripts/run_e2e.py --feedback
+python ai_tests/run_e2e.py --feedback
 ```
 
 M16 `FeedbackLoop.process` 读取 `report.json`，输出 4 类反馈建议到 `feedback_suggestions.md/.json`。
@@ -162,12 +162,12 @@ M16 `FeedbackLoop.process` 读取 `report.json`，输出 4 类反馈建议到 `f
 
 | 命令 | 说明 | 阶段 |
 |------|------|------|
-| `python ai_tests/scripts/run_e2e.py` | 全量 E2E 测试 | 5.5.2~5.5.7 |
-| `python ai_tests/scripts/run_e2e.py --diff HEAD~1` | V3 源码影响分析 | 5.5.1 |
-| `python ai_tests/scripts/run_e2e.py --feedback` | V3 反馈闭环 | 5.5.8 |
-| `python ai_tests/scripts/run_e2e.py --tc TC-XXX` | 复测指定用例 | 失败复测 |
-| `python ai_tests/scripts/run_e2e.py --gen-test BookshelfActivity` | V3 生成 B 轨 Python 用例 | M9 |
-| `python ai_tests/scripts/run_e2e.py --update-source-map` | 更新 source_map.json | M8 维护 |
+| `python ai_tests/run_e2e.py` | 全量 E2E 测试 | 5.5.2~5.5.7 |
+| `python ai_tests/run_e2e.py --diff HEAD~1` | V3 源码影响分析 | 5.5.1 |
+| `python ai_tests/run_e2e.py --feedback` | V3 反馈闭环 | 5.5.8 |
+| `python ai_tests/run_e2e.py --tc TC-XXX` | 复测指定用例 | 失败复测 |
+| `python ai_tests/run_e2e.py --gen-test BookshelfActivity` | V3 生成 B 轨 Python 用例 | M9 |
+| `python ai_tests/run_e2e.py --update-source-map` | 更新 source_map.json | M8 维护 |
 | `python ai_tests/scripts/gen_module_matrix.py` | 生成覆盖率报告 | 14.4 |
 | `python ai_tests/lib/feedback_loop.py --report <report.json>` | 单独触发反馈闭环 | 5.5.8 |
 

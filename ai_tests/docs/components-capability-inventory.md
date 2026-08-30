@@ -1,5 +1,7 @@
 # ai_tests 组件能力清单（Components Capability Inventory）
 
+> 2026-08-30 ai-test-system-refinement 治理：52 个一次性/重复/残留脚本已删除（备份 bak/ai-test-refinement-20260830/），相关条目已清理；现行权威脚本清单见 docs/fixed_test_workflow.md
+
 > **生成时间**：2026-07-26
 > **范围**：`f:\myself\github\WeAgentChat\temp\legado\ai_tests\` 目录下全部脚本与组件
 > **目的**：归纳总结通用组件能力，供 AI agent 与开发者复用
@@ -27,7 +29,7 @@ ai_tests/
 │   ├── source_test_generator.py # M9 源码→测试生成器（V3）
 │   ├── feedback_loop.py         # M16 反馈闭环（V3）
 │   └── source_map.json          # Activity 静态调用图（M8 输出）
-├── scripts/                     # 操作脚本（34 个，按用途分类）
+├── scripts/                     # 操作脚本（按用途分类，见第五节）
 ├── cases/                       # V3 双轨用例（MD + auto_*.py）
 ├── templates/                   # Jinja2 模板（report.md.j2 等）
 ├── testdata/                    # 测试数据（RSS 搜索/登录测试 JSON）
@@ -328,7 +330,7 @@ Layer 0: 源码驱动层（V3）
 
 ---
 
-## 五、scripts/ 脚本分类（34 个）
+## 五、scripts/ 脚本分类（按用途登记通用能力脚本）
 
 ### 5.1 设备管理类（4 个）
 
@@ -339,13 +341,12 @@ Layer 0: 源码驱动层（V3）
 | `quick_dns_check.py` | DNS 可达性对比测试（脚本侧 vs 真机侧，7 个失败源） | `python ai_tests/scripts/quick_dns_check.py` | - |
 | `quick_build_install.py` | 快速编译 + 安装 + L1 验证（步骤1编译→步骤2启动MEmu→步骤3安装→L1验证） | `python ai_tests/scripts/quick_build_install.py` | 0/1/2 |
 
-### 5.2 UI 自动化类（7 个）
+### 5.2 UI 自动化类（6 个）
 
 | 脚本 | 功能 | 安全约束 |
 |------|------|---------|
 | `dump_ui_safe.py` | 安全 dump UI 结构（过滤 text 属性，只输出 resource-id/class/bounds/clickable） | 不输出业务文本 |
 | `dump_ui_safe_v2.py` | v2（支持指定设备，过滤 text/content-desc） | 同上 |
-| `parse_ui_safe.py` | 解析 UI XML（源名替换为源[N]，只输出技术字段+中心点坐标） | 源名→源[N] |
 | `ui_explorer.py` | UI 探索辅助（解析 XML，输出 text/desc/rid/bounds/class） | 用于导航探索 |
 | `nav_helper.py` | 视频播放器导航辅助（全程脱敏，只输出编号） | 源名→编号 |
 | `l2_verify_video_player.py` | 视频播放器 L2 验证（8 场景：swipe_article/pagination/preload/position_memory/backward_compat/buffer_progress/control_visibility/error_patterns/all） | 推荐 error_patterns 场景（永久日志验证 4 个修复点 0 错误） |
@@ -365,27 +366,21 @@ Layer 0: 源码驱动层（V3）
 - 退出码：0=全覆盖 / 1=部分缺失 / 2=无用例
 - 内置自检程序（`--self-test`，3 类用例：正常/边界/异常）
 
-### 5.4 数据注入类（3 个）
+### 5.4 数据注入类（2 个）
 
 | 脚本 | 功能 | 去重逻辑 | WAL 处理 |
 |------|------|---------|---------|
 | `import_book_source.py` | 导入书源（默认 10 个，避免校验时间过长） | `INSERT OR REPLACE`（按 bookSourceUrl） | 删除 WAL/SHM 避免覆盖 |
 | `import_rss_source.py` | 导入订阅源（基础版，按 sourceUrl 单字段去重） | `DELETE WHERE sourceUrl=?` | 拉取+清理+回写 |
-| `import_rss_source_v5.py` | V5 专用（按 sourceUrl + sourceName 组合去重，保留同 URL 不同名称的子源） | `DELETE WHERE sourceUrl=? AND sourceName=?` | 同上 + 自动检测 ADB 设备 |
 
 **关键陷阱**（项目记忆铁证）：
 - `import_rss_source.py` chown 硬编码 `u0_a0:u0_a0` 是 BUG，正式包 uid=10065(u0_a65) / 测试包 uid=10064(u0_a64) / 共存包 uid 不同，导入后必须手动 chown 到目标包实际 uid 否则抛 `SQLiteCantOpenDatabaseException`
-- V5 组合去重原因：聚合/导航拆分子源共享父站 sourceUrl 但 sourceName 不同（按分类区分），原脚本按 sourceUrl 单字段去重会损失 47 个子源
 
-### 5.5 数据库查询类（8 个）
+### 5.5 数据库查询类（3 个）
 
 | 脚本 | 功能 | 技术字段 | 业务字段过滤 |
 |------|------|---------|-------------|
-| `query_image_source.py` | 查询 articleStyle=2 图片源（pull DB + sqlite3 查询） | url_prefix(前30字符) / type / articleStyle / ruleContent_len / ruleImage_len / ruleTitle_len / enabled | ✅ |
-| `query_image_source_safe.py` | 安全查询图片源（run-as cat，避免 shell 转义） | 同上 | ✅ |
-| `query_image_source_v2.py` | v2（stdin 传 SQL 给 sqlite3，避免 shell 转义） | 同上 | ✅ |
-| `query_image_source_v3.py` | v3（run-as + base64 读取 DB，sourceUrl 用 hash 替代显示） | sourceUrl_hash / type / articleStyle / 规则长度 | ✅ |
-| `query_image_source_v4.py` | v4（查询表结构 + 读取 WAL 文件，支持环境变量 DEVICE） | 表结构 + WAL 内容 | ✅ |
+| `query_image_source_safe.py` | 安全查询图片源（run-as cat，避免 shell 转义） | url_prefix(前30字符) / type / articleStyle / ruleContent_len / ruleImage_len / ruleTitle_len / enabled | ✅ |
 | `query_notnull.py` | 查询 rssArticles NOT NULL 列（PRAGMA table_info） | 列名 / 类型 / NOT NULL / default | - |
 | `query_schema.py` | 查询 rssArticles 表结构 | 列名 / 类型 | - |
 | `verify_db.py` | 验证模拟器 DB 中订阅源数量（按 type 分组统计） | total / web / img / vid / enabled 计数 | ✅ |
@@ -398,24 +393,7 @@ Layer 0: 源码驱动层（V3）
 | `inject_image_source.py` | 修改 DB：把第一个源改成 articleStyle=2 + 插入 rssArticles 记录 + push 回设备 | - |
 | `match_image_source.py` | 匹配 UI 中的图片源分类（不输出业务文本，只输出位置+长度+是否图片源） | UI 位置 + 长度 |
 
-### 5.7 V5 订阅源批量优化类（6 个）
-
-| 脚本 | 功能 | 输入 | 输出 |
-|------|------|------|------|
-| `v5_classification_scan.py` | V4 订阅源分类扫描（229 源） | optimized_v2_lite_final_v4.json | v5_classification.json（脱敏分类结果） |
-| `v5_cf_breakthrough.py` | V5 CF 盾源 4 个破盾突破（5 大技术：headful+反检测 / cookie 注入 / 等待 30s / google cache / httpx 禁用 TLS+HTTP 降级） | optimized_v5_final.json | v5_cf_breakthrough.json |
-| `v5_video_breakthrough.py` | V5 视频源 88 个深度突破（6 大突破手段，Playwright sync_api） | optimized_v5_final.json | v5_video_breakthrough.json |
-| `v5_spa_breakthrough.py` | V5 SPA 站点外链提取突破（3 个 SPA 站点，5 大技术：滚动触发懒加载 / Vue/React props 提取 / 扫描 window 对象 / 扫描 script JSON / 提取可见链接） | optimized_v5_final.json | v5_spa_breakthrough.json |
-| `v5_hard_source_fix.py` | 67 个难点源深度处理（CF 盾 / 登录源 / 弹框源 / enabled=false 恢复） | optimized_v2_lite_final_v4.json + v5_classification.json | v5_hard_source_fix.json |
-| `v5_missing_fields_fix.py` | 135 个缺字段源深度补全（Playwright mobile_context + 去弹框 JS + DOM 结构检测） | 同上 | v5_missing_fields_fix.json |
-
-**统一脱敏规范**：
-- URL → `http://[DOMAIN]/path`（路径前 30-50 字符）
-- 业务名 → `源[idx]`
-- IP → `[IP]`
-- cookie/token → `***`
-
-### 5.8 验证类（2 个）
+### 5.7 验证类（2 个）
 
 | 脚本 | 功能 | 场景 |
 |------|------|------|
@@ -462,9 +440,7 @@ M16 FeedbackLoop（依赖 config.CRASH_PATTERNS + config.PROJECT_ROOT）
 | `verify_env.py` | config |
 | `verify_thread_pool_split.py` | config + adb |
 | `import_*` 系列 | config（部分直接硬编码 ADB_PATH） |
-| `query_image_source_v3/v4.py` | 直接硬编码 ADB_PATH |
 | `nav_helper.py` | config + uiautomator2 |
-| V5 系列 | Playwright sync_api（独立运行，不依赖 lib） |
 
 ### 6.3 数据流
 
@@ -518,7 +494,7 @@ M16 反馈闭环（消费 report.json → 4 类建议 + 陷阱库/回归历史�
 | 步骤执行（前置证据→动作→后置证据） | M4 | `execute_step(step, screenshot_dir, xml_dir, step_index)` |
 | 自愈机制（3 次重试 + App 重启） | M4 | `execute_step_with_heal(...)` |
 | 阻塞屏幕关闭 | M4 | `dismiss_dialogs()`（隐私协议/帮助文档/设置本地密码/权限请求） |
-| 安全 UI dump（过滤业务文本） | scripts | `dump_ui_safe.py` / `dump_ui_safe_v2.py` / `parse_ui_safe.py` |
+| 安全 UI dump（过滤业务文本） | scripts | `dump_ui_safe.py` / `dump_ui_safe_v2.py` |
 | UI 探索辅助 | scripts | `ui_explorer.py` |
 | 视频播放器导航 | scripts | `nav_helper.py` |
 
@@ -540,7 +516,6 @@ M16 反馈闭环（消费 report.json → 4 类建议 + 陷阱库/回归历史�
 |------|--------|---------|---------|
 | 书源导入 | scripts | `import_book_source.py` | INSERT OR REPLACE（按 bookSourceUrl） |
 | 订阅源导入（基础） | scripts | `import_rss_source.py` | DELETE WHERE sourceUrl=? |
-| 订阅源导入（V5 组合去重） | scripts | `import_rss_source_v5.py` | DELETE WHERE sourceUrl=? AND sourceName=? |
 | DB 修改+回写 | scripts | `inject_image_source.py` | - |
 
 ### 7.5 数据库查询能力
@@ -549,7 +524,7 @@ M16 反馈闭环（消费 report.json → 4 类建议 + 陷阱库/回归历史�
 |------|--------|---------|---------|
 | 拉取 DB（含 WAL） | scripts | `pull_db()` | 清理本地 WAL/SHM 避免 malformed |
 | 回写 DB（清理 WAL/SHM） | scripts | `push_db()` | 删除设备 WAL/SHM 避免覆盖 |
-| articleStyle=2 图片源查询 | scripts | `query_image_source*.py`（5 个版本） | 只输出技术字段 |
+| articleStyle=2 图片源查询 | scripts | `query_image_source_safe.py` | 只输出技术字段 |
 | 表结构查询 | scripts | `query_schema.py` / `query_notnull.py` | - |
 | DB 计数验证 | scripts | `verify_db.py` | 按 type 分组统计 |
 
@@ -628,17 +603,6 @@ M16 反馈闭环（消费 report.json → 4 类建议 + 陷阱库/回归历史�
 | 回归历史条目构建 | M16 | `_build_regression_entry(report)` |
 | 陷阱库自动追加（known_issues.md） | M16 | `_append_known_issue(issue)` |
 | 回归历史自动追加（regression_history.md） | M16 | `_append_regression_history(entry)` |
-
-### 7.12 V5 订阅源批量优化能力
-
-| 能力 | 提供者 | 脚本 |
-|------|--------|------|
-| 订阅源分类扫描（229 源） | scripts | `v5_classification_scan.py` |
-| CF 盾破盾（5 大技术） | scripts | `v5_cf_breakthrough.py` |
-| 视频源深度突破（6 大手段） | scripts | `v5_video_breakthrough.py` |
-| SPA 站点外链提取（5 大技术） | scripts | `v5_spa_breakthrough.py` |
-| 难点源处理（CF 盾/登录/弹框/enabled 恢复） | scripts | `v5_hard_source_fix.py` |
-| 缺字段源补全（Playwright + 去弹框 JS + DOM 检测） | scripts | `v5_missing_fields_fix.py` |
 
 ---
 

@@ -108,3 +108,12 @@ M16 feedback_loop.py process(report)
 - **规避方式**：测试用例编写前必须核对实际 App 源码 UI 实现（EncodeToolsScreen.kt 等 Compose Screen 文件），不能基于旧 UI 设计假设；对于 Compose `ExposedDropdownMenuBox`/`Spinner` 类组件，若目标选项是默认选中（`currentType=0`），应省略"点击选择"步骤；详见 `docs/tests/F-P0-1-debug-tools.md` TC-F-P0-1-01 步骤说明注释
 - **关联 TC-ID**：TC-F-P0-1-01
 - **verdict**：已修复
+
+### [已知-009] 验证空炮（模拟器全新安装）
+
+- **分类**：环境类
+- **场景描述**：全新安装/重置后的模拟器读不到旧版本写入的脏数据（缓存/prefs/DB），"验证通过"可能是空炮——崩溃复现类验证在干净环境无法复现问题，得出虚假通过结论
+- **根因**：全新安装模拟器数据状态干净，与用户真实场景（带脏缓存/旧 prefs/旧 DB）不一致；铁证：config-needs-restart-fix 发现页崩溃在全新安装模拟器无法复现，真机有脏缓存才崩
+- **规避方式**：崩溃复现必须先构造用户数据状态（回灌旧版本脏缓存/prefs/DB 后再验证）；复现类问题先确认模拟器数据状态是否贴近用户真实场景，再判定"验证通过"是否有效
+- **关联 TC-ID**：未知（影响所有复现类验证）
+- **verdict**：已知

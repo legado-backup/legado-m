@@ -143,9 +143,9 @@
 
 ## 三、功能设计（docs/specs/）
 
-> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 61 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
+> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 62 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
 
-### 活跃 Specs（61 个）
+### 活跃 Specs（62 个）
 
 | Spec | 状态 | 说明 |
 |------|------|------|
@@ -153,6 +153,7 @@
 | [bugfix-20260822](./specs/bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
 | [bugfix-ui-20260824](./specs/bugfix-ui-20260824/README.md) | 🔄 | 20260824 用户反馈 11 项 UI/功能修复（图片圆角/搜索框/顶栏/分组/入口/文案等） |
 | [cache-entry-relocate](./specs/cache-entry-relocate/README.md) | 🔄 | 「我的」页功能归堆重构（内容与规则/外观/同步/工具/精准管理/关于 6 组框架） |
+| [enhance-switch-governance-fix](./specs/enhance-switch-governance-fix/README.md) | 🔄 | 画质增强治理修复（总开关失灵/预设脱节/无长度响应 OOM/滑条帧级开销） |
 | [cache-toggle-rename-rss-all-label](./specs/cache-toggle-rename-rss-all-label/README.md) | ✅ | 文案调整：视频缓存开关改名「播放时缓存」+订阅「全部」分组标签缩短 |
 | [config-needs-restart-fix](./specs/config-needs-restart-fix/README.md) | ✅ | 配置修改需重启生效统一修复（订阅顶栏残留+书架布局不生效）+视效对齐 archive |
 | [cookie-management-fix](./specs/cookie-management-fix/README.md) | ✅ | Cookie 管理链路修复（WebView/CookieStore/OkHttp 同步断裂 6 问题） |
@@ -198,6 +199,7 @@
 | [subpage-topbar-unify](./specs/subpage-topbar-unify/README.md) | 🔄 | 子页面头部统一（全 App TitleBar 子页批量迁移 MainTopBarView） |
 | [tag-mode-unify](./specs/tag-mode-unify/README.md) | 🔄 | 书架订阅标签样式统一（对齐 Archive MainTopBarView 顶栏标签体系） |
 | [theme-rss-header-layout-sync](./specs/theme-rss-header-layout-sync/README.md) | ✅ | 主题设置与订阅/发现页头部布局联动修复（即时刷新+废弃 key 清理） |
+| [ai-test-system-refinement](./specs/ai-test-system-refinement/README.md) | 🔄 | ai_test 体系沉淀反思优化（五批次：SOP 文档沉淀+经验回流 / 编排层 feedback+五件套接入 / 用例解析修复 30 条 seg 残留 / scripts 52 个删除候选治理 / pytest 全量验证） |
 | [thread-pool-audit](./specs/thread-pool-audit/README.md) | 🔄 | 线程池配置全面审查（13 项配置点静态审查） |
 | [topbar-icon-semantics-fix](./specs/topbar-icon-semantics-fix/README.md) | 🔄 | 顶栏图标语义与功能修复（Archive 迁移三级丢失链全量普查） |
 | [topbar-search-entry-align](./specs/topbar-search-entry-align/README.md) | ✅ | 主 Tab 头部搜索入口形态统一与主题取色对齐（消费主题槽位） |
