@@ -1,329 +1,263 @@
 # 文档索引
 
-> 项目所有文档的统一入口，覆盖项目规范、项目流程、功能设计、核�?Skill 四类文档�?
+> 项目所有文档的统一入口，覆盖项目规范、项目流程、功能设计、核心 Skill 五类文档。最后更新：2026-08-30（文档规整重建，历史 spec 已归档至 docs/specs/archive/）。
 
 ---
 
-## 一、项目规范（docs/project-rules/�?
+## 一、项目规范（docs/project-rules/）
 
-> AI Agent 编码时必须遵循的项目特有规则，按需加载�?
+> AI Agent 编码时必须遵循的项目特有规则，按需加载。
 
 | 规范 | 文件 | 核心内容 |
 |------|------|----------|
-| 命名规范 | [project-rules/naming_rules.md](./project-rules/naming_rules.md) | 类后缀约定+up/dur/Await缩写+常量混合风格+扩展函数组织+包结�?|
-| 代码风格 | [project-rules/checkstyle_rules.md](./project-rules/checkstyle_rules.md) | Coroutine链式封装+双版本模�?kotlin.runCatching+object单例+@IntDef+顶层lazy |
-| 异常处理 | [project-rules/exception_rules.md](./project-rules/exception_rules.md) | NoStackTraceException体系+四种捕获模式+网络错误�?协程异常 |
-| 日志规范 | [project-rules/logging_rules.md](./project-rules/logging_rules.md) | AppLog+LogUtils+DebugLog三层体系+标签约定+使用规则 |
-| 架构模式 | [project-rules/architecture_rules.md](./project-rules/architecture_rules.md) | 手动DI+ViewModel模式+Room配置+Web服务�?事件系统+模块依赖+构建配置 |
-| 测试规范 | [project-rules/testing_rules.md](./project-rules/testing_rules.md) | JUnit4+书源自测三阶�?测试运行命令 |
-| 工作流程 | [project-rules/openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec四文�?强制检查点+文档同步映射�?子代理使用指�?上下文预算检�?|
-| 延伸版本对比方法�?| [project-rules/forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 27+延伸版本清单+五阶段对比流�?优先级矩�?踩坑案例 |
-| E2E测试流程 | [project-rules/ai_e2e_testing_workflow.md](./project-rules/ai_e2e_testing_workflow.md) | 5.5.1-5.5.8八步强制流程+固化层保�?V3.1快速验证脚�?|
-| 测试用例设计 | [project-rules/test-case-design-guide.md](./project-rules/test-case-design-guide.md) | 双轨�?源码溯源字段+步骤语义�?|
-| 改造过程日�?| [project-rules/logging-during-refactoring.md](./project-rules/logging-during-refactoring.md) | 10类必加日志场�?永久/临时双轨+Tag规范+验证检查清�?|
-| 版本交付同步 | [project-rules/version-delivery-sync.md](./project-rules/version-delivery-sync.md) | 同步清单+updateLog.md格式+编译前更新时�?|
-| 复杂任务流水�?| [project-rules/complex-task-pipeline.md](./project-rules/complex-task-pipeline.md) | 五阶段流水线+硬性约束（单子代理�?2文件�?反模�?|
-| 子代理质量管�?| [project-rules/sub-agent-quality-management.md](./project-rules/sub-agent-quality-management.md) | 分级子代理策略（低风险强�?高风险禁止）+prompt四要�?主代理监�?二次验证+兜底机制 |
-| 全局思考检查清�?| [project-rules/global-thinking-checklist.md](./project-rules/global-thinking-checklist.md) | 改动功能前强制门禁：前端入口+后端接口+数据�?覆盖安装+使用场景+回填�?维度盘点 |
-| 错误沉淀机制 | [project-rules/spec-sedimentation-mechanism.md](./project-rules/spec-sedimentation-mechanism.md) | 错误→沉淀→子规范→主规范引用闭环+5条沉淀规则+3次验证流�?|
-| 数据库升级安全规�?| [project-rules/database-migration-safety.md](./project-rules/database-migration-safety.md) | DatabaseView修改DROP+CREATE+migration runCatching+version递增+覆盖安装兼容�?|
-| 真机测试流程复用 | [project-rules/real-device-test-reuse.md](./project-rules/real-device-test-reuse.md) | 可用脚本清单+测试流程模板+问题闭环+数据库验证（WAL�?校验必须触发真实路径 |
-| 包名规范 | [project-rules/package-naming.md](./project-rules/package-naming.md) | 构建APK包名配置+与原版共�?|
-| 延伸版本参�?| [project-rules/forks-reference.md](./project-rules/forks-reference.md) | 网络�?前端/协程/WebView/数据管理组件优化或功能借鉴任务的方法论 |
-| 前端UI规范 | [project-rules/frontend-ui-standards.md](./project-rules/frontend-ui-standards.md) | archive迁移后前端统一基线：设计Token(AppShapes/UiCorner)+页面骨架分型+组件六族选用+View/Compose混用红线+改造检查清单+已知坑 |
+| 命名规范 | [naming_rules.md](./project-rules/naming_rules.md) | 类后缀约定+up/dur/Await 缩写+常量混合风格+扩展函数组织+包结构 |
+| 代码风格 | [checkstyle_rules.md](./project-rules/checkstyle_rules.md) | Coroutine 链式封装+双版本模式+kotlin.runCatching+object 单例+@IntDef+顶层 lazy |
+| 异常处理 | [exception_rules.md](./project-rules/exception_rules.md) | NoStackTraceException 体系+四种捕获模式+网络错误+协程异常 |
+| 日志规范 | [logging_rules.md](./project-rules/logging_rules.md) | AppLog+LogUtils+DebugLog 三层体系+标签约定+使用规则 |
+| 架构模式 | [architecture_rules.md](./project-rules/architecture_rules.md) | 手动 DI+ViewModel 模式+Room 配置+Web 服务+事件系统+模块依赖+构建配置 |
+| 测试规范 | [testing_rules.md](./project-rules/testing_rules.md) | JUnit4+书源自测三阶段+测试运行命令 |
+| 工作流程 | [openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec 四文档+强制检查点+文档同步映射表+子代理使用指引+上下文预算检查 |
+| 延伸版本对比方法论 | [forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 27+延伸版本清单+五阶段对比流程+优先级矩阵+踩坑案例 |
+| E2E 测试流程 | [ai_e2e_testing_workflow.md](./project-rules/ai_e2e_testing_workflow.md) | 5.5.1-5.5.8 八步强制流程+固化层保护+V3.1 快速验证脚本 |
+| 测试用例设计 | [test-case-design-guide.md](./project-rules/test-case-design-guide.md) | 双轨制+源码溯源字段+步骤语义化 |
+| 改造过程日志 | [logging-during-refactoring.md](./project-rules/logging-during-refactoring.md) | 10 类必加日志场景+永久/临时双轨+Tag 规范+验证检查清单 |
+| 版本交付同步 | [version-delivery-sync.md](./project-rules/version-delivery-sync.md) | 同步清单+updateLog.md 格式+编译前更新时机 |
+| 复杂任务流水线 | [complex-task-pipeline.md](./project-rules/complex-task-pipeline.md) | 五阶段流水线+硬性约束（单子代理≤12 文件）+反模式 |
+| 子代理质量管理 | [sub-agent-quality-management.md](./project-rules/sub-agent-quality-management.md) | 分级子代理策略（低风险强制/高风险禁止）+prompt 四要素+主代理监督+二次验证+兜底机制 |
+| 全局思考检查清单 | [global-thinking-checklist.md](./project-rules/global-thinking-checklist.md) | 改动功能前强制门禁：前端入口+后端接口+数据库+覆盖安装+使用场景+回填点 6 维盘点 |
+| 错误沉淀机制 | [spec-sedimentation-mechanism.md](./project-rules/spec-sedimentation-mechanism.md) | 错误→沉淀→子规范→主规范引用闭环+5 条沉淀规则+3 次验证流程 |
+| 数据库升级安全规范 | [database-migration-safety.md](./project-rules/database-migration-safety.md) | DatabaseView 修改 DROP+CREATE+migration runCatching+version 递增+覆盖安装兼容性 |
+| 真机测试流程复用 | [real-device-test-reuse.md](./project-rules/real-device-test-reuse.md) | 可用脚本清单+测试流程模板+问题闭环+数据库验证（WAL 模式校验必须触发真实路径） |
+| 包名规范 | [package-naming.md](./project-rules/package-naming.md) | 构建 APK 包名配置+与原版共存 |
+| 延伸版本参考 | [forks-reference.md](./project-rules/forks-reference.md) | 网络层/前端/协程/WebView/数据管理组件优化或功能借鉴任务的方法论 |
+| 前端 UI 规范 | [frontend-ui-standards.md](./project-rules/frontend-ui-standards.md) | archive 迁移后前端统一基线：设计 Token（AppShapes/UiCorner）+页面骨架分型+组件六族选用+View/Compose 混用红线+改造检查清单+已知坑 |
+| Git 提交工作流 | [git-commit-workflow.md](./project-rules/git-commit-workflow.md) | Git 提交工作流 |
+| APK 发布工作流 | [apk-publish-workflow.md](./project-rules/apk-publish-workflow.md) | APK 正式发布流程 |
+| 工作方法论 | [work-methodology.md](./project-rules/work-methodology.md) | 大型任务（10+ 文件/多 Issue）工作方法论 |
 
 ---
 
-## 二、项目流程（docs/project-flow/�?
+## 二、项目流程（docs/project-flow/）
 
-> 项目架构和模块的详细技术文档，按需加载�?
+> 项目架构和模块的详细技术文档，按需加载。
 
-### 快速入�?
+### 快速入口
 
 | 文档 | 核心内容 |
 |------|----------|
 | [project-flow/quick-reference.md](./project-flow/quick-reference.md) | 命令/文件/版本锁定速查 |
-| [project-flow/task-navigation.md](./project-flow/task-navigation.md) | 14个任务导航表（按任务类型索引代码锚点�?|
-| [project-flow/build-apk-guide.md](./project-flow/build-apk-guide.md) | APK打包全流程：环境搭建+签名+构建+包名修改 |
-| [project-flow/INDEX.md](./project-flow/INDEX.md) | 关键词索引（A-Z�?|
+| [project-flow/task-navigation.md](./project-flow/task-navigation.md) | 14 个任务导航表（按任务类型索引代码锚点） |
+| [project-flow/build-apk-guide.md](./project-flow/build-apk-guide.md) | APK 打包全流程：环境搭建+签名+构建+包名修改 |
+| [project-flow/INDEX.md](./project-flow/INDEX.md) | 关键词索引（A-Z） |
+| [project-flow/git-repo-management.md](./project-flow/git-repo-management.md) | Git 仓库管理规范（master 分支+Conventional Commits） |
+| [project-flow/README.md](./project-flow/README.md) | 项目文档导航 |
 
-### 架构文档
-
-| 文档 | 核心内容 |
-|------|----------|
-| [project-flow/architecture/rule-engine.md](./project-flow/architecture/rule-engine.md) | SourceRule状态机+五种解析+JS环境+WebJs模式+变量系统+ruleType常量 |
-| [project-flow/architecture/rule-engine-algorithms.md](./project-flow/architecture/rule-engine-algorithms.md) | SourceRule完整规范+RuleAnalyzer完整算法+五种解析器算法细�?Mode枚举 |
-| [project-flow/architecture/rule-engine-js-env.md](./project-flow/architecture/rule-engine-js-env.md) | AnalyzeRule/AnalyzeUrl环境绑定+ajax跨域请求+Rhino编译缓存+共享作用�?@put/@get变量机制 |
-| [project-flow/architecture/skill-architecture.md](./project-flow/architecture/skill-architecture.md) | Skill架构：金字塔架构+5阶段工作�?JVM仿真�?basic-memory经验引擎+固化脚本+审计�?|
-| [project-flow/architecture/multi-agent-analysis-spec.md](./project-flow/architecture/multi-agent-analysis-spec.md) | 五阶段流水线+单代理≤12文件+并行+交叉验证+导航同步 |
-| [project-flow/architecture/overview.md](./project-flow/architecture/overview.md) | 项目架构总览 |
-| [project-flow/architecture/android-ui.md](./project-flow/architecture/android-ui.md) | MainActivity导航+ReadBookActivity三层继承+RSS UI+Activity体系+Fragment+Widget+Theme |
-| [project-flow/architecture/api-dataflow.md](./project-flow/architecture/api-dataflow.md) | HTTP/WebSocket/Beacon完整链路+API对照�?|
-| [project-flow/architecture/app-init.md](./project-flow/architecture/app-init.md) | 50步启动流�?常量系统+EventBus+异常体系+监控 |
-| [project-flow/architecture/base-layer.md](./project-flow/architecture/base-layer.md) | BaseActivity/VMBaseActivity/BaseViewModel/BaseService/RecyclerAdapter/Diff+动画 |
-| [project-flow/architecture/frontend.md](./project-flow/architecture/frontend.md) | Vue3 MPA架构+config/types�?模块+路由+组件�?技术栈 |
-| [project-flow/architecture/frontend-components.md](./project-flow/architecture/frontend-components.md) | Vue3 Web重构方案—组件与页面：路由设�?页面组件+通用组件 |
-| [project-flow/architecture/frontend-stores.md](./project-flow/architecture/frontend-stores.md) | Vue3 Web重构方案—Store与API层：TypeScript类型定义+Pinia Store+API调用�?|
-| [project-flow/architecture/network-layer.md](./project-flow/architecture/network-layer.md) | OkHttp拦截器链+SSL全信�?Cookie双层+Cronet加�?代理 |
-
-### 模块文档
+### 架构文档（project-flow/architecture/）
 
 | 文档 | 核心内容 |
 |------|----------|
-| [project-flow/modules/webbook-search.md](./project-flow/modules/webbook-search.md) | WebBook双版�?并发搜索调度+四分类聚合去�?发现/详情/目录/正文全链�?|
-| [project-flow/modules/content-pipeline.md](./project-flow/modules/content-pipeline.md) | ContentProcessor七步管线+替换规则引擎+分段/简�?样式适配 |
-| [project-flow/modules/reading-engine.md](./project-flow/modules/reading-engine.md) | ReadBook状态机+三章缓存+预下�?翻页跳章+漫画+音频 |
-| [project-flow/modules/reading-engine-pagination.md](./project-flow/modules/reading-engine-pagination.md) | durChapterPos字符偏移分页机制+TextChapter数据结构+页面计算算法+6种翻页动�?|
-| [project-flow/modules/reading-engine-media.md](./project-flow/modules/reading-engine-media.md) | ReadManga漫画阅读+AudioPlay音频播放+BookType位标�?|
-| [project-flow/modules/data-layer.md](./project-flow/modules/data-layer.md) | 21实体+21DAO+1视图+BookChapter复合主键+AutoMigration+位标�?TypeConverter |
-| [project-flow/modules/web-service.md](./project-flow/modules/web-service.md) | NanoHTTPD路由+14POST+12GET+4控制�?WebSocket+静态服�?|
-| [project-flow/modules/local-book.md](./project-flow/modules/local-book.md) | TXT编码检�?目录规则自动�?EPUB懒加�?PDF/MOBI |
-| [project-flow/modules/service-layer.md](./project-flow/modules/service-layer.md) | WebDAV同步+下载缓存+TTS朗读+RSS子系�?JS扩展函数 |
-| [project-flow/modules/config-system.md](./project-flow/modules/config-system.md) | AppConfig/ReadBookConfig/ThemeConfig/SourceConfig/LocalConfig |
-| [project-flow/modules/android-services.md](./project-flow/modules/android-services.md) | 11个Service+WebSocketServer+ExoPlayer+朗读状态机+音频焦点+WakeLock+通知 |
-| [project-flow/modules/backup-restore.md](./project-flow/modules/backup-restore.md) | 21数据源JSON导出+AES加密+WebDAV同步+Mutex并发 |
-| [project-flow/modules/remote-third-party.md](./project-flow/modules/remote-third-party.md) | RemoteBook/WebDAV浏览+Glide/GSYVideo/ExoPlayer+更新系统 |
-| [project-flow/modules/js-extensions.md](./project-flow/modules/js-extensions.md) | 30+ JS可调用方法：ajax/connect/webView/cache/file/encode/python |
-| [project-flow/modules/source-management.md](./project-flow/modules/source-management.md) | 导入/导出/校验/调试/登录/18+过滤/排序全链�?|
-| [project-flow/modules/model-layer.md](./project-flow/modules/model-layer.md) | ReadAloud/VideoPlay/BookCover/CheckSource/Debug/RuleUpdate/SharedJsScope |
-| [project-flow/modules/rss-subsystem.md](./project-flow/modules/rss-subsystem.md) | Rss调度+RssParserByRule规则解析+RssParserDefault标准解析+文章流UI |
-| [project-flow/modules/rss-image-type-analysis.md](./project-flow/modules/rss-image-type-analysis.md) | 图片类型订阅源（type=1）内容规则加载图片完整链�?ruleContent适配方式+coverDecodeJs解密+与BookSource差距分析 |
-| [project-flow/modules/tools-infrastructure.md](./project-flow/modules/tools-infrastructure.md) | utils工具�?协程封装+加密+广播接收�?|
-| [project-flow/modules/custom-libraries.md](./project-flow/modules/custom-libraries.md) | MOBI解析引擎+WebDAV客户�?主题引擎+阿里云TTS |
+| [architecture/rule-engine.md](./project-flow/architecture/rule-engine.md) | SourceRule 状态机+五种解析+JS 环境+WebJs 模式+变量系统+ruleType 常量 |
+| [architecture/rule-engine-algorithms.md](./project-flow/architecture/rule-engine-algorithms.md) | SourceRule 完整规范+RuleAnalyzer 完整算法+五种解析器算法细节+Mode 枚举 |
+| [architecture/rule-engine-js-env.md](./project-flow/architecture/rule-engine-js-env.md) | AnalyzeRule/AnalyzeUrl 环境绑定+ajax 跨域请求+Rhino 编译缓存+共享作用域+@put/@get 变量机制 |
+| [architecture/skill-architecture.md](./project-flow/architecture/skill-architecture.md) | Skill 架构：金字塔架构+5 阶段工作流+JVM 仿真器+basic-memory 经验引擎+固化脚本+审计器 |
+| [architecture/multi-agent-analysis-spec.md](./project-flow/architecture/multi-agent-analysis-spec.md) | 大规模并行子代理分析验证修复方法论：五阶段流水线+单代理≤12 文件+并行+交叉验证+导航同步 |
+| [architecture/overview.md](./project-flow/architecture/overview.md) | 架构全景图 |
+| [architecture/android-ui.md](./project-flow/architecture/android-ui.md) | Android UI 层架构：MainActivity 导航+ReadBookActivity 三层继承+RSS UI+Activity 体系+Fragment+Widget+Theme |
+| [architecture/api-dataflow.md](./project-flow/architecture/api-dataflow.md) | 接口数据流—前后端交互全链路：HTTP/WebSocket/Beacon 完整链路+API 对照表 |
+| [architecture/app-init.md](./project-flow/architecture/app-init.md) | App 入口与初始化流程：50 步启动流程+常量系统+EventBus+异常体系+监控 |
+| [architecture/base-layer.md](./project-flow/architecture/base-layer.md) | Base 类与 MVVM 体系：BaseActivity/VMBaseActivity/BaseViewModel/BaseService/RecyclerAdapter/Diff+动画 |
+| [architecture/frontend.md](./project-flow/architecture/frontend.md) | 前端架构—Vue3 Web 管理界面：MPA 架构+config/types 工具+模块+路由+组件+技术栈 |
+| [architecture/frontend-components.md](./project-flow/architecture/frontend-components.md) | Vue3 Web 重构方案—组件与页面：路由设计+页面组件+通用组件 |
+| [architecture/frontend-stores.md](./project-flow/architecture/frontend-stores.md) | Vue3 Web 重构方案—Store 与 API 层：TypeScript 类型定义+Pinia Store+API 调用层 |
+| [architecture/network-layer.md](./project-flow/architecture/network-layer.md) | 网络层架构：OkHttp 拦截器链+SSL 全信任+Cookie 双层+Cronet 加速+代理 |
+| [architecture/build-configuration.md](./project-flow/architecture/build-configuration.md) | Legado 构建配置与依赖体系 |
+| [architecture/ci-cd-pipeline.md](./project-flow/architecture/ci-cd-pipeline.md) | CI/CD 流程文档 |
+| [architecture/intent-deep-links.md](./project-flow/architecture/intent-deep-links.md) | Intent 与深度链接体系 |
+| [architecture/multi-module-architecture.md](./project-flow/architecture/multi-module-architecture.md) | 多模块架构 |
+| [architecture/security-model.md](./project-flow/architecture/security-model.md) | Legado 安全模型 |
 
-### 数据库文�?
+### 模块文档（project-flow/modules/）
 
 | 文档 | 核心内容 |
 |------|----------|
-| [project-flow/database/overview.md](./project-flow/database/overview.md) | 数据库架构总览 |
-| [project-flow/database/entities.md](./project-flow/database/entities.md) | 实体详细定义 |
-| [project-flow/database/tables.md](./project-flow/database/tables.md) | 数据库v89全部21张表完整DDL+索引定义+约束说明 |
+| [modules/webbook-search.md](./project-flow/modules/webbook-search.md) | WebBook 搜索与网络书模块：双版本+并发搜索调度+四分类聚合去重+发现/详情/目录/正文全链路 |
+| [modules/content-pipeline.md](./project-flow/modules/content-pipeline.md) | 内容处理管线：ContentProcessor 七步管线+替换规则引擎+分段/简繁+样式适配 |
+| [modules/reading-engine.md](./project-flow/modules/reading-engine.md) | 阅读引擎模块：ReadBook 状态机+三章缓存+预下载+翻页跳章+漫画+音频 |
+| [modules/reading-engine-pagination.md](./project-flow/modules/reading-engine-pagination.md) | 阅读引擎分页算法详解：durChapterPos 字符偏移分页机制+TextChapter 数据结构+页面计算算法+6 种翻页动画 |
+| [modules/reading-engine-media.md](./project-flow/modules/reading-engine-media.md) | 多媒体阅读（漫画+音频）：ReadManga 漫画阅读+AudioPlay 音频播放+BookType 位标记 |
+| [modules/data-layer.md](./project-flow/modules/data-layer.md) | 数据层模块：21 实体+21DAO+1 视图+BookChapter 复合主键+AutoMigration+位标记+TypeConverter |
+| [modules/web-service.md](./project-flow/modules/web-service.md) | Web 服务与 API 模块：NanoHTTPD 路由+14POST+12GET+4 控制+WebSocket+静态服务 |
+| [modules/local-book.md](./project-flow/modules/local-book.md) | 本地书籍解析模块：TXT 编码检测+目录规则自动匹配+EPUB 懒加载+PDF/MOBI |
+| [modules/service-layer.md](./project-flow/modules/service-layer.md) | 服务层与辅助模块：WebDAV 同步+下载缓存+TTS 朗读+RSS 子系统+JS 扩展函数 |
+| [modules/config-system.md](./project-flow/modules/config-system.md) | 配置系统：AppConfig/ReadBookConfig/ThemeConfig/SourceConfig/LocalConfig |
+| [modules/android-services.md](./project-flow/modules/android-services.md) | Android Service 层：11 个 Service+WebSocketServer+ExoPlayer+朗读状态机+音频焦点+WakeLock+通知 |
+| [modules/backup-restore.md](./project-flow/modules/backup-restore.md) | 备份恢复系统：21 数据源 JSON 导出+AES 加密+WebDAV 同步+Mutex 并发 |
+| [modules/remote-third-party.md](./project-flow/modules/remote-third-party.md) | 远程书籍与第三方集成：RemoteBook/WebDAV 浏览+Glide/GSYVideo/ExoPlayer+更新系统 |
+| [modules/js-extensions.md](./project-flow/modules/js-extensions.md) | JS 扩展函数体系：30+ JS 可调用方法 ajax/connect/webView/cache/file/encode/python |
+| [modules/source-management.md](./project-flow/modules/source-management.md) | 书源管理全链路：导入/导出/校验/调试/登录/18+过滤/排序 |
+| [modules/model-layer.md](./project-flow/modules/model-layer.md) | Model 层全局单例：ReadAloud/VideoPlay/BookCover/CheckSource/Debug/RuleUpdate/SharedJsScope |
+| [modules/rss-subsystem.md](./project-flow/modules/rss-subsystem.md) | RSS 子系统：Rss 调度+RssParserByRule 规则解析+RssParserDefault 标准解析+文章流 UI |
+| [modules/tools-infrastructure.md](./project-flow/modules/tools-infrastructure.md) | 工具与辅助层：utils 工具类+协程封装+加密+广播接收器 |
+| [modules/custom-libraries.md](./project-flow/modules/custom-libraries.md) | 自定义库层：MOBI 解析引擎+WebDAV 客户端+主题引擎+阿里云 TTS |
+| [modules/association-import.md](./project-flow/modules/association-import.md) | 关联导入体系 |
+| [modules/constant-system.md](./project-flow/modules/constant-system.md) | 常量系统 |
+| [modules/exception-system.md](./project-flow/modules/exception-system.md) | 异常体系 |
+| [modules/glide-video-webview.md](./project-flow/modules/glide-video-webview.md) | Glide 图片加载·视频播放·WebView 池化 |
+| [modules/help-layer.md](./project-flow/modules/help-layer.md) | Help 辅助层 |
+| [modules/http-helper-layer.md](./project-flow/modules/http-helper-layer.md) | HTTP 辅助层 |
+| [modules/receiver-system.md](./project-flow/modules/receiver-system.md) | 广播接收器体系 |
+| [modules/rhino-module.md](./project-flow/modules/rhino-module.md) | Rhino 模块深度分析 |
+| [modules/source-extensions.md](./project-flow/modules/source-extensions.md) | 源辅助与扩展 |
+| [modules/ui-core-pages.md](./project-flow/modules/ui-core-pages.md) | 核心 UI 页面深度分析 |
+| [modules/ui-secondary-pages.md](./project-flow/modules/ui-secondary-pages.md) | 次要 UI 页面架构文档 |
+| [modules/update-system.md](./project-flow/modules/update-system.md) | 应用更新系统 |
+| [modules/utils-extensions.md](./project-flow/modules/utils-extensions.md) | 工具与扩展函数体系 |
+| [modules/widget-system.md](./project-flow/modules/widget-system.md) | 自定义控件体系 |
+
+### 数据库文档（project-flow/database/）
+
+| 文档 | 核心内容 |
+|------|----------|
+| [database/overview.md](./project-flow/database/overview.md) | 数据库概览（架构总览） |
+| [database/entities.md](./project-flow/database/entities.md) | 核心实体字段详解 |
+| [database/tables.md](./project-flow/database/tables.md) | 数据库全部表 DDL+索引（版本以 AppDatabase.kt 为准，当前 v108） |
+
+### UI 设计标准（project-flow/ui-standards/）
+
+> UI 设计架构体系：四组件族基线+取色唯一基线+开发门禁，前端 UI 改造必读。
+
+| 文档 | 核心内容 |
+|------|----------|
+| [ui-standards/architecture.md](./project-flow/ui-standards/architecture.md) | UI 设计架构体系（总纲）—AI 前端开发必读：四组件族基线+取色唯一基线+开发门禁 |
+| [ui-standards/README.md](./project-flow/ui-standards/README.md) | ui-standards 文档索引 |
+| [ui-standards/color.md](./project-flow/ui-standards/color.md) | §9.2 取色规范 |
+| [ui-standards/components.md](./project-flow/ui-standards/components.md) | §9.1 组件目录 |
+| [ui-standards/dialog-shell.md](./project-flow/ui-standards/dialog-shell.md) | §9.5 对话框壳（Dialog Shell） |
+| [ui-standards/how-to.md](./project-flow/ui-standards/how-to.md) | UI 实操指南（How-to）—AI 新增/修改 UI 的即查手册 |
+| [ui-standards/migration-registry.md](./project-flow/ui-standards/migration-registry.md) | §9.6 迁移登记表（Archive 对齐迁移） |
+| [ui-standards/page-skeleton.md](./project-flow/ui-standards/page-skeleton.md) | §9.4 页面骨架（Scaffold） |
+| [ui-standards/spacing-corner-typography.md](./project-flow/ui-standards/spacing-corner-typography.md) | §9.3 间距/圆角/字体规范 |
+| [ui-standards/theme-architecture.md](./project-flow/ui-standards/theme-architecture.md) | §9.7 主题体系架构总纲：三大体系+红线禁令 |
 
 ---
 
-## 三、功能设计（docs/specs/�?
+## 三、功能设计（docs/specs/）
 
-> 功能设计文档，按 OpenSpec 工作流程管理�?
+> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 61 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
 
-### 活跃 Specs
+### 活跃 Specs（61 个）
 
-| 文档 | 说明 |
-|------|------|
-| [specs/bookshelf-refresh-and-title-font/](./specs/bookshelf-refresh-and-title-font/README.md) | 书架下拉刷新转圈不消失 + 顶栏标题字号不统一修复（① 转圈复位与真实刷新脱钩：唯一复位点 delay(1000) 盲定时 + Fragment 级 lifecycleScope 销毁冻结 + material3 受控竞态；修复为 MainViewModel 暴露 upTocIdle StateFlow 事件驱动复位 + viewLifecycle scope + 5s 兜底 ② 书架标题 24sp 硬编码特判 vs 其他页 20sp：去除 Mode.BOOKSHELF 分支统一 20sp） ✅ 实施完成（编译门禁+真机核验通过） |
-| [specs/list-residue-compose/](./specs/list-residue-compose/README.md) | 列表 Compose 化残留清账（高亮三弹框 + CacheActivity 缓存列表 + 探索瀑布流，共 5 弹框 2 列表 Compose 化，删除 6 冗余布局 + 3 Adapter） ✅ 实施完成（真机回归：缓存页全链路 PASS；探索瀑布待发现源数据补验 3.2b） |
-| [specs/download-manager-optimize/](./specs/download-manager-optimize/README.md) | 下载管理深度优化（全面分析下载管理面 48 项（批次内 36 项）待优化：P1 五项正确性——分片完整性校验缺失×2/续传 total 一致性/Service 重建后删任务孤儿文件/UI 未订阅 StateFlow 改轮询；批次 A P1 正确性 + B 引擎健壮性（进度落库节流/HLS IV MEDIA-SEQUENCE/磁盘预检/僵尸字段清理 DB 107→108 等 11 项）+ C 数据一致性与 UI 收口 + D UX 增强 + E IDM 动态分段引擎（单文件绝对偏移写入/逻辑分段队列/动态分裂窃取/.seg 断点文件/单流回退）；成熟方案调研 Media3/OkDownload/Fetch/aria2/OkHttp Range 后裁定演进式自研引擎优化不引库） ✅ 实施完成（编译门禁+真机核验通过） |
-| [specs/video-player-image-enhance/](./specs/video-player-image-enhance/README.md) | 视频播放器画质增强三级档位（A 基础·全机型：色彩四参数+预设 TextureView ColorFilter；B 进阶·中端+：CAS 自适应锐化+降噪 Media3 Effect；B+ 高级·中高端+：Anime4K CNN 超分 2x+CAS 组合，SoC 定级门禁+掉帧守护；C 探索登记：TFLite AI/SDR→HDR；穿透验证清单 K1✅已核实默认 TextureView/K2 待实测/K3-K7 预案） 🔄 设计中（A0 无侵入验证完成，K2 待运行时实测） |
-| [specs/video-player-ux-fixes/](./specs/video-player-ux-fixes/README.md) | 视频播放器体验五项修复（① 本地已下载视频播放隐藏下载按钮（file:// 判定）② 滑动快进灵敏度可配置（5 档，video_config 持久化）③ 右上角配置弹框透明修复+AppDialogFrame 规范壳+VideoSettingsPanelContent 取色同源 ④ 全屏标题移到左上角返回键右侧 ⑤ 全屏返回按钮图标收敛 20dp 对齐规范） ✅ 实施完成（编译门禁 BUILD SUCCESSFUL 2026-08-29；测试包 082910 已装机；L2 真机验证待恢复） |
-| [specs/download-hls-complete-fix/](./specs/download-hls-complete-fix/README.md) | 下载 HLS 完成链路修复（mp4 只几百 KB：MediaMuxer 视频轨 csd 不完整触发 native SIGABRT 杀进程→任务悬在 RUNNING 不进完成列表；修复 csd 严格校验+TsFallback 兜底+完成列表软件内内置播放器播放） 🔄 设计中 |
-| [specs/header-search-unify/](./specs/header-search-unify/README.md) | 主Tab头部搜索入口统一（以订阅页为标准：只有搜索按钮→点击进入搜索；书架去无效 searchEntry 胶囊（点击无响应仅留按钮）；我的页新建全屏设置搜索页 SettingsSearchActivity 复用 LegadoTheme+MySettingsScreen 主题零破坏，设置数据逻辑提取共享防漂移） ✅ 实施完成（编译通过，待真机验证；发现页 Out of Scope 已由 topbar-search-entry-align 补齐） |
-| [specs/topbar-search-entry-align/](./specs/topbar-search-entry-align/README.md) | 主Tab头部搜索入口形态统一与主题取色对齐（发现/订阅仍显示 searchEntry 胶囊"搜索框"外观 vs 书架/我的纯按钮，订阅页真根因=selectSource 覆盖初始化状态；关胶囊触发 titleSelect 源选择入口回归；Compose SettingsSearchBar 用 M3 surfaceVariant 属违规取色且不消费「搜索框背景色」主题设置→消费 ThemeUiPalette 槽位+alpha 对齐+清除违规；前端 UI 规范补"入口形态+取色双端一致"条款并修订 §1.4 矛盾条款；订阅页已裁决纯按钮） ✅ 实施完成（编译门禁 BUILD SUCCESSFUL 2026-08-29；真机 L2 归后续会话） |
-| [specs/rss-image-load-optimization/](./specs/rss-image-load-optimization/README.md) | 图片订阅源加载优化（参考书源加载机制：URL 解析结果缓存跳过网络请求+WebView 嗅探 / 图集模式按屏幕采样解码 / 前 3 张并发预下载，显著缩短首图出现与切图时间） 🔄 开发中（编译验证后转已完成） |
-| [specs/folder-cover-replace-bugfix/](./specs/folder-cover-replace-bugfix/README.md) | 文件夹封面替换回归修复（订阅源/书架文件夹自定义封面替换后不生效：根因为订阅文件夹 Compose 化迁移后替换/恢复入口只更新 View 版 Adapter、漏更新 `folderComposeCovers` 状态源致 Compose 不重组；书架待真机确认） 🔄 设计中 |
-| [specs/rss-folder-cover-dialog-align/](./specs/rss-folder-cover-dialog-align/README.md) | 订阅文件夹封面弹框对齐书架（经典订阅长按文件夹现为直调 HandleFileActivity 通用列表：无标准弹框/无预览/无恢复默认入口/URL 语义分歧；新建 RssFolderCoverDialog 走 ComposeDialogFragment+AppDialogFrame 标准体系，含 BookCoverImage 预览+选图（http 直存对齐书架）+恢复默认+确定取消编辑态语义；存储保持 source_group_covers 表） ✅ 实施完成（编译门禁+测试包 082917 装机 L1+L2 真机验证 ALL PASS；S2/S3 完整点击链路留用户自测） |
-| [specs/folder-cover-ratio-archive-align/](./specs/folder-cover-ratio-archive-align/README.md) | 文件夹封面比例对齐 Archive（书架/发现页/View版文件夹封面宽高比 0.7 → 0.75，对齐阅读Archive CoverImageView 的 4:3，消除方形/横版封面的"拉长"失真与不协调观感） 🔄 设计中 |
-| [specs/tag-mode-unify/](./specs/tag-mode-unify/README.md) | 书架订阅标签样式统一（书架 style1 分组切换由 Compose ScrollableTabRow 改为 MainTopBarView 顶栏标签体系：titleSelect 分组名+向下箭头弹出分组菜单 / primaryBar 分组胶囊 / tagsBar 书本标签多级过滤 / filterToggleButton 右侧向下展开，与订阅共用 RoundedTagBarView 实现观感统一，对齐 Rimchars archive） 🔄 设计中 |
-| [specs/my-topbar-unify/](./specs/my-topbar-unify/README.md) | 我的页头部统一（「我的」页头部从 TitleBar 迁移到 MainTopBarView 新增 Mode.MY，与书架/订阅/发现同一组件、观感一致，样式可被顶栏设置/主题设置/样式管理全量管理；保留设置项就地搜索能力） ✅ 实施完成（待真机 L2 验证） |
-| [specs/rss-folder-subtag-fix/](./specs/rss-folder-subtag-fix/README.md) | 订阅文件夹样式头部误显标签/箭头修复（点进文件夹后头部误显二级源标签+向下箭头；根因 renderRssSecondaryTags 无条件 showTags(true)；修复为仅标签样式展示） 🔄 设计中 |
-| [specs/subpage-topbar-unify/](./specs/subpage-topbar-unify/README.md) | 子页面头部统一（全 App TitleBar 子页迁移 MainTopBarView，新增 Mode.SUB 支持返回/菜单/副标题/内容插槽，子页头部全量受顶栏/主题/样式管理，批量分 3 批迁移） 🔄 设计中 |
-| [specs/highlight-dialog-compose/](./specs/highlight-dialog-compose/README.md) | 高亮三弹框 Compose 化（7.11am 残留：HighlightRuleEditDialog/HighlightRuleGroupManageDialog/HighlightPresetRuleDialog 由 BaseDialogFragment+XML 统一迁移 ComposeDialogFragment+AppDialogFrame，分组管理对照 GroupManageComposeDialog 薄壳受控模式，删除 dialog_highlight_* XML） ✅ 实施完成 |
-| [specs/dialog-leftovers-compose/](./specs/dialog-leftovers-compose/README.md) | 弹框遗留项 Compose 化（7.11an autoTask AutoTaskLogDialog/ImportAutoTaskDialog + 7.11an2 urlrecord 内部 showDetailDialog/showFilterDialog 旧 View 弹框迁移 ComposeDialogFragment，过滤 6 selector 收敛单套底部弹框） ✅ 实施完成 |
-| [specs/list-residue-compose/](./specs/list-residue-compose/README.md) | 列表残留 Compose 化收尾（7.11ai CacheActivity 缓存列表 RecyclerView→纯 Compose LazyColumn 壳层删 CacheAdapter + 7.11aj ExploreFragment 瀑布 rvDiscoverBooks→LazyVerticalStaggeredGrid 变体删 ExploreShowWaterfallAdapter） ✅ 实施完成（2026-08-25 编译通过，待真机回归 3.1/3.2） |
-| [specs/INDEX.md](./specs/INDEX.md) | 项目状态面?功能状?|
-| [specs/TEMPLATE.md](./specs/TEMPLATE.md) | 功能设计文档模板 |
-| [specs/video-player-theme-unify/](./specs/video-player-theme-unify/) | 视频播放器主题统一（消除内置播放器孤儿样式：控制条深色悬浮层+主题高亮、倍速/选集/画面比例/音轨弹框动态设色接入 ThemeStore+UiCorner、旧模式功能区/调试面板硬编码色清理、硬编码中文迁移 strings.xml、主题切换 RECREATE 刷新 View 侧） 🔄 设计中 |
-| [specs/archive-ui-migration-202608/](./specs/archive-ui-migration-202608/) | Archive 前端 UI 迁移整合（放弃自研增量 Compose 化，整体迁移 Rimchars/legado 最新 tag archive-v3-3.26.08172114 UI 层替换本项目 UI；Cronet 150→500.0.1 cronet-bundled 去内部打包减体积；深度差异分析=后端 WebBook 11/12 兼容+编译硬约束 3 点+主题系统 32 字段/~68 key 重做+数据库 v104 并入 25 实体 5 批迁移+特色功能 A/B 分级 P0/P1/P2 整合；10 阶段迁移流水线+UI 标准实时沉淀+项目标识还原+独立项目实施） 🔄 设计中 |
-| [specs/bugfix-20260824/](./specs/bugfix-20260824/) | 20260824 UI/功能反馈 11 项修复（① 订阅图片四角圆角 ② 搜索框样式统一 ③ 顶栏管理颜色经典头部未生效 ④ 订阅分组视图设置未生效+分组→文件夹改名 ⑤ 新版切经典头部残留标签 ⑥ 我的页文件管理重复入口 ⑦ 关于页应用名 ⑧ 欢迎页文案 ⑨ 前端 UI 规范沉淀子规范 ⑩ APK 体积精简分析 ⑪ 订阅页分组管理入口） 🔄 设计中 |
-| [specs/ui-theme-gap-audit/](./specs/ui-theme-gap-audit/README.md) | UI 主题管理缺口审计与全量样式测试（三维清单：功能 F1-F31+页面 L1-L6+流程 P1-P14；阶段1 静态审计→问题清单 v0；阶段2 测试用例集 F-UI-THEME+Qwen3VL 判定协议；阶段3 修复轮 G1-G11 全处置（字号/圆角 token 化、调试工具主题联动、弹窗包主题、菜单统一、书源编辑/调试头迁移）+R2 全量复测 fail=0/VL 无新候选+R3 修复面专项通过） ✅ 全闭环（2026-08-26） |
-| [specs/ui-style-unify-deep-fix/](./specs/ui-style-unify-deep-fix/README.md) | UI 风格统一深度修复（用户不满意上轮 G1-G11 只做色值 token 化未触及"同类页面不同组件"宏观分裂；3 子代理组件级盘点：头部 5 类分裂 H1-H5（管理页双体系/自绘顶栏/旧 TitleBar/原生 M3 孤例）+弹框 4 套体系 D1-D4（旧 View 38/系统 AlertDialog 50/Import material3 默认）+订阅经典新版切换 6 结构性遗留 S1-S6；双基线收敛（MainTopBarView SUB / GlassTopAppBar / AppDialogFrame）+订阅状态机修复，一次测全量→一次修复→复测） 🔄 设计中 |
-| [specs/video-download-manager/](./specs/video-download-manager/README.md) | 视频下载与下载管理整合（播放器右栏全屏/收藏/设置旁新增下载按钮，一键下载当前视频默认以标题命名；自研 IDM 式多线程 Range 分片引擎替代系统 DownloadManager；m3u8 分片下载→合并→平台 MediaExtractor/MediaMuxer 重封装 mp4→清理分片；下载管理页复用展示正在/完成分类） ✅ 实施完成（编译通过，待真机验证） |
-| [specs/download-manager-maturity/](./specs/download-manager-maturity/README.md) | 下载器成熟化改造（盘点全量下载入口 6 个发起点+1 个管理页入口：播放器/更新/Web/RSS/WebView 弹窗/管理页重试 + 精准管理；分级补齐缺口：Room 任务持久化+崩溃恢复（根治"进去就没了"）、直链/m3u8 断点续传、真实暂停/恢复、并发上限+FIFO 排队、指数退避重试、错误码、通知 id 稳定映射、网络感知(仅 WiFi)+完整性校验；末尾调研否决引入 aria2/开源库，选定自研增量加固） 🔄 设计中 |
-| [specs/fix-rss-search-scope/](./specs/fix-rss-search-scope/README.md) | 订阅搜索范围上下文修复（订阅页经典形态头部搜索按钮进入分组/标签/类型/未分组后仍全局搜索：RssSearchScope 扩展 @type:0/1/2/@no_group token + RssFragment 按 currentGroup/currentType 计算 scope 传入；根目录保持全局、搜索页手动切范围与不持久化能力不变） 🔄 设计中 |
-| [specs/topbar-icon-semantics-fix/](./specs/topbar-icon-semantics-fix/README.md) | 顶栏图标语义与功能修复（二次全面审查版：根因链=Archive 迁移三级丢失链（菜单下沉范式→搬壳不搬语义→H6 数据+渲染双向降维 MenuAction 无 showAsAction 承接字段）；全量普查 87 always 项对照实锤 B 类收拢回归 18 页/25 项+C 类疑似丢失 3 项；修复原则=对齐 Archive showAsAction 语义，四组件系分层（ConfigTopBar alwaysShow 分级渲染/GlassTopAppBar 槽直写/MainTopBarView 布局/View TitleBar）；死按钮防线；ui-standards 四层面补齐（门禁/严禁/迁移登记处置列/图标行为走查审计）防 AI 重犯） 🔄 开发中 |
-| [specs/config-needs-restart-fix/](./specs/config-needs-restart-fix/README.md) | 配置修改需重启生效统一修复（订阅新版→经典顶栏残留 + 书架布局/分组/书名/列表样式/边距不生效需重启，同根因三实锤：rssFlowJob 泄漏 / style2 零事件监听 / BookshelfScreen remember{AppConfig.x} 快照+分类过宽；补 BOOKSHELF_STRUCTURE_CHANGED 结构重建事件 + 订阅双 collector 取消 + 参数化受控入参 + 三配置接入 + K7 书名语义错位修复 + K8 封面正方形修复 + AD-07 取色归位 + 视效全量对齐 archive；编译门禁通过，真机 L2 延后） ✅ 实施完成（编译通过，待真机 L2） |
-| [specs/rss-classic-layout-align/](./specs/rss-classic-layout-align/README.md) | 经典订阅布局管理与书架对齐修复（核查实锤 P1-P7：sourceMargin 文件夹视图不生效（硬编码间距）/升降序死配置/排序"更新时间"项不可达/showBookname 三重问题（语义反转+无入口+跨页不刷新）/弹框"列表紧凑"摆设/item_rss 视效脱节（圆角硬编码+缺主题字体+双份间距）/View 版文件夹死代码；修复=SourceFolderComposeGrid margin 参数化+弹框补齐（升降序+第7项+书名入口+删摆设）+语义对齐 K7+跨页监听 BOOKSHELF_STRUCTURE_CHANGED+item_rss 视效对齐主题字体圆角+死代码清理） 🔄 设计中 |
-| [specs/bugfix-20260822/](./specs/bugfix-20260822/) | 20260822 真机反馈 Bug 修复（六条反馈 + Downloadslogs 全量日志 12 FATAL 深度分析：备份页 Compose 化对齐 Archive/统计框隐藏不删码/订阅页新版经典切换 modernRssPage 无消费方/主题顶栏对齐/BookSourceActivity 递归环/VideoPagerAdapter 越界/两 Activity Manifest 缺注册/ClassCast+NPE 缺陷） ✅ 实施完成（测试包 3.26.082301，待真机验证） |
-| [specs/sniff-stability-enhance-20260731/](./specs/sniff-stability-enhance-20260731/) | 嗅探稳定性增强（基于logs(8)真机日志深度分析9个优化点：P0 R5嗅探去重�?1%浪费消除/P1 DoH负缓�?0s�?0s+健康检�?视频流强制HTTP/1.1+favicon.ico缓存/P2 StreamReset重用NonCancellable+日志采样+证书错误记忆/P3 play.php预解�?window.__videoUrls__容错�?🔄 设计�?|
-| [specs/bugfix-20260730-batch1/](./specs/bugfix-20260730-batch1/) | 真机测试Bug修复批次1�?个BUG：图片头部遮�?播放器UI入口缺失+CDN缓存清除+"未找到订�?提示+ExoPlayer LoadControl共享线程错误+DoH DNS冷启�?Cronet降级+InsetsSource警告�?🔄 设计�?|
-| [specs/cronet-proguard-fix-20260731/](./specs/cronet-proguard-fix-20260731/) | release包Cronet ProGuard规则修复（R8混淆移除org.chromium.net.Cronet入口类导致libcronet.so JNI_OnLoad SIGABRT崩溃9次，嗅探能力减弱；精准补全keep规则保留API入口类） 🔄 设计�?|
-| [specs/cronet-so-download-fix-20260731/](./specs/cronet-so-download-fix-20260731/) | Cronet SO下载修复+嗅探能力恢复（真机日志铁证：DoH 3服务器全失败+HTTP/2协议错误降级OkHttp+SO下载源Google Storage国内不稳定；修复DoH服务器配置增加阿里腾�?切换SO下载源到GitHub Releases+修复下载逻辑+优化HTTP/2降级时长+恢复嗅探超时5s�?🔄 设计�?|
-| [specs/cronet-global-enable-20260731/](./specs/cronet-global-enable-20260731/) | Cronet 全局启用深度分析与优化方案（深度分析4大已用模块OkHttp/ExoPlayer/DoH/AnalyzeUrl+3大未用模块WebView/Glide/HttpURLConnection；识别isCronet开关不一致问题：ExoPlayer+DoH不受开关控制；统一开关逻辑+日志诊断增强+ProGuard规则完善�?🔄 设计�?|
-| [specs/rhino-engine-upgrade/](./specs/rhino-engine-upgrade/) | Rhino 引擎升级兼容性分析（字节码实证：1.9.1 唯一 VarHandle 出处 SlotMapOwner$ThreadedAccess；运行时探针证实该项目配置下�?class 永不加载�?6/26 书源片段通过、书源型负载 +31%；唯一障碍收敛为构建期 D8 反糖化） �?已完�?�?最终决�?保持锁定 1.8.1，沉淀「待�?minSdk�?3 直跳 1.9.1」里程碑 |
-| [specs/multiline-on-demand-extraction/](./specs/multiline-on-demand-extraction/) | 多线路多集按需采集架构优化（ruleContent只返回播放页URL，VideoUrlExtractor统一入口三层降级按需采集m3u8，参考影视仓两阶段架构） 🔄 开发中 |
-| [specs/sniff-migration-booksource/](./specs/sniff-migration-booksource/) | 嗅探与滑动切换能力迁移至书源（图片嗅探→type2书源 ReadManga 0图兜�?reuse ImageSnifferWebView / 视频嗅探→type4书源复用统一三层入口 extractVideoUrlForEpisode 泛化 ruleData 解决播放页URL / 上下滑动切换�?下集 episodes 驱动多页；零数据库变更、RSS 不受影响�?�?已完成（代码实施+编译通过+RSS 真机回归通过；书源侧真机验证因无测试源由用户决策改源码级验证�?|
-| [specs/tvbox-source-converter/](./specs/tvbox-source-converter/) | TVBox/影视仓播放源转化�?legado 订阅源（字段映射+类型适配+规则转换+批量处理�?🔄 设计�?|
-| [specs/legados-forks-comparison/](./specs/legados-forks-comparison/) | legados Fork 对比与集成方案（分析GEd520/legados fork差异，P0/P1/P2三级集成候选，HelpDoc/MemoryPressure/JsCacheManager�?0项集成设计） 🔄 设计�?|
-| [specs/forks-ecosystem-analysis/](./specs/forks-ecosystem-analysis/) | Legado 延伸版本生态功能深度分析（更新10+下载7=17个直系fork源码仓库�?大功能领域横向对比排除UI维度，输出汇总式analysis-report+三态borrow-decisions借鉴决策矩阵�?🔄 实施中（阶段B系列：B12/B14/B15/B16 已落地，真机验证已执行通过，详�?issues-found.md�?|
-| [specs/precise-manage/](./specs/precise-manage/) | 精准管理聚合页（借鉴 Legado_Max：我的页新增入口聚合网址记录/存储管理/下载管理/文件管理，View 体系重写；网址记录=OkHttp 拦截�?Room 新表 Migration 102�?03+搜索/筛�?日期分组/批量清除；存储管�?复用 cache 统计 API 8 类缓存清理；下载管理=DownloadState 内存单例+500ms 轮询系统 DownloadManager 列表页） �?已实施（2026/08/08 编译+单测 186 通过，待真机�?|
-| [specs/tvbox-optimization/](./specs/tvbox-optimization/) | 借鉴影视仓优点优�?legado（播放器双引�?网络层catvod/QuickJS+DLNA投屏+本地服务器） 🔄 设计�?|
-| [specs/rss-age-verify-autobypass/](./specs/rss-age-verify-autobypass/) | RSS 订阅源年龄验证自动绕过（三层防护：Header Cookie 预置 + loginCheckJs 自动验证 + injectJs 自动点击�?🔄 设计�?|
-| [specs/cookie-management-fix/](./specs/cookie-management-fix/) | Cookie 管理链路修复（WebView↔CookieStore↔OkHttp 同步断裂6问题：P0 Cookie不回�?P1过期清理+P2全局清空+P3死代�?P4域名不匹配） 🔄 设计�?|
-| [specs/apk-release-publish-20260729/](./specs/apk-release-publish-20260729/) | APK 发布�?Gitee+GitHub Release（Python 脚本一键发布三包到双平�?Release，版本号从文件名提取，updateLog 自动作为 body，token 配置不入 git�?🔄 设计�?|
-| [specs/image-gallery-activity/](./specs/image-gallery-activity/) | 图片浏览�?Activity 化改造（PhotoDialog 单图弹出→ImageGalleryActivity 多图浏览，参�?VideoPlayerActivity 架构，ViewPager2 双层嵌套+跨文章切�?旋转/缩放/长按保存�?🔄 实施完成待L2真机验证 |
-| [specs/image-canvas-thread-fix-20260728/](./specs/image-canvas-thread-fix-20260728/) | 图片画廊图片不显示根因修复（Glide downloadOnly 回调�?glide-disk-cache-thread 触发，SSIV.recycle() 创建 GestureDetector �?Handler 异常，被 CallbackException 吞掉不触�?onLoadFailed；修复：onResourceReady/onLoadFailed �?itemView.post 切主线程�?🔄 设计�?|
-| [specs/player-review-and-optimization/](./specs/player-review-and-optimization/) | 视频/图片播放器审查与优化整合（基�?份审查报�?1份多维度审查整合报告，共32 ERROR+44 WARN+32 INFO=108项，�?2个ADR决策；R2修订完成：AD-01保留L4不缓�?AD-06 centerCrop替代fitXY/AD-10补充22类硬编码颜色/AD-12 PlayerControlsHelper替代BasePlayerActivity�?🔄 设计中（R2 修订完成，待实施�?*图片部分已废弃，�?image-player-vertical-canvas-optimization 取代**�?|
-| [specs/video-prebuffer-enhancement/](./specs/video-prebuffer-enhancement/) | 视频播放器分段预缓冲机制深度分析与优化（源码深度分析+对标Media3 DefaultPreloadManager；发现P0 BUG：FirstFramePreloader/VideoPreloader的readBytes无限�?未写入SimpleCache导致预加载完全无效；P0修复+P1 HLS setAllowChunklessPreparation+运行时NetworkCallback+P2埋点评估�?🔄 设计�?|
-| [specs/video-buffer-speed-optimization/](./specs/video-buffer-speed-optimization/) | 当前播放视频缓冲速度优化（聚焦当前视频非预加载；7层联合优化：LoadControl深度调优 setTargetBufferBytes(-1)+setPrioritizeTimeOverSizeThresholds / HLS LL-HLS targetOffsetMs+超时配置 / OkHttp EventListener+Dispatcher / CacheDataSource FLAG_IGNORE_CACHE_ON_ERROR / 自适应码率 / 解码器异步队�?/ AnalyticsListener 性能监控埋点�?2个ADR决策�?5个需求项R1-R15�?0个验证场景） 🔄 设计�?|
-| [specs/image-player-vertical-canvas-optimization/](./specs/image-player-vertical-canvas-optimization/) | 内置图片播放器垂直画布优化方案（�?RecyclerView 垂直长画�?点击进入 ViewPager2 大图+滚动到底部自动加载下一篇，取代 player-review-and-optimization 图片部分，含 13 �?ADR + 17 个验证场�?+ 48 项任务） �?V4 设计审查通过+全部任务实施完成（Phase 0-8 �?48 项），待编译验证+L2 真机测试 |
-| [specs/android-ui-optimization/](./specs/android-ui-optimization/) | Android UI/UX 优化（P0 Bug+Design Token+暗色模式+现代化） �?实施完成 |
-| [specs/reader-overlay-compose/](./specs/reader-overlay-compose/) | 阅读器浮层 Compose 化（S5 骨架四阶段完成：菜单层顶栏MenuTitleBar+底栏MenuBottomBar+scrim Compose化 / activeSheet单态收敛 / 阅读设置Sheet / ReaderUiState单StateFlow / BackHandler优先级链；正文 page/ 5 文件零改动红线已实测保留；P2 §8 验收 7/8 勾选，FR-11 真机交用户回归） ✅ 已实施（真机待回归） |
-| [specs/ui-redesign-m3/](./specs/ui-redesign-m3/) | UI 重构设计（v2 已完善：深度对标四仓+MoRealm墨境纯Compose现代工程标杆，五色→34槽位推导/PillNavigationBar/设置三模板/shimmer骨架屏 + 鸿蒙MyCenter三级布局；整体前端思想综合收敛五支柱+功能不裁剪红线清单A-D；v2 新增 全量84页面类功能点核对表pages-inventory + 前端UI工程规范ui-standards（6类页面骨架S1-S6/组件六族目录/状态管理范式/真机功能点覆盖测试门禁）；实现细化规格17组件签名/主题toM3Scheme映射/PR+KPI/themeConfig格式封口；ADR 01-22；保留暗夜紫默认主题；目标=前端全部Compose（正文内核保留View）丨🔄 设计v2完善 + 实施Phase0-3已落地 + Phase P1 支干实施中（2026-08-12 S1 MainActivity 接线 12.20/12.21 FR-11✅ + S4 BookInfoActivity 壳层接线 12.23 + 公共组件族两期 12.22）） |
-| [specs/sigma-sync-202607/](./specs/sigma-sync-202607/) | 同步阅读Sigma 2026-07最新提交（2 bug修复+订阅�?默认值） �?已完�?|
-| [specs/builtin-themes/](./specs/builtin-themes/) | 新增8个内置主题（5日间+3夜间，WCAG AA�?�?已完�?|
-| [specs/legado-skill-optimization/](./specs/legado-skill-optimization/) | Legado Skill 优化 |
-| [specs/legado-skill-optimization-v2/](./specs/legado-skill-optimization-v2/) | Legado Skill V2 优化（聚焦修复错误知�?门禁强化+架构瘦身，避免历�?声称完成≠实际生�?陷阱�?🔄 设计�?|
-| [specs/skill-optimization/](./specs/skill-optimization/) | Legado Source Creator Skill 优化（v6：删孤岛+废弃JVM仿真�?确立Playwright MCP唯一地位+新增网站分析报告中间产物+删除legado_client Python客户�?AI手动操作工作�?移除basic-memory引用+新增经验检索三�?视频源核心要求速查+快速入�?源码阅读步骤+SKILL.md�?20�?references�?5文档�?🔄 设计�?|
-| [specs/rss-batch-optimize-v2/](./specs/rss-batch-optimize-v2/) | RSS 订阅源批量优�?v2�?22源，复用v1工作�?占位�?模板源处�?域名迁移+反爬配置+skill反哺�?🔄 设计�?|
-| [specs/legado-skill-v2-rebuild/](./specs/legado-skill-v2-rebuild/) | Legado Skill V2 重建 |
-| [specs/skill-core-capability-rebuild/](./specs/skill-core-capability-rebuild/) | Skill 核心能力重建 |
-| [specs/skill-usability-optimization/](./specs/skill-usability-optimization/) | Skill 可用性优�?|
-| [specs/source-repair-loop-optimization/](./specs/source-repair-loop-optimization/) | 源修复循环优�?|
-| [specs/jvm-webview-and-test-fix/](./specs/jvm-webview-and-test-fix/) | JVM WebView 与测试修�?|
-| [specs/legado-core-optimization/](./specs/legado-core-optimization/) | Legado 核心质量优化（内存泄�?线程安全+ANR+错误处理+测试�?�?Batch1+2完成 |
-| [specs/dependency-upgrade-optimization/](./specs/dependency-upgrade-optimization/) | 依赖升级性能优化+minSdk迁移（Coroutines 9.8x+Lifecycle 2.11+Core 1.19+7组AndroidX升级+OkHttp 5.4+WebView修复�?�?实施完成 |
-| [specs/legado-skill-unified-redesign/](./specs/legado-skill-unified-redesign/) | Legado Skill 统一重设�?|
-| [specs/network-perf-stability/](./specs/network-perf-stability/) | 网络组件性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密，P0稳定+P1性能+P2架构�?�?实施完成（P0+P1），待真机验�?|
-| [specs/ssl-handshake-investigation/](./specs/ssl-handshake-investigation/) | SSL握手失败根因排查（net_error -101）：OkHttp升级路径审计+WebView链路审计，结�?非升级导�? �?调查完成 |
-| [specs/e2e-automated-testing/](./specs/e2e-automated-testing/) | APK 端到端自动化测试验证系统（MEmu+uiautomator2+AI 日志分析，一键打包→装包→跑用例→出报告�?🔄 设计�?|
-| [specs/ai-tests-deep-audit/](./specs/ai-tests-deep-audit/) | ai_tests 深度审计与补全完善（15优点+14缺点+12缺失项，短期6+中期8+长期5任务�?�?审计完成 |
-| [specs/e2e-ui-executor-hardening/](./specs/e2e-ui-executor-hardening/) | E2E UI 执行器加固（scroll_find 滚动查找/自愈重构/失败跳过/dismiss_dialogs 误判修复/规则分析�?uiautomator2 崩溃排除/证据收集路径修复/测试用例对齐 Compose UI�?�?实施完成，单用例 pass_rate=100% |
-| [specs/apk-size-optimization/](./specs/apk-size-optimization/) | APK 体积审核与精简优化（v3：debug APK解压分析+打包技术手段全量评估，已用所有稳定优化，零功能影响预�?2.5~3.5MB，附折中选项�?🔄 设计�?|
-| [specs/folder-view-welcome-refactor/](./specs/folder-view-welcome-refactor/) | 书源/订阅源文件夹视图重构 + 欢迎页增�?+ 前端样式审计 �?实施完成，待真机验证 |
-| [specs/source-folder-cover/](./specs/source-folder-cover/) | 发现/订阅源文件夹封面替换（学到书架精髓：长按选图换封面+恢复默认；Room v103→104 新增 source_group_covers 表，kind+groupName 双命名空间隔离；管理页固定平铺去文件夹） 🔄 设计�?|
-| [specs/video-m3u8-cache/](./specs/video-m3u8-cache/) | 视频播放�?m3u8 边下边播缓存（cachePlay 配置 + 设置开关，默认开启） �?已实施，待真机验�?|
-| [specs/rss-cache-first/](./specs/rss-cache-first/) | RSS 阅读源缓存优先加载（列表�?DiffUtil 增量更新 + WebView cacheFirst 默认 true�?�?已实施，待真机验�?|
-| [specs/rss-image-decrypt-optimization/](./specs/rss-image-decrypt-optimization/) | 订阅源图片解密优化（调试输出截断防崩�?+ 列表并行化提速；真机发现并修�?ImageUtils 块对齐校验误拦截 base64 文本封面致图片永不显示） �?引擎修复完成（ImageUtils 移除块校�?失败兜底bytes），真机验证图片显示通过 |
-| [specs/video-mute-highspeed/](./specs/video-mute-highspeed/) | 视频播放器默认静�?+ 高倍速支持（3X/5X/10X/15X + 播放界面静音按钮�?�?已实施，待真机验�?|
-| [specs/source-layout-redesign/](./specs/source-layout-redesign/) | 书源/订阅源布局设置重做（修复书源分�?bug + 视图模式扩展5�?+ 订阅源排�?+ 类型筛�?+ 统一配置对话框） 🔄 设计�?|
-| [specs/exoplayer-resilience/](./specs/exoplayer-resilience/) | ExoPlayer 韧性优化（预嗅�?LRU缓存+自动WebView降级，解�?002错误码和浏览器能播放但内置播放器失败痛点�?🔄 实施�?|
-| [specs/video-playback-failure-fix-20260726/](./specs/video-playback-failure-fix-20260726/) | 视频播放失败修复（基�?026-07-26真机日志深度分析�?7个Bug清单+38项任务，解决视频地址获取8.5�?嗅探超时3000ms+降级链使用过期嗅探结�?onPlayerError未记录AppLog+协程生命周期错位等核心问题，预期视频地址获取时间<3�?嗅探成功率≥90%/播放失败可追溯率100%�?�?Phase 1+2 代码改造完成（27项任务全部完成）+Phase 6 真机日志分析修复2个Bug（ImageGalleryActivity Glide销毁崩�?VideoUrlExtractor .m3u8快速路径回归）+编译验证通过，待L2真机测试 |
-| [specs/player-mature-solutions-alignment/](./specs/player-mature-solutions-alignment/) | 播放器成熟方案对齐（基于V2深度架构分析+49个权威来源验证：70%真实支撑+10%AI臆想+20%成熟方案遗漏�?个Phase 22项任务：Phase1可观测�?错误反馈闭环/Phase2视频核心能力补齐（BandwidthMeter+首帧预加�?下一个视频预加载�?Phase3图片核心诉求补齐（左右滚�?图片金字�?最大尺�?智能预加载）/Phase4网络层韧性（DoH+302缓存+Cronet恢复�?Phase5架构优化（实例池+修正AI臆想设计），全部P0/P1任务有成熟方案参考支撑） �?Phase 1+2+4+5 实施完成（含实例池LoadControl档位工厂化修复），编译通过待真机测试；Phase 3 图片增强项待实施 |
-| [specs/memory-mechanism-redesign/](./specs/memory-mechanism-redesign/) | 项目记忆机制改造（AI 独立记忆系统 AD-11 完全分离：项目目�?.trae/memory/ 替代 C盘，废弃 conv_id 简化方案，多任务并�?AskUserQuestion 确认，解决C盘路径Edit/Write受限痛点�?🔄 实施�?|
-| [specs/sub-agent-budget-optimization/](./specs/sub-agent-budget-optimization/) | 子代理编排与思考预算优化（强制子代理规避GLM-5.2思考上限，同对话内虚拟拆分任务不增加成本，监控+质量保证+规范冲突处理�?�?已完�?|
-| [specs/yesterday-changes-deep-audit/](./specs/yesterday-changes-deep-audit/) | 昨日改动�?026-07-08）深度自我审查（书源订阅源布局+视频播放器，6 Agent 并行审查发现 29 �?bug + 7 阻塞�?+ 1 需求偏差） �?审查完成 |
-| [specs/context-compression-feedback-preservation/](./specs/context-compression-feedback-preservation/) | 上下文压缩用户反馈保�?+ 主线任务完成质量三层审查 + 打包功能差距三层修复（Part A 反馈持久�?四件�?+ Part B B0openspec偏差/B1代码/B2交付 + Part C C1偏差归属/C2 F1-F10核查/C3 E2E+L2�?�?已完成（D1偏差已修正，7类细节不符需新建spec�?|
-| [specs/source-layout-detail-refinement/](./specs/source-layout-detail-refinement/) | 书源/订阅源布局细节精修（D1标签+分组两模�?/ D2按类型分组修�?返回�?/ D3订阅源二级页还原列表 / D4搜索�?/ D5视频缓存下拉选择 / D6倍�?5x保留�?�?实施完成待文档同�?|
-| [specs/rss-video-player-enhancement/](./specs/rss-video-player-enhancement/) | 订阅源视频播放器增强（R1多集选择播放 + R2 m3u8播放失败调试日志 + R3学习旧订阅源布局 + R4日志异常优化 + R5自动抓取视频链接+Header修复404�?🔄 实施完成待用户实测（7.1/7.2/7.5/7.6 + 3.17 Bug修复 L2通过�?.3/7.4/7.7/7.8 需真实视频站点验证�?|
-| [specs/douyin-style-video-player/](./specs/douyin-style-video-player/) | 抖音风格沉浸式竖屏视频播放器重设计（ViewPager2+Fragment架构 / 三种状态PURE/NORMAL/FULLSCREEN / 左下角标�?线路+集数 / 右侧快退/静音/收藏/倍�?设置/快进 / 横屏全屏+双指缩放 / 控件默认显示+双指左右滑动隐藏 / 综合设置面板BottomSheet�?🔄 实施完成待L2真机验证 |
-| [specs/video-article-swipe-switch/](./specs/video-article-swipe-switch/) | 视频播放器上下滑动切换文章（ViewPager2+Fragment+文章列表模式+分页加载+预缓�?位置记忆�?�?实施完成（阶�?-8全部代码完成+L2验证通过�?|
-| [specs/video-control-visibility-enhancement/](./specs/video-control-visibility-enhancement/) | 视频播放器控件显隐与缓冲条优化（F1缓冲进度条修�?secondaryProgress绑定 / F2控件3秒自动隐�?单击切换+触摸事件根因修复OnTouchListener设到surface_container�?�?实施完成（L2真机验证通过�?|
-| [specs/video-ui-dedup-layout-adjust/](./specs/video-ui-dedup-layout-adjust/) | 视频播放�?UI 去重与布局调整（移除右侧静�?倍速按钮避免与GSY底部控件重叠 + 左下角标题区和全屏按钮上�?2dp避免遮挡GSY底部播放�?+ VideoFragment.kt死代码清理） �?实施完成（Phase 1-4全部完成+L2验证通过�?|
-| [specs/video-playback-issues-round1/](./specs/video-playback-issues-round1/) | 视频播放问题修复�?轮（10类问题：ExoPlayer失败降级WebView用skill V2模板 + 播放器类型配�?+ ViewPager2兼容�?+ 加密解密容错 + ClassCastException容错 + SQLiteBlobTooBig容错 + WebView线程安全 + 网络重试 + JSON容错 + HlsPlaylistStuck + Cronet回退�?�?实施完成（L2真机验证通过�?.6 ViewPager2滑动切换核心修复 onInterceptTouchEvent 方案�?|
-| [specs/video-back-fullscreen-fix/](./specs/video-back-fullscreen-fix/) | 视频播放器返回按钮修�?全屏按钮迁移+真全屏优化（B1: setNavigationOnClickListener绕过onSupportNavigateUp时序冲突 / U1: btn_fullscreen移入right_buttons随整体显�?/ F1: TitleBar gone()替代ActionBar hide()释放布局空间�?🔄 开发中（代码完�?L1通过，待真机L2验证�?|
-| [specs/video-gesture-overhaul/](./specs/video-gesture-overhaul/) | 视频播放器手势交互重构（修复长按加速丢�?去掉快退快进按钮改左右滑�?长按倍�?双击暂停/播放�?种手势统一管理不冲突） �?已完�?|
-| [specs/spec-system-optimization/](./specs/spec-system-optimization/) | 规范体系优化（三层规范结构：全局通用规范→项目主规范→项目子规范，AGENTS.md核心步骤+索引格式，全局规范整合去重，压缩恢复强制加载项目主规范，违禁词三道防线，子规范强制加载机制�?�?已完成（检查点3最终验收通过 2026-07-13，整合策略已被global-spec-restructure颠覆�?|
-| [specs/global-spec-restructure/](./specs/global-spec-restructure/) | 全局规范重组（多文件拆分策略�?1个全局规范文件，核�?文件9.42KB系统注入+6个按需加载，AGENTS.md瘦身533�?54行，test-prompt.md待新对话验证�?🔄 实施中（检查点2�?|
-| [specs/app-stability-round2/](./specs/app-stability-round2/) | App 稳定性第二轮修复（P1-1~P1-4+P2-1~P2-2+P3-1�?项：Room去description+图片解密文件头检�?ExoPlayer setMimeType+视频抓取流程优化+Cronet运行时降�?协程取消守卫+ruleContent非空分支content校验�?�?全部完成（检查点3验收通过�?6源扩展测试通过�?|
-| [specs/build-workflow-optimization/](./specs/build-workflow-optimization/) | 打包流程规整（统一包名规范：测试包/共存�?正式包三种分类，修复build-legado.bat默认包名不一致，设计面向AI执行的详细打包流程，更新build-apk-guide.md�?🔄 设计�?|
-| [specs/rss-concurrency-and-checksource-optimization/](./specs/rss-concurrency-and-checksource-optimization/) | 订阅源解析并发配置化+书源/订阅源校验去重优化（需求一：Semaphore(6)配置�?图片加载并发+双参数分离；需求二：书源域名校验走AnalyzeUrl真实请求+订阅�?维度校验+域名+type多维度去重） 🔄 设计�?|
-| [specs/real-device-test-plan/](./specs/real-device-test-plan/) | 真机测试计划：rss-concurrency-and-checksource-optimization �?4项变更功能真机端到端测试（分层UI+Service+数据+日志，用真实书源数据，weight回填验证，经验沉淀�?🔄 设计�?|
-| [specs/global-issue-fix-and-spec-sedimentation/](./specs/global-issue-fix-and-spec-sedimentation/) | 全局问题修复与规范沉淀�?3项用户反馈：数据库升级覆盖安�?高亮规则崩溃+校验逻辑重构+lastHost三层回填+UI Bug修复+工程规范沉淀机制+全局思考检查清单） 🔄 设计�?|
-| [specs/v3.26.0717-bug-fix-batch/](./specs/v3.26.0717-bug-fix-batch/) | v3.26.0717 真机测试 Bug 批量修复�?问题：订阅源并发显示+颜色选择器主�?替换规则崩溃+设置项数值显�?域名分组排序+视图布局评估�?🔄 设计�?|
-| [specs/rss-parse-optimization/](./specs/rss-parse-optimization/) | 订阅源解析全流程性能优化�?维度22个优化点�?个P1+17个P2，核�?项分三批实施：Pattern缓存+RssArticle索引/scriptCache全局共享+HTTP响应缓存/解密缓存扩容+预连接） �?全部完成（检查点3验收通过�?文件+106行变更，APK legado_app_3.26.071419.apk�?|
-| [specs/source-layout-bookshelf-style/](./specs/source-layout-bookshelf-style/) | Issue-6 书源/订阅源布局参考书架重构（方案D�?个XML重构+SourceExt.kt新建+4个Adapter适配+订阅源upSourceHost链路改�?RssSourceActivity异常输入修复�?1个ADR�?�?实施完成（编译通过+真机启动无崩溃，APK legado_app_3.26.071720.apk�?|
-| [specs/forks-archive-comparison/](./specs/forks-archive-comparison/) | 阅读 Archive 私仓深度对比与借鉴分析（克�?Rimchars/legado-private-armv8-release �?temp/forks-comparison/legado-archive�? 大维度子代理并行对比：主�?EPUB/AI/发现�?视频/构建/依赖，输出三态借鉴决策�?12借鉴/8不借鉴/9待评估，不修改本项目源码�?🔄 待验�?|
-| [specs/rss-unified-search/](./specs/rss-unified-search/) | 订阅源统一搜索（对标书架搜索：新建 RssSearchActivity+RssSearchModel 并发调度所有带 searchUrl 的订阅源，title+pubDate 去重聚合多源，支持换源，复用 SearchKeyword 表加 type 字段�?🔄 设计�?|
-| [specs/rss-v5_7-deep-fix/](./specs/rss-v5_7-deep-fix/) | RSS 订阅�?V5.7 深度修复�?3 启用�?12 必备字段规则修复 + 15 CF盾源破盾恢复 + 7 timeout 源重�?+ 5维度真机验证 + 陷阱68-72沉淀 + ADR Y-Statement 5项决策） 🔄 设计�?|
-| [specs/logging-audit-and-enhancement/](./specs/logging-audit-and-enhancement/) | 日志规范全面审查与补全完善（核心模块catch块日志覆盖：WebBook 90%缺失+规则引擎40%+网络�?7%，统一模块Tag规范+ai_tests通用日志获取脚本+规范文档优化�?🔄 设计�?|
-| [specs/thread-pool-split-config/](./specs/thread-pool-split-config/) | 书源线程池拆分与自定义配置（共用 threadCount 拆分�?searchThreadCount + updateCacheThreadCount 两个独立配置�?0+ 业务点归类替换，UI 自定义入口，老用户自动迁移） �?实施完成（仅本地commit+验收通过�?
-| [specs/thread-pool-audit/](./specs/thread-pool-audit/) | 线程池配置全面审查（13项配置点静态审查：8个FixedThreadPool+globalExecutor+DispatchersMonitor+OkHttp连接�?Dispatchers.IO+Coroutine.kt，识别泄漏风�?性能瓶颈/默认值合理性，输出P0/P1/P2优化建议�?🔄 设计�?|
-| [specs/highlight-rule-fix-20260727/](./specs/highlight-rule-fix-20260727/) | 阅读高亮规则系统修复（isRegex 修正+首启播种+upsert+即时生效+fill 快绘补画�? 项根因修复） �?已实施（核心修复完成，回归由 highlight-rule-restore-default-20260729 修复�?|
-| [specs/highlight-rule-restore-default-20260729/](./specs/highlight-rule-restore-default-20260729/) | 高亮规则丢失修复 + 恢复默认规则（修复愈合逻辑覆盖用户 pattern �?BUG + 新增"恢复默认规则"菜单支持合并/覆盖模式，解决用户清空后无法恢复内置常规规则痛点�?🔄 实施中（Phase A/B 完成，待编译+真机验收�?|
-| [specs/video-player-m3u8-fix/](./specs/video-player-m3u8-fix/) | 内置视频播放�?m3u8 播放失败深度分析与优化（m3u8 URL 短路嗅探+HLS fallback 链去�?分片重试策略增强+Cache-Control 请求头移除） 🔄 设计�?|
-| [specs/source-arch-mutual-borrow/](./specs/source-arch-mutual-borrow/) | 书源/订阅源架构差异分析与机制层互补优�?V2（按用户反馈推翻V1字段借鉴方案；抽�?个共享机制组件：M1并发控制/M2正文URL过滤/M3缓存策略/M4预连�?M5WebView控制/M6网络请求统一；零实体字段增加+零数据库迁移；WebBook.kt 4�?Rss.kt 2处重复网络请求模式统一；修复RssSource.parseConcurrency未落地BUG；分6批实施M6→M1→M4→M2→M3→M5�?🔄 设计�?V2 |
-| [specs/harden-blank-highlight-rules-20260808/](./specs/harden-blank-highlight-rules-20260808/README.md) | 高亮规则空数据自动修复（根因：用户升级后 prefs 存储 12 条规�?name/pattern 全空导致列表�?编辑�?不生效；HighlightRuleStore.load() 增加"全部规则 name+pattern 为空→自�?reset 恢复内置规则"自愈加固�?�?实施完成（编�?真机验证：全空注入自动恢复、混合数据不误伤、正常数据无自愈日志�?|
-| [specs/cache-entry-relocate/](./specs/cache-entry-relocate/README.md) | "我的"页功能归堆重构（6 组框架：内容与规则/外观/同步与服务/工具/精准管理/关于；缓存管理迁精准管理数据管理卡片、诊断三件套迁新"日志与诊断"卡片、高亮规则归规则组、AI 设置归工具组、关于/退出独立成组、网址记录消双入口；C1-C10 十项源码核查全 PASS，页面本体零改动） ✅ 设计完成（方案一 6 组版待用户审核） |
-### 归档 Specs
+| Spec | 状态 | 说明 |
+|------|------|------|
+| [bookshelf-refresh-and-title-font](./specs/bookshelf-refresh-and-title-font/README.md) | ✅ | 书架下拉刷新转圈不消失+顶栏标题字号不统一修复 |
+| [bugfix-20260822](./specs/bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
+| [bugfix-ui-20260824](./specs/bugfix-ui-20260824/README.md) | 🔄 | 20260824 用户反馈 11 项 UI/功能修复（图片圆角/搜索框/顶栏/分组/入口/文案等） |
+| [cache-entry-relocate](./specs/cache-entry-relocate/README.md) | 🔄 | 「我的」页功能归堆重构（内容与规则/外观/同步/工具/精准管理/关于 6 组框架） |
+| [cache-toggle-rename-rss-all-label](./specs/cache-toggle-rename-rss-all-label/README.md) | ✅ | 文案调整：视频缓存开关改名「播放时缓存」+订阅「全部」分组标签缩短 |
+| [config-needs-restart-fix](./specs/config-needs-restart-fix/README.md) | ✅ | 配置修改需重启生效统一修复（订阅顶栏残留+书架布局不生效）+视效对齐 archive |
+| [cookie-management-fix](./specs/cookie-management-fix/README.md) | ✅ | Cookie 管理链路修复（WebView/CookieStore/OkHttp 同步断裂 6 问题） |
+| [cronet-global-enable-20260731](./specs/cronet-global-enable-20260731/README.md) | 🔄 | Cronet 默认自动启用与扩展使用方案（P0 全局启用已落地） |
+| [dialog-leftovers-compose](./specs/dialog-leftovers-compose/README.md) | ✅ | 弹框遗留项 Compose 化（autoTask 两弹框+urlrecord 详情/过滤弹框迁移） |
+| [douyin-style-video-player](./specs/douyin-style-video-player/README.md) | ✅ | 抖音风格沉浸式竖屏视频播放器重设计（垂直滑动+悬浮控件+三态切换） |
+| [download-hls-complete-fix](./specs/download-hls-complete-fix/README.md) | 🔄 | 下载 HLS 完成链路修复（m3u8 下载成功但产物异常三连问题） |
+| [download-manager-maturity](./specs/download-manager-maturity/README.md) | 🔄 | 下载器成熟化改造（Room 持久化+断点续传+暂停恢复+并发上限+重试） |
+| [download-manager-optimize](./specs/download-manager-optimize/README.md) | ✅ | 下载管理深度优化（P1 正确性+引擎健壮性+IDM 动态分段引擎） |
+| [exoplayer-resilience](./specs/exoplayer-resilience/README.md) | ✅ | ExoPlayer 韧性优化（MimeSniffer 识别链+WebView 降级两层防护） |
+| [fix-highlight-rule-toggle-refresh](./specs/fix-highlight-rule-toggle-refresh/README.md) | ✅ | 高亮规则管理页复选框切换不即时刷新修复（Compose 跳过引用比较） |
+| [fix-rss-search-scope](./specs/fix-rss-search-scope/README.md) | 🔄 | 订阅搜索范围上下文修复（分组/标签/类型内搜索按上下文收窄） |
+| [folder-cover-ratio-archive-align](./specs/folder-cover-ratio-archive-align/README.md) | 🔄 | 文件夹封面比例对齐 Archive（0.7→0.75 消除拉长失真） |
+| [folder-cover-replace-bugfix](./specs/folder-cover-replace-bugfix/README.md) | ✅ | 书架/订阅文件夹自定义封面替换失效回归修复 |
+| [folder-view-welcome-refactor](./specs/folder-view-welcome-refactor/README.md) | ✅ | 书源/订阅源文件夹视图重构+欢迎页增强+前端样式审计 |
+| [forks-ecosystem-analysis](./specs/forks-ecosystem-analysis/README.md) | 🔄 | 阅读 M 功能借鉴与整体实施（17 fork 生态分析完成+分阶段借鉴落地） |
+| [global-spec-restructure](./specs/global-spec-restructure/README.md) | 🔄 | 全局规范重组（AGENTS.md 跨项目通用内容迁移至全局规范） |
+| [header-search-unify](./specs/header-search-unify/README.md) | ✅ | 主 Tab 头部搜索入口统一（以订阅页为标准，书架/我的对齐） |
+| [highlight-dialog-compose](./specs/highlight-dialog-compose/README.md) | ✅ | 高亮三弹框 Compose 化迁移（编辑/分组管理/预设规则） |
+| [image-canvas-3fix-20260728](./specs/image-canvas-3fix-20260728/README.md) | — | 图片画布模块 3 问题根因修复（基于日志包证据链） |
+| [image-player-vertical-canvas-optimization](./specs/image-player-vertical-canvas-optimization/README.md) | 🔄 | 内置图片播放器垂直画布优化（垂直长画布+点击查看大图） |
+| [image-thread-coordination-fix-20260731](./specs/image-thread-coordination-fix-20260731/README.md) | 🔄 | 图片加载与视频切换线程协调修复（正式包反馈两类问题） |
+| [legados-forks-comparison](./specs/legados-forks-comparison/README.md) | ✅ | legados Fork 对比与集成方案（逐文件源码对比识别可集成特性） |
+| [legado-skill-v2-rebuild](./specs/legado-skill-v2-rebuild/README.md) | 🔄 | Legado Skill V2 重建方案（基于第十轮深度审计的统一重建） |
+| [list-residue-compose](./specs/list-residue-compose/README.md) | ✅ | 遗留列表 Compose 化收尾（CacheActivity 缓存列表+Explore 瀑布列表） |
+| [memory-mechanism-redesign](./specs/memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
+| [multiline-on-demand-extraction](./specs/multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
+| [my-topbar-unify](./specs/my-topbar-unify/README.md) | 🔄 | 「我的」页头部迁移 MainTopBarView（与书架/订阅/发现观感统一） |
+| [network-perf-stability](./specs/network-perf-stability/README.md) | 🔄 | 网络性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密） |
+| [p0-bugfix-round1](./specs/p0-bugfix-round1/README.md) | ✅ | P0 核心 Bug 修复第一轮（2026-07-08 改动发现的 4 项） |
+| [player-mature-solutions-alignment](./specs/player-mature-solutions-alignment/README.md) | 🔄 | 播放器成熟方案对齐（可观测性+视频/图片核心能力+网络韧性，5 Phase） |
+| [player-review-and-optimization](./specs/player-review-and-optimization/README.md) | ✅ | 视频/图片播放器审查与优化整合（8 份审查报告 108 项+12 个 ADR） |
+| [reader-overlay-compose](./specs/reader-overlay-compose/README.md) | 🔄 | 阅读器浮层 Compose 化（S5 骨架：菜单层+浮层壳核分离，正文零改动） |
+| [rss-classic-layout-align](./specs/rss-classic-layout-align/README.md) | ✅ | 经典订阅布局管理与书架对齐修复（margin/排序/书名/弹框等 7 项实锤） |
+| [rss-folder-cover-dialog-align](./specs/rss-folder-cover-dialog-align/README.md) | ✅ | 订阅文件夹封面弹框对齐书架（标准弹框+预览+恢复默认） |
+| [rss-folder-subtag-fix](./specs/rss-folder-subtag-fix/README.md) | 🔄 | 订阅文件夹样式点进文件夹头部误显标签/箭头修复 |
+| [rss-image-load-optimization](./specs/rss-image-load-optimization/README.md) | 🔄 | 图片订阅源加载优化（参考书源：URL 缓存+采样解码+并发预下载） |
+| [rss-video-player-enhancement](./specs/rss-video-player-enhancement/README.md) | 🔄 | 订阅源视频播放器增强（多集选择/调试日志/自动抓取 R1-R5） |
+| [sniff-migration-booksource](./specs/sniff-migration-booksource/README.md) | ✅ | 嗅探与滑动切换能力迁移至书源（图片/视频嗅探+上下滑动切换） |
+| [sniff-regression-rss-image-crash](./specs/sniff-regression-rss-image-crash/README.md) | ✅ | 嗅探回归与图片订阅源崩溃取证修复（① WebView 池全局互斥修复嗅探回归 ② 图片订阅源崩溃根因模拟器复现实锤：appendItems 后台线程更新 vs 主线程 notify 竞态 → RecyclerView Inconsistency FATAL，修复后 3 轮全绿；Phase B 定向防御 H4/H6/H1/H3；真实崩溃栈回灌闭环） |
+| [source-arch-mutual-borrow](./specs/source-arch-mutual-borrow/README.md) | 🔄 | 书源/订阅源架构差异分析与机制层互补优化（6 个共享机制组件，V2） |
+| [source-layout-redesign](./specs/source-layout-redesign/README.md) | ✅ | 书源/订阅源布局设置重做（视图模式/排序/类型筛选/统一配置对话框） |
+| [subpage-topbar-unify](./specs/subpage-topbar-unify/README.md) | 🔄 | 子页面头部统一（全 App TitleBar 子页批量迁移 MainTopBarView） |
+| [tag-mode-unify](./specs/tag-mode-unify/README.md) | 🔄 | 书架订阅标签样式统一（对齐 Archive MainTopBarView 顶栏标签体系） |
+| [theme-rss-header-layout-sync](./specs/theme-rss-header-layout-sync/README.md) | ✅ | 主题设置与订阅/发现页头部布局联动修复（即时刷新+废弃 key 清理） |
+| [thread-pool-audit](./specs/thread-pool-audit/README.md) | 🔄 | 线程池配置全面审查（13 项配置点静态审查） |
+| [topbar-icon-semantics-fix](./specs/topbar-icon-semantics-fix/README.md) | 🔄 | 顶栏图标语义与功能修复（Archive 迁移三级丢失链全量普查） |
+| [topbar-search-entry-align](./specs/topbar-search-entry-align/README.md) | ✅ | 主 Tab 头部搜索入口形态统一与主题取色对齐（消费主题槽位） |
+| [ui-redesign-m3](./specs/ui-redesign-m3/README.md) | 🔄 | UI 重构设计（对标 M3 设计语言，全量页面 Compose 化，ADR 01-22） |
+| [ui-style-unify-deep-fix](./specs/ui-style-unify-deep-fix/README.md) | 🔄 | UI 风格统一深度修复（头部 5 类+弹框 4 套体系双基线收敛） |
+| [ui-theme-gap-audit](./specs/ui-theme-gap-audit/README.md) | 🔄 | UI 主题管理缺口审计与全量样式测试（F/L/P 三维清单+测试用例集+修复轮） |
+| [video-back-fullscreen-fix](./specs/video-back-fullscreen-fix/README.md) | 🔄 | 视频播放器返回按钮修复+全屏按钮迁移+真全屏优化 |
+| [video-download-manager](./specs/video-download-manager/README.md) | ✅ | 视频下载与下载管理整合（自研 IDM 式分片引擎+m3u8 重封装） |
+| [video-extractor-enhancement](./specs/video-extractor-enhancement/README.md) | 🔄 | 内置视频抓取能力增强（自动抓取视频链接补齐规则短板） |
+| [video-player-image-enhance](./specs/video-player-image-enhance/README.md) | ✅ | 视频播放器画质增强三级档位（色彩参数/CAS 锐化降噪/Anime4K 超分） |
+| [video-player-theme-unify](./specs/video-player-theme-unify/README.md) | ✅ | 视频播放器主题统一（控制条/弹框动态设色+硬编码色清理） |
+| [video-player-ux-fixes](./specs/video-player-ux-fixes/README.md) | ✅ | 视频播放器体验五项修复（下载按钮/快进灵敏度/弹框透明/标题/图标） |
 
-| 文档 | 说明 |
-|------|------|
-| [specs/archive/skill-improvement/](./specs/archive/skill-improvement/) | Skill 改进设计文档 |
-| [specs/archive/skill-architecture-optimization/](./specs/archive/skill-architecture-optimization/) | Skill 架构优化设计 �?已完�?|
-| [specs/archive/skill-html-fetch-enhancement/](./specs/archive/skill-html-fetch-enhancement/) | Skill HTML 获取能力增强 �?已完�?|
-| [specs/archive/test-infra-upgrade/](./specs/archive/test-infra-upgrade/) | 测试基础设施升级 ⚠️ 代码实现完成，测试验证缺�?|
-| [specs/archive/skill-trio-optimization/](./specs/archive/skill-trio-optimization/) | Skill 三件套优�?🔄 进行�?|
-| [specs/archive/skill-deep-optimization-v2/](./specs/archive/skill-deep-optimization-v2/) | Skill 深度优化 V2 �?已完�?|
+> 历史 spec 已归档至 docs/specs/archive/（100 个 spec 目录+2 个散件分析文档，2026-08-30 文档规整），其中 42 个为停滞设计归档待定（README 顶部有标注，可随时恢复），完整清单见 [specs/INDEX.md](./specs/INDEX.md)。
 
 ---
 
-## 四、核�?Skill�?trae/skills/legado-source-creator/�?
+## 四、核心 Skill（.trae/skills/legado-source-creator/）
 
-> 项目核心工具：Legado 书源/订阅源智能创建器�?9 条陷阱检查�? 阶段闭环工作流�?0 大参考目录�?6 个验证脚本�?
+> 项目核心工具：Legado 书源/订阅源智能创建器（79 条陷阱检查清单+5 阶段闭环工作流+10 大参考目录+验证脚本）。
 
 ### 核心文档
 
 | 文档 | 核心内容 |
 |------|----------|
-| [SKILL.md](../.trae/skills/legado-source-creator/SKILL.md) | 主文档：规则引擎完整知识+79条陷阱检查清�?5阶段闭环工作�?|
-| [AI_README.md](../.trae/skills/legado-source-creator/AI_README.md) | AI使用指南：快速开�?脚本使用+工作流程+经验反哺规范 |
+| [SKILL.md](../.trae/skills/legado-source-creator/SKILL.md) | 主文档：规则引擎完整知识+79 条陷阱检查清单+5 阶段闭环工作流 |
 
 ### 参考文档索引（10 大目录）
 
 | 目录 | 子文档数 | 核心内容 |
 |------|----------|----------|
-| [references/](../.trae/skills/legado-source-creator/references/_INDEX.md) | 4 核心文档 | 规则语法+URL模板+实体字段+示例�?|
-| [references/troubleshooting/](../.trae/skills/legado-source-creator/references/troubleshooting/_index.md) | 6 子文�?| 常见陷阱与故障排�?|
-| [references/js-extensions/](../.trae/skills/legado-source-creator/references/js-extensions/_index.md) | 11 子文�?| JS扩展函数完整参�?|
-| [references/js-patterns/](../.trae/skills/legado-source-creator/references/js-patterns/_index.md) | 11 子文�?| JS模式参考手�?|
-| [references/special-scenarios/](../.trae/skills/legado-source-creator/references/special-scenarios/_index.md) | 13 子文�?| 登录/验证�?加密/视频等特殊场�?|
-| [references/source-analysis/](../.trae/skills/legado-source-creator/references/source-analysis/_index.md) | 6 子文�?| 源码分析验证结果 |
-| [references/site-features/](../.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 子文�?| 站点特征与规则类型映�?|
-| [references/rule-construction-guide/](../.trae/skills/legado-source-creator/references/rule-construction-guide/_index.md) | 3 子文�?| 规则构建指南 |
-| [references/known-fix-patterns/](../.trae/skills/legado-source-creator/references/known-fix-patterns/_index.md) | 8 子文�?| 已知修复模式 |
-| [references/cms-samples/](../.trae/skills/legado-source-creator/references/cms-samples/_INDEX.md) | 2 子文�?| CMS模板样本 |
+| [references/](../.trae/skills/legado-source-creator/references/_INDEX.md) | 4 核心文档 | 规则语法+URL 模板+实体字段+示例库 |
+| [references/troubleshooting/](../.trae/skills/legado-source-creator/references/troubleshooting/_index.md) | 6 子文档 | 常见陷阱与故障排除 |
+| [references/js-extensions/](../.trae/skills/legado-source-creator/references/js-extensions/_index.md) | 11 子文档 | JS 扩展函数完整参考 |
+| [references/js-patterns/](../.trae/skills/legado-source-creator/references/js-patterns/_index.md) | 11 子文档 | JS 模式参考手册 |
+| [references/special-scenarios/](../.trae/skills/legado-source-creator/references/special-scenarios/_index.md) | 13 子文档 | 登录/验证码/加密/视频等特殊场景 |
+| [references/source-analysis/](../.trae/skills/legado-source-creator/references/source-analysis/_index.md) | 6 子文档 | 源码分析验证结果 |
+| [references/site-features/](../.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 子文档 | 站点特征与规则类型映射 |
+| [references/rule-construction-guide/](../.trae/skills/legado-source-creator/references/rule-construction-guide/_index.md) | 3 子文档 | 规则构建指南 |
+| [references/known-fix-patterns/](../.trae/skills/legado-source-creator/references/known-fix-patterns/_index.md) | 8 子文档 | 已知修复模式 |
+| [references/cms-samples/](../.trae/skills/legado-source-creator/references/cms-samples/_INDEX.md) | 2 子文档 | CMS 模板样本 |
 
-### 工具：JVM 规则引擎仿真�?
+### 工具与脚本（已清理）
 
-| 工具 | 用�?|
-|------|------|
-| `tools/legado-jvm/build/libs/legado-jvm.jar` | JVM 仿真器（统一JAR，Rhino+jsoup+hutool+AnalyzeRule�?|
-| `scripts/legado_client/client/rule_engine_client.py` | Python 客户端（调用 JVM 仿真器） |
-| [references/source-analysis/ajax-diff-analysis.md](../.trae/skills/legado-source-creator/references/source-analysis/ajax-diff-analysis.md) | ajax 差异分析文档 |
-
-### 验证脚本
-
-| 脚本 | 用�?|
-|------|------|
-| `scripts/quick-verify.py` | 浅层可用性验证（网站存活+HTTP�?|
-| `scripts/verify-source.py` | 深度链路验证（规则引擎模拟解析） |
-| `scripts/debug-source.py` | 端到端真机级调试 |
-| `scripts/generate-js-doc.py` | 提取JS模式生成文档 |
-| `scripts/deep-analyze-js.py` | 深度JS分析（变量传递链/加密模式�?|
-
-### 固化脚本
-
-| 脚本 | 用�?|
-|------|------|
-| `scripts/verify-decrypt.py` | AES/DES 解密验证 |
-| `scripts/verify-selector.py` | CSS 选择器验�?|
-| `scripts/verify-image.py` | 图片加密验证 |
-| `scripts/analyze_site.py` | 网站结构分析 |
-| `scripts/verify-source.py` | 源完整性验�?|
-| `scripts/diagnose-failures.py` | 失败诊断 |
-| `scripts/run-full-regression.py` | 全量回归 |
-| `scripts/quick-test-sources.py` | 快速批量测�?|
-
-### 辅助脚本
-
-| 脚本 | 用�?|
-|------|------|
-| `scripts/html_fetcher.py` | HTML获取回退�?|
-| `scripts/diagnose-failures.py` | 失败诊断 |
-| `scripts/run-full-regression.py` | 全量回归 |
+> ⚠️ 历史工具（JVM 规则引擎仿真器、验证/固化/辅助 Python 脚本）已在 skill-optimization v6 中删除（确立 Playwright MCP 唯一验证地位，废弃 JVM 仿真器与 Python 客户端），本表不再罗列。当前验证方式以 SKILL.md 内工作流为准。
 
 ### 模板文件
 
-| 文件 | 用�?|
+| 文件 | 用途 |
 |------|------|
-| `templates/auto-video-player.html` | 自动视频播放器模�?|
-| `templates/hls-video-player.html` | HLS视频播放器模�?|
-| `templates/inject-video-player.js` | 注入式视频播放器JS |
+| `templates/auto-video-player.html` | 自动视频播放器模板 |
+| `templates/hls-video-player.html` | HLS 视频播放器模板 |
+| `templates/inject-video-player.js` | 注入式视频播放器 JS |
 
 ---
 
-## 五、工作流审计�?Skill�?trae/skills/legado-workflow-auditor/�?
+## 五、工作流审计 Skill（.trae/skills/legado-workflow-auditor/）
 
-> 书源/订阅源创建或优化任务完成后的强制审计工具，确�?Phase 完成标志、basic-memory 执行证据、自测交付流程的合规性�?
+> 书源/订阅源创建或优化任务完成后的强制审计工具，确保 Phase 完成标志、basic-memory 执行证据、自测交付流程的合规性。
 
 | 文档 | 核心内容 |
 |------|----------|
-| [SKILL.md](../.trae/skills/legado-workflow-auditor/SKILL.md) | 审计规则+检查清�?审计报告模板 |
+| [SKILL.md](../.trae/skills/legado-workflow-auditor/SKILL.md) | 审计规则+检查清单+审计报告模板 |

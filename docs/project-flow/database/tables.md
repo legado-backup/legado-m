@@ -1,6 +1,6 @@
 # 数据库表结构 DDL
 
-> Legado 数据库 v89 全部 21 张表的完整 CREATE TABLE 语句、索引定义和约束说明。
+> Legado 数据库 v108（以 AppDatabase.kt version 字段为准）全部 21 张表的完整 CREATE TABLE 语句、索引定义和约束说明。
 
 ---
 

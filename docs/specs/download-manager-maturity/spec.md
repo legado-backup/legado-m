@@ -71,7 +71,7 @@
 ### Drawbacks
 - 断点续传对「服务器不支持 Range」的直连源失效（单线程整段下载，无续传点）——接受，这类源占比低。
 - m3u8 续传依赖分片清单持久化，极端进程强杀下清单写入间隙可能丢一两个分片——接受，可重下。
-- Room 表新增 + 版本升级（`legado.db` schema 变更，当前 v89）——需按 `database-migration-safety` 走迁移验证。
+- Room 表新增 + 版本升级（`legado.db` schema 变更，版本以 `AppDatabase.kt` version 字段为准）——需按 `database-migration-safety` 走迁移验证。
 
 ### Prior Art
 - 参考 `precise-manage` 规格的下载管理页 UI 与 `DownloadState` 轮询模型。

@@ -54,7 +54,7 @@
 
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
-| 数据库定义(版本89) | `data/AppDatabase.kt` | L69-149 |
+| 数据库定义(v108，以 AppDatabase.kt version 字段为准) | `data/AppDatabase.kt` | L69-149 |
 | AutoMigration列表 | `data/AppDatabase.kt` | L78-125 |
 | Book实体 | `data/entities/Book.kt` | L34-38 |
 | BookChapter实体 | `data/entities/BookChapter.kt` | L30-42 |
@@ -168,12 +168,12 @@
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
 | 异常体系架构 | [modules/exception-system.md](./modules/exception-system.md) | - |
-| NoStackTraceException 基类 | data/entities/NoStackTraceException.kt | - |
-| ContentEmptyException | data/entities/ContentEmptyException.kt | - |
-| ConcurrentException | data/entities/ConcurrentException.kt | - |
-| EmptyFileException | data/entities/EmptyFileException.kt | - |
-| RegexTimeoutException | data/entities/RegexTimeoutException.kt | - |
-| TocEmptyException | data/entities/TocEmptyException.kt | - |
+| NoStackTraceException 基类 | app/src/main/java/io/legado/app/exception/NoStackTraceException.kt | - |
+| ContentEmptyException | app/src/main/java/io/legado/app/exception/ContentEmptyException.kt | - |
+| ConcurrentException | app/src/main/java/io/legado/app/exception/ConcurrentException.kt | - |
+| EmptyFileException | app/src/main/java/io/legado/app/exception/EmptyFileException.kt | - |
+| RegexTimeoutException | app/src/main/java/io/legado/app/exception/RegexTimeoutException.kt | - |
+| TocEmptyException | app/src/main/java/io/legado/app/exception/TocEmptyException.kt | - |
 | 异常使用场景 | [modules/exception-system.md](./modules/exception-system.md) | 4 异常使用场景分析 |
 
 ## 常量/配置键相关
@@ -215,7 +215,7 @@
 | ImagePageAdapter 内层适配器（旋转/缩放） | ui/image/ImagePageAdapter.kt | - |
 | FloatingPlayer 浮窗播放 | ui/video/FloatingPlayer.kt | - |
 | 弹幕系统 | ui/video/DanmakuAdapter.kt | - |
-| WebViewPool 对象池 | help/http/WebViewPool.kt | - |
+| WebViewPool 对象池（三 scope 分层 GLOBAL/DISCOVERY/RSS；pauseTimers/resumeTimers 进程级 API 全局互斥判断） | help/webView/WebViewPool.kt | - |
 | WebJsExtensions JS桥接 | help/http/WebJsExtensions.kt | - |
 
 ## HTTP请求/Cookie/WebView辅助
@@ -236,11 +236,11 @@
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
 | 更新系统架构 | [modules/update-system.md](./modules/update-system.md) | - |
-| AppUpdate 门面 | model/appUpdate/AppUpdate.kt | - |
-| AppUpdateGitHub 实现 | model/appUpdate/AppUpdateGitHub.kt | - |
-| AppUpdateGitee 实现 | model/appUpdate/AppUpdateGitee.kt | - |
-| AppReleaseInfo 数据结构 | model/appUpdate/AppReleaseInfo.kt | - |
-| AppVariant 变体枚举 | model/appUpdate/AppVariant.kt | - |
+| AppUpdate 门面 | app/src/main/java/io/legado/app/help/update/AppUpdate.kt | - |
+| AppUpdateGitHub 实现 | app/src/main/java/io/legado/app/help/update/AppUpdateGitHub.kt | - |
+| AppUpdateGitee 实现 | app/src/main/java/io/legado/app/help/update/AppUpdateGitee.kt | - |
+| AppReleaseInfo 数据结构 | app/src/main/java/io/legado/app/help/update/AppReleaseInfo.kt | - |
+| AppVariant 变体枚举 | app/src/main/java/io/legado/app/help/update/AppReleaseInfo.kt（enum class AppVariant，无独立文件） | - |
 
 ## 源验证/源扩展
 

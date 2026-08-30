@@ -2,7 +2,7 @@
 
 > **AI 在进行网络层/前端/协程/WebView 等组件优化时，必须主动对比以下延伸版本的实现，学习借鉴优点，不闭门造车。**
 > 来源：[阅读·全版本集散地](https://momoa.cc.cd/%E4%B8%8B%E8%BD%BD/xz)（41+ 版本；旧地址 momo-b5a.pages.dev 已失效，2026-08-16 更新）
-> 上游活跃度快照（2026-07-16 ~ 2026-08-16 实测）：**原版 gedoor 已停更**（最后推送 2026-05-27）；活跃上游依次为 喵公子（14 release）、阅读T（30 提交）、MD3（27 提交）、阅读Archive（46 提交，relay 子系统）、阅读NG（Compose 迁移）、legado-E（仅 EPUB 修复 PR#451）；蛋蛋Max/阅读R/辞晨 零提交。详见 `docs/specs/sync-upstream-optimizations-20260816/README.md` §1.1。
+> 上游活跃度快照（2026-07-16 ~ 2026-08-16 实测）：**原版 gedoor 已停更**（最后推送 2026-05-27）；活跃上游依次为 喵公子（14 release）、阅读T（30 提交）、MD3（27 提交）、阅读Archive（46 提交，relay 子系统）、阅读NG（Compose 迁移）、legado-E（仅 EPUB 修复 PR#451）；蛋蛋Max/阅读R/辞晨 零提交。详见 `docs/specs/archive/sync-upstream-optimizations-20260816/README.md` §1.1。
 
 ## 主线分支（基于原版，网络层与原版基本一致）
 
@@ -65,6 +65,6 @@ Phase 1: 准备阶段 → Phase 2: 分类对比 → Phase 3: 差异识别 → Ph
 ## 关键踩坑警示
 
 - ⚠️ **GitHub git trees API 有缓存错误**：所有结论以 `git clone --depth 1` 实测为准
-- ⚠️ **仓库 404 不等于不存在**：可能是改名/私有/删除，需在 [阅读·全版本集散地](https://momo-b5a.pages.dev/%E4%B8%8B%E8%BD%BD/xz) 查新地址
+- ⚠️ **仓库 404 不等于不存在**：可能是改名/私有/删除，需在 [阅读·全版本集散地](https://momoa.cc.cd/%E4%B8%8B%E8%BD%BD/xz) 查新地址（旧地址 momo-b5a.pages.dev 已失效）
 - ⚠️ **前端源码在 `modules/web/`**：不是 `app/src/main/assets/web/`（后者是构建产物）
 - ⚠️ **PowerShell curl 别名冲突**：使用 `curl.exe` 或 `Invoke-WebRequest`

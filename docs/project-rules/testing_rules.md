@@ -6,7 +6,7 @@
 
 ## 现状
 
-项目测试覆盖极度薄弱，仅有 2 个 JUnit 4 测试文件：
+项目测试覆盖薄弱，实际测试文件以 `./gradlew test` 实际运行为准，当前已知包括：
 
 | 文件 | 内容 |
 |------|------|
@@ -30,7 +30,7 @@ androidTest/ 下有 6 个测试文件：ExampleInstrumentedTest.kt, AndroidJsTes
 
 ### 书源/订阅源自测
 
-书源和订阅源必须经过自测通过后才能交付，详见 AGENTS.md「自测三阶段流水线」。
+书源和订阅源必须经过自测通过后才能交付：书源/订阅源 5 阶段闭环自测（见 .trae/skills/legado-source-creator/SKILL.md）。
 
 ### 运行测试
 

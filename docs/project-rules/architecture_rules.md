@@ -29,7 +29,7 @@ DI 方式为手动管理：
 
 ## 数据库层
 
-- Room 数据库：`legado.db`，版本 89
+- Room 版本以 `AppDatabase.kt` 的 `version` 字段为准（撰写时为 108，文档禁止硬编码快照版本号）
 - **允许主线程查询**：`allowMainThreadQueries()` — Glide 图片加载等上下文中必需，保持启用
 - `room.generateKotlin=false`：生成 Java 而非 Kotlin
 - Schema 导出：`app/schemas/`

@@ -20,17 +20,18 @@
 | 3b. L2验证订阅源搜索 | `l2_verify_rss_search.py` | 订阅源统一搜索L2功能验证（rss-unified-search新增） | `python ai_tests/scripts/l2_verify_rss_search.py [--keyword 关键词] [--scenario all]` |
 | 3c. L2验证精准管理 | `l2_verify_precise_manage.py` | 精准管理L2验证（precise-manage新增：聚合入口/网址记录/存储管理/下载管理/文件管理/crash_check） | `python ai_tests/scripts/l2_verify_precise_manage.py [--scenario all]` |
 | 4. SwipeTest日志分析 | `swipe_test_log.py` | SwipeTest日志抓取分析（仅临时日志验证时用） | `python ai_tests/scripts/swipe_test_log.py [clear\|capture\|analyze]` |
-| 5. 修复点覆盖度分析 | `fix_coverage_check.py` | 检查每个修复点的正向日志是否触发（10个修复点） | `python ai_tests/scripts/fix_coverage_check.py` |
-| 6. 批量源遍历 | `batch_source_test.py` | 自动遍历多个RSS源检测修复点触发（全程脱敏） | `python ai_tests/scripts/batch_source_test.py [起始编号] [结束编号]` |
-| 7. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
-| 8. AppLog日志获取 | `collect_app_log.py` | 按模块Tag过滤logcat+拉取文件日志（logging-audit新增） | `python ai_tests/scripts/collect_app_log.py [--tag TAG\|--file\|--all]` |
-| 9. 订阅形态切换验证 | `verify_rss_mode_switch.py` | 6.8 新版/经典订阅切换真机验证（打开配置页→切换→查prefs→回订阅页验形态） | `python ai_tests/scripts/verify_rss_mode_switch.py --full`（`--discovery` 验发现-订阅配置页） |
-| 10. 多媒体书检查 | `check_video_books.py` | 检查 MyFeatureBooksActivity 是否有视频/图片书（VideoPagerAdapter 回归前置） | `python ai_tests/scripts/check_video_books.py` |
-| 11. 详情页无 null 弹框 | `verify_book_info_no_null.py` | 书架长按进详情页，验证无 "book is null" toast + 更多菜单正常（含拷贝书籍URL） | `python ai_tests/scripts/verify_book_info_no_null.py` |
-| 12. 播放器会话复用重置 | `verify_player_session_reset.py` | singleTask 旧会话驻留后台后新播放请求是否正确重置（下载视频→新播放意图切换；验证 onNewIntent 重置日志+UI标题切换+无崩溃） | `python ai_tests/scripts/verify_player_session_reset.py` |
-| 13. 订阅源嗅探回归 | `verify_rss_sniff_after_download.py` | 下载视频→订阅源嗅探播放完整用户场景回归（嗅探链路 AppLog 标记+onNewIntent 重置+无旧会话残留；自动从 DB 选启用源视频文章） | `python ai_tests/scripts/verify_rss_sniff_after_download.py <legado.db>` |
-| 14. 订阅源/DB 脱敏查询 | `query_rss_video_sources.py` | 脱敏查询模拟器 DB（只输出 id/计数/类型技术字段，不输出源名称/URL） | `python ai_tests/scripts/query_rss_video_sources.py <db_path>` |
+| 5. 导航辅助 | `nav_helper.py` | 脱敏导航到视频播放器（只输出编号不输出名称） | `python ai_tests/scripts/nav_helper.py [源编号]` |
+| 6. 订阅形态切换验证 | `verify_rss_mode_switch.py` | 6.8 新版/经典订阅切换真机验证（打开配置页→切换→查prefs→回订阅页验形态） | `python ai_tests/scripts/verify_rss_mode_switch.py --full`（`--discovery` 验发现-订阅配置页） |
+| 7. 多媒体书检查 | `check_video_books.py` | 检查 MyFeatureBooksActivity 是否有视频/图片书（VideoPagerAdapter 回归前置） | `python ai_tests/scripts/check_video_books.py` |
+| 8. 详情页无 null 弹框 | `verify_book_info_no_null.py` | 书架长按进详情页，验证无 "book is null" toast + 更多菜单正常（含拷贝书籍URL） | `python ai_tests/scripts/verify_book_info_no_null.py` |
+| 9. 播放器会话复用重置 | `verify_player_session_reset.py` | singleTask 旧会话驻留后台后新播放请求是否正确重置（下载视频→新播放意图切换；验证 onNewIntent 重置日志+UI标题切换+无崩溃） | `python ai_tests/scripts/verify_player_session_reset.py` |
+| 10. 订阅源嗅探回归 | `verify_rss_sniff_after_download.py` | 下载视频→订阅源嗅探播放完整用户场景回归（嗅探链路 AppLog 标记+onNewIntent 重置+无旧会话残留；自动从 DB 选启用源视频文章） | `python ai_tests/scripts/verify_rss_sniff_after_download.py <legado.db>` |
+| 11. 订阅源/DB 脱敏查询 | `query_rss_video_sources.py` | 脱敏查询模拟器 DB（只输出 id/计数/类型技术字段，不输出源名称/URL） | `python ai_tests/scripts/query_rss_video_sources.py <db_path>` |
 | 15. 双包无崩溃验证 | `verify_no_crash.py` | 安装指定包→启动→进发现页→二轮重启复现缓存读取→logcat 崩溃模式分析（no-crash 2026-08-29 新增） | `python ai_tests/scripts/verify_no_crash.py --type debug\|release` |
+| 16. 图片订阅源浏览链路 L2 | `l2_verify_image_gallery.py` | 自建最小图片源（本地 HTTP+合成 PNG+adb reverse）→RssSortActivity 确定性入口→图集页断言（进入/内容解析+图片下载/滑动 FATAL=0 前台存活）；sniff-regression-rss-image-crash Phase C 新增 | `python ai_tests/scripts/l2_verify_image_gallery.py` |
+| 17. 测试辅助：local.xml 操作 | `repair_local_prefs.py` / `set_flag_appcrash.py` | 重建损坏的 shared_prefs/local.xml（privacyPolicyOk/appCrash 等必需键）/ 切换 appCrash 标记（回灌链路验证用）；均走 base64 安全通道 | `python ai_tests/scripts/repair_local_prefs.py [--crash]` / `set_flag_appcrash.py true\|false` |
+
+> 2026-08-30 文档规整：原步骤 5/6/8（`fix_coverage_check.py`/`batch_source_test.py`/`collect_app_log.py`）所引脚本已不存在于 `ai_tests/`，删除对应步骤；修复点覆盖验证按本文"L2 验证场景清单"（`error_patterns` 场景）与"L2 观测通道"章节执行。
 
 ### ⚠️ 重要：签名配置（步骤1前置条件）
 
@@ -238,3 +239,9 @@ def ensure_cronet_ready():
 3. logcat 关键词：`libcronet.so FileNotFoundException` / `UnsatisfiedLinkError` / `Failed to load native library`
 4. Cronet 库位置：`/data/data/{PKG}/files/cronet/libcronet.so`
 5. HTTP 源不受影响（只有 HTTPS 依赖 Cronet），可用于区分诊断
+
+### L2 观测通道与 adb 数据传输铁律（2026-08-30 sniff-regression-rss-image-crash 沉淀）
+
+1. **文件通道才是确定性观测面**：AppLog 内容在 recordLog 关闭时不落盘（仅 ERROR 级走 logcat），且 logcat 主缓冲在真机上约 10~15 秒即可被刷滚驱逐早期条目。验证"某日志是否产生"必须以**拉取 appLog 文件 grep** 为准，`logcat -d` 抓取窗口越早越好（必要时启动后 3~5 秒即 dump）
+2. **adb 输出落盘禁止 PowerShell `>` 重定向**：`adb shell cat xxx > local` 会产出损坏/截断文件（铁证：shared_prefs 拉取仅剩 51 字节，回写后损坏设备端默认 prefs）。必须走 **base64 通道**：设备端 `base64 <file>` → 本地 `[Convert]::FromBase64String` 解码；写回反向同理。与既有教训"git show > file 毁文件"同源（PowerShell 管道编码问题）
+3. **shared_prefs 直改风险分级**：`local.xml`（LocalConfig）与 `<pkg>_preferences.xml`（defaultSharedPreferences）是不同文件，改前必须先核实目标 key 所在文件（源码 object 声明处 `getSharedPreferences("name", ...)`）；回写损坏会造成该模拟器设置丢失（SharedPreferences 解析失败静默回退空表）

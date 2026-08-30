@@ -81,6 +81,6 @@ flowchart LR
 
 ## 关联文档
 
-- 图片嗅探设计源：`docs/specs/image-sniffer-optimization/` | 图片 UI 架构：`docs/specs/image-gallery-activity/`
+- 图片嗅探设计源：`docs/specs/archive/image-sniffer-optimization/` | 图片 UI 架构：`docs/specs/archive/image-gallery-activity/`
 - RSS 视频播放器：`docs/specs/rss-video-player-enhancement/` | 图片浏览优化：`docs/specs/image-player-vertical-canvas-optimization/`
 - 规范速查：`docs/INDEX.md`、`docs/project-flow/task-navigation.md`、`docs/project-rules/version-delivery-sync.md`、`docs/project-rules/ai_e2e_testing_workflow.md`、`docs/project-rules/package-naming.md`

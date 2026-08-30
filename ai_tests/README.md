@@ -47,6 +47,7 @@ python ai_tests/run_e2e.py --apk auto --tc all
 | `--gen-test <Activity>` | 为 Activity 生成 Python 测试骨架 | ⚠️ M9 未实现，仅提示 |
 | `--update-source-map` | 重建 source_map.json | ⚠️ M8 未实现，仅提示 |
 | `--feedback` | 触发反馈闭环处理 | ⚠️ M16 未实现，仅提示 |
+| `--ai-verify` | 报告生成后自动拉起 VL 模型判定 manual 用例并回填 ai_verdict（AI-LLM-Testing） | ✅ 已实现（依赖本地 VL 模型服务在线，不可用时跳过并提示） |
 
 ## 用例筛选示例
 
