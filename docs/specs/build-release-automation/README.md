@@ -13,7 +13,7 @@
 
 1. **一键发布编排**：单命令完成"版本确认 → test/release/coexist 三包依次构建 → 校验强化 → gh release 上传 → git tag 推送"全流程，消除两次手工命令割裂。
 2. **校验强化 fail-fast**：updateLog 当日条目缺失、三包产物缺失均从 WARN 升级为 exit 非零；libcronet.so 校验保留 exit 1 级别；新增 apksigner 验签 + 包名/版本三包一致性校验。
-3. **门禁不可绕过**：真机 L2 测试交互式确认（默认 N 拒绝，禁止 --force-skip；AI 代答必须绑定 `--l2-evidence` 当日 L2 报告，证据校验不过即拒绝）；test 包不上 Release 仅本地归档（包名混用禁令）；每包构建后内嵌 daemon 清场（等价 `:STOP_DAEMON`）。
+3. **门禁不可绕过**：真机 L2 测试交互式确认（默认 N 拒绝，禁止 --force-skip；AI 代答必须绑定 `--l2-evidence` 当日 L2 报告，证据校验不过即拒绝）；三包全上传且 test 包带 `_debug` 后缀命名防冲突，上传前逐包包名断言防混发；每包构建后内嵌 daemon 清场（等价 `:STOP_DAEMON`）。
 4. **双形态入口**：人工双击 `publish.bat`（薄壳，交互式确认链）；AI 场景 `python scripts/publish_release.py` + AskUserQuestion 代答确认（`--confirm-stage` 续跑 + L2 证据绑定），门禁由用户亲自放行并留痕。
 5. **发布与回滚锚点**：gh CLI 上传替代 requests（规避 uploads.github.com SSL 与 51MB+ 大文件双坑）；git tag push 前打印供人工确认，形成版本回滚锚点。
 6. **幽灵 CI 清理**：注释 test.yml / web.yml 的 push 触发器（secrets 未配置的空转失败源），注释后 push 零 CI 运行。

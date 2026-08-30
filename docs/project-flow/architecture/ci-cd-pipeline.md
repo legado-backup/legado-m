@@ -75,7 +75,7 @@ APK 输出目录：`output/apk/{test,release,coexist}`（发布脚本按此扫�
 | Stage1 版本确认 | `--version` 显式传入，否则按公式 bump（3.yyMMddHH 型 6 位） | 与 build.gradle releaseTime() 同构 |
 | Stage2 三包构建 | subprocess 依次调 build-legado.bat（test/release/coexist），显式版本第 3 参保证三包同版本 | 每包后 bat 内嵌 daemon 清场 |
 | Stage3 校验强化 | 三包齐全 / libcronet.so / apksigner 验签 / aapt2 包名版本一致性 / updateLog 当日条目 | 全部 fail-fast exit；缺包 exit；updateLog 缺当日条目拦截（无回退文案） |
-| Stage4 Release 发布 | GitHub 层 gh CLI 上传 release + coexist（test 包仅本地归档，包名禁令）；Gitee 层走 requests | L2 真机门禁交互确认默认 N |
+| Stage4 Release 发布 | GitHub 层 gh CLI 上传三包（test 包带 `_debug` 后缀防同名冲突）；Gitee 层走 requests | L2 真机门禁交互确认默认 N |
 | Stage5 git tag | tag = 版本号，push 前人工确认 | 版本回滚锚点（`git checkout <版本号>`） |
 
 ### 4.2 用法与参数
@@ -100,7 +100,7 @@ publish.bat [--version <ver>] [--dry-run] [--platform gitee|github|both] [--conf
 
 | 包类型 | 扫描目录 | 文件模式 | 处置 |
 |--------|----------|----------|------|
-| test（测试包） | `output/apk/test` | `legado_miss_app_*.apk` | **仅本地归档，不上传 Release**（包名禁令） |
+| test（测试包） | `output/apk/test` | `legado_miss_app_*.apk` | 上传 Release，asset 重命名为 `legado_miss_app_debug_{version}.apk`（防与正式包同名） |
 | release（正式包） | `output/apk/release` | `legado_miss_app_*.apk` | 上传 GitHub（gh CLI）+ Gitee（requests），保持原文件名 |
 | coexist（共存包） | `output/apk/coexist` | `legado_legacy_app_*.apk` | 同上，保持原文件名 |
 

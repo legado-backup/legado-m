@@ -77,7 +77,7 @@
 4. **R4 so 校验保留**：libcronet.so 存在性校验保留，缺失 exit 1，禁止降级为 WARN
 5. **R5 验签与一致性校验**：每包通过 apksigner 验签（v1/v2）+ aapt 核对包名（含 `.debug`/`.release` 后缀）与版本号，三包版本必须一致，失败 exit 非零
 6. **R6 真机门禁交互确认**：发布前交互式确认"L2 已通过（y/N）"，回车/默认 N 即拒绝中止；禁止提供默认关闭的 `--force-skip` 类参数
-7. **R7 test 包不发布**：test 包仅本地归档（debug 命名防覆盖），不作为 asset 上传 Release；正式发布仅接受 release + coexist 产物（包名混用禁令断言）
+7. **R7 三包全上传与包名断言**：test 包随 release/coexist 一并上传 Release（2026-08-30 用户裁决，经 get_upload_name 加 `_debug` 后缀命名防同名冲突）；上传前逐包断言包名与包类型匹配（EXPECTED_PACKAGES 表，防混发）
 8. **R8 每包构建后 daemon 清场**：编排器在三包各自构建后内嵌等价 `:STOP_DAEMON` 逻辑（或调用 stop-daemons.bat），作为不可跳过步骤
 9. **R9 tag 人工确认**：git tag 由脚本基于发布版本创建，push 前打印 tag 名与 commit 供人工确认，确认后才执行 push
 10. **R10 幽灵 CI 清零**：test.yml 与 web.yml 的 push 触发器注释（保留 workflow_dispatch），注释后向 main 的 push 零 CI 运行
@@ -90,7 +90,7 @@
 - **Scenario 1（主场景：正常发版全流程）**
   - Given：updateLog.md 已写入当日条目，jks 本地可用，gh CLI 已认证，真机 L2 已通过
   - When：执行 `python publish_release.py --version 3.26.0830xx`，依次通过版本确认、三包构建、校验强化，交互确认 L2 输入 `y`，确认 tag push
-  - Then：三包产出于 `output/apk/` 归档且校验全通过，gh Release 创建并上传 release + coexist 两个 asset（test 包仅本地归档），git tag 推送至远端形成回滚锚点，全程零 WARN 中断
+  - Then：三包产出于 `output/apk/` 归档且校验全通过，gh Release 创建并上传三个 asset（test 包重命名为 `legado_miss_app_debug_{version}.apk` 防同名冲突），git tag 推送至远端形成回滚锚点，全程零 WARN 中断
 
 - **Scenario 2（缺 updateLog 当日条目被拦截）**
   - Given：updateLog.md 最新条目日期早于今日（版本交付同步门禁未执行）
@@ -133,7 +133,7 @@ flowchart TD
     G4 -->|"失败"| F4["exit 非零"]
     G4 -->|"通过"| G5{"门禁5：真机 L2 已通过？<br/>交互确认 y/N，默认 N"}
     G5 -->|"N / 回车"| F5["中止：不产生 tag 与 Release"]
-    G5 -->|"y"| E["阶段4 gh release 上传<br/>release + coexist 上传<br/>test 包仅本地归档（门禁：包名禁混用）"]
+    G5 -->|"y"| E["阶段4 gh release 上传<br/>三包全上传<br/>test 包 _debug 后缀防同名（R7）"]
     E --> G6{"门禁6：tag push 人工确认<br/>打印 tag 名与 commit"}
     G6 -->|"拒绝"| F6["跳过 push，本地保留 tag"]
     G6 -->|"确认"| T["阶段5 推送 git tag<br/>版本回滚锚点"]
