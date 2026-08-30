@@ -407,6 +407,36 @@ RssFragment (MainActivity Tab3)
     └── 长按文章 → 收藏(RssStar) / 标为已读
 ```
 
+### RssFragment modern/classic 双模式（F-4/6.x）
+
+> 以下断言经 [RssFragment.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt) 源码核验（2026-08-30，行号为当日快照）。
+
+**模式开关与分派**：
+
+- 开关：`AppConfig.modernRssPage`（AppConfig.kt L414-L415，**默认 true** = 现代形态）；Fragment 侧字段 `usingModernRss`（RssFragment.kt L148）
+- 分派入口 `applyRssMode()`（L342-L352）：`usingModernRss = AppConfig.modernRssPage` → 统一 `resetRssModeState()`（L355-L380，取消跨模式 collector / 清分组类型标签 / 隔离 sortHostViewModel / 重置 `classicHeaderReady`）→ 分发到 `applyModernRssMode()`（L422）或 `applyClassicRssMode()`（L383）→ `invalidateOptionsMenu()`
+- onResume 检测配置变化重建（L241/L301 `usingModernRss != AppConfig.modernRssPage`），重建后以新配置初始化，不循环重建
+- `classicHeaderReady`（L161）：per-mode header 挂载标志，S5 模式切换时释放（L379），`getHeaderCount()` 幂等兜底防重复挂载（L1013-L1016）
+
+**classic 路径 — applyClassicRssMode（L383-L419）**：
+
+- `recyclerView` 可见（L393）+ Compose 顶栏 `initComposeTopBar()`（L395）+ 分组胶囊标签 `initTabLayout()`（L396，D1）+ Compose 文件夹网格 `initFolderComposeView()`（L397，folder-compose-refactor，卡片间距跟随 `AppConfig.sourceMargin`，L175）
+- 文件夹/标签模式由 `sourceGroupStyle`+`sourceGroupMode` 驱动（L179-L184：`isFolderViewMode` = style!=0 且 mode==1；标签模式 = style!=0 且 mode==0）
+- **z 序双保险**（L388-L391）：`rss_fragment_container`/`rss_web_container` 为全屏 z 序最高层，切 classic 时无条件 `isGone = true`，否则 modern 容器残留会盖住经典列表（真机实锤 2026-08-28）
+- **500ms 二次收敛**（L407-L418）：`postDelayed(500)` 校验 modern 容器/胶囊是否被竞态重新渲染，是则强制再次清空（`destroyModernRssChildren` + 清空顶栏 primaryItems/tags）——守卫"经典顶栏+modern 内容"混合态
+
+**modern 路径 — applyModernRssMode（L422-L432）**：
+
+- `recyclerView.gone()`，初始化 `initModernRssView()`（L452 起：顶栏 Mode.RSS + 源选择 titleSelect → SourceSelectDialog + 源标签 primaryBar 点击切源）+ `observeRssSources()`
+- 内容双分支（L450 注释 + L471-L477）：可现代渲染的源（`canRenderInModernPage()`）内嵌 **RssArticlesFragment** 文章列表；否则 `openRssLegacy` 走 **WebView 单源渲染**（`rssWebContainer`）
+
+**资源与作用域**：
+
+- `destroyModernRssChildren()`（L434-L446）：销毁 rssWebView（stopLoading→about:blank→destroy）+ `commitNow` 同步移除内嵌 Fragment（commit 异步窗口期会残留覆盖经典列表）
+- WebView 池隔离：离开订阅页 `WebViewPool.scheduleDestroyScope(WebViewPool.Scope.RSS)`（L321）/ `destroyScope(WebViewPool.Scope.RSS)`（L337），详见 [webview-pool.md](./webview-pool.md)
+
+**历史迁移**：旧偏好键 `PreferKey.rssViewMode` 已删除（0 引用，PreferKey.kt L292 注释），分组展示迁移链为 `sourceGroupStyle`（L300，0=列表/1=按类型/2=按分组）+ `sourceGroupMode` + `sourceMargin`（L307，卡片间距）。
+
 ### RssArticlesActivity — 文章阅读
 
 ```

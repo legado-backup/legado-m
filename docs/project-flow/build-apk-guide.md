@@ -683,13 +683,15 @@ Legado 使用 Chromium Cronet 作为网络加速库。Cronet 相关文件位于 
 
 ```powershell
 # 1. 修改 gradle.properties 中的 CronetVersion
-# CronetVersion=128.0.6613.40
+# CronetVersion=500.0.1
 
 # 2. 执行下载任务
 .\gradlew app:downloadCronet
 ```
 
 此任务会下载对应版本的 JAR 和各架构 SO 文件，并更新 `cronet.json`。
+
+> **2026-08-19 迁移**：Cronet 已切换为 `cronet-bundled` Maven 构件（`gradle.properties` 中 `CronetVersion=500.0.1`），替换本地 `cronetlib/` jars 并移除 APK 内置 SO 手工打包，上述 `downloadCronet` 本地下载流程仅作历史参考。
 
 ---
 
@@ -733,30 +735,30 @@ npm run build
 
 ### 7.3 修改方法
 
-#### 方法一：修改 applicationId（最简单，推荐）
+#### 方法一：通过 customAppId 属性传包名（最简单，推荐）
 
-只需修改 `app/build.gradle` 中的 `applicationId`：
+本项目 `applicationId` 由 `customAppId` 构建属性动态决定（`app/build.gradle` L61-66），不传参时默认 `io.legado.miss.app`：
 
 ```groovy
-// app/build.gradle 第 50 行
+// app/build.gradle 第 61-66 行
 defaultConfig {
-    applicationId "com.yourname.legado"  // 改为你的包名
-    // ...
+    // 1. 传 -PcustomAppId=xxx → 共存包（用户自定义包名）
+    // 2. 不传参数 + 构建类型 debug → 测试包（io.legado.miss.app.debug）
+    // 3. 不传参数 + 构建类型 release → 正式包（io.legado.miss.app.release）
+    applicationId project.hasProperty("customAppId") ? project.property("customAppId") : "io.legado.miss.app"
 }
 ```
 
-同时修改 release 的 `applicationIdSuffix`，确保不同构建类型包名不同：
+修改包名无需编辑 gradle 文件，构建时传参即可：
 
-```groovy
-buildTypes {
-    release {
-        applicationIdSuffix '.release'  // 最终包名: com.yourname.legado.release
-    }
-    debug {
-        applicationIdSuffix '.debug'    // 最终包名: com.yourname.legado.debug
-    }
-}
+```powershell
+# 共存包示例（与原版 legado 共存）
+.\gradlew assembleAppDebug -PcustomAppId=io.legado.app.debug
+# 或一键脚本（内部等价传参）
+build-legado.bat debug io.legado.app
 ```
+
+包名后缀由 `buildTypes` 的 `applicationIdSuffix` 追加（`app/build.gradle` L123/L144：release 加 `.release`、debug 加 `.debug`），最终包名 = `customAppId`（或默认值）+ 构建类型后缀。
 
 > **注意**：此方法只改 applicationId，不改 Kotlin 源码包结构（namespace）。applicationId 和 namespace 是独立的——applicationId 决定应用在设备上的标识，namespace 决定 R 类和 BuildConfig 的包路径。两者可以不同。
 
@@ -830,7 +832,9 @@ android {
 
 ## 八、GitHub Actions 自动构建
 
-项目已配置 CI/CD（`.github/workflows/release.yml`），支持自动构建和发布。
+> ⚠️ **本 fork 未实际启用 GitHub Actions 自动构建**：`.github/workflows/` 下的 5 个 workflow 均为上游 legado-E 遗产，push 触发已被注释（仅保留手动 workflow_dispatch 且实际不使用）。打包请走 `build-legado.bat` 或 gradlew 命令，本章仅作参考。
+
+上游 legado-E 曾配置 CI/CD（`.github/workflows/release.yml`），支持自动构建和发布。
 
 ### 8.1 触发方式
 

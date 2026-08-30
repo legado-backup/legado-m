@@ -218,7 +218,7 @@ Phase 1       Phase 2        Phase 3        Phase 4        Phase 5
 
 ### 7.2 同步检查清单
 
-- [ ] 实体数量（21 实体 + 21 DAO + 1 视图）
+- [ ] 实体数量（56 实体 + 43 DAO + 1 视图，version=108）
 - [ ] API 路由数量（14 POST + 12 GET + 4 控制器）
 - [ ] Mode 枚举（6 种，含 WebJs）
 - [ ] 主键定义（BookChapter 复合主键，Bookmark Long 主键）

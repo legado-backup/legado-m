@@ -137,7 +137,7 @@ gh release delete-asset <tag> <asset_name> -R syq17496152/legado --yes
 - **现象**：`SSLError(SSLCertVerificationError: certificate verify failed: unable to get local issuer certificate)`
 - **根因**：Windows 环境 uploads.github.com 证书链验证失败（api.github.com 正常，疑似网络代理拦截）
 - **临时方案**：脚本已禁用 SSL 验证（`SESSION.verify = False`）+ 过滤 InsecureRequestWarning
-- **TODO**：排查网络环境（代理/防火墙）根因，恢复严格 SSL 验证
+- **TODO（待确认，2026-08-30 复核）**：排查网络环境（代理/防火墙）根因，恢复严格 SSL 验证。脚本侧临时方案已实证（`scripts/publish_release.py` L31/33 `SESSION.verify = False` + 过滤 InsecureRequestWarning）；根因属运行环境问题，代码层面无法进一步实证
 
 ### 4.2 大文件上传 SSLEOFError
 
@@ -164,7 +164,10 @@ gh release delete-asset <tag> <asset_name> -R syq17496152/legado --yes
 
 ### 5.1 标准发布流程
 
-1. **构建三包**：`gradlew assembleDebug` + `gradlew assembleRelease` + `gradlew assembleCoexist`
+1. **构建三包**（productFlavors 仅 `app`，任务名必须带 App 前缀；无 `assembleCoexist` 任务，共存包靠 `-PcustomAppId` 实现）：
+   - 测试包：`build-legado.bat debug`（即 `gradlew assembleAppDebug`）
+   - 正式包：`build-legado.bat release`（即 `gradlew assembleAppRelease`）
+   - 共存包：`build-legado.bat debug io.legado.app`
 2. **更新日志**：编译前更新 `app/src/main/assets/updateLog.md`
 3. **libcronet.so 内置校验（强制，cronet-bundled 架构）**：每包构建后必须验证 APK **含** libcronet.so（cronet-bundled 单体 AAR 内置模式：API+实现+so 随 AAR 打包，安装时系统按 ABI 自动提取，CronetLoader 已退化为无操作存根）。若 APK 不含 so 说明依赖被错误排除，禁止发布
    > 历史变更：Cronet 150 时代为"动态下载模式"（APK 必须不含 so），升级 cronet-bundled 500.0.1 后架构翻转，详见 `CronetLoader.kt` 头注释

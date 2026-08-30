@@ -1,38 +1,42 @@
-# 前端架构 — Vue3 Web 管理界面
+# 前端架构 — Vue3 Web 管理界面（现状册）
 
-> 基于 Vue3 + Vite + VueRouter + Pinia 的 Web 管理界面，嵌入 APK assets 提供书架/阅读/书源管理功能。
-> 源码目录：`modules/web/src/`
+> 基于 Vue3 + Vite + VueRouter + Pinia 的 Web 管理界面，构建产物同步进 APK assets 提供书架/阅读/书源管理/备份功能。
+> 源码目录：`modules/web/src/`。本文为**现状文档**（2026-08 源码实测核验）。
+>
+> **书写约定**：全文以符号名/组件名/文件路径为锚点，不使用行号定位（代码持续演进，行号极易漂移）；仅极少数稳定锚点保留行号并注明核验日期。文件行数仅供量级参考。
 
 ---
 
 ## 1. 整体架构
 
-### 1.1 多入口（MPA）架构
+### 1.1 单入口 SPA 架构（实况）
 
-前端采用**多页面应用（Multi-Page Application）**架构，每个功能域是独立的 Vue 应用实例：
+前端采用**单页面应用（SPA）**架构，唯一入口为 `src/main.ts`，Vite 配置中**无 MPA input**（`vite.config.ts` 的 `build.rollupOptions` 仅配置了 `manualChunks` 产物分包，未配置多入口）。
 
 ```
-pages/
-├── bookshelf/
-│   ├── index.html          # HTML 入口
-│   └── main.js             # 书架入口 JS（创建 App + bookRouter + store）
-└── source/
-    ├── index.html          # HTML 入口
-    └── main.js             # 源管理入口 JS（创建 App + sourceRouter + store）
+modules/web/src/
+├── main.ts                 # 唯一入口（22 行）：createApp(App).use(store).use(router).mount('#app')
+│                           #   + watch(bookStore.isNight) 同步 Element Plus dark 类
+│                           #   + vite:preloadError 监听（阻止预加载报错冒泡）
+├── router/                 # 4 个文件
+│   ├── index.ts            # 汇总 [bookRoutes, sourceRoutes, backupRoutes].flat()
+│   ├── bookRouter.ts       # / 、/chapter
+│   ├── sourceRouter.ts     # /bookSource 、/rssSource
+│   └── backupRouter.ts     # /backup
+├── store/                  # 3 个 Pinia Store（bookStore/sourceStore/connectionStore + index.ts）
+├── views/                  # 4 个页面
+│   ├── BookShelf.vue       # 书架页（500 行）
+│   ├── BookChapter.vue     # 阅读页（770 行）
+│   ├── SourceEditor.vue    # 源编辑器（43 行壳）
+│   └── BackupManager.vue   # 备份管理页（630 行）
+└── components/             # 13 个 .vue 组件
 ```
 
-| 入口 | 路由模块 | 可用路由 | 用途 |
-|------|----------|----------|------|
-| `pages/bookshelf/main.js` | `bookRouter` | `/` , `/chapter` | 书架 + 阅读 |
-| `pages/source/main.js` | `sourceRouter` | `/bookSource` , `/rssSource` | 书源/RSS源编辑 |
-
-两个入口共享 `App.vue`、`store/`、Element Plus 等模块，但使用**不同的路由实例**。`src/main.ts` 是 Vite 开发模式下的单一入口，合并了两个路由（`.flat()`）。
-
-**bookshelf 入口独有**：监听 `useBookStore().isNight` 同步 Element Plus 的 `dark` CSS 类到 `<html>` 元素。
+> **遗留死代码说明**：`src/pages/` 目录（bookshelf/、source/ 两个子目录各含 index.html + main.js + README.md）为早期 MPA 双入口方案的遗留物，**当前 Vite 构建不使用**（无对应 input 配置），阅读源码时请勿以此为入口理解架构。
 
 ### 1.2 App.vue — 极简根组件
 
-[App.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/App.vue)（仅 3 行）
+`App.vue`（仅 3 行）：
 
 ```html
 <template>
@@ -45,7 +49,7 @@ App.vue 不含任何 `<script>` 或 `<style>` 块，仅作为 `<router-view>` �
 ### 1.3 整体架构图
 
 ```
-main.ts / pages/*/main.js (入口)
+main.ts (唯一入口)
   └── createApp(App).use(store).use(router).mount('#app')
        │
        └── App.vue (<router-view>)
@@ -59,27 +63,13 @@ main.ts / pages/*/main.js (入口)
             │        ├── read-bar (右侧 fixed 浮动) — 上一章/下一章
             │        └── chapter (居中 670px) — ChapterContent 正文
             │
-            └── /bookSource 或 /rssSource → SourceEditor.vue (源编辑器)
-                     ├── 左侧: SourceTabForm (表单编辑，接收 config prop)
-                     ├── 中间: ToolBar (操作按钮 + 快捷键)
-                     └── 右侧: SourceTabTools (4个 el-tabs 页签)
-```
-
-```mermaid
-graph TD
-    A["pages/bookshelf/main.js<br/>pages/source/main.js"] --> B["createApp App.vue<br/>.use store .use router .mount"]
-    B --> C["App.vue &lt;router-view&gt;"]
-    C --> D["/ → BookShelf.vue<br/>书架页"]
-    C --> E["/chapter → BookChapter.vue<br/>阅读页"]
-    C --> F["/bookSource 或 /rssSource<br/>→ SourceEditor.vue"]
-    D --> D1["左侧导航栏 260px<br/>搜索框/最近阅读/连接状态"]
-    D --> D2["右侧书架区<br/>BookItems 卡片网格"]
-    E --> E1["tool-bar 左侧浮动<br/>目录/设置/书架/跳顶/跳底"]
-    E --> E2["read-bar 右侧浮动<br/>上一章/下一章"]
-    E --> E3["chapter 居中 670px<br/>ChapterContent 正文"]
-    F --> F1["SourceTabForm<br/>表单编辑"]
-    F --> F2["ToolBar<br/>操作按钮+快捷键"]
-    F --> F3["SourceTabTools<br/>4个 el-tabs 页签"]
+            ├── /bookSource 或 /rssSource → SourceEditor.vue (源编辑器)
+            │        ├── 左侧: SourceTabForm (表单编辑，接收 config prop)
+            │        ├── 中间: ToolBar (操作按钮 + 快捷键)
+            │        └── 右侧: SourceTabTools (4个 el-tabs 页签)
+            │
+            └── /backup → BackupManager.vue (备份管理页)
+                     └── 备份预览卡片 + 备份文件下载
 ```
 
 ---
@@ -89,8 +79,8 @@ graph TD
 ### 2.1 路由模式
 
 - **Hash 路由**：`createWebHashHistory()`
-- 无嵌套路由，子路由模块扁平化合并（`[bookRoutes, sourceRoutes].flat()`）
-- `afterEach` 导航守卫：路由 name 为 `'shelf'` 时设置 `document.title = '书架'`
+- 无嵌套路由，三个子路由模块扁平化合并（`[bookRoutes, sourceRoutes, backupRoutes].flat()`）
+- `afterEach` 导航守卫：路由 name 为 `'shelf'` 时 `document.title = '书架'`；name 为 `'backup'` 时 `document.title = '数据备份'`
 
 ### 2.2 路由表
 
@@ -100,8 +90,11 @@ graph TD
 | `/chapter` | `chapter` | `BookChapter.vue` | 懒加载 `() => import(...)` | bookRouter |
 | `/bookSource` | `book-home` | `SourceEditor.vue` | 直接导入 | sourceRouter |
 | `/rssSource` | `rss-home` | `SourceEditor.vue` | 直接导入 | sourceRouter |
+| `/backup` | `backup` | `BackupManager.vue` | 懒加载 `() => import(...)` | backupRouter |
 
-**关键点**：`/bookSource` 和 `/rssSource` 共用同一个 `SourceEditor.vue` 组件，通过 URL 路径正则 `/bookSource/i` 判断是书源模式还是 RSS 源模式，自动切换不同的表单配置。
+**关键点**：
+- `/bookSource` 和 `/rssSource` 共用同一个 `SourceEditor.vue` 组件，通过 URL 路径正则 `/bookSource/i` 判断是书源模式还是 RSS 源模式，自动切换不同的表单配置。
+- `/backup` 为独立备份管理页（见 §3.4）。
 
 ### 2.3 跨页面通信
 
@@ -111,36 +104,11 @@ graph TD
 | 全局共享 | Pinia store | `isNight`, `shelf`, `config`, `readingBook`, `catalog` 等 |
 | 持久化 | `localStorage` | `readingRecent`（最近阅读）、`tabName`（源编辑器页签）、`remoteUrl`（后端地址） |
 
-```mermaid
-flowchart TD
-    subgraph sessionStorage机制
-        S1["BookShelf.vue<br/>点击书籍"] --> S2["sessionStorage 写入<br/>bookUrl/name/author<br/>chapterIndex/chapterPos/isSeachBook"]
-        S2 --> S3["router.push /chapter"]
-        S3 --> S4["BookChapter.vue<br/>从 sessionStorage 读取参数"]
-    end
-
-    subgraph Pinia共享机制
-        P1["bookStore<br/>isNight/shelf/config<br/>readingBook/catalog"] --> P2["任意组件<br/>useBookStore 访问"]
-        P3["sourceStore<br/>bookSources/rssSources<br/>currentSource/editTabSource"] --> P4["源编辑器组件<br/>useSourceStore 访问"]
-    end
-
-    subgraph localStorage持久化
-        L1["readingRecent<br/>最近阅读书籍"] --> L2["跨会话保留"]
-        L3["tabName<br/>源编辑器页签"] --> L4["刷新后恢复"]
-        L5["remoteUrl<br/>后端地址"] --> L6["跨页面共享"]
-    end
-
-    S1 -.-> P1
-    S4 -.-> P1
-```
-
 ---
 
 ## 3. 页面功能详解
 
-### 3.1 书架页（BookShelf.vue）
-
-[BookShelf.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/BookShelf.vue)（488 行）
+### 3.1 书架页（BookShelf.vue，500 行）
 
 #### 布局
 
@@ -182,22 +150,20 @@ index-wrapper
 
 ---
 
-### 3.2 章节阅读页（BookChapter.vue）
-
-[BookChapter.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/BookChapter.vue)（770 行）
+### 3.2 章节阅读页（BookChapter.vue，770 行）
 
 #### 布局
 
 ```
 chapter-wrapper (点击切换工具栏显示)
-├── tool-bar (左侧 fixed 浮动工具栏, left:50% + margin-left 负偏移)
+├── tool-bar (左侧 fixed 浮动工具栏)
 │   └── tools
 │       ├── PopCatalog (目录弹窗, el-popover)
 │       ├── ReadSettings (阅读设置弹窗, el-popover)
 │       ├── 返回书架按钮
 │       ├── 跳到顶部按钮
 │       └── 跳到底部按钮
-├── read-bar (右侧 fixed 浮动工具栏, right:50% + margin-right 负偏移)
+├── read-bar (右侧 fixed 浮动工具栏)
 │   └── tools
 │       ├── 上一章 (toPreChapter)
 │       └── 下一章 (toNextChapter)
@@ -209,13 +175,13 @@ chapter-wrapper (点击切换工具栏显示)
         └── bottom-bar (底部锚点)
 ```
 
-**工具栏定位原理**：`fixed` + `left:50%` 居中，再通过 `margin-left` 负偏移向两侧推开。移动端（776px）工具栏改为全宽横排，内容区 `width: 100vw`。
+**工具栏定位原理**：`fixed` + 50% 居中 + 负 margin 偏移推向两侧。移动端（766px 断点）工具栏改为全宽横排，内容区 `width: 100vw`。
 
 #### 核心功能
 
 | 功能 | 实现方式 | 说明 |
 |------|----------|------|
-| 章节加载 | `API.getBookContent(bookUrl, chapterIndex)` → 按 `\n+` 分割 | 两种模式：`reloadChapter=true`（切换章节：清空重置）vs `reloadChapter=false`（无限滚动：追加） |
+| 章节加载 | `API.getBookContent(bookUrl, chapterIndex)` → 按 `\n+` 分割 | 两种模式：切换章节（清空重置）vs 无限滚动（追加） |
 | 无限滚动 | `IntersectionObserver` 监听底部哨兵 | `rootMargin: '-100% 0% 20% 0%'`，自动预加载下一章 |
 | 键盘导航 | ArrowLeft/Right 翻章，ArrowUp/Down 滚动一屏 | 使用 `jump` 插件平滑动画 |
 | 进度保存 | `saveBookProgressThrottle()` 60秒节流 + `visibilitychange` 页面隐藏时保存 | 兼容 Safari<14 |
@@ -241,9 +207,7 @@ chapter-wrapper (点击切换工具栏显示)
 
 ---
 
-### 3.3 源编辑器（SourceEditor.vue）
-
-[SourceEditor.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/SourceEditor.vue)（43 行）
+### 3.3 源编辑器（SourceEditor.vue，43 行壳）
 
 #### 布局
 
@@ -293,6 +257,20 @@ chapter-wrapper (点击切换工具栏显示)
 
 ---
 
+### 3.4 备份管理页（BackupManager.vue，630 行）
+
+`/backup` 路由对应的独立页面，`backup-card` 卡片式布局，支持 `isNight` 暗色样式（复用 `bookStore.isNight`）。
+
+| 功能 | 实现方式 | 说明 |
+|------|----------|------|
+| 备份预览 | 原生 `fetch()` 请求 `{entry_point}backupPreview` → `BackupOverview` | 展示文件名/总大小/创建时间/备份项列表（`items`，每项含 displayName/description/count/size） |
+| 备份下载 | 原生 `fetch()` 请求 `{entry_point}backup` → Blob → `<a download="backup.zip">` 触发下载 | `/backup` 端点返回 ZIP 文件（后端 HttpServer 特判，非 ReturnData JSON 封装） |
+| 入口地址 | 直接引入 `legado_http_entry_point`（`@/api` 导出） | 未走 API 模块的 `getBackupPreview`/`getBackupUrl` 封装（该封装在 api/api.ts 中存在，视图层暂用裸 fetch） |
+
+> 后端对照：`/backupPreview` → `BackupController.getBackupPreview()`；`/backup` → HttpServer 特殊分发 ZIP（详见 [api-dataflow.md](./api-dataflow.md) §4）。
+
+---
+
 ## 4. 组件树
 
 ### 4.1 全部组件（13 个 .vue）
@@ -310,42 +288,17 @@ App.vue (<router-view>)
 │   │   └── CatalogItem.vue × N  (虚拟列表子项, PC端每项2个章节)
 │   └── ReadSettings.vue  (el-popover 弹窗, 唯一使用处)
 │
-└── [路由 /bookSource 或 /rssSource] → SourceEditor.vue
-    ├── SourceTabForm.vue  (左侧: 表单, 接收 config prop, 按类型分发控件)
-    ├── ToolBar.vue  (中间: 操作按钮 + 快捷键弹窗)
-    └── SourceTabTools.vue  (右侧: el-tabs 页签容器)
-        ├── [Tab: 编辑源] → SourceJson.vue  (el-input textarea)
-        ├── [Tab: 调试源] → SourceDebug.vue  (SSE 流式调试)
-        ├── [Tab: 源列表] → SourceList.vue  (虚拟列表)
-        │   └── SourceItem.vue × N  (虚拟列表子项, el-checkbox)
-        └── [Tab: 帮助] → SourceHelp.vue  (10个帮助链接)
-```
-
-```mermaid
-graph TD
-    App["App.vue<br/>&lt;router-view&gt;"]
-
-    App --> BS["BookShelf.vue<br/>路由 /"]
-    App --> BC["BookChapter.vue<br/>路由 /chapter"]
-    App --> SE["SourceEditor.vue<br/>路由 /bookSource 或 /rssSource"]
-
-    BS --> BI["BookItems.vue × N<br/>CSS Grid 380px"]
-
-    BC --> CC["ChapterContent.vue × N<br/>v-for 多章渲染"]
-    CC --> CC1["IntersectionObserver<br/>段落追踪 + jump 平滑滚动"]
-    BC --> PC["PopCatalog.vue<br/>el-popover 弹窗"]
-    PC --> CI["CatalogItem.vue × N<br/>虚拟列表子项"]
-    BC --> RS["ReadSettings.vue<br/>el-popover 弹窗"]
-
-    SE --> STF["SourceTabForm.vue<br/>表单 接收config prop"]
-    SE --> TB["ToolBar.vue<br/>操作按钮+快捷键"]
-    SE --> STT["SourceTabTools.vue<br/>el-tabs 页签容器"]
-
-    STT --> SJ["SourceJson.vue<br/>el-input textarea"]
-    STT --> SD["SourceDebug.vue<br/>SSE 流式调试"]
-    STT --> SL["SourceList.vue<br/>虚拟列表"]
-    SL --> SI["SourceItem.vue × N<br/>虚拟列表子项"]
-    STT --> SH["SourceHelp.vue<br/>帮助链接"]
+├── [路由 /bookSource 或 /rssSource] → SourceEditor.vue
+│   ├── SourceTabForm.vue  (左侧: 表单, 接收 config prop, 按类型分发控件)
+│   ├── ToolBar.vue  (中间: 操作按钮 + 快捷键弹窗)
+│   └── SourceTabTools.vue  (右侧: el-tabs 页签容器)
+│       ├── [Tab: 编辑源] → SourceJson.vue  (el-input textarea)
+│       ├── [Tab: 调试源] → SourceDebug.vue  (SSE 流式调试)
+│       ├── [Tab: 源列表] → SourceList.vue  (虚拟列表)
+│       │   └── SourceItem.vue × N  (虚拟列表子项, el-checkbox)
+│       └── [Tab: 帮助] → SourceHelp.vue  (10个帮助链接)
+│
+└── [路由 /backup] → BackupManager.vue  (独立页面, 无子组件)
 ```
 
 ### 4.2 组件 Store 依赖
@@ -368,11 +321,11 @@ graph TD
 
 ---
 
-## 5. 状态管理（Pinia）
+## 5. 状态管理（Pinia，3 个 Store）
 
 ### 5.1 bookStore — 书籍与阅读状态
 
-**Store ID**: `'book'`
+**导出名**：`useBookStore`；**Store ID**: `'book'`
 
 #### State
 
@@ -420,7 +373,7 @@ graph TD
 
 ### 5.2 sourceStore — 书源/RSS源状态
 
-**Store ID**: `'source'`
+**导出名**：`useSourceStore`；**Store ID**: `'source'`
 
 #### State
 
@@ -468,7 +421,7 @@ editHistory: { new: Source[], old: Source[] }  // 各限制最多 50 条
 
 ### 5.3 connectionStore — 连接状态
 
-**Store ID**: `'connection'`
+**导出名**：`useConnectionStore`；**Store ID**: `'connection'`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -478,88 +431,35 @@ editHistory: { new: Source[], old: Source[] }  // 各限制最多 50 条
 
 ---
 
-## 6. API 层
+## 6. API 层（权威对照见 api-dataflow.md）
+
+> **唯一权威约定**：前端 ↔ 后端 Web API 的完整对照表（HTTP 函数清单、WebSocket 端点、Controller 映射）统一维护在 [api-dataflow.md §4](./api-dataflow.md)，本文不再重复维护该表，此处仅保留前端侧请求基础设施描述。
 
 ### 6.1 axios 实例配置
 
 - **baseURL** 三级优先级：`VITE_API` 环境变量 → `localStorage('remoteUrl')` → `location.origin`
 - **timeout**：120 秒
-- 单一实例，全局共享
+- 单一实例（`api/axios.ts`），全局共享
 
-### 6.2 HTTP API 函数清单（15 个）
+### 6.2 前端 API 模块结构
 
-| 函数 | 方法 | URL | 说明 |
-|------|------|-----|------|
-| `getReadConfig(http_url?)` | GET | `getReadConfig` | 获取阅读配置，超时 3s |
-| `saveReadConfig(config)` | POST | `saveReadConfig` | 保存阅读配置 |
-| `saveBookProgress(bookProgress)` | POST | `saveBookProgress` | ⚠️ 已废弃，推荐用 Beacon 版本 |
-| `saveBookProgressWithBeacon(bookProgress)` | sendBeacon | `saveBookProgress` | 浏览器关闭时可靠发送 |
-| `getBookShelf()` | GET | `getBookshelf` | 获取书架书籍列表 |
-| `getChapterList(bookUrl)` | GET | `getChapterList?url=...` | 获取章节目录 |
-| `getBookContent(bookUrl, chapterIndex)` | GET | `getBookContent?url=...&index=...` | 获取章节正文 |
-| `saveBook(book)` | POST | `saveBook` | 添加书籍到书架 |
-| `deleteBook(book)` | POST | `deleteBook` | 从书架删除书籍 |
-| `getSources()` | GET | `getBookSources` 或 `getRssSources` | 按 `isBookSource` 动态选择端点 |
-| `saveSource(data)` | POST | `saveBookSource` 或 `saveRssSource` | 保存单个源 |
-| `saveSources(data)` | POST | `saveBookSources` 或 `saveRssSources` | 批量保存源 |
-| `deleteSource(data)` | POST | `deleteBookSources` 或 `deleteRssSources` | 批量删除源 |
-| `getProxyCoverUrl(coverUrl)` | — | `cover?path=...` | 构造封面代理 URL |
-| `getProxyImageUrl(bookUrl, src, width)` | — | `image?path=...&url=...&width=...` | 构造图片代理 URL |
+| 文件 | 职责 |
+|------|------|
+| `api/axios.ts` | axios 实例（baseURL/timeout 配置） |
+| `api/api.ts` | 全部 HTTP/WebSocket 函数 + `LeagdoApiResponse` 类型 + 备份 API（`getBackupPreview`/`getBackupUrl`）+ `setApiEntryPoint` 入口地址注入 |
+| `api/index.ts` | 响应拦截器/错误拦截器 + WebSocket 错误回调注册 + `parseLeagdoHttpUrlWithDefault()`（L72，稳定锚点，2026-08 核验）入口地址解析 |
 
-### 6.3 WebSocket API 函数（2 个）
+完整函数清单与后端 Controller 对照：**[api-dataflow.md §4](./api-dataflow.md)**。
 
-| 函数 | WS 端点 | 发送数据 | 说明 |
-|------|---------|----------|------|
-| `search(searchKey, onReceive, onFinish)` | `searchBook` | `{"key":"..."}` | 搜索书籍，逐条接收结果 |
-| `debug(sourceUrl, searchKey, onReceive, onFinish)` | `bookSourceDebug` 或 `rssSourceDebug` | `{"tag":"...","key":"..."}` | SSE 流式调试 |
+### 6.3 入口地址发现规则（摘要）
 
-**WebSocket 端口派生规则**：WS 端口 = HTTP 端口 + 1（默认 HTTP→81，HTTPS→444）；协议：HTTP→`ws://`，HTTPS→`wss://`。
-
-### 6.4 拦截器
-
-| 拦截器 | 行为 |
-|--------|------|
-| 响应拦截器 | 校验每个响应是否为 `LegadoApiResponse` 格式（含 `isSuccess`/`errorMsg`/`data`），校验失败弹出警告 |
-| 错误拦截器 | 弹出"后端连接失败"提示，设置 `connectionStore.connectType = 'danger'` |
-| WebSocket 消息回调 | 每次收到消息刷新连接状态为 `'已连接' + 入口地址` |
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant BS as BookShelf.vue
-    participant API as API层
-    participant BE as Legado后端
-    participant BC as BookChapter.vue
-
-    U->>BS: 点击书籍卡片
-    BS->>BS: 判断 SeachBook vs Book
-    alt 搜索书 SeachBook
-        BS->>API: API.saveBook(book)
-        API->>BE: POST /saveBook
-        BE-->>API: 保存成功
-        API-->>BS: 返回结果
-    end
-    BS->>BS: toDetail() 写入 sessionStorage
-    BS->>BC: router.push('/chapter')
-    BC->>API: API.getChapterList(bookUrl)
-    API->>BE: GET /getChapterList?url=...
-    BE-->>API: 返回章节目录
-    API-->>BC: catalog 数据
-    BC->>API: API.getBookContent(bookUrl, chapterIndex)
-    API->>BE: GET /getBookContent?url=...&index=...
-    BE-->>API: 返回章节正文
-    API-->>BC: 章节内容数据
-    BC->>BC: 渲染 ChapterContent
-    BC->>BC: IntersectionObserver 追踪阅读位置
-    BC->>API: saveBookProgressWithBeacon(进度)
-    API->>BE: sendBeacon /saveBookProgress
-```
+`parseLeagdoHttpUrlWithDefault()`：默认使用当前页面 origin；若 baseURL 是有效 URL 则使用之；WebSocket 端口 = HTTP 端口 + 1（无端口时 HTTP→81 / HTTPS→444）；协议随 HTTP 为 https 与否切换 `wss://` / `ws://`。详细规则与示例见 [api-dataflow.md §6](./api-dataflow.md)。
 
 ---
 
 ## 7. config/ — 配置体系
 
-### 7.1 bookSourceEditConfig.ts（书源编辑表单，~608 行）
+### 7.1 bookSourceEditConfig.ts（书源编辑表单，~609 行）
 
 定义书源编辑界面的 **7 组表单字段**，结构为 `{ name: 分组名, children: 配置项[] }`：
 
@@ -575,9 +475,9 @@ sequenceDiagram
 
 单个配置项结构：`{ title, id, type: 'String'|'Array'|'Boolean'|'Number', array?, hint?, required?, namespace? }`
 
-**段评组（review）已整体注释掉，状态：已废弃。**
+**校验组（review）已整体注释掉，状态：已废弃。**
 
-### 7.2 rssSourceEditConfig.ts（RSS源编辑表单，~277 行）
+### 7.2 rssSourceEditConfig.ts（RSS源编辑表单，~278 行）
 
 定义 RSS 源编辑界面的 **5 组表单字段**：
 
@@ -591,7 +491,7 @@ sequenceDiagram
 
 **与 bookSourceEditConfig 关键差异**：RSS 没有 `namespace` 字段，所有规则平铺；多了 `start` 和 `webView` 分组。
 
-### 7.3 themeConfig.ts（主题配置，~74 行）
+### 7.3 themeConfig.ts（主题配置，~65 行）
 
 ```typescript
 {
@@ -654,9 +554,7 @@ export type SourceConfig = Partial<Record<SourceConfigKey, SourceConfigValue>>
 
 ## 9. hooks/ — useLoading 组合式函数
 
-[loading.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/hooks/loading.ts)（39 行）
-
-封装 Element Plus `ElLoading.service`，提供：
+`hooks/loading.ts`（40 行）封装 Element Plus `ElLoading.service`，提供：
 
 ```typescript
 export const useLoading = (target, text, spinner?) => {
@@ -671,9 +569,7 @@ export const useLoading = (target, text, spinner?) => {
 
 ## 10. plugins/ — jump 平滑滚动动画引擎
 
-[jump.js](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/plugins/jump.js)（~190 行）
-
-**架构**：闭包模块模式 → 单例导出。
+`plugins/jump.js`（~186 行），**架构**：闭包模块模式 → 单例导出。
 
 **核心 API**：
 ```typescript
@@ -698,9 +594,7 @@ jump(target: number | string | HTMLElement, options?: Options): void
 | `easing` | `easeInOutQuad` | 缓动函数 |
 | `container` | `window` | 滚动容器 |
 
-使用 `requestAnimationFrame` 驱动逐帧滚动。在 `ChapterContent` 中用于恢复阅读进度时的平滑滚动；在 `BookChapter` 中用于键盘导航翻屏。
-
-[jump.d.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/plugins/jump.d.ts) 提供 TypeScript 类型声明。
+使用 `requestAnimationFrame` 驱动逐帧滚动。在 `ChapterContent` 中用于恢复阅读进度时的平滑滚动；在 `BookChapter` 中用于键盘导航翻屏。`plugins/jump.d.ts` 提供 TypeScript 类型声明。
 
 ---
 
@@ -710,9 +604,9 @@ jump(target: number | string | HTMLElement, options?: Options): void
 
 ```
 BaseBook { name, author, bookUrl, kind?, wordCount?, variable? }
-  ├── Book — 书架/阅读完整书籍（tocUrl/origin/durChapterIndex/durChapterPos/readConfig等）
-  │   └── BookChapter — 章节实体（url/title/isVolume/bookUrl/index/isVip等）
-  ├── SeachBook — 搜索结果（注意命名拼写，比BaseBook多了origin/coverUrl/intro/tocUrl等）
+  ├── Book — 书架/阅读完整书籍（tocUrl/origin/durChapterIndex/durChapterPos/readConfig 等）
+  │   └── BookChapter — 章节实体（url/title/isVolume/bookUrl/index/isVip 等）
+  ├── SeachBook — 搜索结果（注意命名拼写，比 BaseBook 多了 origin/coverUrl/intro/tocUrl 等）
   └── BookProgress — 阅读进度快照（Pick 子集）
 ```
 
@@ -720,8 +614,8 @@ BaseBook { name, author, bookUrl, kind?, wordCount?, variable? }
 
 ```
 BaseSource { concurrentRate?, loginUrl?, loginUi?, header?, enabledCookieJar?, jsLib? }
-  ├── BookSoure — 书源实体（bookSourceUrl主键/ruleSearch/ruleExplore/ruleBookInfo/ruleToc/ruleContent）
-  └── RssSource — RSS源实体（sourceUrl主键/ruleArticles/ruleTitle/rulePubDate/sourceIcon等）
+  ├── BookSoure — 书源实体（bookSourceUrl 主键/ruleSearch/ruleExplore/ruleBookInfo/ruleToc/ruleContent）
+  └── RssSource — RSS源实体（sourceUrl 主键/ruleArticles/ruleTitle/rulePubDate/sourceIcon 等）
 
 Source = BookSoure | RssSource
 ```
@@ -747,11 +641,11 @@ type webReadConfig = {
 }
 ```
 
-### 11.4 components.d.ts — 自动注册的全局组件（22 个）
+### 11.4 components.d.ts — 自动注册的全局组件
 
-由 `unplugin-vue-components` 自动生成。包含 13 个项目组件 + 9 个 Element Plus 组件（`ElButton`/`ElCheckbox`/`ElDialog`/`ElInput` 等）+ `RouterLink`/`RouterView`。
+由 `unplugin-vue-components` 自动生成。包含 13 个项目组件 + Element Plus 组件（`ElButton`/`ElCheckbox`/`ElDialog`/`ElInput` 等）+ `RouterLink`/`RouterView`。
 
-### 11.5 auto-imports.d.ts — 自动导入声明（~55 个）
+### 11.5 auto-imports.d.ts — 自动导入声明
 
 由 `unplugin-auto-import` 自动生成。包含 Vue（`ref/reactive/computed/watch/onMounted/nextTick/inject/provide` 等）、Vue Router（`useRouter/useRoute/onBeforeRouteLeave` 等）、Pinia（`createPinia/defineStore/storeToRefs` 等）、Element Plus（`ElMessage/ElMessageBox`）、项目 Store（`useBookStore/useSourceStore/useConnectionStore`）。
 
@@ -762,7 +656,7 @@ type webReadConfig = {
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Vue 3 | 3.x | 前端框架 |
-| Vite | 5.x | 构建工具 |
+| Vite | 5.x | 构建工具（单入口，vendor 分包，生产模式 drop console） |
 | Vue Router 4 | 4.x | Hash 路由（`createWebHashHistory`） |
 | Pinia | 2.x | 状态管理（3 个 Store） |
 | Element Plus | 2.x | UI 组件库（暗色模式 CSS 变量） |
@@ -822,82 +716,97 @@ ToolBar.undo() → store.editHistoryUndo() → old栈push当前源, new栈pop恢
 ### 13.5 暗色模式同步
 
 ```
-main.ts / pages/bookshelf/main.js:
-  watch(store.isNight, isNight => {
+main.ts:
+  watch(useBookStore().isNight, isNight => {
     isNight ? document.documentElement.classList.add('dark')
             : document.documentElement.classList.remove('dark')
   })
 
 SourceEditor.vue:
   useDark() from @vueuse/core → 自动管理 dark class
+
+BackupManager.vue:
+  复用 bookStore.isNight → :class="{ dark: isNight }" 手动切换样式
 ```
 
 ---
 
-## 14. 代码锚点
+## 14. 代码锚点（去行号化索引）
 
-| 功能 | 文件 | 行号 |
-|------|------|------|
-| 根组件 | [App.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/App.vue) | L1-L3 |
-| 开发入口 | [main.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/main.ts) | L1-L22 |
-| 多入口-书架 | [pages/bookshelf/main.js](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/pages/bookshelf/main.js) | L1-L19 |
-| 多入口-源管理 | [pages/source/main.js](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/pages/source/main.js) | L1-L7 |
-| 路由总入口 | [router/index.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/router/index.ts) | L1-L15 |
-| 书架路由 | [router/bookRouter.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/router/bookRouter.ts) | L4-L13 |
-| 源路由 | [router/sourceRouter.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/router/sourceRouter.ts) | L5-L14 |
-| 书架页 | [views/BookShelf.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/BookShelf.vue) | L1-L488 |
-| 阅读页 | [views/BookChapter.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/BookChapter.vue) | L1-L770 |
-| 源编辑器 | [views/SourceEditor.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/views/SourceEditor.vue) | L1-L43 |
-| 工具栏 | [components/ToolBar.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/ToolBar.vue) | L1-L303 |
-| 源表单 | [components/SourceTabForm.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceTabForm.vue) | L1-L70 |
-| 源工具页签 | [components/SourceTabTools.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceTabTools.vue) | L1-L25 |
-| 源JSON编辑 | [components/SourceJson.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceJson.vue) | L1-L35 |
-| 源调试 | [components/SourceDebug.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceDebug.vue) | L1-L60 |
-| 源列表 | [components/SourceList.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceList.vue) | L1-L143 |
-| 源列表项 | [components/SourceItem.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceItem.vue) | L1-L55 |
-| 源帮助 | [components/SourceHelp.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/SourceHelp.vue) | L1-L60 |
-| 正文内容 | [components/ChapterContent.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/ChapterContent.vue) | L1-L173 |
-| 弹出目录 | [components/PopCatalog.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/PopCatalog.vue) | L1-L92 |
-| 目录项 | [components/CatalogItem.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/CatalogItem.vue) | L1-L33 |
-| 阅读设置 | [components/ReadSettings.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/ReadSettings.vue) | L1-L356 |
-| 书籍卡片 | [components/BookItems.vue](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/components/BookItems.vue) | L1-L72 |
-| 书源配置 | [config/bookSourceEditConfig.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/config/bookSourceEditConfig.ts) | L1-L608 |
-| RSS配置 | [config/rssSourceEditConfig.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/config/rssSourceEditConfig.ts) | L1-L277 |
-| 主题配置 | [config/themeConfig.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/config/themeConfig.ts) | L1-L74 |
-| API 函数 | [api/api.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/api/api.ts) | L1-L226 |
-| API 拦截器 | [api/index.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/api/index.ts) | L1-L112 |
-| axios 实例 | [api/axios.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/api/axios.ts) | L1-L13 |
-| bookStore | [store/bookStore.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/store/bookStore.ts) | L1-L209 |
-| sourceStore | [store/sourceStore.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/store/sourceStore.ts) | L1-L133 |
-| connectionStore | [store/connectionStore.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/store/connectionStore.ts) | L1-L23 |
-| useLoading | [hooks/loading.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/hooks/loading.ts) | L1-L39 |
-| jump 插件 | [plugins/jump.js](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/plugins/jump.js) | L1-L190 |
-| Book 类型 | [book.d.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/book.d.ts) | L1-L109 |
-| Source 类型 | [source.d.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/source.d.ts) | L1-L163 |
-| Web 配置类型 | [web.d.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/web.d.ts) | L1-L14 |
-| 工具函数 | [utils/utils.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/utils/utils.ts) | L1-L67 |
+> 以下按"模块 → 文件/符号"组织，供快速定位；行号一律不写（易漂移），文件行数为 2026-08 实测参考值。
+
+### 入口与路由
+
+| 锚点 | 位置 | 行数参考 |
+|------|------|----------|
+| 根组件 `App.vue` | `src/App.vue` | 3 |
+| 唯一入口 `main.ts` | `src/main.ts` | 22 |
+| 路由汇总 `router/index.ts`（flat 合并 + afterEach 标题） | `src/router/index.ts` | 17 |
+| 书架路由 `bookRoutes` | `src/router/bookRouter.ts` | 22 |
+| 源路由 `sourceRoutes` | `src/router/sourceRouter.ts` | 23 |
+| 备份路由 `backupRoutes` | `src/router/backupRouter.ts` | 16 |
+
+### 页面（views/）
+
+| 组件 | 行数参考 |
+|------|----------|
+| `BookShelf.vue` 书架页 | 500 |
+| `BookChapter.vue` 阅读页 | 770 |
+| `SourceEditor.vue` 源编辑器壳 | 43 |
+| `BackupManager.vue` 备份管理页 | 630 |
+
+### 组件（components/，13 个 .vue）
+
+| 组件 | 行数参考 |
+|------|----------|
+| `ToolBar.vue` | 350 |
+| `SourceTabForm.vue` | 89 |
+| `SourceTabTools.vue` | 39 |
+| `SourceJson.vue` | 44 |
+| `SourceDebug.vue` | 67 |
+| `SourceList.vue` | 161 |
+| `SourceItem.vue` | 56 |
+| `SourceHelp.vue` | 70 |
+| `ChapterContent.vue` | 204 |
+| `PopCatalog.vue` | 136 |
+| `CatalogItem.vue` | 51 |
+| `ReadSettings.vue` | 596 |
+| `BookItems.vue` | 196 |
+
+### 状态与 API
+
+| 锚点 | 位置 | 行数参考 |
+|------|------|----------|
+| `bookStore` / `useBookStore` | `src/store/bookStore.ts` | 210 |
+| `sourceStore` / `useSourceStore` | `src/store/sourceStore.ts` | 134 |
+| `connectionStore` / `useConnectionStore` | `src/store/connectionStore.ts` | 24 |
+| store 汇总导出 | `src/store/index.ts` | 6 |
+| HTTP/WS 函数 + 备份 API | `src/api/api.ts` | 250 |
+| 拦截器 + `parseLeagdoHttpUrlWithDefault`（稳定锚点 L72） | `src/api/index.ts` | 113 |
+| axios 实例 | `src/api/axios.ts` | 15 |
+
+### 配置 / 工具 / 插件 / 类型
+
+| 锚点 | 位置 | 行数参考 |
+|------|------|----------|
+| 书源编辑配置（7 组表单） | `src/config/bookSourceEditConfig.ts` | 609 |
+| RSS 编辑配置（5 组表单） | `src/config/rssSourceEditConfig.ts` | 278 |
+| 主题配置 | `src/config/themeConfig.ts` | 65 |
+| 配置类型 | `src/config/sourceConfig.d.ts` | 18 |
+| 通用工具 | `src/utils/utils.ts` | 68 |
+| 源数据工具（注意拼写 souce） | `src/utils/souce.ts` | 75 |
+| useLoading | `src/hooks/loading.ts` | 40 |
+| jump 插件 | `src/plugins/jump.js`（类型 `jump.d.ts`） | 186 |
+| Book 类型 | `src/book.d.ts` | 109 |
+| Source 类型 | `src/source.d.ts` | 165 |
+| Web 配置类型 | `src/web.d.ts` | 14 |
 
 ---
 
-## 15. Vue3 Web 重构方案
+## 15. Vue3 Web 重构方案（已迁出）
 
-> 以下为基于 Legado Android 原生 UI 分析的完整 Vue3 Web 重构方案，与上方现有架构（MPA + Element Plus）不同，本方案采用 SPA + Naive UI 架构。
-
-### 15.1 重构方案与现有架构对比
-
-| 维度 | 现有架构 | 重构方案 |
-|------|---------|---------|
-| 架构模式 | MPA（双入口 bookshelf/source） | SPA（单入口 + vue-router） |
-| UI 库 | Element Plus | Naive UI |
-| 路由 | Hash 路由，4条 | Hash 路由，8条（+搜索/详情/阅读器/替换/设置） |
-| 状态管理 | 3 Store (book/source/connection) | 5 Store (+reader/config/replace) |
-| 阅读器 | 无限滚动 + IntersectionObserver | CSS columns 分页 + 触摸手势 + TTS |
-| 主题 | 7主题 + body/content/popup 三区域 | 4预设主题 + CSS 变量系统 |
-
-### 15.2 重构方案子文档
-
-| 子文档 | 核心内容 |
-|--------|---------|
-| [frontend-components.md](./frontend-components.md) | 路由设计+组件树+页面实现+阅读器核心+移动端适配+主题系统+组件库选择 |
-| [frontend-stores.md](./frontend-stores.md) | TypeScript类型定义+5个Pinia Store实现+API调用层+WebSocket封装 |
-| 源工具函数 | [utils/souce.ts](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/utils/souce.ts) | L1-L75 |
+> 原第 15 章「Vue3 Web 重构方案」及两个子文档（frontend-components.md / frontend-stores.md）已合并迁出至独立文档：
+>
+> **[frontend-refactor-plan.md](./frontend-refactor-plan.md)**（未完成实施方案存档，含落地状态 WARNING 标注）
+>
+> 本章原位仅保留此指针。当前实施现状以本文（§1-14）为准。

@@ -197,25 +197,11 @@ Log.d("VideoPlay", "降级到WebView: url=${urlPathOnly}, title=${title}, reason
 
 > **改造时必须检查 catch 块是否有日志调用，无日志的 catch 块必须补全。**
 
-### 补全原则
+### 补全原则与覆盖检查（唯一权威源：logging_rules.md）
 
-1. **所有 catch 块必须有 `AppLog.putDebugWithTag` 调用**（除 CancellationException 重新抛出外）
-2. **使用 putDebugWithTag 而非 put**：确保 recordLog 关闭时零开销，不影响用户功能
-3. **不重复记录**：已有 AppLog.put/putError/putWarn 调用的 catch 块不重复添加
-4. **记录内容**：模块 Tag + 操作描述 + 异常对象（throwable 自动展开调用栈）
-5. **脱敏原则**：
-   - URL 只保留路径模式（`/path/{id}`），禁止输出完整 URL
-   - cookie/token/key/secret 隐藏为 `***`
-   - 源名称不记录，只记源 ID 编号
-6. **级别选择**：影响主流程用 `Level.ERROR`（默认），可降级用 `Level.WARN`，调试/成功信息用 `Level.INFO`
-7. **保留现有代码**：Debug.log / DebugLog.e / 已有 AppLog 调用全部保留，不删除
+> putDebugWithTag 使用指南（vs put 的选择、级别选择）、脱敏铁律（URL 路径模式化、cookie/token/key/secret 隐藏 `***`、源名称只记 ID 编号）、三维度覆盖（catch 块/关键操作成功失败/关键参数）统一见 [logging_rules.md](./logging_rules.md) 对应章节，本文不再重复维护（防双源漂移）。
 
-### 三维度覆盖检查
-
-改造时除 catch 块（维度1）外，还需检查：
-
-- **维度2（关键操作成功/失败）**：方法入口/成功出口/失败分支是否有 `putDebugWithTag`（level=INFO/WARN）
-- **维度3（关键参数）**：URL构建/规则解析/响应状态码等关键参数传递点是否有 `putDebugWithTag`（level=INFO）
+改造时唯一新增要求：所有 catch 块必须有 `AppLog.putDebugWithTag` 调用（除 CancellationException 重新抛出外），且使用对应模块的 Tag 常量（下表）；已有 AppLog/Debug 调用全部保留。
 
 ### 模块 Tag 使用
 
@@ -231,15 +217,15 @@ catch 块日志必须使用对应模块的 Tag 常量（见 `logging_rules.md` �
 
 ### 验证步骤
 
-改造完成后通过 `collect_app_log.py` 验证日志输出：
+改造完成后用 adb logcat 标准命令验证日志输出（项目无通用日志采集脚本；`swipe_test_log.py` 仅支持固定 Tag，不适用此处）：
 
 ```bash
-# 按模块 Tag 过滤 logcat
-ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --tag WebBook
+# 按模块 Tag 过滤 logcat（-d 转储后退出，阻塞风险低）
+adb logcat -d -s WebBook:D
 
-# 拉取文件日志
-ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --file
+# 多 Tag 组合（对应 AppLog TAG_* 常量值，见 app/src/main/java/io/legado/app/constant/AppLog.kt）
+adb logcat -d -s WebBook:D AnalyzeRule:D HttpHelper:D
 
-# 全量获取
-ai_tests\venv\Scripts\python.exe ai_tests/scripts/collect_app_log.py --all
+# 需要留档时重定向到文件
+adb logcat -d -s WebBook:D > app_log.txt
 ```

@@ -1,6 +1,8 @@
 # 核心实体字段详解
 
 > BookSource（书源）、Book、SearchBook、BookChapter 及 5 组规则的完整字段说明。
+>
+> **覆盖范围**：本文覆盖**核心 21 实体**（2026-08 前的既有实体）；v90-v108 扩展期新增的 **35 个实体**（AI 能力 / 朗读 / 阅读增强 / 系统管理）见 [entities-extensions.md](entities-extensions.md)。全量 56 实体 + 1 视图的权威定义以 `AppDatabase.kt` L125-147 与 `app/schemas/io.legado.app.data.AppDatabase/108.json` 为准。
 
 ---
 
@@ -611,7 +613,7 @@ RSS/Atom 订阅源配置，40+ 字段，实现 BaseSource 接口。
 
 ### BookChapterReview — 章节段评（孤立实体）
 
-> ⚠️ 此实体存在于源码但**未注册**在 AppDatabase 的 `@Database` 注解中，属于孤立实体。可能已废弃或尚未集成。
+> ⚠️ 此实体存在于源码但**未注册**在 AppDatabase 的 `@Database` 注解中，属于孤立实体（幽灵条目，无对应数据库表）。可能已废弃或尚未集成，**不计入 v108 的 56 实体计数**。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -635,6 +637,19 @@ RSS/Atom 订阅源配置，40+ 字段，实现 BaseSource 接口。
 ## 14. 补充实体字段详解
 
 > 以下实体在早期版本中仅被提及表名/类型名，此处补充完整字段说明。源码路径均为 `app/src/main/java/io/legado/app/data/entities/`。
+
+### ReadRecord — 阅读时间记录实体
+
+[ReadRecord.kt:6-14](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/ReadRecord.kt#L6-L14)
+
+> 表名 `readRecord`，复合主键 `(deviceId, bookName)`。按设备+书名维度记录累计阅读时长，支撑多设备阅读统计与同步。下文 `ReadRecordShow` 是其 DAO 聚合查询的展示映射类（**非 @Entity**，不是本表本体）。
+
+| 字段 | 类型 | 注解 | 说明 |
+|------|------|------|------|
+| `deviceId` | String | `@PrimaryKey` | 设备唯一标识（复合主键之一） |
+| `bookName` | String | `@PrimaryKey` | 书名（复合主键之二） |
+| `readTime` | Long | `@ColumnInfo(defaultValue = "0")` | 累计阅读时长（毫秒） |
+| `lastRead` | Long | `@ColumnInfo(defaultValue = "0")` | 最后阅读时间戳（新建对象默认当前时间） |
 
 ### ReadRecordShow — 阅读记录展示视图
 
@@ -664,7 +679,7 @@ RSS/Atom 订阅源配置，40+ 字段，实现 BaseSource 接口。
 
 [ReplaceBook.kt:5-18](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/ReplaceBook.kt#L5-L18)
 
-> 非 `@Entity` 注解的普通 data class，表示替换规则与书籍的关联关系。用于「换源」功能中展示某本书在不同书源下的搜索结果。`type` 默认值来自 `BookType.text`。
+> ⚠️ **幽灵条目**：非 `@Entity` 注解的普通 data class，未注册于 `@Database`，无对应数据库表，**不计入 v108 的 56 实体计数**。表示替换规则与书籍的关联关系。用于「换源」功能中展示某本书在不同书源下的搜索结果。`type` 默认值取自 `BookType.text`。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|

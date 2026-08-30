@@ -34,6 +34,7 @@
 | 数据库定义 | `app/src/main/java/io/legado/app/data/AppDatabase.kt` |
 | ProGuard | `app/proguard-rules.pro` |
 | 依赖版本 | `gradle/libs.versions.toml` |
+| 2026-08 新增类入口 | 主界面顶栏 `ui/widget/MainTopBarView.kt` · 视频画质增强 `help/exoplayer/ImageEnhanceEffects.kt` + `ui/video/ImageEnhanceController.kt` · 图片画布 `ui/image/ImageCanvasViewModel.kt` · Exo 视频管理 `help/gsyVideo/ExoVideoManager.kt`（路径前缀 `app/src/main/java/io/legado/app/`） |
 
 ## 版本锁定依赖
 
@@ -50,10 +51,10 @@
 | 项目 | 值 |
 |------|------|
 | 名称 | legado.db |
-| 版本 | 89 |
+| 版本 | 108（以 AppDatabase.kt version 字段为准） |
 | ORM | Room |
-| 实体数 | 21 |
-| DAO 数 | 21 |
+| 实体数 | 56 实体 + 1 视图（BookSourcePart） |
+| DAO 数 | 43 |
 | Schema | app/schemas/ |
 
 ## Web API 端点

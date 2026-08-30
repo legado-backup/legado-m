@@ -1,13 +1,24 @@
 # 工具与辅助层
 
+> **权威声明**：本文档已吸收原 receiver-system.md 与 utils-extensions.md 全部内容（两文件已删除），为工具/广播组件层的唯一权威文档。文件数与行数均基于源码实测。
+>
 > **核心问题**：`utils/` 目录有哪些重要工具类？协程/加密/广播接收器如何组织？
-> **答案**：`utils/` 含 100+ 工具文件（编码检测/简繁转换/压缩/池化/Canvas录制/网络）；`help/coroutine/` 提供链式协程封装；`help/crypto/` 提供对称/非对称加密；`receiver/` 管理4个 BroadcastReceiver。
+> **答案**：`utils/` 实测 114 个 .kt（根目录 95 + 4 子包 19：canvasrecorder 11 含 pools/ 3、compress 3、objectpool 5、viewbindingdelegate 3）；`help/coroutine/` 提供链式协程封装；`help/crypto/` 提供对称/非对称加密；广播组件共 7 项（`receiver/` 6 类 + `service/relay/RelayBootReceiver`）。
 
 ---
 
 ## 1. utils/ 工具类概览
 
-**目录**：[utils/](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/)（100+ 文件）
+**目录**：[utils/](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/utils/)（实测 114 个 .kt：根目录 95 + 子包 19）
+
+### 1.0 子包结构（实测）
+
+| 子包 | 文件数 | 核心内容 |
+|------|--------|---------|
+| `canvasrecorder/` | 11（根 8 + pools/ 3） | Canvas 录制：BaseCanvasRecorder / CanvasRecorder / CanvasRecorderApi23Impl / CanvasRecorderApi29Impl / CanvasRecorderImpl / CanvasRecorderLocked / CanvasRecorderFactory / CanvasRecorderExtensions；`pools/` 含 CanvasPool / PicturePool / RenderNodePool |
+| `compress/` | 3 | ZipUtils（ZIP/GZIP）、LibArchiveUtils（libarchive）、SafeZipExtractor（安全解压） |
+| `objectpool/` | 5 | ObjectPool 接口、BaseObjectPool、BaseSafeObjectPool、ObjectPoolLocked、ObjectPoolExtensions |
+| `viewbindingdelegate/` | 3 | ActivityViewBindings、FragmentViewBindings、ViewBindingProperty |
 
 ```mermaid
 graph TB
@@ -344,20 +355,23 @@ class SymmetricCryptoAndroid(
 
 ---
 
-## 4. receiver/ — 广播接收器层
+## 4. receiver/ — 广播接收器层（实测 6 类 597 行 + RelayBootReceiver 共 7 项）
 
 **目录**：[receiver/](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/)
 
-| 文件 | 职责 | 注册方式 |
-|------|------|----------|
-| `MediaButtonReceiver.kt` | 耳机/蓝牙媒体按键监听（播放/暂停/上下章） | AndroidManifest 静态注册 |
-| `TimeBatteryReceiver.kt` | 每分钟时间滴答 + 电量变化 → EventBus 广播 | `ReadBookActivity` 动态注册 |
-| `NetworkChangedListener.kt` | 网络状态变化监听 | API <24→Broadcast / ≥24→NetworkCallback |
-| `SharedReceiverActivity.kt` | 系统分享/文本选择入口（透明Activity→分发处理） | AndroidManifest intent-filter |
+| 文件 | 行数 | 职责 | 注册方式 |
+|------|------|------|----------|
+| `MediaButtonReceiver.kt` | 114 | 耳机/蓝牙媒体按键监听（播放/暂停/上下章） | AndroidManifest 静态注册 |
+| `TimeBatteryReceiver.kt` | 25 | 每分钟时间滴答 + 电量变化 → EventBus 广播 | `ReadBookActivity` 动态注册 |
+| `NetworkChangedListener.kt` | 65 | 网络状态变化监听 | API <24→Broadcast / ≥24→NetworkCallback |
+| `SharedReceiverActivity.kt` | 50 | 系统分享/文本选择入口（透明Activity→分发处理） | AndroidManifest intent-filter |
+| `ReadGoalWidgetProvider.kt` | 178 | 阅读目标桌面小组件：RemoteViews + Bitmap 进度环渲染当日目标进度，数据来自 appDb/ReadRecordWidgetStore，点击跳转阅读记录页 | AndroidManifest 桌面小部件 |
+| `ReadRankWidgetProvider.kt` | 100 | 阅读排行桌面小组件：展示阅读时长排行，自定义 UPDATE 广播触发 `updateAll(force)`，IO 协程 + lastRefreshTime 节流 | AndroidManifest 桌面小部件 |
+| `RelayBootReceiver.kt`（service/relay/） | 14 | 开机/包替换自启：ACTION_BOOT_COMPLETED / ACTION_MY_PACKAGE_REPLACED 时，若 `publicWebRelayEnabled` 开关开启则启动 RelayService | AndroidManifest BOOT_COMPLETED / MY_PACKAGE_REPLACED |
 
 ### 4.1 MediaButtonReceiver — 媒体按键
 
-[MediaButtonReceiver.kt:L1-L121](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/MediaButtonReceiver.kt)
+[MediaButtonReceiver.kt:L1-L114](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/MediaButtonReceiver.kt)
 
 处理耳机/蓝牙设备的播放控制键：
 
@@ -397,14 +411,14 @@ flowchart TB
 
 ### 4.2 TimeBatteryReceiver — 时间/电量
 
-[TimeBatteryReceiver.kt:L1-L31](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/TimeBatteryReceiver.kt)
+[TimeBatteryReceiver.kt:L1-L25](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/TimeBatteryReceiver.kt)
 
 - `ACTION_TIME_TICK` → `postEvent(TIME_CHANGED)`（每分钟一次）
 - `ACTION_BATTERY_CHANGED` → `postEvent(BATTERY_CHANGED, level)`
 
 ### 4.3 NetworkChangedListener — 网络变化
 
-[NetworkChangedListener.kt:L1-L77](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/NetworkChangedListener.kt)
+[NetworkChangedListener.kt:L1-L65](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/NetworkChangedListener.kt)
 
 API 版本自适应：
 - **API ≥ 24** → `ConnectivityManager.NetworkCallback`（新版 API）
@@ -418,6 +432,24 @@ API 版本自适应：
 - `ACTION_SEND` → 其他 App 分享文本（URL 提取 → 搜索/添加书架）
 - `ACTION_PROCESS_TEXT` → Android 6+ 选中文本处理
 - `action=readAloud` → 快捷方式触发朗读
+
+### 4.5 ReadGoalWidgetProvider — 阅读目标小组件
+
+[ReadGoalWidgetProvider.kt:L1-L178](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/ReadGoalWidgetProvider.kt)
+
+`AppWidgetProvider` 实现。`onUpdate`/`onReceive` 触发 `updateWidgets`：从 appDb + `ReadRecordWidgetStore` 读取当日阅读数据，Canvas/Paint（PorterDuffXfermode）绘制进度环 Bitmap，`RemoteViews` 渲染到小组件；`TaskStackBuilder` 点击跳转 `ReadRecordActivity`/`MainActivity`。
+
+### 4.6 ReadRankWidgetProvider — 阅读排行小组件
+
+[ReadRankWidgetProvider.kt:L1-L100](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/receiver/ReadRankWidgetProvider.kt)
+
+`AppWidgetProvider` 实现。自定义广播 `UPDATE_READ_RANK_WIDGET` 触发 `updateAll(force = true)`；IO 协程作用域（SupervisorJob）内刷新数据，`lastRefreshTime` 时间戳节流防止重复刷新；点击跳转阅读记录页。
+
+### 4.7 RelayBootReceiver — Relay 服务自启（service/relay/）
+
+[RelayBootReceiver.kt:L1-L14](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/service/relay/RelayBootReceiver.kt)
+
+仅响应 `ACTION_BOOT_COMPLETED` 与 `ACTION_MY_PACKAGE_REPLACED`；读取 `defaultSharedPreferences` 的 `publicWebRelayEnabled` 开关，开启时 `RelayService.start(context)` 恢复公共 Web 中继服务。
 
 ---
 
