@@ -18,7 +18,7 @@
 | 维度 | NG 现状 | 本项目现状 | 判定 |
 |------|---------|-----------|------|
 | 网络/协程 | 继承 Sigma 原版 + cronet 128 动态下载（单点风险）+ NetworkLog 仅内存 | FaviconCache/DoH/Brotli/307-308/StreamResetRetry/熔断降级/ANR 修复/CookieStore P 系列修复/cronet-bundled 锁定 | **本项目超集**，NG 仅 2 项可借（按源 Cookie 隔离概念、JSBridge 按源缓存） |
-| WebView | 单全局池，回池清理完整 | 多 Scope 池+resettingPool+主线程 destroy+互斥守卫，回池清理为 NG 超集 | **本项目超集**，无可借 |
+| WebView | 单全局池，回池清理完整 | 多 Scope 池+resettingPool+主线程 destroy+互斥守卫，本项目回池清理超集于 NG | **本项目超集**，无可借 |
 | 规则引擎 | evalJS 类沙箱包裹（2 接入点）+按源 cookie/cache 绑定+弹窗拦截 | API 全集无缺口+编译缓存+容错+RSS 并行/搜索+SourceNetworkClient 工程性收敛 | NG 强在**沙箱**，本项目强在**工程性与功能**；互有输出 |
 | 数据层 | v114，13 新实体（AI/角色/工具回执），全列显式默认值，workKey 域键 | v108 但广度大（69 实体/44 DAO），v108 起分叉 | **基线已分叉**：NG 迁移链不可复用；亮点（显式默认值/幂等哈希/workKey）可吸收 |
 | AI | 全套（供应商/MCP/压缩/技能/净化/扫书/聊天） | 仅 AiMcpClient（客户端方向）；无供应商地基 | **NG 代际领先**，P1/P2 主攻 |
@@ -50,7 +50,7 @@
 ### 2.3 本项目的劣势（诚实自查）
 1. AI 能力为零且成代际差（缺的是整层基建，非单功能）
 2. 打包发版全手动无 CI
-3. 书源安全欠账敞开（文件越界/缓存跨源互读/JS 滥弹窗/JS 可持久篡改书架——网络日志脱敏除外，实测已具备）
+3. 书源安全欠账敞开（文件越界/缓存跨源互读/JS 滥弹窗/JS 可持久篡改书架）
 4. Compose 化进度落后（NG 交互面 70-80% vs 本项目 S 批刚起步）
 5. 多角色听书空白
 6. 主动发现能力不足（用户已批评），测试覆盖密度待提升
@@ -93,17 +93,38 @@ graph TD
     P3 --> P6[二期：#14 Compose 播放器]
 ```
 
+- 并行性：P5∥P0 零文件交集可并行；P3∥P1 可并行但 DB 版本号走自适应门禁（起点=实施时 AppDatabase version+1）；P4 应用层（#15）依赖 P1，不依赖 P2（内部工具走本项目 AiToolRegistry）
+
 实施级设计文档（设计前置，未审查不实施）：
 
 | 分期 | 设计文档 | 覆盖决策表项 |
 |------|----------|------------|
-| P0 | [migration-designs/P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | #1 #2 #3 #4 #5 |
+| P0 | [migration-designs/P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | #1 #2 #4 #5 + #3（保护项：P0 目标⑤零修改回归验证） |
 | P1 | [migration-designs/P1-ai-foundation.md](./migration-designs/P1-ai-foundation.md) | #6 #7 + DB v109 |
 | P2 | [migration-designs/P2-mcp-service.md](./migration-designs/P2-mcp-service.md) | #8 |
 | P3 | [migration-designs/P3-tts-multirole.md](./migration-designs/P3-tts-multirole.md) | #9 |
 | P5 | [migration-designs/P4-visual-patterns.md](./migration-designs/P4-visual-patterns.md) | #10 |
 
 后置项（#11 #12 #13 #14 #15）在对应前置期落地后再补实施级设计，本轮不做深度设计（避免为暂缓项过度设计）。
+
+### 对本项目规范的提升清单（交叉验证 V3 轮收编，实施各期时同步回灌）
+
+| 来源 | 提升点 | 回灌目标 |
+|------|--------|----------|
+| P0-D15 | 开关消费点实时读 SP | architecture_rules.md 配置章节 |
+| P0-D16 | hash 短码替代源名日志（含后续同主题项合并） | logging_rules.md 脱敏原则 |
+| P0 | 模块 Tag 清单刷新（7→26）+新观察模块一律升格 TAG_ 常量 | logging_rules.md |
+| P1-D12 | Gson 缺失字段不取 Kotlin 默认值→反序列化入口 sanitize 双闸 | checkstyle_rules.md 新增小节 |
+| P2-D8 | 注册表单一事实源 | architecture_rules.md |
+| 交叉验证 | runCatchingSql 三副本收敛（公共入口 :1367） | database-migration-safety.md R2 |
+| 交叉验证 | runCatching 禁用于取消信号边界（显式 rethrow CancellationException） | exception_rules.md |
+| P5 | 材质语义角色条款+material-roles.md | ui-standards architecture.md §五索引+§四门禁 |
+| P5 | 顶栏 alpha 槽位指引（tagBarAlpha/wallpaperAlpha/cornerScale） | color.md |
+| P5 | 材质门禁三条可 Grep 断言 | architecture.md §四 checklist |
+| P5 | 高度归属显式化+BOTTOM_BAR 定位条款 | material-roles.md |
+| P5 | "同 role 材质一致"断言升级 ai_tests F-UI-THEME 常驻 | ai_tests |
+| P3 | TAG_TTS 回灌 | logging_rules.md |
+| P3 | 新组件基线登记（ReadAloudRoleBindDialog/TtsEngineManageActivity） | components.md |
 
 ## 5. Architecture Decisions
 
@@ -129,7 +150,7 @@ graph TD
 - **Decision**: P0 组成=文件沙箱+缓存命名空间（无行为变化）+弹窗拦截（仅拦弹窗类）+日志脱敏（无行为变化）+类策略灰度（记日志不拦截）+状态写保护（GuardLog 记录模式）；全量收紧延后且以观察数据为准
 - **Goal**: P0 零书源破坏
 - **Tradeoff**: 首期安全闭环不完整（接受：渐进收紧是唯一可持续路径）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-30 检查点 1 五轮审查设计验收通过）
 
 ### AD-04: AI 体系以供应商抽象层为第一切入点，DB 版本链自起重编
 - **Context**: NG AI 全家桶构建在 AiProvider 之上；两侧 DB v108 已分叉（本项目独有 35 表），NG migration 链不可复用
@@ -137,7 +158,7 @@ graph TD
 - **Decision**: 先迁供应商抽象（拆分后适配本项目）；DB 从本项目 v109 起自增重编，NG 的建表 SQL/显式默认值/workKey 模式吸收，版本号与迁移语义不复用
 - **Goal**: 地基正确且数据库演进可控可回溯
 - **Tradeoff**: 无短期用户可见 AI 功能（接受）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-30 检查点 1 五轮审查设计验收通过）
 
 ### AD-05: 视觉体系只借三个架构模式，不引 NG 组件
 - **Context**: NG ui/design 是完整设计系统，液态玻璃成本高；本项目 ui-style-unify-deep-fix 进行中且有四组件族基线
@@ -145,7 +166,7 @@ graph TD
 - **Decision**: 只吸收材质语义角色参数化（role→spec）、单一调度点+优雅降级、ThemeResolver 不可变快照三模式，产出 ui-standards 规范条款+本项目组件设计；液态玻璃视觉效果单独立项不混入
 - **Goal**: 架构层防取色回潮，治 H9/H11
 - **Tradeoff**: 无玻璃视觉效果短期交付（接受）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-30 检查点 1 五轮审查设计验收通过）
 
 ### AD-06: 听书一期"非 AI 最小闭环"且与自研 TTS 绑定体系做映射
 - **Context**: NG 路由/实体与本项目自研 TTS 参数绑定（currentToneID/currentSpeakerName/currentEmotion*）不同构；BookCharacter 同名不同构
@@ -153,7 +174,7 @@ graph TD
 - **Decision**: 一期迁引擎层（TtsEngineStore 等 20 类裁剪）+五级路由+手动绑定，实体采用 NG 结构但类名规避冲突（本项目 BookCharacter 保留，NG 体系命名 NgTtsCast* 或合并方案在 P3 设计中裁决）；AI 分镜二期
 - **Goal**: 手动绑角色即可用，二期无缝升级
 - **Tradeoff**: 一期选角手动（接受）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-30 检查点 1 五轮审查设计验收通过）
 
 ## 6. File Changes
 
@@ -161,3 +182,4 @@ graph TD
 - `docs/specs/ng-benchmark-analysis/`：README/spec/design/evidence-pack/tasks + migration-designs/ 五份实施级设计
 - `docs/INDEX.md`（活跃 Specs 表）
 - `docs/project-rules/forks-reference.md`（追加 NG 条目，待裁决后）
+- `docs/project-rules/` 上述规范文件将在各期实施时回灌（本期不动规范原文）
