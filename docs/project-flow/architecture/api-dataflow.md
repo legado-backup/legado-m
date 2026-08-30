@@ -217,6 +217,8 @@ class ReturnData {
 
 ## 4. 完整 API 对照表
 
+> **唯一权威约定**：本节为前端 ↔ 后端 Web API 对照的唯一权威版本（frontend.md §6 仅留指针）。表中"前端调用"列与 `modules/web/src/api/api.ts` 实际导出函数一一对应（2026-08 逐函数核验，共 19 个 HTTP/WS 函数 + 2 个备份函数）。**禁止在无 api.ts 实证的情况下向本表追加前端调用行**（历史上曾出现 7 行虚构调用，已清除）。
+
 ### 4.1 Books 相关
 
 | 前端调用 | HTTP方法 | 路由路径 | Controller方法 | 入参 | 返回 |
@@ -227,6 +229,7 @@ class ReturnData {
 | `API.saveBook(book)` | POST | `/saveBook` | `BookController.saveBook` | Book JSON | `null` |
 | `API.deleteBook(book)` | POST | `/deleteBook` | `BookController.deleteBook` | Book JSON | `null` |
 | `API.saveBookProgress(p)` | POST | `/saveBookProgress` | `BookController.saveBookProgress` | BookProgress | `null` |
+| `API.saveBookProgressWithBeacon(p)` | sendBeacon (POST) | `/saveBookProgress` | `BookController.saveBookProgress` | BookProgress | — （页面关闭可靠发送） |
 | `API.getReadConfig()` | GET | `/getReadConfig` | `BookController.getWebReadConfig` | — | `webReadConfig` |
 | `API.saveReadConfig(c)` | POST | `/saveReadConfig` | `BookController.saveWebReadConfig` | config | `null` |
 | `API.getProxyCoverUrl(url)` | GET | `/cover?path=` | `BookController.getCover` | path | 图片二进制 |
@@ -240,13 +243,8 @@ class ReturnData {
 | `API.saveSource(data)` | POST | `/saveBookSource` 或 `/saveRssSource` | `saveSource` | 单个保存 |
 | `API.saveSources(data)` | POST | `/saveBookSources` 或 `/saveRssSources` | `saveSources` | 批量保存 |
 | `API.deleteSource(data)` | POST | `/deleteBookSources` 或 `/deleteRssSources` | `deleteSources` | 批量删除 |
-| `API.getBookSource(url)` | GET | `/getBookSource?url=` | `BookSourceController.getBookSource` | 获取单个书源 |
-| `API.getRssSource(url)` | GET | `/getRssSource?url=` | `RssSourceController.getRssSource` | 获取单个RSS源 |
-| `API.refreshToc(url)` | GET | `/refreshToc?bookUrl=` | `BookController.refreshToc` | 刷新目录 |
-| `API.addLocalBook(book)` | POST | `/addLocalBook` | `BookController.addLocalBook` | 添加本地书籍 |
-| `API.saveReplaceRule(rule)` | POST | `/saveReplaceRule` | `ReplaceRuleController.saveReplaceRule` | 保存替换规则 |
-| `API.deleteReplaceRule(rule)` | POST | `/deleteReplaceRule` | `ReplaceRuleController.deleteReplaceRule` | 删除替换规则 |
-| `API.testReplaceRule(rule)` | POST | `/testReplaceRule` | `ReplaceRuleController.testReplaceRule` | 测试替换规则 |
+
+> ⚠️ **历史勘误（2026-08）**：本表曾包含 `API.getBookSource(url)` / `API.getRssSource(url)` / `API.refreshToc(url)` / `API.addLocalBook(book)` / `API.saveReplaceRule(rule)` / `API.deleteReplaceRule(rule)` / `API.testReplaceRule(rule)` 共 7 行，经与 `modules/web/src/api/api.ts` 全量函数清单比对，**这些前端函数并不存在（0 命中），属虚构调用，已全部删除**。替换规则/本地书籍的导入链路见 [modules/association-import.md](../modules/association-import.md) 与 [modules/web-service.md](../modules/web-service.md)，勿在本表凭后端端点反推前端调用。
 
 ### 4.3 WebSocket 端点
 
@@ -256,6 +254,13 @@ class ReturnData {
 | | | 服务端→客户端 | `[SearchBook, ...]` JSON 数组分批推送，完成时关闭连接 |
 | `API.debug(sourceUrl,key,onRcv,onFinish)` | `/bookSourceDebug` / `/rssSourceDebug` | 客户端→服务端 | `{"tag":"sourceUrl","key":"关键词"}` |
 | | | 服务端→客户端 | JSON 日志（state=10/20/30/40 不输出, -1 错误关闭, 1000 完成关闭） |
+
+### 4.4 备份相关（Web 前端 BackupManager 页）
+
+| 前端调用 | HTTP方法 | 路由路径 | 服务端处理 | 返回 | 说明 |
+|----------|----------|----------|-----------|------|------|
+| `API.getBackupPreview()`（api.ts 封装，实际视图层用裸 `fetch`） | GET | `/backupPreview` | `BackupController.getBackupPreview()` | `BackupOverview` JSON（fileName/totalSize/createTime/items[]） | 备份内容预览 |
+| `API.getBackupUrl()`（api.ts 封装，实际视图层用裸 `fetch`） | GET | `/backup` | HttpServer 特判（`HttpServer.kt` `if (uri == "/backup")` 分支） | ZIP 文件二进制流 | 非 ReturnData JSON 封装；前端以 Blob + `<a download="backup.zip">` 触发下载 |
 
 ---
 
@@ -286,7 +291,7 @@ class ReturnData {
 
 前端自动发现后端 API 入口：
 
-[api/index.ts parseLegadoHttpUrlWithDefault()](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/api/index.ts#L72-L104)
+[api/index.ts parseLeagdoHttpUrlWithDefault()](file:///f:/myself/github/WeAgentChat/temp/legado/modules/web/src/api/index.ts#L72-L104)
 
 ```
 规则:

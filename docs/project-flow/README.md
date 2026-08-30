@@ -17,11 +17,11 @@
 | 修改正文后处理 | [modules/content-pipeline.md](./modules/content-pipeline.md) |
 | 新增阅读功能 | [modules/reading-engine.md](./modules/reading-engine.md) |
 | 新增数据库表/字段 | [modules/data-layer.md](./modules/data-layer.md) |
-| 新增 Web API | [modules/web-service.md](./modules/web-service.md) |
+| 新增 Web API | [modules/web-service-api.md](./modules/web-service-api.md) |
 | 优化 TXT/EPUB 解析 | [modules/local-book.md](./modules/local-book.md) |
 | 了解 WebDAV/TTS/RSS | [modules/service-layer.md](./modules/service-layer.md) |
-| 修改 UI/Activity | [architecture/android-ui.md](./architecture/android-ui.md) |
-| 了解 Android 页面布局交互 | [architecture/android-ui.md](./architecture/android-ui.md) §9-10 |
+| 修改 UI/Activity | [architecture/android-ui-core.md](./architecture/android-ui-core.md) |
+| 了解 Android 页面布局交互 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) |
 | 修改网络层/SSL | [architecture/network-layer.md](./architecture/network-layer.md) |
 | 修改配置项 | [modules/config-system.md](./modules/config-system.md) |
 | 新增后台 Service | [modules/android-services.md](./modules/android-services.md) |
@@ -43,8 +43,8 @@
 | 修改核心UI页面 | [modules/ui-core-pages.md](./modules/ui-core-pages.md) |
 | 修改次要UI页面 | [modules/ui-secondary-pages.md](./modules/ui-secondary-pages.md) |
 | 理解关联导入体系 | [modules/association-import.md](./modules/association-import.md) |
-| 了解广播接收器 | [modules/receiver-system.md](./modules/receiver-system.md) |
-| 查看工具/扩展函数 | [modules/utils-extensions.md](./modules/utils-extensions.md) |
+| 了解广播接收器 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) §4 |
+| 查看工具/扩展函数 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) §1 |
 | 了解构建配置 | [architecture/build-configuration.md](./architecture/build-configuration.md) |
 | 理解多模块架构 | [architecture/multi-module-architecture.md](./architecture/multi-module-architecture.md) |
 
@@ -64,10 +64,12 @@ docs/project-flow/
 │   ├── rule-engine-js-env.md          ← JS环境绑定（AnalyzeRule+AnalyzeUrl绑定+Rhino缓存+@put/@get变量）
 │   ├── rule-engine-algorithms.md      ← 规则引擎算法（SourceRule初始化+RuleAnalyzer完整算法+前缀检测）
 │   ├── frontend.md                    ← Vue3 MPA架构（config/types等9模块+路由+组件树+功能）
-│   ├── frontend-components.md         ← 前端组件（路由设计+阅读器核心+通用组件）
-│   ├── frontend-stores.md             ← 前端状态管理（Pinia Stores+数据流）
+│   ├── frontend-refactor-plan.md      ← Vue3 Web重构方案（⚠️未实施存档：路由+组件树+阅读器核心+Store/API，store落地3/5，并入原components/stores两册）
 │   ├── api-dataflow.md                ← 接口数据流（HTTP/WS/Beacon完整链路+API表）
-│   ├── android-ui.md                  ← Android UI层（MainActivity+ReadBookActivity三层继承+RSS+Activity体系+Widget+Theme+核心页面布局与交互）
+│   ├── android-ui-core.md             ← Android UI核心框架册（MainActivity主框架+Activity/Fragment体系+Base+导航+启动+N1顶栏+N2 Compose现状）
+│   ├── android-ui-pages.md            ← Android UI页面详解册（页面布局交互+调试+搜索+发现+导入+工具+N3订阅双模式+N4发现页缓存加固）
+│   ├── android-ui-media-theme.md      ← Android UI阅读媒体与主题册（阅读界面+排版+漫画+音频+Widget+主题+布局资源+横屏+N5 EPUB高亮+N6画质增强）
+│   ├── android-ui-changelog.md        ← Android UI统计与变更记录册（UI层源码统计+时敏优化记录）
 │   ├── network-layer.md               ← 网络层（OkHttp拦截器链+SSL+Cookie+Cronet+代理）
 │   ├── app-init.md                    ← App初始化（50步启动+常量+EventBus+异常+监控）
 │   ├── base-layer.md                  ← ⭐ Base类与MVVM（BaseActivity/VM/Service+RecyclerAdapter+Diff）
@@ -80,15 +82,18 @@ docs/project-flow/
 ├── database/
 │   ├── overview.md                    ← 数据库概览（AppDatabase定义+版本+迁移清单）
 │   ├── entities.md                    ← 实体与字段详解（BookSource+Book+5组规则字段）
-│   └── tables.md                      ← 表结构DDL（全部21张表DDL+索引+约束）
-└── modules/
+│   ├── entities-extensions.md         ← 扩展实体清单（v90-v108新增35实体：AI能力/朗读BGM/阅读增强/系统管理）
+│   └── tables.md                      ← 表结构DDL（核心21表DDL+新增表速览+索引+约束，当前v108）
+├── modules/
     ├── webbook-search.md              ← WebBook双版本+搜索调度+四分类去重
     ├── content-pipeline.md            ← ContentProcessor七步管线+替换规则引擎
     ├── reading-engine.md              ← ReadBook状态机+三章缓存+预下载
     ├── reading-engine-media.md        ← 阅读引擎媒体层（BookType位标志+ReadManga+AudioPlay）
     ├── reading-engine-pagination.md   ← 阅读引擎排版层（durChapterPos+TextChapter+翻页动画）
-    ├── data-layer.md                  ← 21实体+21DAO+1视图+AutoMigration
-    ├── web-service.md                 ← NanoHTTPD路由+14POST+12GET+4控制器+WebSocket
+    ├── data-layer.md                  ← 56实体+43DAO+1视图（BookSourcePart）+AutoMigration
+    ├── web-service.md                 ← Web服务索引页（详情分见web-service-api/web-service-lifecycle两册）
+    ├── web-service-api.md             ← Web服务REST API规范（HttpServer路由+端点+WebSocket+Beacon+静态服务+Vue3前端对照）
+    ├── web-service-lifecycle.md       ← Web服务生命周期（WebService+ReaderProvider+快捷方式+WiFi传书+安全模型）
     ├── local-book.md                  ← TXT编码检测+目录规则+EPUB
     ├── service-layer.md               ← WebDAV+TTS+RSS+JS扩展
     ├── config-system.md               ← 配置系统（AppConfig+ReadBookConfig+ThemeConfig+字段类型修正）
@@ -103,18 +108,27 @@ docs/project-flow/
     ├── help-layer.md                   ← ⭐ Help辅助层（监控三件套+数据传递+渲染优化+规则辅助+缓存系统+默认数据）
     ├── exception-system.md              ← 异常体系（NoStackTraceException+7种业务异常+使用场景）
     ├── constant-system.md               ← 常量系统（13个常量模块+位标志+@IntDef+预编译正则+事件总线）
-    ├── glide-video-webview.md            ← Glide图片加载+视频播放+WebView池化（ModelLoader+弹幕+WebViewPool+WebJsExtensions）
+    ├── glide-video-webview.md            ← Glide·视频·WebView索引页（详情分见glide/video/webview-pool三册）
+    ├── glide.md                          ← Glide图片加载（ModelLoader+Fetcher体系+OkHttpStreamFetcher+注册中心+模糊变换+异步回收）
+    ├── video.md                          ← 视频播放（四层架构+VideoPlayer/FloatingPlayer+弹幕+ExoPlayer引擎层+画质增强+手势体系）
+    ├── webview-pool.md                   ← WebView池化（对象池+动态Context+WebJsExtensions桥接）
     ├── http-helper-layer.md              ← HTTP辅助层（okHttpClient拦截器链+Cookie分层+SSL+BackstageWebView+Cronet封装）
     ├── update-system.md                  ← 应用更新系统（策略模式+GitHub/Gitee双源+AppVariant变体匹配）
-    ├── source-extensions.md              ← 源辅助与扩展（SourceHelp+exploreKinds三级缓存+验证码等待+BaseSourceExtensions）
     ├── custom-libraries.md             ← ⭐ 自定义库层（MOBI解析引擎+WebDAV+主题引擎+阿里云TTS+Cronet+权限+对话框+偏好控件）
     ├── rhino-module.md                   ← ⭐ Rhino模块（沙箱体系+协程桥接+递归保护+Continuation机制）
     ├── widget-system.md                  ← ⭐ 自定义控件体系（70+控件8子包+主题感知+阅读界面控件组合）
     ├── ui-core-pages.md                  ← ⭐ 核心UI页面（ReadBookActivity 1857行+MainActivity+搜索/书源/设置/欢迎页）
     ├── ui-secondary-pages.md             ← ⭐ 次要UI页面（替换规则+字典+代码编辑+视频+浏览器+文件+登录+二维码+字体）
     ├── association-import.md             ← ⭐ 关联导入体系（8种ImportDialog+FileAssociationActivity+Deep Link路由）
-    ├── receiver-system.md                ← ⭐ 广播接收器体系（MediaButtonReceiver+NetworkChangedListener+TimeBatteryReceiver）
-    └── utils-extensions.md               ← ⭐ 工具与扩展函数（81个文件：网络/编码/加密/图片/Android扩展/数据处理）
+    └── tools-infrastructure.md           ← ⭐ 工具与辅助层（utils工具类+协程封装+加密+广播接收器，含原广播接收器体系与工具扩展函数两册内容）
+├── python-ref/                        ← Python重构参考外迁区（权威业务文档仍在modules/与architecture/）
+│   ├── README.md                      ← 目录用途+6件清单+权威源声明
+│   ├── reading-engine.md              ← 阅读引擎Python参考（ReadBook状态+三章缓存+翻页跳章）
+│   ├── web-service.md                 ← Web服务Python参考（REST API+数据模型）
+│   ├── local-book.md                  ← 本地书籍解析Python参考（TXT/EPUB）
+│   ├── service-layer.md               ← 服务层Python参考（WebDAV/TTS/RSS）
+│   ├── webbook-search.md              ← WebBook搜索Python参考（并发调度+四分类）
+│   └── config-system.md               ← 配置系统Python参考（AppConfig/ReadBookConfig）
 ```
 
 ---
@@ -136,7 +150,6 @@ flowchart TB
         GVW["glide-video-webview.md\n图片/视频/WebView"]
         HHL["http-helper-layer.md\nHTTP辅助层"]
         US["update-system.md\n应用更新"]
-        SX["source-extensions.md\n源辅助与扩展"]
         WS["webbook-search.md\n搜索调度"]
         CP["content-pipeline.md\n正文管线"]
         SM["source-management.md\n书源管理"]
@@ -149,8 +162,7 @@ flowchart TB
     WS -->|"搜索请求"| HHL
     WS -->|"规则解析"| RE
     CP -->|"正文请求"| HHL
-    SM -->|"校验/扩展"| SX
-    SX -->|"分类发现"| RE
+    SM -->|"校验/分类发现"| RE
     GVW -->|"图片URL"| HHL
     ES -->|"异常处理"| WS
     ES -->|"异常处理"| CP

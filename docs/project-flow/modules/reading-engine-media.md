@@ -555,21 +555,9 @@ class AudioCallBack:
 
 ### 4.1 BookType 与引擎路由
 
+> BookType 位标志权威定义见 [constant-system.md §4](./constant-system.md)，此处不再重复（原 IntEnum 位标志表已删除——真实 BookType 是位标志组合而非枚举）。
+
 ```python
-from enum import IntEnum
-
-
-class BookType(IntEnum):
-    """书籍类型"""
-    TEXT = 0
-    IMAGE = 1
-    AUDIO = 2
-    PDF = 3
-    EPUB = 4
-    CBZ = 5
-    TXT = 6
-
-
 def get_reading_engine(book: 'Book'):
     """根据书籍类型选择阅读引擎"""
     if book.is_image():

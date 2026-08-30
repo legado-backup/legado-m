@@ -8,10 +8,10 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| AnalyzeByJSoup | [architecture/rule-engine.md](./architecture/rule-engine.md) | 3.1 CSS选择器解析 |
-| AnalyzeByJSonPath | [architecture/rule-engine.md](./architecture/rule-engine.md) | 3.2 JSONPath解析 |
-| AnalyzeByRegex | [architecture/rule-engine.md](./architecture/rule-engine.md) | 3.4 正则解析 |
-| AnalyzeByXPath | [architecture/rule-engine.md](./architecture/rule-engine.md) | 3.3 XPath解析 |
+| AnalyzeByJSoup | [architecture/rule-engine.md](./architecture/rule-engine.md) / [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 3.1 CSS选择器解析 / §4 完整解析引擎 |
+| AnalyzeByJSonPath | [architecture/rule-engine.md](./architecture/rule-engine.md) / [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 3.2 JSONPath解析 / §6 完整规范 |
+| AnalyzeByRegex | [architecture/rule-engine.md](./architecture/rule-engine.md) / [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 3.4 正则解析 / §7 完整规范 |
+| AnalyzeByXPath | [architecture/rule-engine.md](./architecture/rule-engine.md) / [architecture/rule-engine-algorithms.md](./architecture/rule-engine-algorithms.md) | 3.3 XPath解析 / §5 完整规范 |
 | AnalyzeRule | [architecture/rule-engine.md](./architecture/rule-engine.md) | 1 架构总览 |
 | AnalyzeRule 环境绑定 | [architecture/rule-engine-js-env.md](./architecture/rule-engine-js-env.md) | 1 AnalyzeRule绑定 |
 | AnalyzeUrl | [architecture/rule-engine.md](./architecture/rule-engine.md) | 5 URL模板引擎 |
@@ -24,42 +24,46 @@
 | AudioPlay 音频播放 | [modules/reading-engine-media.md](./modules/reading-engine-media.md) | 3 AudioPlay |
 | AudioPlayService | [modules/android-services.md](./modules/android-services.md) | 5 AudioPlayService |
 | AutoMigration | [modules/data-layer.md](./modules/data-layer.md) | 6 迁移策略 |
-| Activity 体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 2 Activity继承体系 |
-| AudioPlay 音频播放 | [architecture/android-ui.md](./architecture/android-ui.md) | 13 音频播放架构 |
-| 排版引擎 | [architecture/android-ui.md](./architecture/android-ui.md) | 11 排版引擎架构 |
-| 漫画阅读 | [architecture/android-ui.md](./architecture/android-ui.md) | 12 漫画阅读架构 |
-| Widget 自定义控件 | [architecture/android-ui.md](./architecture/android-ui.md) | 14 Widget控件体系详解 |
-| 主题系统 | [architecture/android-ui.md](./architecture/android-ui.md) | 15 主题系统深度架构 |
-| 布局资源体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 16 布局资源体系 |
-| 横屏适配 | [architecture/android-ui.md](./architecture/android-ui.md) | 17 横屏适配策略 |
-| 夜间模式 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.9 夜间模式颜色覆盖 |
-| Column 列实体 | [architecture/android-ui.md](./architecture/android-ui.md) | 11.6 Column实体体系 |
-| ZhLayout 中文排版 | [architecture/android-ui.md](./architecture/android-ui.md) | 11.5 中文排版 |
-| TextChapterLayout | [architecture/android-ui.md](./architecture/android-ui.md) | 11 排版引擎架构 |
-| ThemeStore 主题存储 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.3 ThemeStore |
-| TintHelper 控件着色 | [architecture/android-ui.md](./architecture/android-ui.md) | 15.7 TintHelper |
-| PhotoView 图片查看 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.2 图片查看域 |
-| CoverImageView 封面图 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.2 图片查看域 |
-| DragSelectTouchHelper | [architecture/android-ui.md](./architecture/android-ui.md) | 14.3 列表交互域 |
-| FastScroller 快速滚动 | [architecture/android-ui.md](./architecture/android-ui.md) | 14.3 列表交互域 |
-| BottomWebViewDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 14.4 对话框域 |
-| VerticalSeekBar | [architecture/android-ui.md](./architecture/android-ui.md) | 14.5 进度条域 |
-| WebtoonRecyclerView | [architecture/android-ui.md](./architecture/android-ui.md) | 12.3 缩放系统 |
-| 启动引导 | [architecture/android-ui.md](./architecture/android-ui.md) | 19 启动引导流程 |
-| WelcomeActivity | [architecture/android-ui.md](./architecture/android-ui.md) | 19 启动引导流程 |
-| 书源调试 | [architecture/android-ui.md](./architecture/android-ui.md) | 20 书源调试流程 |
-| 搜索范围 | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
-| SearchScopeDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
-| 发现页 | [architecture/android-ui.md](./architecture/android-ui.md) | 22 发现页架构 |
-| ExploreAdapter | [architecture/android-ui.md](./architecture/android-ui.md) | 22 发现页架构 |
-| 关联导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
-| URL Scheme 导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
-| 辅助工具页面 | [architecture/android-ui.md](./architecture/android-ui.md) | 24 辅助工具页面 |
-| 阅读记录 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.1 ReadRecordActivity |
-| 缓存导出 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.2 CacheActivity |
-| 页面组件统计 | [architecture/android-ui.md](./architecture/android-ui.md) | 18.1 页面布局组件统计 |
-| 分组编辑 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
-| groupId 位运算 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.4 groupId位运算核心 |
+| Android UI 核心框架册 | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 全文（主框架/Activity/Fragment/Base/导航/启动/N1 顶栏/N2 Compose） |
+| Android UI 页面详解册 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 全文（页面布局/调试/搜索/发现/导入/工具/N3/N4） |
+| Android UI 阅读媒体与主题册 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 全文（阅读界面/排版/漫画/音频/Widget/主题/横屏/N5/N6） |
+| Android UI 统计与变更册 | [architecture/android-ui-changelog.md](./architecture/android-ui-changelog.md) | 全文（源码统计+时敏记录） |
+| Activity 体系 | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 2 活动（Activity）体系 |
+| AudioPlay 音频播放 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 4 音频播放架构 |
+| 排版引擎 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 2 排版引擎架构 |
+| 漫画阅读 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 3 漫画阅读架构 |
+| Widget 自定义控件 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5 Widget 自定义控件体系详解 |
+| 主题系统 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 6 主题系统深度架构 |
+| 布局资源体系 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 7 布局资源体系 |
+| 横屏适配 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 8 横屏适配策略 |
+| 夜间模式 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 6.9 夜间模式颜色覆盖 |
+| Column 列实体 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 2.6 Column（列）实体体系 |
+| ZhLayout 中文排版 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 2.5 中文排版（ZhLayout） |
+| TextChapterLayout | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 2 排版引擎架构 |
+| ThemeStore 主题存储 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 6.3 主题存储引擎 ThemeStore |
+| TintHelper 控件着色 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 6.7 TintHelper 控件着色引擎 |
+| PhotoView 图片查看 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.2 图片查看域 |
+| CoverImageView 封面图 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.2 图片查看域 |
+| DragSelectTouchHelper | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.3 列表交互域 |
+| FastScroller 快速滚动 | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.3 列表交互域 |
+| BottomWebViewDialog | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.4 对话框域 |
+| VerticalSeekBar | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 5.5 进度条域 |
+| WebtoonRecyclerView | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 3.3 WebtoonRecyclerView 缩放系统 |
+| 启动引导 | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 6 启动引导流程 |
+| WelcomeActivity | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 6.1 WelcomeActivity 架构 |
+| 书源调试 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 3 书源调试流程 |
+| 搜索范围 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 4 搜索范围配置 |
+| SearchScopeDialog | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 4 搜索范围配置 |
+| 发现页 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 5 发现页架构 |
+| ExploreAdapter | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 5 发现页架构 |
+| 关联导入 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 6 关联导入体系 |
+| URL Scheme 导入 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 6.2 URL Scheme 处理 |
+| 辅助工具页面 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7 辅助工具页面 |
+| 阅读记录 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.1 ReadRecordActivity 阅读记录 |
+| 缓存导出 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.2 CacheActivity 缓存与导出 |
+| 页面组件统计 | [architecture/android-ui-changelog.md](./architecture/android-ui-changelog.md) | 1 UI 层源码统计 |
+| 分组编辑 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.3 分组编辑三层对话框 |
+| groupId 位运算 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.4 groupId 位运算核心 |
 | AppDatabase | [database/entities.md](./database/entities.md) | 1 数据库定义 |
 | API 数据流 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 1 HTTP链路 |
 | App 启动流程 | [architecture/app-init.md](./architecture/app-init.md) | 1 50步启动流程 |
@@ -73,7 +77,7 @@
 | AppUpdateGitHub | [modules/update-system.md](./modules/update-system.md) | 2 策略模式架构 |
 | AppUpdateGitee | [modules/update-system.md](./modules/update-system.md) | 2 策略模式架构 |
 | AppVariant 变体匹配 | [modules/update-system.md](./modules/update-system.md) | 3 AppReleaseInfo |
-| AsyncRecycleBitmapPool 异步回收 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 6 AsyncRecycleBitmapPool |
+| AsyncRecycleBitmapPool 异步回收 | [modules/glide.md](./modules/glide.md) | 6 AsyncRecycleBitmapPool |
 | 安全 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 8 版本锁定 |
 
 ---
@@ -114,7 +118,7 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | CacheBook | [modules/service-layer.md](./modules/service-layer.md) | 4 章节缓存 |
-| CacheActivity 缓存导出 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.2 CacheActivity |
+| CacheActivity 缓存导出 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.2 CacheActivity 缓存与导出 |
 | CacheBookService | [modules/android-services.md](./modules/android-services.md) | 9 CacheBookService |
 | CheckSource 检验配置 | [modules/model-layer.md](./modules/model-layer.md) | 5 CheckSource |
 | CheckSourceService | [modules/android-services.md](./modules/android-services.md) | 11 CheckSourceService |
@@ -127,14 +131,14 @@
 | Cookie 管理 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 3 Cookie链路 |
 | Cookie 三级优先级 | [architecture/network-layer.md](./architecture/network-layer.md) | 4 Cookie三级优先级 |
 | Coroutine 链式协程 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 2.1 Coroutine |
-| CORS | [modules/web-service.md](./modules/web-service.md) | 2.2 CORS预检 |
+| CORS | [modules/web-service-api.md](./modules/web-service-api.md) | 2 HttpServer 路由分发（CORS预检） |
 | Cronet | [modules/service-layer.md](./modules/service-layer.md) | 1.1 初始化流程 |
 | Cronet 加速 | [architecture/network-layer.md](./architecture/network-layer.md) | 5 Cronet加速 |
 | Cronet 网络引擎封装 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 7 lib/cronet/ |
 | CrashHandler 崩溃处理 | [modules/help-layer.md](./modules/help-layer.md) | 1.2 CrashHandler |
 | CacheManager 三级缓存 | [modules/help-layer.md](./modules/help-layer.md) | 7.1 CacheManager |
 | ColorPreference 颜色选择 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 10.3 ColorPreference |
-| CSS 分页 | [architecture/frontend-components.md](./architecture/frontend-components.md) | 3 阅读器核心 |
+| CSS 分页 | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 3 阅读器核心实现 |
 | ConcurrentException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
 | ContentEmptyException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
 | CookieManager 会话分层 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 2 CookieManager |
@@ -148,13 +152,13 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | DAO 设计 | [modules/data-layer.md](./modules/data-layer.md) | 5 DAO层 |
-| DDL 表定义 | [database/tables.md](./database/tables.md) | 全部21张表DDL |
-| Debug（书源） | [modules/web-service.md](./modules/web-service.md) | 5.2 书源调试WebSocket |
+| DDL 表定义 | [database/tables.md](./database/tables.md) | 核心 21 表 DDL+新增表速览 |
+| Debug（书源） | [modules/web-service-api.md](./modules/web-service-api.md) | 5 书源调试WebSocket |
 | Debug 调试状态机 | [modules/model-layer.md](./modules/model-layer.md) | 6 Debug |
 | DefaultData 默认数据 | [modules/config-system.md](./modules/config-system.md) | 8 DefaultData |
 | DirectLinkUpload 直链上传 | [modules/help-layer.md](./modules/help-layer.md) | 8.1 DirectLinkUpload |
 | DecompressInterceptor 解压 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 5 DecompressInterceptor |
-| 弹幕系统 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 4 弹幕系统 |
+| 弹幕系统 | [modules/video.md](./modules/video.md) | 4 弹幕系统 |
 | DispatchersMonitor 调度器监控 | [modules/help-layer.md](./modules/help-layer.md) | 1.3 DispatchersMonitor |
 | Dialogs DSL对话框 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 9 lib/dialogs/ |
 | DiffRecyclerAdapter | [architecture/base-layer.md](./architecture/base-layer.md) | 4 RecyclerAdapter |
@@ -178,7 +182,10 @@
 | ExoPlayer 音频 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 4 ExoPlayer |
 | EmptyFileException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
 | EventBus 事件总线常量 | [modules/constant-system.md](./modules/constant-system.md) | 12 EventBus |
-| exploreKinds 分类发现 | [modules/source-extensions.md](./modules/source-extensions.md) | 2 exploreKinds |
+| exploreKinds 分类发现 | [modules/source-management.md](./modules/source-management.md) | 11 BookSourceExtensions exploreKinds 三级缓存 |
+| EPUB 渲染与高亮（N5） | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 9 N5 EPUB 渲染与高亮 |
+| ExoPlayer 引擎层 | [modules/video.md](./modules/video.md) | 6 ExoPlayer 引擎层 |
+| 扩展实体清单（v90-v108） | [database/entities-extensions.md](./database/entities-extensions.md) | 全文（新增 35 实体四分组） |
 
 ---
 
@@ -186,12 +193,13 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| Fragment 体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 3 Fragment架构 |
+| Fragment 体系 | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 3 Fragment 体系 |
 | Frontend Vue3 | [architecture/frontend.md](./architecture/frontend.md) | 1 前端架构 |
+| frontend-refactor-plan 重构方案 | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 全文（路由/组件树/阅读器核心/Store/API，未实施存档） |
 | 五阶段流水线 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 四层架构 | [architecture/overview.md](./architecture/overview.md) | 1 四层架构 |
-| FloatingPlayer 浮窗播放 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 FloatingPlayer |
-| FileAssociationActivity 文件关联 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
+| FloatingPlayer 浮窗播放 | [modules/video.md](./modules/video.md) | 3 FloatingPlayer 浮窗播放器 |
+| FileAssociationActivity 文件关联 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 6.4 文件关联处理流程 |
 
 ---
 
@@ -205,11 +213,12 @@
 | GSY Video 视频播放 | [modules/remote-third-party.md](./modules/remote-third-party.md) | 3 GSY Video |
 | getContent 正文获取 | [modules/webbook-search.md](./modules/webbook-search.md) | 6.4 正文获取 |
 | getContent 七步管线 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 2 七步管线 |
-| Glide图片加载+视频+WebView | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 架构总览 |
-| GroupEditDialog 分组编辑 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
-| GroupManageDialog 分组管理 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
-| GroupSelectDialog 分组选择 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.3 分组编辑三层对话框 |
-| groupId 位运算 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.4 groupId位运算核心 |
+| Glide图片加载+视频+WebView | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 索引页（详情分见 glide/video/webview-pool 三册） |
+| Glide 模块（ModelLoader+Fetcher） | [modules/glide.md](./modules/glide.md) | 1 ModelLoader+Fetcher 继承体系 |
+| GroupEditDialog 分组编辑 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.3 分组编辑三层对话框 |
+| GroupManageDialog 分组管理 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.3 分组编辑三层对话框 |
+| GroupSelectDialog 分组选择 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.3 分组编辑三层对话框 |
+| groupId 位运算 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.4 groupId 位运算核心 |
 
 ---
 
@@ -218,7 +227,7 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | HttpReadAloudService | [modules/android-services.md](./modules/android-services.md) | 4 HttpReadAloudService |
-| HttpServer 路由 | [modules/web-service.md](./modules/web-service.md) | 2 HttpServer路由 |
+| HttpServer 路由 | [modules/web-service-api.md](./modules/web-service-api.md) | 2 HttpServer 路由分发 |
 | HTTP 拦截器 | [architecture/api-dataflow.md](./architecture/api-dataflow.md) | 2 拦截器链 |
 | Help 辅助层 | [modules/help-layer.md](./modules/help-layer.md) | 全文 |
 | HTTP辅助层 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 架构总览 |
@@ -231,7 +240,7 @@
 |--------|------|------|
 | IntentData 大对象传递 | [modules/help-layer.md](./modules/help-layer.md) | 2.1 IntentData |
 | IntentHelp 系统Intent | [modules/help-layer.md](./modules/help-layer.md) | 2.3 IntentHelp |
-| ImageLoader 统一入口 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 4 ImageLoader |
+| ImageLoader 统一入口 | [modules/glide.md](./modules/glide.md) | 4 ImageLoader 统一入口API |
 | IntentAction Intent动作 | [modules/constant-system.md](./modules/constant-system.md) | 10 IntentAction |
 | InvalidBooksDirException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
 
@@ -269,9 +278,10 @@
 | LocalConfig 本地状态 | [modules/config-system.md](./modules/config-system.md) | 5 LocalConfig |
 | LauncherIconHelp 图标更换 | [modules/help-layer.md](./modules/help-layer.md) | 6.3 LauncherIconHelp |
 | LayoutManager 布局工厂 | [modules/help-layer.md](./modules/help-layer.md) | 3.2 LayoutManager |
-| Lifecycle | [architecture/android-ui.md](./architecture/android-ui.md) | 4 生命周期 |
+| Lifecycle | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 4 Base 基类体系（生命周期回调封装） |
 | LifecycleHelp 生命周期 | [modules/help-layer.md](./modules/help-layer.md) | 3.1 LifecycleHelp |
-| LegadoGlideModule 注册中心 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 LegadoGlideModule |
+| LegadoGlideModule 注册中心 | [modules/glide.md](./modules/glide.md) | 3 LegadoGlideModule 注册中心 |
+| LocalBook 解析 Python 参考 | [python-ref/local-book.md](./python-ref/local-book.md) | 全文（TXT/EPUB 重构参考） |
 
 ---
 
@@ -295,7 +305,7 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| NanoHTTPD | [modules/web-service.md](./modules/web-service.md) | 1 服务概览 |
+| NanoHTTPD | [modules/web-service-api.md](./modules/web-service-api.md) | 1 服务概览 |
 | NetworkModule | [architecture/app-init.md](./architecture/app-init.md) | 2 模块初始化 |
 | NativeBaseSource Rhino绑定 | [modules/js-extensions.md](./modules/js-extensions.md) | 9 NativeBaseSource |
 | NoBooksDirException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
@@ -311,10 +321,10 @@
 | OkHttpClient 构建 | [architecture/network-layer.md](./architecture/network-layer.md) | 1 OkHttpClient |
 | ObjectPool 对象池 | [modules/tools-infrastructure.md](./modules/tools-infrastructure.md) | 1.5 ObjectPool |
 | ObsoleteUrlFactory 兼容桥 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 8 ObsoleteUrlFactory |
-| OkHttpStreamFetcher 图片加载 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 OkHttpStreamFetcher |
+| OkHttpStreamFetcher 图片加载 | [modules/glide.md](./modules/glide.md) | 2 OkHttpStreamFetcher 图片加载完整流程 |
 | OkHttpUtils 请求工具 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 7 OkHttpUtils |
 | 18+ 内容过滤 | [modules/source-management.md](./modules/source-management.md) | 10 18+内容过滤 |
-| OnLineImportActivity 在线导入 | [architecture/android-ui.md](./architecture/android-ui.md) | 23 关联导入体系 |
+| OnLineImportActivity 在线导入 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 6 关联导入体系 |
 
 ---
 
@@ -328,14 +338,15 @@
 | PaintPool 画笔池 | [modules/help-layer.md](./modules/help-layer.md) | 4.1 PaintPool |
 | Permission 权限管理 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 8 lib/permission/ |
 | Prefs 偏好控件 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 10 lib/prefs/ |
-| Pinia Store | [architecture/frontend-stores.md](./architecture/frontend-stores.md) | 2 Pinia Stores |
+| Pinia Store | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 13 Pinia Store 实现（5 个 Store 方案） |
 | PreferKey 偏好键 | [modules/config-system.md](./modules/config-system.md) | 7 PreferKey |
 | preDownload 预下载 | [modules/reading-engine.md](./modules/reading-engine.md) | 7 预下载策略 |
 | putMap 变量系统 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 2.5 变量系统 |
 | Python 客户端 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 5 Python客户端 |
+| Python 重构参考外迁区 | [python-ref/README.md](./python-ref/README.md) | 目录用途+6 件清单+权威源声明 |
 | PageAnim 翻页动画类型 | [modules/constant-system.md](./modules/constant-system.md) | 8 PageAnim |
-| PooledWebView 动态Context | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 PooledWebView |
-| ProgressManager 下载进度 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 7 ProgressManager |
+| PooledWebView 动态Context | [modules/webview-pool.md](./modules/webview-pool.md) | 2 PooledWebView 动态Context切换 |
+| ProgressManager 下载进度 | [modules/glide.md](./modules/glide.md) | 7 ProgressManager 下载进度回调 |
 
 ---
 
@@ -367,8 +378,8 @@
 | ReplaceAnalyzer | [modules/content-pipeline.md](./modules/content-pipeline.md) | 4 替换规则引擎 |
 | Restore 恢复 | [modules/backup-restore.md](./modules/backup-restore.md) | 3 Restore恢复模块 |
 | RegexTimeoutException | [modules/exception-system.md](./modules/exception-system.md) | 3 业务异常详解 |
-| RssSourceExtensions RSS扩展 | [modules/source-extensions.md](./modules/source-extensions.md) | 3 RssSourceExtensions对比 |
-| ReturnData 响应 | [modules/web-service.md](./modules/web-service.md) | 3 统一响应格式 |
+| RssSourceExtensions RSS扩展 | [modules/source-management.md](./modules/source-management.md) | 12 RssSourceExtensions sortUrls 解析 |
+| ReturnData 响应 | [modules/web-service-api.md](./modules/web-service-api.md) | 3 统一响应格式 ReturnData |
 | rhino 版本 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 8 版本锁定 |
 | Rhino 编译缓存 | [architecture/rule-engine-js-env.md](./architecture/rule-engine-js-env.md) | 3 Rhino编译缓存 |
 | RhinoScriptEngine | [architecture/rule-engine.md](./architecture/rule-engine.md) | 3.5 JS执行Rhino |
@@ -383,8 +394,10 @@
 | RuleComplete 规则补全 | [modules/help-layer.md](./modules/help-layer.md) | 5.1 RuleComplete |
 | RuleUpdate 规则订阅 | [modules/model-layer.md](./modules/model-layer.md) | 7 RuleUpdate |
 | Room 数据库 | [database/entities.md](./database/entities.md) | 1 数据库定义 |
-| ReadRecordActivity 阅读记录 | [architecture/android-ui.md](./architecture/android-ui.md) | 24.1 ReadRecordActivity |
-| RSS 调试差异 | [architecture/android-ui.md](./architecture/android-ui.md) | 20.4 RSS调试差异 |
+| ReadRecordActivity 阅读记录 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 7.1 ReadRecordActivity 阅读记录 |
+| RSS 调试差异 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 3.4 RSS 调试差异 |
+| ReaderProvider 内容通道 | [modules/web-service-lifecycle.md](./modules/web-service-lifecycle.md) | 3 ReaderProvider（ContentProvider 通道） |
+| ReadBook Python 参考 | [python-ref/reading-engine.md](./python-ref/reading-engine.md) | 全文（阅读引擎重构参考） |
 
 ---
 
@@ -393,8 +406,8 @@
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
 | SearchModel 并发 | [modules/webbook-search.md](./modules/webbook-search.md) | 4 并发调度 |
-| SearchScope 搜索范围 | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
-| SearchScopeDialog | [architecture/android-ui.md](./architecture/android-ui.md) | 21 搜索范围配置 |
+| SearchScope 搜索范围 | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 4 搜索范围配置 |
+| SearchScopeDialog | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 4 搜索范围配置 |
 | SearchRule | [architecture/rule-engine.md](./architecture/rule-engine.md) | 9 锚点速查 |
 | SharedJsScope 共享作用域 | [modules/model-layer.md](./modules/model-layer.md) | 8 SharedJsScope |
 | Skill 架构 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 1 Skill体系 |
@@ -410,10 +423,11 @@
 | SourceType 源类型 | [modules/constant-system.md](./modules/constant-system.md) | 6 SourceType |
 | Status 播放状态 | [modules/constant-system.md](./modules/constant-system.md) | 11 Status |
 | StrResponse 字符串响应 | [modules/http-helper-layer.md](./modules/http-helper-layer.md) | 9 StrResponse |
-| sortUrls 排序地址 | [modules/source-extensions.md](./modules/source-extensions.md) | 3 RssSourceExtensions对比 |
+| sortUrls 排序地址 | [modules/source-management.md](./modules/source-management.md) | 12 RssSourceExtensions sortUrls 解析 |
 | 书源校验 | [modules/source-management.md](./modules/source-management.md) | 3.5 CheckSource |
 | 书源排序 | [modules/source-management.md](./modules/source-management.md) | 9 书源排序体系 |
 | 设计模式总结 | [architecture/overview.md](./architecture/overview.md) | 3 设计模式 |
+| Service 层 Python 参考 | [python-ref/service-layer.md](./python-ref/service-layer.md) | 全文（WebDAV/TTS/RSS 重构参考） |
 
 ---
 
@@ -441,7 +455,7 @@
 | 陷阱检查 | [architecture/skill-architecture.md](./architecture/skill-architecture.md) | 3 陷阱体系 |
 | 编码检测 | [modules/local-book.md](./modules/local-book.md) | 2.1 编码检测 |
 | 书源规则 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 2 规则预处理 |
-| 书源调试 | [modules/web-service.md](./modules/web-service.md) | 5.2 书源调试WebSocket |
+| 书源调试 | [modules/web-service-api.md](./modules/web-service-api.md) | 5 书源调试WebSocket |
 
 ---
 
@@ -452,8 +466,8 @@
 | UMD 解析 | [modules/local-book.md](./modules/local-book.md) | 4 PDF/MOBI/UMD |
 | URL 模板 | [architecture/rule-engine.md](./architecture/rule-engine.md) | 5 URL模板引擎 |
 | UrlOption 字段 | [architecture/network-layer.md](./architecture/network-layer.md) | 7 AnalyzeUrl管线 |
-| useBookStore | [architecture/frontend-stores.md](./architecture/frontend-stores.md) | 2 Pinia Stores |
-| useReaderStore | [architecture/frontend-stores.md](./architecture/frontend-stores.md) | 2 Pinia Stores |
+| useBookStore | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 13 Pinia Store 实现 |
+| useReaderStore | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 13 Pinia Store 实现 |
 
 ---
 
@@ -461,12 +475,12 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| Vue3 前端 | [modules/web-service.md](./modules/web-service.md) | 9 Vue3前端集成 |
-| Vue3 路由 | [architecture/frontend-components.md](./architecture/frontend-components.md) | 1 路由设计 |
-| ViewModel 体系 | [architecture/android-ui.md](./architecture/android-ui.md) | 5 ViewModel |
+| Vue3 前端 | [modules/web-service-api.md](./modules/web-service-api.md) | 10 Vue3 前端对照 |
+| Vue3 路由 | [architecture/frontend-refactor-plan.md](./architecture/frontend-refactor-plan.md) | 1 路由设计 |
+| ViewModel 体系 | [architecture/base-layer.md](./architecture/base-layer.md) | 2 BaseViewModel |
 | VideoPlay 视频播放 | [modules/model-layer.md](./modules/model-layer.md) | 3 VideoPlay |
 | VideoPlayService | [modules/android-services.md](./modules/android-services.md) | 6 VideoPlayService |
-| VideoPlayer 视频播放器 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 2 VideoPlayer |
+| VideoPlayer 视频播放器 | [modules/video.md](./modules/video.md) | 2 VideoPlayer 主播放器 |
 | VMBaseActivity | [architecture/base-layer.md](./architecture/base-layer.md) | 1 BaseActivity |
 
 ---
@@ -481,12 +495,18 @@
 | WebDAV 同步 | [modules/service-layer.md](./modules/service-layer.md) | 2 WebDAV同步 |
 | WebDAV 客户端 | [modules/custom-libraries.md](./modules/custom-libraries.md) | 2 lib/webdav/ |
 | WebDAV 备份同步 | [modules/backup-restore.md](./modules/backup-restore.md) | 7 WebDAV备份同步 |
-| WebSocket | [modules/web-service.md](./modules/web-service.md) | 5 WebSocket协议 |
+| WebSocket | [modules/web-service-api.md](./modules/web-service-api.md) | 5 WebSocket 协议完整规范 |
+| Web 服务 REST API 规范 | [modules/web-service-api.md](./modules/web-service-api.md) | 全文（端点/WebSocket/Beacon/静态服务/Vue3 对照） |
+| Web 服务生命周期 | [modules/web-service-lifecycle.md](./modules/web-service-lifecycle.md) | 全文（WebService/ReaderProvider/传书/安全模型） |
 | WebService 前台服务 | [modules/android-services.md](./modules/android-services.md) | 7 WebService |
 | WeakReference 缓存 | [modules/content-pipeline.md](./modules/content-pipeline.md) | 1.1 单例工厂 |
 | webView 渲染 | [modules/js-extensions.md](./modules/js-extensions.md) | 2 网络访问系列 |
-| WebViewPool 对象池 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 1 WebViewPool |
-| WebJsExtensions JS桥接 | [modules/glide-video-webview.md](./modules/glide-video-webview.md) | 3 WebJsExtensions |
+| WebViewPool 对象池 | [modules/webview-pool.md](./modules/webview-pool.md) | 1 WebViewPool 对象池机制 |
+| WebJsExtensions JS桥接 | [modules/webview-pool.md](./modules/webview-pool.md) | 3 WebJsExtensions JS-Native桥接 |
+| WebTileService 快捷磁贴 | [modules/web-service-lifecycle.md](./modules/web-service-lifecycle.md) | 2 WebTileService 快捷磁贴 |
+| WiFi 传书 | [modules/web-service-lifecycle.md](./modules/web-service-lifecycle.md) | 5 WiFi 传书功能 |
+| WebBook 搜索 Python 参考 | [python-ref/webbook-search.md](./python-ref/webbook-search.md) | 全文（并发调度/四分类重构参考） |
+| Web 服务 Python 参考 | [python-ref/web-service.md](./python-ref/web-service.md) | 全文（REST API/数据模型重构参考） |
 | Widget 控件体系 | [modules/widget-system.md](./modules/widget-system.md) | 1 控件继承体系 |
 | Widget 主题感知 | [modules/widget-system.md](./modules/widget-system.md) | 2 主题感知机制 |
 
@@ -508,7 +528,10 @@
 | 代理支持 | [architecture/network-layer.md](./architecture/network-layer.md) | 5 代理支持 |
 | 异常体系 | [modules/exception-system.md](./modules/exception-system.md) | 全文 |
 | 应用更新系统 | [modules/update-system.md](./modules/update-system.md) | 全文 |
-| 源辅助与扩展 | [modules/source-extensions.md](./modules/source-extensions.md) | 全文 |
+| 源辅助与扩展 | [modules/source-management.md](./modules/source-management.md) | 7/11/12 源扩展体系（原源扩展专册并入） |
+| 顶栏体系（N1） | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 7 N1 顶栏体系 MainTopBarView |
+| 订阅页双模式（N3） | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 8 N3 订阅页双模式 |
+| 发现页缓存加固（N4） | [architecture/android-ui-pages.md](./architecture/android-ui-pages.md) | 9 N4 发现页缓存加固 |
 
 ---
 
@@ -522,6 +545,11 @@
 | 自定义DNS | [modules/config-system.md](./modules/config-system.md) | 1 AppConfig |
 | 精准修复 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 导航同步 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
+| 画质增强 | [modules/video.md](./modules/video.md) | 7 画质增强体系 |
+| Compose 化现状（N2） | [architecture/android-ui-core.md](./architecture/android-ui-core.md) | 8 N2 Compose 化现状 |
+| EPUB 渲染与高亮（N5） | [architecture/android-ui-media-theme.md](./architecture/android-ui-media-theme.md) | 9 N5 EPUB 渲染与高亮 |
+| 传书（WiFi） | [modules/web-service-lifecycle.md](./modules/web-service-lifecycle.md) | 5 WiFi 传书功能 |
+| 配置系统 Python 参考 | [python-ref/config-system.md](./python-ref/config-system.md) | 全文（AppConfig/ReadBookConfig 重构参考） |
 
 ---
 

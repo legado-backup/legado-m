@@ -291,6 +291,10 @@ fun webView(...) {
 | `getZipStringContent(url, path)` | 从网络 ZIP 中读取指定文件内容 |
 | `getZipByteArrayContent(url, path)` | 从网络 ZIP 中读取指定文件为字节数组 |
 | `getRarStringContent` / `get7zStringContent` | 从 RAR/7z 中读取 |
+| `readFileBytes(file)` / `writeFile(file, content/bytes)` | 二进制读写（File 对象重载） |
+| `cachePut(key, value)` / `cacheGet(key)` / `cacheRemove(key)` | ACache 磁盘缓存（键值对，区别于 cacheFile 网络文件缓存） |
+
+**安全性**：所有文件操作相对路径限定在 `/android/data/{package}/cache/` 下，`getFile()` 含目录穿越检查。
 
 ---
 
@@ -378,30 +382,7 @@ fun autoDecode(bytes: ByteArray): String      // 自动检测并解码
 
 ---
 
-## 5. 文件操作系列
-
-```kotlin
-// 文件路径 (相对路径限定在 ExternalCache 目录)
-fun getFile(path: String): File
-fun getFile(name: String, extension: String): File
-
-// 文件 IO
-fun readFile(file: File): String              // 读取文本文件
-fun readFileBytes(file: File): ByteArray      // 读取二进制文件
-fun writeFile(file: File, content: String)    // 写入文本
-fun writeFile(file: File, bytes: ByteArray)   // 写入二进制
-
-// 缓存 (ACache 磁盘缓存)
-fun cachePut(key: String, value: String)      // 写入缓存
-fun cacheGet(key: String): String?            // 读取缓存
-fun cacheRemove(key: String)                  // 删除缓存
-```
-
-**安全性**：所有文件操作限定在 `/android/data/{package}/cache/` 下（相对路径）。
-
----
-
-## 6. 正则扩展 (RegexJsExtensions)
+## 14. 正则扩展 (RegexJsExtensions)
 
 **文件**：[RegexJsExtensions.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/help/RegexJsExtensions.kt)
 
@@ -419,7 +400,7 @@ fun regexCount(regex: String, str: String): Int                  // 匹配计数
 
 ---
 
-## 7. UI 交互系列
+## 15. UI 交互系列
 
 ```kotlin
 // Toast 提示
@@ -443,7 +424,7 @@ fun openVideoPlayer(url: String, title: String, isFloat: Boolean)
 
 ---
 
-## 8. 高级功能
+## 16. 高级功能
 
 ```kotlin
 // 字典查词
@@ -463,7 +444,7 @@ fun python(code: String, args: Map<String, String>): String?
 
 ---
 
-## 9. NativeBaseSource — Rhino 绑定的 Java 对象
+## 17. NativeBaseSource — Rhino 绑定的 Java 对象
 
 **文件**：[NativeBaseSource.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/help/rhino/NativeBaseSource.kt)
 
@@ -514,7 +495,7 @@ java.openUrl(source.loginUrl, "login") // 打开登录页面
 
 ---
 
-## 10. JsEncodeUtils 完整方法清单
+## 18. JsEncodeUtils 完整方法清单
 
 ```kotlin
 interface JsEncodeUtils {
@@ -546,7 +527,7 @@ interface JsEncodeUtils {
 
 ---
 
-## 11. CoroutineContext 传递
+## 19. CoroutineContext 传递
 
 JS 代码执行时，协程上下文从 `RhinoScriptEngine` 传递到 JS 方法：
 

@@ -1,10 +1,12 @@
 # 数据库表结构 DDL
 
-> Legado 数据库 v108（以 AppDatabase.kt version 字段为准）全部 21 张表的完整 CREATE TABLE 语句、索引定义和约束说明。
+> Legado 数据库 v108（以 AppDatabase.kt version 字段为准）。本文为**核心 21 张表**的完整 CREATE TABLE 语句、索引定义和约束说明（2026-08 前既有表）。
+>
+> **全量 56 张表**（v90-v108 扩展期新增 35 表）的权威 DDL 见 `app/schemas/io.legado.app.data.AppDatabase/108.json`；新增表速览与代表性 DDL 摘要见本文 §5，实体说明见 [entities-extensions.md](entities-extensions.md)。
 
 ---
 
-## 核心表关系图
+## 1. 核心表关系图
 
 ```mermaid
 %%{init: {'themeVariables': {'fontFamily': 'Microsoft YaHei, SimHei, sans-serif'}}}%%
@@ -21,9 +23,9 @@ erDiagram
 
 ---
 
-## 5. 表结构详解
+## 2. 表结构详解
 
-### 5.1 books — 书籍表
+### 2.1 books — 书籍表
 
 核心书籍表，存储书架中每本书的完整信息。
 
@@ -87,7 +89,7 @@ CREATE TABLE IF NOT EXISTS books (
 | `intro` | TEXT? | 书籍简介原文 |
 | `customIntro` | TEXT? | 用户编辑的简介，优先级高于 `intro` |
 | `charset` | TEXT? | 仅本地书籍使用，指定文件编码（如 `"UTF-8"`） |
-| `type` | INTEGER | 类型位标志，见 [BookType 位标志](#41-booktype--书籍类型位标志) |
+| `type` | INTEGER | 类型位标志，见 [BookType 位标志（overview.md）](overview.md#booktype--书籍类型位标志) |
 | `group` | INTEGER | 分组位掩码，对应 `book_groups.groupId`。0 表示未分组。支持位运算多分组 |
 | `latestChapterTitle` | TEXT? | 最新章节的标题文字 |
 | `latestChapterTime` | INTEGER | 最新章节发布/更新时间（毫秒时间戳） |
@@ -158,7 +160,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_books_name_author ON books (name, author
 
 ---
 
-### 5.2 book_groups — 分组表
+### 2.2 book_groups — 分组表
 
 书籍自定义分组配置。
 
@@ -206,7 +208,7 @@ CREATE TABLE IF NOT EXISTS book_groups (
 
 ---
 
-### 5.3 book_sources — 书源表
+### 2.3 book_sources — 书源表
 
 书源配置表，记录了每个书源的完整规则定义。
 
@@ -308,7 +310,7 @@ CREATE INDEX IF NOT EXISTS index_book_sources_bookSourceUrl ON book_sources (boo
 
 ---
 
-### 5.4 chapters — 章节表
+### 2.4 chapters — 章节表
 
 存储每本书的目录章节信息。
 
@@ -371,7 +373,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_chapters_bookUrl_index ON chapters (book
 
 ---
 
-### 5.5 bookmarks — 书签表
+### 2.5 bookmarks — 书签表
 
 存储书签和笔记。
 
@@ -414,7 +416,7 @@ CREATE INDEX IF NOT EXISTS index_bookmarks_bookName_bookAuthor ON bookmarks (boo
 
 ---
 
-### 5.6 replace_rules — 替换净化规则表
+### 2.6 replace_rules — 替换净化规则表
 
 用于正文/标题的文本替换净化规则。
 
@@ -464,7 +466,7 @@ CREATE INDEX IF NOT EXISTS index_replace_rules_id ON replace_rules (id);
 
 ---
 
-### 5.7 rssSources — RSS 源表
+### 2.7 rssSources — RSS 源表
 
 RSS/Atom 订阅源配置表。
 
@@ -549,7 +551,7 @@ CREATE INDEX IF NOT EXISTS index_rssSources_sourceUrl ON rssSources (sourceUrl);
 
 ---
 
-### 5.8 rssArticles — RSS 文章表
+### 2.8 rssArticles — RSS 文章表
 
 每个 RSS 源的文章列表缓存。
 
@@ -596,7 +598,7 @@ CREATE TABLE IF NOT EXISTS rssArticles (
 
 ---
 
-### 5.9 rssStars — RSS 收藏表
+### 2.9 rssStars — RSS 收藏表
 
 用户收藏的 RSS 文章。
 
@@ -625,7 +627,7 @@ CREATE TABLE IF NOT EXISTS rssStars (
 
 ---
 
-### 5.10 rssReadRecords — RSS 阅读记录表
+### 2.10 rssReadRecords — RSS 阅读记录表
 
 记录用户阅读过的 RSS 文章，支持跨设备同步阅读状态。
 
@@ -655,7 +657,7 @@ CREATE INDEX IF NOT EXISTS index_rssReadRecords_origin ON rssReadRecords (origin
 
 ---
 
-### 5.11 httpTTS — HTTP TTS 引擎表
+### 2.11 httpTTS — HTTP TTS 引擎表
 
 在线朗读引擎（TTS）配置。
 
@@ -698,7 +700,7 @@ CREATE TABLE IF NOT EXISTS httpTTS (
 
 ---
 
-### 5.12 searchBooks — 搜索结果缓存表
+### 2.12 searchBooks — 搜索结果缓存表
 
 书籍搜索结果缓存，外键关联 `book_sources`。
 
@@ -748,7 +750,7 @@ CREATE INDEX IF NOT EXISTS index_searchBooks_origin ON searchBooks (origin);
 
 ---
 
-### 5.13 search_keywords — 搜索关键词历史表
+### 2.13 search_keywords — 搜索关键词历史表
 
 记录用户搜索过的关键词。
 
@@ -771,7 +773,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_search_keywords_word ON search_keywords 
 
 ---
 
-### 5.14 readRecord — 阅读时间记录表
+### 2.14 readRecord — 阅读时间记录表
 
 记录每本书在各设备上的阅读时长。
 
@@ -798,7 +800,7 @@ CREATE TABLE IF NOT EXISTS readRecord (
 
 ---
 
-### 5.15 cookies — Cookie 存储表
+### 2.15 cookies — Cookie 存储表
 
 按域名存储的 Cookie。
 
@@ -820,7 +822,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_cookies_url ON cookies (url);
 
 ---
 
-### 5.16 dictRules — 字典规则表
+### 2.16 dictRules — 字典规则表
 
 在线字典查询规则配置。
 
@@ -849,7 +851,7 @@ CREATE TABLE IF NOT EXISTS dictRules (
 
 ---
 
-### 5.17 txtTocRules — TXT 目录规则表
+### 2.17 txtTocRules — TXT 目录规则表
 
 用于解析 TXT 文本文件的目录结构。
 
@@ -882,7 +884,7 @@ CREATE TABLE IF NOT EXISTS txtTocRules (
 
 ---
 
-### 5.18 ruleSubs — 规则订阅表
+### 2.18 ruleSubs — 规则订阅表
 
 用于在线更新书源/RSS/替换规则等。
 
@@ -937,7 +939,7 @@ CREATE TABLE IF NOT EXISTS ruleSubs (
 
 ---
 
-### 5.19 caches — 缓存键值表
+### 2.19 caches — 缓存键值表
 
 通用缓存存储。
 
@@ -956,7 +958,8 @@ CREATE TABLE IF NOT EXISTS caches (
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `key` | TEXT PK | 缓存键 | | `value` | TEXT? | 缓存值（任意序列化文本） |
+| `key` | TEXT PK | 缓存键 |
+| `value` | TEXT? | 缓存值（任意序列化文本） |
 | `deadline` | INTEGER | 过期截止时间戳。当前时间超过此值时缓存失效，0 表示永不过期 |
 
 **索引**：
@@ -967,7 +970,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS index_caches_key ON caches ("key");
 
 ---
 
-### 5.20 keyboardAssists — 键盘辅助表
+### 2.20 keyboardAssists — 键盘辅助表
 
 快捷输入辅助配置。
 
@@ -994,7 +997,7 @@ CREATE TABLE IF NOT EXISTS keyboardAssists (
 
 ---
 
-### 5.21 servers — 远程服务器配置表
+### 2.21 servers — 远程服务器配置表
 
 远程同步服务器配置（当前仅支持 WebDAV）。
 
@@ -1033,7 +1036,7 @@ CREATE TABLE IF NOT EXISTS servers (
 
 ---
 
-## 6. 索引设计总览
+## 3. 索引设计总览
 
 | 表名 | 索引名 | 类型 | 列 | 用途 |
 |------|--------|------|----|------|
@@ -1053,7 +1056,7 @@ CREATE TABLE IF NOT EXISTS servers (
 
 ---
 
-## 7. 视图
+## 4. 视图
 
 ### book_sources_part
 
@@ -1076,6 +1079,110 @@ SELECT
     eventListener,
     bookSourceType
 FROM book_sources;
+```
+
+---
+
+## 5. 新增表速览（v90-v108 扩展期，35 张）
+
+> v108 全量 56 张表的权威 DDL 见 `app/schemas/io.legado.app.data.AppDatabase/108.json`；35 张新增表的完整清单按领域分组见 [entities-extensions.md](entities-extensions.md)。以下摘录 5 张代表性新表的建表 DDL（对照 `DatabaseMigrations.kt` 与 108.json 核实）。
+
+**① highlights — 高亮表（v92，migration_91_92，BookHighlight）**
+
+```sql
+CREATE TABLE IF NOT EXISTS `highlights` (
+    `time` INTEGER NOT NULL,            -- 高亮时间戳 (PK)
+    `bookName` TEXT NOT NULL,
+    `bookAuthor` TEXT NOT NULL,
+    `chapterIndex` INTEGER NOT NULL,
+    `chapterPos` INTEGER NOT NULL,      -- 起始字符偏移
+    `chapterPosEnd` INTEGER NOT NULL,   -- 结束字符偏移
+    `chapterName` TEXT NOT NULL,
+    `bookText` TEXT NOT NULL,           -- 高亮原文
+    `style` TEXT NOT NULL,              -- 样式 JSON
+    `note` TEXT NOT NULL,               -- 笔记
+    PRIMARY KEY(`time`)
+);
+CREATE INDEX IF NOT EXISTS `index_highlights_bookName_bookAuthor` ON `highlights` (`bookName`, `bookAuthor`);
+```
+
+**② playHistories — 播放历史表（v101，migration_100_101，PlayHistory）**
+
+```sql
+CREATE TABLE IF NOT EXISTS playHistories(
+    articleUrl TEXT NOT NULL,           -- 订阅文章 URL（复合 PK 之一）
+    videoUrl TEXT NOT NULL,             -- 视频 URL（复合 PK 之二）
+    position INTEGER NOT NULL DEFAULT 0,    -- 已播放位置（毫秒）
+    duration INTEGER NOT NULL DEFAULT 0,    -- 总时长（毫秒）
+    lastPlayTime INTEGER NOT NULL DEFAULT 0,-- 最后播放时间戳
+    rssSourceId TEXT NOT NULL DEFAULT '',   -- 所属订阅源
+    PRIMARY KEY(articleUrl, videoUrl)
+);
+```
+
+**③ source_recycle_bin — 源回收站表（v102，migration_101_102，SourceRecycleBin）**
+
+```sql
+CREATE TABLE IF NOT EXISTS source_recycle_bin(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    type TEXT NOT NULL DEFAULT '',      -- 源类型（书源/订阅源/替换规则等）
+    key TEXT NOT NULL DEFAULT '',       -- 源唯一键
+    name TEXT NOT NULL DEFAULT '',      -- 快照名称
+    groupName TEXT,                     -- 原分组
+    payload TEXT NOT NULL DEFAULT '',   -- 完整 JSON 快照
+    deletedAt INTEGER NOT NULL DEFAULT 0, -- 删除时间戳
+    expireAt INTEGER NOT NULL DEFAULT 0   -- 过期时间戳（自动清理）
+);
+CREATE INDEX IF NOT EXISTS index_source_recycle_bin_type ON source_recycle_bin(type);
+CREATE INDEX IF NOT EXISTS index_source_recycle_bin_key ON source_recycle_bin(key);
+CREATE INDEX IF NOT EXISTS index_source_recycle_bin_expireAt ON source_recycle_bin(expireAt);
+```
+
+**④ ai_memory_items — AI 长期记忆表（v106，migration_105_106，AiMemoryItem）**
+
+```sql
+CREATE TABLE IF NOT EXISTS `ai_memory_items` (
+    `memoryId` TEXT NOT NULL,           -- 记忆 ID (PK, UUID)
+    `scope` TEXT NOT NULL DEFAULT '',   -- 作用域：global/book/session/character/roleplay
+    `bookKey` TEXT NOT NULL DEFAULT '',
+    `sessionId` TEXT NOT NULL DEFAULT '',
+    `type` TEXT NOT NULL DEFAULT '',    -- 类型：note/user_preference/plot_fact/character_fact/relation_state/world_state
+    `subject` TEXT NOT NULL DEFAULT '', -- SPO 三元组：主语
+    `predicate` TEXT NOT NULL DEFAULT '',-- SPO：谓语
+    `objectValue` TEXT NOT NULL DEFAULT '',-- SPO：宾语
+    `content` TEXT NOT NULL DEFAULT '', -- 完整内容
+    `confidence` INTEGER NOT NULL DEFAULT 50,
+    `importance` INTEGER NOT NULL DEFAULT 50,
+    `fingerprint` TEXT NOT NULL DEFAULT '', -- 指纹（唯一索引，防重复记忆）
+    `createdAt` INTEGER NOT NULL DEFAULT 0,
+    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+    `lastUsedAt` INTEGER NOT NULL DEFAULT 0,
+    /* 另有 sourceIds/sourceChapterIndex 等字段 */
+    PRIMARY KEY(`memoryId`)
+);
+-- 索引：(scope,updatedAt) (bookKey,updatedAt) (sessionId,updatedAt) (type,updatedAt)，fingerprint UNIQUE
+```
+
+**⑤ download_tasks — 下载任务表（v107 创建，v108 重建终版，DownloadTaskEntity）**
+
+```sql
+-- v108 终版（migration_107_108 重建，清除 errorMsg/resumePointJson/segmentsJson 僵尸列）
+CREATE TABLE IF NOT EXISTS `download_tasks` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    `url` TEXT NOT NULL,
+    `fileName` TEXT NOT NULL,
+    `taskType` TEXT NOT NULL,           -- DIRECT/M3U8 等
+    `headersJson` TEXT,
+    `status` TEXT NOT NULL,             -- WAITING/RUNNING/PAUSED/DONE/ERROR
+    `progress` INTEGER NOT NULL,
+    `totalSize` INTEGER NOT NULL,
+    `downloadedSize` INTEGER NOT NULL,
+    `speed` INTEGER NOT NULL,
+    `errorCode` TEXT,
+    `localPath` TEXT,
+    `targetDir` TEXT,
+    `startTime` INTEGER NOT NULL
+);
 ```
 
 ---

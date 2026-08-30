@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-**Legado（开源阅读）** 是一款面向 Android 平台的开源电子书阅读器，GitHub 仓库为 [gedoor/legado](https://github.com/gedoor/legado)。与市场上大多数阅读器不同，Legado 的核心设计理念是**用户驱动的书源规则引擎**——用户通过编写自定义规则，即可将任意网页转化为结构化的书籍资源。
+**Legado（阅读M）** 是一款面向 Android 平台的开源电子书阅读器（原版仓库 [gedoor/legado](https://github.com/gedoor/legado)）。**本项目为 fork 版本**：fork 自 [legado-E](https://github.com/Luoyacheng/legado-E)，私有仓 `github.com/syq17496152/legado`。与市场上大多数阅读器不同，Legado 的核心设计理念是**用户驱动的书源规则引擎**——用户通过编写自定义规则，即可将任意网页转化为结构化的书籍资源。
 
 ### 核心特征
 
@@ -23,7 +23,7 @@
 | UI | Android Activity + Fragment + ViewModel |
 | 规则引擎 | jsoup 1.16.2（CSS）/ JSONPath / JsoupXpath（XPath） / Rhino 1.8.1（JS） |
 | 网络 | OkHttp 3.x + Cronet（可选） |
-| 数据库 | Room v108（21 实体 + 21 DAO + 1 视图，版本以 AppDatabase.kt version 字段为准） |
+| 数据库 | Room v108（56 实体 + 1 视图 + 43 DAO，版本以 AppDatabase.kt version 字段为准） |
 | Web 服务 | NanoHTTPD + Vue3 |
 | 加密 | hutool 5.8.22（书源加解密） |
 
@@ -76,7 +76,7 @@ flowchart TB
 
     subgraph INFRA["基础设施层"]
         direction LR
-        D1["数据层<br/>Room v108<br/>21实体+21DAO+1视图"]
+        D1["数据层<br/>Room v108<br/>56实体+1视图+43DAO"]
         D2["网络层<br/>OkHttp+Cronet<br/>SSL+Cookie"]
         D3["服务层<br/>NanoHTTPD+TTS<br/>WebDAV+Service"]
     end
@@ -126,7 +126,7 @@ flowchart TB
 │  └── RhinoScriptEngine (JS执行 rhino 1.8.1)         │
 ├─────────────────────────────────────────────────────┤
 │ 基础设施层                                            │
-│  ├── 数据层 (Room 21实体+21DAO+1视图 v108)           │
+│  ├── 数据层 (Room 56实体+1视图+43DAO v108)            │
 │  ├── 网络层 (OkHttp + Cronet)                        │
 │  └── 服务层 (NanoHTTPD + WebDAV + TTS)               │
 └─────────────────────────────────────────────────────┘
@@ -200,46 +200,41 @@ UI 输入关键词
 
 ---
 
-## 模块文档索引
+## 架构阅读路线图
 
-### 架构文档
+> 本文档集与 [INDEX.md](../INDEX.md)（150+ 条目关键词索引）、[README.md](../README.md) 存在收录重叠，本表仅按**阅读顺序**组织导航；速查请直接用 [quick-reference.md](../quick-reference.md)。
 
-| 模块 | 文档 | 说明 |
-|------|------|------|
-| 🔴 **AI方法论** | [architecture/multi-agent-analysis-spec.md](architecture/multi-agent-analysis-spec.md) | **强制遵循**：五阶段流水线+单代理≤12文件+并行+交叉验证+导航同步 |
-| 规则引擎 | [architecture/rule-engine.md](architecture/rule-engine.md) | SourceRule状态机+五种解析+JS环境+WebJs模式+变量系统+ruleType常量 |
-| 前端架构 | [architecture/frontend.md](architecture/frontend.md) | Vue3 MPA架构+config/types等9模块+路由+组件树+技术栈 |
-| API数据流 | [architecture/api-dataflow.md](architecture/api-dataflow.md) | HTTP/WebSocket/Beacon完整链路+API对照表 |
-| 核心字段 | [database/entities.md](../database/entities.md) | BookSource/Book/SearchBook/BookChapter/5组规则字段详解 |
-| Android UI层 | [architecture/android-ui.md](architecture/android-ui.md) | MainActivity导航+ReadBookActivity三层继承+RSS UI完整覆盖+Activity体系+Fragment+Widget+Theme |
-| 网络层 | [architecture/network-layer.md](architecture/network-layer.md) | OkHttp拦截器链+SSL全信任+Cookie双层+Cronet加速+代理+AnalyzeUrl请求管线 |
-| App初始化 | [architecture/app-init.md](architecture/app-init.md) | 50步启动流程+常量系统+EventBus+异常体系+监控 |
-| Base类与MVVM | [architecture/base-layer.md](architecture/base-layer.md) | BaseActivity/VMBaseActivity/BaseViewModel/BaseService/RecyclerAdapter/Diff+动画 |
+### 主线路线（建议按序阅读）
 
-### 模块文档
+| 序 | 文档 | 一句话说明 |
+|----|------|-----------|
+| 1 | [architecture/rule-engine.md](architecture/rule-engine.md) | 规则引擎：SourceRule 状态机+五种解析+JS 环境（核心差异化，先读） |
+| 2 | [architecture/api-dataflow.md](architecture/api-dataflow.md) | HTTP/WebSocket/Beacon 完整链路+API 对照表 |
+| 3 | [../database/entities.md](../database/entities.md) | BookSource/Book/SearchBook 等核心实体字段详解 |
+| 4 | [architecture/android-ui-core.md](architecture/android-ui-core.md) | UI 四册之核心册：MainActivity 导航+Activity/Fragment 体系+N1 顶栏（姊妹册：pages/media-theme/changelog） |
+| 5 | [architecture/network-layer.md](architecture/network-layer.md) | OkHttp 拦截器链+SSL+Cookie+Cronet+AnalyzeUrl 请求管线 |
+| 6 | [architecture/app-init.md](architecture/app-init.md) | 50 步启动流程+常量系统+EventBus+异常体系 |
+| 7 | [architecture/base-layer.md](architecture/base-layer.md) | Base 类与 MVVM：Activity/ViewModel/Adapter |
+| 8 | [architecture/frontend.md](architecture/frontend.md) | Vue3 单入口 SPA（main.ts）：config/types 等 9 模块+路由+组件树 |
+| 9 | [architecture/multi-agent-analysis-spec.md](architecture/multi-agent-analysis-spec.md) | AI 方法论（强制遵循）：五阶段流水线+单代理≤12文件+交叉验证 |
 
-| 模块 | 文档 | 说明 |
-|------|------|------|
-| 搜索/网络书 | [modules/webbook-search.md](../modules/webbook-search.md) | WebBook双版本+并发搜索+四分类去重 |
-| 内容处理 | [modules/content-pipeline.md](../modules/content-pipeline.md) | ContentProcessor七步管线+替换规则引擎 |
-| 阅读引擎 | [modules/reading-engine.md](../modules/reading-engine.md) | ReadBook状态机+三章缓存+预下载+漫画+音频 |
-| 数据层 | [modules/data-layer.md](../modules/data-layer.md) | 21实体+21DAO+1视图+AutoMigration+位标志+TypeConverter |
-| Web服务 | [modules/web-service.md](../modules/web-service.md) | NanoHTTPD路由+14POST+12GET+4控制器+WebSocket+静态服务 |
-| 本地书籍 | [modules/local-book.md](../modules/local-book.md) | TXT编码检测+目录规则+EPUB+MOBI+PDF+UMD |
-| 配置系统 | [modules/config-system.md](../modules/config-system.md) | AppConfig/ReadBookConfig/ThemeConfig/SourceConfig/LocalConfig+字段类型修正(textBold Int/pageAnim Int/paragraphIndent String) |
-| Android Service | [modules/android-services.md](../modules/android-services.md) | 11个Service+WebSocketServer+CustomExporter+ExoPlayer+朗读状态机+音频焦点+WakeLock+通知 |
-| 备份恢复 | [modules/backup-restore.md](../modules/backup-restore.md) | 21数据源JSON导出+AES加密+WebDAV同步+Mutex并发 |
-| 远程书+第三方库 | [modules/remote-third-party.md](../modules/remote-third-party.md) | RemoteBook/WebDAV浏览+Glide/GSYVideo/ExoPlayer+更新系统 |
-| Model层单例 | [modules/model-layer.md](../modules/model-layer.md) | ReadAloud/VideoPlay/BookCover/CheckSource/Debug/RuleUpdate/SharedJsScope |
-| JS扩展函数 | [modules/js-extensions.md](../modules/js-extensions.md) | 30+ JS可调用方法：ajax/connect/webView/cache/file/encode/python |
-| 书源管理 | [modules/source-management.md](../modules/source-management.md) | 导入/导出/校验/调试/登录/18+过滤+排序全链路 |
-| RSS子系统 | [modules/rss-subsystem.md](../modules/rss-subsystem.md) | Rss调度+RssParserByRule规则解析+RssParserDefault标准解析+文章流UI |
-| 工具与辅助层 | [modules/tools-infrastructure.md](../modules/tools-infrastructure.md) | utils工具类+协程封装+加密+广播接收器 |
-| 自定义库层 | [modules/custom-libraries.md](../modules/custom-libraries.md) | MOBI解析引擎(KF6/KF8)+文件数量修正+语言映射+WebDAV客户端+主题引擎+阿里云TTS |
+### 模块文档（按需查阅）
 
-### 参考文档
-
-| 模块 | 文档 | 说明 |
-|------|------|------|
-| 快速参考 | [../quick-reference.md](../quick-reference.md) | 命令/文件/版本锁定速查 |
-| 全局索引 | [../INDEX.md](../INDEX.md) | 150+条目全局关键词索引 |
+| 文档 | 一句话说明 |
+|------|-----------|
+| [modules/webbook-search.md](../modules/webbook-search.md) | WebBook 双版本+并发搜索+四分类去重 |
+| [modules/content-pipeline.md](../modules/content-pipeline.md) | ContentProcessor 七步管线+替换规则引擎 |
+| [modules/reading-engine.md](../modules/reading-engine.md) | ReadBook 状态机+三章缓存+预下载+漫画+音频 |
+| [modules/data-layer.md](../modules/data-layer.md) | Room 实体/DAO/AutoMigration+位标志+TypeConverter |
+| [modules/web-service.md](../modules/web-service.md) | NanoHTTPD 路由+控制器+WebSocket+静态服务 |
+| [modules/local-book.md](../modules/local-book.md) | TXT 编码检测+目录规则+EPUB+MOBI+PDF+UMD |
+| [modules/config-system.md](../modules/config-system.md) | AppConfig/ReadBookConfig/ThemeConfig/SourceConfig 配置体系 |
+| [modules/android-services.md](../modules/android-services.md) | Service 层：朗读状态机+音频焦点+WebSocket+ExoPlayer+通知 |
+| [modules/backup-restore.md](../modules/backup-restore.md) | 备份 JSON 导出+AES 加密+WebDAV 同步 |
+| [modules/remote-third-party.md](../modules/remote-third-party.md) | 远程书/WebDAV 浏览+Glide/GSYVideo/ExoPlayer+更新系统 |
+| [modules/model-layer.md](../modules/model-layer.md) | Model 层单例：ReadAloud/VideoPlay/BookCover/CheckSource 等 |
+| [modules/js-extensions.md](../modules/js-extensions.md) | 30+ JS 可调用方法（ajax/file/encode 等） |
+| [modules/source-management.md](../modules/source-management.md) | 书源导入/导出/校验/调试/登录全链路 |
+| [modules/rss-subsystem.md](../modules/rss-subsystem.md) | RSS 调度+规则解析+文章流 UI |
+| [modules/tools-infrastructure.md](../modules/tools-infrastructure.md) | utils 工具类+协程封装+加密+广播接收器 |
+| [modules/custom-libraries.md](../modules/custom-libraries.md) | MOBI 解析引擎+WebDAV 客户端+主题引擎+阿里云 TTS |

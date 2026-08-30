@@ -36,7 +36,7 @@
 |------|----------|------|
 | 阅读核心(文字) | `model/ReadBook.kt` | L61, L534-596 |
 | 翻页/跳章 | `model/ReadBook.kt` | L304-419 |
-| 内容加载完成 | `model/ReadBook.kt` | L693-783 |
+| 翻页跳转/章节切换/内容加载状态 | `model/ReadBook.kt` | L693-789（skipToPage L693 / openChapter L726 / contentLoadFinish L789） |
 | 阅读界面 | `ui/book/read/ReadBookActivity.kt` | L151-166 |
 | 漫画阅读 | `model/ReadManga.kt` | L45, L154-240 |
 | 音频播放 | `model/AudioPlay.kt` | L38, L171-222 |
@@ -73,10 +73,10 @@
 
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
-| UI 层架构总览 | [architecture/android-ui.md](./architecture/android-ui.md) | - |
+| UI 层架构总览 | [architecture/android-ui-core.md](./architecture/android-ui-core.md)（四册体系，页面/媒体主题/统计分见 android-ui-pages/media-theme/changelog） | - |
 | UI 重构设计规范 | [specs/ui-redesign-m3/](../specs/ui-redesign-m3/) | - |
 | 阅读器浮层 Compose 化（S5） | [specs/reader-overlay-compose/](../specs/reader-overlay-compose/) | - |
-| 主界面/MainActivity | `ui/main/MainActivity.kt` | L70-503 |
+| 主界面/MainActivity | `ui/main/MainActivity.kt` | 核心逻辑 L2100-2490（底部导航配置 L2102 / ViewPager 适配器 L2484，全文 2548 行） |
 | 阅读界面 | `ui/book/read/ReadBookActivity.kt` | L151-166 |
 | 搜索界面 | `ui/book/search/SearchActivity.kt` | L66-70 |
 | 书源编辑界面 | `ui/book/source/edit/BookSourceEditActivity.kt` | - |
@@ -218,6 +218,16 @@
 | WebViewPool 对象池（三 scope 分层 GLOBAL/DISCOVERY/RSS；pauseTimers/resumeTimers 进程级 API 全局互斥判断） | help/webView/WebViewPool.kt | - |
 | WebJsExtensions JS桥接 | help/http/WebJsExtensions.kt | - |
 
+## 2026-08 新增模块
+
+| 模块 | 读取文件 | 一句话职责 |
+|------|----------|-----------|
+| 视频画质增强 | `help/exoplayer/ImageEnhanceEffects.kt` + `ui/video/ImageEnhanceController.kt` | ExoPlayer 视频画质增强效果引擎 + UI 开关控制器 |
+| 图片画布 | `ui/image/ImageCanvasViewModel.kt` | 图片画布交互的状态管理（ViewModel） |
+| 主界面顶栏 | `ui/widget/MainTopBarView.kt` | 主界面顶栏自定义 View（866 行），TOP_BAR_CHANGED 事件驱动重载（EventBus.kt L72） |
+| Exo 视频管理 | `help/gsyVideo/ExoVideoManager.kt` | GSY 播放器的 ExoPlayer 内核管理封装 |
+| RSS 双模式 | `ui/main/rss/RssFragment.kt` | RSS 页 modern/classic 双模式切换（AppConfig.modernRssPage，默认 modern） |
+
 ## HTTP请求/Cookie/WebView辅助
 
 | 步骤 | 读取文件 | 行号 |
@@ -246,7 +256,7 @@
 
 | 步骤 | 读取文件 | 行号 |
 |------|----------|------|
-| 源辅助与扩展架构 | [modules/source-extensions.md](./modules/source-extensions.md) | - |
+| 源辅助与扩展架构 | [modules/source-management.md](./modules/source-management.md)（§7/§11/§12 源扩展体系） | - |
 | SourceHelp 门面 | model/source/SourceHelp.kt | - |
 | BookSourceExtensions 扩展 | model/source/BookSourceExtensions.kt | - |
 | RssSourceExtensions 扩展 | model/source/RssSourceExtensions.kt | - |

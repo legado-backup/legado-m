@@ -523,68 +523,11 @@ object ALiYun {
 
 ---
 
-## 5. lib/prefs/ — SharedPreferences 封装
-
-提供类型安全的 SharedPreferences 读写：
-
-```kotlin
-// 通过 splitties 库的 appCtx + 类型安全委托
-val prefs = prefs(context)  // SharedPreferences
-prefs.edit { putInt(KEY, value) }
-prefs.getInt(KEY, default)
-```
-
-结合 `ThemeStore`、`AppConfig` 等配置系统使用。
-
----
-
-## 6. lib/permission/ — 动态权限
-
-[PermissionActivity.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/lib/permission/PermissionActivity.kt)
-
-透明 Activity，处理 Android 6+ 运行时权限申请：
-
-```
-启动 PermissionActivity
-  → requestPermissions(manifestPermission)
-  → onRequestPermissionsResult()
-      → 成功 → finish() + 回调
-      → 拒绝 → 引导设置页面
-```
-
----
-
-## 7. 各库与模块的依赖关系
-
-```
-App 启动初始化
-│
-├── lib/permission/ → 动态权限申请 (所有需要权限的模块)
-│
-├── lib/theme/ThemeStore
-│   ├── 初始化时读取 SharedPreferences
-│   ├── 应用到所有 Activity/Widget
-│   ├── BaseActivity → ThemeStore 监听回调
-│   └── TintHelper → 视图着色
-│
-├── lib/webdav/WebDav
-│   ├── Backup/Restore → 备份上传/下载
-│   ├── AppWebDav → WebDAV 同步服务
-│   └── RemoteBookWebDav → 远程书籍浏览
-│
-├── lib/mobi/MobiReader
-│   └── model/localBook/MobiFile → LocalBook 导入入口
-│
-└── lib/prefs/ → ThemeStore / AppConfig 底层存储
-```
-
----
-
-## 7. lib/cronet/ — Chromium Cronet 网络引擎封装
+## 5. lib/cronet/ — Chromium Cronet 网络引擎封装
 
 > **8个Kotlin文件，封装 Chromium Cronet 网络引擎，提供 OkHttp 兼容的拦截器，支持 QUIC/HTTP2/Brotli，动态下载 .so 库，证书信任绕过。**
 
-### 7.1 文件清单
+### 5.1 文件清单
 
 | 文件 | 职责 |
 |------|------|
@@ -595,7 +538,7 @@ App 启动初始化
 | `CallbackResult.kt` | 回调步骤值容器（data class） |
 | `NewCallBack.kt` | API≥N 的 AbsCallBack 实现（基于 CompletableFuture） |
 
-### 7.2 架构
+### 5.2 架构
 
 ```mermaid
 classDiagram
@@ -625,7 +568,7 @@ classDiagram
     AbsCallBack <|-- NewCallBack
 ```
 
-### 7.3 核心流程
+### 5.3 核心流程
 
 ```
 OkHttp Chain
@@ -640,7 +583,7 @@ OkHttp Chain
     → Cronet 失败 → 降级 chain.proceed() (仅 ERR_CERT_*/ERR_SSL_* 静默)
 ```
 
-### 7.4 CronetLoader — 动态 .so 加载
+### 5.4 CronetLoader — 动态 .so 加载
 
 [CronetLoader.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/lib/cronet/CronetLoader.kt)
 
@@ -651,11 +594,11 @@ MD5: assets/cronet.json 按 CPU ABI 读取
 CPU ABI: 反射 ApplicationInfo.primaryCpuAbi, 失败回退 Build.SUPPORTED_ABIS[0]
 ```
 
-### 7.5 证书信任绕过
+### 5.5 证书信任绕过
 
 `disableCertificateVerify()`: 通过反射替换 `X509Util.sDefaultTrustManager/sTestTrustManager` 为 `SSLHelper.unsafeTrustManagerExtensions`，实现全站证书信任。
 
-### 7.6 与其他模块的依赖
+### 5.6 与其他模块的依赖
 
 ```
 CronetInterceptor
@@ -667,11 +610,11 @@ CronetInterceptor
 
 ---
 
-## 8. lib/permission/ — 运行时权限管理
+## 6. lib/permission/ — 运行时权限管理
 
 > **3个核心文件 + 7个辅助文件，串行化权限请求队列，支持6种请求类型，Activity Result API。**
 
-### 8.1 文件清单
+### 6.1 文件清单
 
 | 文件 | 职责 |
 |------|------|
@@ -679,7 +622,7 @@ CronetInterceptor
 | `Permissions.kt` | 权限常量定义 + 分组（object） |
 | `PermissionActivity.kt` | 透明 Activity，处理6种权限请求 UI |
 
-### 8.2 RequestManager — 串行化队列
+### 6.2 RequestManager — 串行化队列
 
 ```kotlin
 object RequestManager : OnPermissionsResultCallback {
@@ -689,7 +632,7 @@ object RequestManager : OnPermissionsResultCallback {
 }
 ```
 
-### 8.3 6种请求类型
+### 6.3 6种请求类型
 
 | 类型 | 说明 |
 |------|------|
@@ -700,7 +643,7 @@ object RequestManager : OnPermissionsResultCallback {
 | TYPE_BATTERY_OPTIMIZATION | 电池优化白名单 |
 | TYPE_SYSTEM_ALERT_WINDOW | 悬浮窗权限 |
 
-### 8.4 Permissions — 权限常量
+### 6.4 Permissions — 权限常量
 
 ```kotlin
 object Permissions {
@@ -716,7 +659,7 @@ object Permissions {
 }
 ```
 
-### 8.5 PermissionActivity — 透明 Activity
+### 6.5 PermissionActivity — 透明 Activity
 
 - 拒绝计数持久化到 `SharedPreferences("permission_deny_count")`
 - 拒绝>5次自动跳过
@@ -726,11 +669,11 @@ object Permissions {
 
 ---
 
-## 9. lib/dialogs/ — 对话框 DSL 封装
+## 7. lib/dialogs/ — 对话框 DSL 封装
 
 > **3个文件，提供 Kotlin DSL 风格的对话框 API，支持墨水屏模式适配。**
 
-### 9.1 文件清单
+### 7.1 文件清单
 
 | 文件 | 职责 |
 |------|------|
@@ -738,7 +681,7 @@ object Permissions {
 | `AndroidAlertBuilder.kt` | Android 原生实现（委托 AlertDialog.Builder） |
 | `AndroidDialogs.kt` | Context/Fragment 扩展函数（alert/progressDialog） |
 
-### 9.2 AlertBuilder 接口
+### 7.2 AlertBuilder 接口
 
 ```kotlin
 interface AlertBuilder<D> {
@@ -754,13 +697,13 @@ interface AlertBuilder<D> {
 }
 ```
 
-### 9.3 墨水屏适配
+### 7.3 墨水屏适配
 
 `AndroidAlertBuilder.show()`:
 - `AppConfig.isEInkMode` 时: 禁用暗化(dimAmount=0f)、禁用窗口动画、使用 `bg_eink_border_dialog` 背景
 - 正常模式: 调用 `applyTint()` 为对话框着色
 
-### 9.4 顶层扩展函数
+### 7.4 顶层扩展函数
 
 ```kotlin
 // Context 扩展
@@ -775,11 +718,11 @@ fragment.progressDialog(...)
 
 ---
 
-## 10. lib/prefs/ — 偏好设置控件
+## 8. lib/prefs/ — 偏好设置控件与偏好存储
 
-> **12个文件，自定义 Preference 控件体系，支持颜色选择/滑块/长按/底部栏着色。**
+> **12个文件，自定义 Preference 控件体系，支持颜色选择/滑块/长按/底部栏着色。底层 SharedPreferences 读写封装（splitties appCtx + 类型安全委托 prefs(context)）供 ThemeStore / AppConfig 等配置系统使用。**
 
-### 10.1 文件清单
+### 8.1 文件清单
 
 | 文件 | 职责 |
 |------|------|
@@ -792,7 +735,7 @@ fragment.progressDialog(...)
 | `MultiSelectListPreferenceDialog.kt` | 自定义多选对话框 |
 | `ColorPickerDialog*.kt` | 颜色选择器对话框（预设色/自定义/Alpha/色相深浅） |
 
-### 10.2 Preference 基类
+### 8.2 Preference 基类
 
 ```kotlin
 open class Preference(context, attrs) : androidx.preference.Preference(context, attrs) {
@@ -805,7 +748,7 @@ open class Preference(context, attrs) : androidx.preference.Preference(context, 
 }
 ```
 
-### 10.3 ColorPreference — 颜色选择
+### 8.3 ColorPreference — 颜色选择
 
 ```kotlin
 class ColorPreference : Preference, ColorPickerDialogListener {
@@ -820,7 +763,7 @@ class ColorPreference : Preference, ColorPickerDialogListener {
 
 选择器功能：预设色网格 + 自定义色 HSV + Alpha 滑块 + 色相深浅条
 
-### 10.4 SeekBarPreference — 滑块
+### 8.4 SeekBarPreference — 滑块
 
 ```kotlin
 class SeekBarPreference : Preference {
@@ -831,7 +774,7 @@ class SeekBarPreference : Preference {
 }
 ```
 
-### 10.5 PreferenceFragment — 对话框替换
+### 8.5 PreferenceFragment — 对话框替换
 
 ```kotlin
 abstract class PreferenceFragment : PreferenceFragmentCompat() {
@@ -846,7 +789,7 @@ abstract class PreferenceFragment : PreferenceFragmentCompat() {
 
 ---
 
-## 11. 各库完整依赖关系（更新版）
+## 9. 各库完整依赖关系
 
 ```
 App 启动初始化

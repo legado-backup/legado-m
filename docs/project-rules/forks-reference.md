@@ -49,8 +49,11 @@
 
 | 优化领域 | 优先对比版本 | 原因 |
 |----------|------------|------|
-| **网络层** | 蛋蛋Max > 阅读T > 阅读NG | 蛋蛋Max 有 307/308 重定向；阅读T 有 SOCKS5 隧道+Brotli；阅读NG 有网络日志 |
-| **协程/多线程** | 蛋蛋Max > 阅读NG > 阅读Archive | 蛋蛋Max 修复了 CancellationException 反模式 |
+| **网络层** | 蛋蛋Max > 阅读T > 阅读Archive | 蛋蛋Max 有 307/308 重定向；阅读T 有 SOCKS5 隧道+Brotli；⚠️ 阅读NG 网络层经 2026-08-30 逐文件 diff 实测为本项目超集（本项目有熔断降级/DoH/Brotli 等），不再列为网络层对比对象 |
+| **AI 能力** | 阅读NG（唯一） | 全 fork 生态唯一具备完整 AI 体系（供应商抽象/MCP 服务端/上下文压缩/技能包），已完成深度对标与迁移设计（specs/ng-benchmark-analysis/） |
+| **听书/TTS** | 阅读NG（唯一） | 唯一具备多角色 AI 演播（五级路由+分镜），本项目单音色 |
+| **书源安全** | 阅读NG（唯一） | 唯一成体系的书源安全沙箱（文件命名空间/Cookie 隔离/类策略/弹窗拦截 8 项） |
+| **协程/多线程** | 蛋蛋Max > 阅读Archive | 蛋蛋Max 修复了 CancellationException 反模式（阅读NG 该项与本项目同为超集关系，无增量） |
 | **WebView** | 阅读Archive > 蛋蛋Max > 阅读NG | 阅读Archive 有 closed 标志 + isActiveWebView 修复范式 |
 | **前端** | 蛋蛋Max > MD3阅读 | 仅蛋蛋Max 有前端实质增量（备份功能） |
 | **数据管理** | 蛋蛋Max > 阅读Archive | 蛋蛋Max 有 Web 端备份功能 |

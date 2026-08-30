@@ -138,7 +138,7 @@ CaseParser `_classify_expect` 将预期文本映射到 8 种预期类型。**按
   - 示例：`TC-F-P0-1-auto-001` → `auto_tc_f_p0_1_auto_001.py`
 - TC-ID 编号：`TC-{module}-auto-{NNN}`（大写连字符）
 - 文件头部：`# @tc_id: {tc_id}` 注释（M3 兜底识别）
-- 生成方式：`python ai_tests/scripts/run_e2e.py --gen-test {Activity名}`
+- 生成方式：`python ai_tests/run_e2e.py --gen-test {Activity名}`
 - 生成器：M9 source_test_generator（读取 Activity 源码 → 生成骨架含 TODO 标记）
 
 ### 4.3 双轨调度规则

@@ -1,4 +1,4 @@
-# 文档索引
+﻿﻿# 文档索引
 
 > 项目所有文档的统一入口，覆盖项目规范、项目流程、功能设计、核心 Skill 五类文档。最后更新：2026-08-30（文档规整重建，历史 spec 已归档至 docs/specs/archive/）。
 
@@ -17,7 +17,7 @@
 | 架构模式 | [architecture_rules.md](./project-rules/architecture_rules.md) | 手动 DI+ViewModel 模式+Room 配置+Web 服务+事件系统+模块依赖+构建配置 |
 | 测试规范 | [testing_rules.md](./project-rules/testing_rules.md) | JUnit4+书源自测三阶段+测试运行命令 |
 | 工作流程 | [openspec-workflow.md](./project-rules/openspec-workflow.md) | OpenSpec 四文档+强制检查点+文档同步映射表+子代理使用指引+上下文预算检查 |
-| 延伸版本对比方法论 | [forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 27+延伸版本清单+五阶段对比流程+优先级矩阵+踩坑案例 |
+| 延伸版本对比方法论 | [forks_comparison_methodology.md](./project-rules/forks_comparison_methodology.md) | 对比方法论：五阶段流程+决策矩阵+踩坑（延伸版本数据以 forks-reference.md 为唯一权威源） |
 | E2E 测试流程 | [ai_e2e_testing_workflow.md](./project-rules/ai_e2e_testing_workflow.md) | 5.5.1-5.5.8 八步强制流程+固化层保护+V3.1 快速验证脚本 |
 | 测试用例设计 | [test-case-design-guide.md](./project-rules/test-case-design-guide.md) | 双轨制+源码溯源字段+步骤语义化 |
 | 改造过程日志 | [logging-during-refactoring.md](./project-rules/logging-during-refactoring.md) | 10 类必加日志场景+永久/临时双轨+Tag 规范+验证检查清单 |
@@ -29,7 +29,7 @@
 | 数据库升级安全规范 | [database-migration-safety.md](./project-rules/database-migration-safety.md) | DatabaseView 修改 DROP+CREATE+migration runCatching+version 递增+覆盖安装兼容性 |
 | 真机测试流程复用 | [real-device-test-reuse.md](./project-rules/real-device-test-reuse.md) | 可用脚本清单+测试流程模板+问题闭环+数据库验证（WAL 模式校验必须触发真实路径） |
 | 包名规范 | [package-naming.md](./project-rules/package-naming.md) | 构建 APK 包名配置+与原版共存 |
-| 延伸版本参考 | [forks-reference.md](./project-rules/forks-reference.md) | 网络层/前端/协程/WebView/数据管理组件优化或功能借鉴任务的方法论 |
+| 延伸版本参考 | [forks-reference.md](./project-rules/forks-reference.md) | 延伸版本清单+活跃度快照+优先级矩阵（唯一权威数据源） |
 | 前端 UI 规范 | [frontend-ui-standards.md](./project-rules/frontend-ui-standards.md) | archive 迁移后前端统一基线：设计 Token（AppShapes/UiCorner）+页面骨架分型+组件六族选用+View/Compose 混用红线+改造检查清单+已知坑 |
 | Git 提交工作流 | [git-commit-workflow.md](./project-rules/git-commit-workflow.md) | Git 提交工作流 |
 | APK 发布工作流 | [apk-publish-workflow.md](./project-rules/apk-publish-workflow.md) | APK 正式发布流程 |
@@ -62,13 +62,15 @@
 | [architecture/skill-architecture.md](./project-flow/architecture/skill-architecture.md) | Skill 架构：金字塔架构+5 阶段工作流+JVM 仿真器+basic-memory 经验引擎+固化脚本+审计器 |
 | [architecture/multi-agent-analysis-spec.md](./project-flow/architecture/multi-agent-analysis-spec.md) | 大规模并行子代理分析验证修复方法论：五阶段流水线+单代理≤12 文件+并行+交叉验证+导航同步 |
 | [architecture/overview.md](./project-flow/architecture/overview.md) | 架构全景图 |
-| [architecture/android-ui.md](./project-flow/architecture/android-ui.md) | Android UI 层架构：MainActivity 导航+ReadBookActivity 三层继承+RSS UI+Activity 体系+Fragment+Widget+Theme |
+| [architecture/android-ui-core.md](./project-flow/architecture/android-ui-core.md) | Android UI 核心框架册：MainActivity 主框架+Activity/Fragment 体系+Base 基类+导航链路+启动引导+N1 顶栏体系+N2 Compose 现状 |
+| [architecture/android-ui-pages.md](./project-flow/architecture/android-ui-pages.md) | Android UI 页面详解册：页面布局与交互流程+书源调试+搜索范围+发现页+关联导入+辅助工具+N3 订阅双模式+N4 发现页缓存加固 |
+| [architecture/android-ui-media-theme.md](./project-flow/architecture/android-ui-media-theme.md) | Android UI 阅读媒体与主题册：阅读界面+排版引擎+漫画+音频+Widget+主题+布局资源+横屏+N5 EPUB 与高亮+N6 画质增强 |
+| [architecture/android-ui-changelog.md](./project-flow/architecture/android-ui-changelog.md) | Android UI 统计与变更记录册：UI 层源码统计+时敏优化记录 |
 | [architecture/api-dataflow.md](./project-flow/architecture/api-dataflow.md) | 接口数据流—前后端交互全链路：HTTP/WebSocket/Beacon 完整链路+API 对照表 |
 | [architecture/app-init.md](./project-flow/architecture/app-init.md) | App 入口与初始化流程：50 步启动流程+常量系统+EventBus+异常体系+监控 |
 | [architecture/base-layer.md](./project-flow/architecture/base-layer.md) | Base 类与 MVVM 体系：BaseActivity/VMBaseActivity/BaseViewModel/BaseService/RecyclerAdapter/Diff+动画 |
 | [architecture/frontend.md](./project-flow/architecture/frontend.md) | 前端架构—Vue3 Web 管理界面：MPA 架构+config/types 工具+模块+路由+组件+技术栈 |
-| [architecture/frontend-components.md](./project-flow/architecture/frontend-components.md) | Vue3 Web 重构方案—组件与页面：路由设计+页面组件+通用组件 |
-| [architecture/frontend-stores.md](./project-flow/architecture/frontend-stores.md) | Vue3 Web 重构方案—Store 与 API 层：TypeScript 类型定义+Pinia Store+API 调用层 |
+| [architecture/frontend-refactor-plan.md](./project-flow/architecture/frontend-refactor-plan.md) | Vue3 Web 重构方案（⚠️未实施存档）：路由+组件树+阅读器核心+移动端适配+TypeScript 类型+Pinia Store（落地 3/5）+API 调用层 |
 | [architecture/network-layer.md](./project-flow/architecture/network-layer.md) | 网络层架构：OkHttp 拦截器链+SSL 全信任+Cookie 双层+Cronet 加速+代理 |
 | [architecture/build-configuration.md](./project-flow/architecture/build-configuration.md) | Legado 构建配置与依赖体系 |
 | [architecture/ci-cd-pipeline.md](./project-flow/architecture/ci-cd-pipeline.md) | CI/CD 流程文档 |
@@ -85,8 +87,10 @@
 | [modules/reading-engine.md](./project-flow/modules/reading-engine.md) | 阅读引擎模块：ReadBook 状态机+三章缓存+预下载+翻页跳章+漫画+音频 |
 | [modules/reading-engine-pagination.md](./project-flow/modules/reading-engine-pagination.md) | 阅读引擎分页算法详解：durChapterPos 字符偏移分页机制+TextChapter 数据结构+页面计算算法+6 种翻页动画 |
 | [modules/reading-engine-media.md](./project-flow/modules/reading-engine-media.md) | 多媒体阅读（漫画+音频）：ReadManga 漫画阅读+AudioPlay 音频播放+BookType 位标记 |
-| [modules/data-layer.md](./project-flow/modules/data-layer.md) | 数据层模块：21 实体+21DAO+1 视图+BookChapter 复合主键+AutoMigration+位标记+TypeConverter |
-| [modules/web-service.md](./project-flow/modules/web-service.md) | Web 服务与 API 模块：NanoHTTPD 路由+14POST+12GET+4 控制+WebSocket+静态服务 |
+| [modules/data-layer.md](./project-flow/modules/data-layer.md) | 数据层模块：56 实体+43 DAO+1 视图 BookSourcePart+BookChapter 复合主键+AutoMigration+位标记+TypeConverter（v90-v108 新增 35 实体见 entities-extensions.md） |
+| [modules/web-service.md](./project-flow/modules/web-service.md) | Web 服务索引页（详情分见 web-service-api.md REST/端点/WebSocket 与 web-service-lifecycle.md 生命周期/传书） |
+| [modules/web-service-api.md](./project-flow/modules/web-service-api.md) | Web 服务 REST API 规范：HttpServer 路由+端点详解+ReturnData+WebSocket+Beacon+静态服务+Vue3 前端对照 |
+| [modules/web-service-lifecycle.md](./project-flow/modules/web-service-lifecycle.md) | Web 服务生命周期：WebService 服务+ReaderProvider+快捷方式+WiFi 传书+帮助系统+安全模型 |
 | [modules/local-book.md](./project-flow/modules/local-book.md) | 本地书籍解析模块：TXT 编码检测+目录规则自动匹配+EPUB 懒加载+PDF/MOBI |
 | [modules/service-layer.md](./project-flow/modules/service-layer.md) | 服务层与辅助模块：WebDAV 同步+下载缓存+TTS 朗读+RSS 子系统+JS 扩展函数 |
 | [modules/config-system.md](./project-flow/modules/config-system.md) | 配置系统：AppConfig/ReadBookConfig/ThemeConfig/SourceConfig/LocalConfig |
@@ -102,16 +106,16 @@
 | [modules/association-import.md](./project-flow/modules/association-import.md) | 关联导入体系 |
 | [modules/constant-system.md](./project-flow/modules/constant-system.md) | 常量系统 |
 | [modules/exception-system.md](./project-flow/modules/exception-system.md) | 异常体系 |
-| [modules/glide-video-webview.md](./project-flow/modules/glide-video-webview.md) | Glide 图片加载·视频播放·WebView 池化 |
+| [modules/glide-video-webview.md](./project-flow/modules/glide-video-webview.md) | Glide·视频·WebView 索引页（详情分见 glide.md/video.md/webview-pool.md） |
+| [modules/glide.md](./project-flow/modules/glide.md) | Glide 图片加载模块：ModelLoader+Fetcher 体系+OkHttpStreamFetcher+注册中心+模糊变换+异步回收 |
+| [modules/video.md](./project-flow/modules/video.md) | 视频播放模块：四层架构+VideoPlayer/FloatingPlayer+弹幕+ExoPlayer 引擎层+画质增强+手势体系 |
+| [modules/webview-pool.md](./project-flow/modules/webview-pool.md) | WebView 池化模块：WebViewPool 对象池+PooledWebView 动态 Context+WebJsExtensions JS 桥接 |
 | [modules/help-layer.md](./project-flow/modules/help-layer.md) | Help 辅助层 |
 | [modules/http-helper-layer.md](./project-flow/modules/http-helper-layer.md) | HTTP 辅助层 |
-| [modules/receiver-system.md](./project-flow/modules/receiver-system.md) | 广播接收器体系 |
 | [modules/rhino-module.md](./project-flow/modules/rhino-module.md) | Rhino 模块深度分析 |
-| [modules/source-extensions.md](./project-flow/modules/source-extensions.md) | 源辅助与扩展 |
 | [modules/ui-core-pages.md](./project-flow/modules/ui-core-pages.md) | 核心 UI 页面深度分析 |
 | [modules/ui-secondary-pages.md](./project-flow/modules/ui-secondary-pages.md) | 次要 UI 页面架构文档 |
 | [modules/update-system.md](./project-flow/modules/update-system.md) | 应用更新系统 |
-| [modules/utils-extensions.md](./project-flow/modules/utils-extensions.md) | 工具与扩展函数体系 |
 | [modules/widget-system.md](./project-flow/modules/widget-system.md) | 自定义控件体系 |
 
 ### 数据库文档（project-flow/database/）
@@ -120,7 +124,22 @@
 |------|----------|
 | [database/overview.md](./project-flow/database/overview.md) | 数据库概览（架构总览） |
 | [database/entities.md](./project-flow/database/entities.md) | 核心实体字段详解 |
-| [database/tables.md](./project-flow/database/tables.md) | 数据库全部表 DDL+索引（版本以 AppDatabase.kt 为准，当前 v108） |
+| [database/tables.md](./project-flow/database/tables.md) | 核心 21 表 DDL+新增表速览+索引（版本以 AppDatabase.kt 为准，当前 v108） |
+| [database/entities-extensions.md](./project-flow/database/entities-extensions.md) | 扩展实体清单（v90-v108 新增 35 实体）：AI 能力/朗读 BGM/阅读增强/系统管理四组 |
+
+### Python 重构参考（project-flow/python-ref/）
+
+> Python 重构参考外迁区：从 Kotlin 源码提取的跨语言移植参考件，权威业务文档仍在 modules/ 与 architecture/。
+
+| 文档 | 核心内容 |
+|------|----------|
+| [python-ref/README.md](./project-flow/python-ref/README.md) | 目录用途+6 件清单+权威源声明 |
+| [python-ref/reading-engine.md](./project-flow/python-ref/reading-engine.md) | 阅读引擎 Python 参考：ReadBook 状态+三章缓存+翻页跳章+预下载 |
+| [python-ref/web-service.md](./project-flow/python-ref/web-service.md) | Web 服务 Python 参考：REST API+数据模型+响应辅助 |
+| [python-ref/local-book.md](./project-flow/python-ref/local-book.md) | 本地书籍解析 Python 参考：TXT 编码+EPUB |
+| [python-ref/service-layer.md](./project-flow/python-ref/service-layer.md) | 服务层 Python 参考：WebDAV+TTS+RSS |
+| [python-ref/webbook-search.md](./project-flow/python-ref/webbook-search.md) | WebBook 搜索 Python 参考：并发调度+四分类聚合 |
+| [python-ref/config-system.md](./project-flow/python-ref/config-system.md) | 配置系统 Python 参考：AppConfig+ReadBookConfig+SSE 推送适配 |
 
 ### UI 设计标准（project-flow/ui-standards/）
 
@@ -182,10 +201,12 @@
 | [memory-mechanism-redesign](./specs/memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
 | [multiline-on-demand-extraction](./specs/multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
 | [my-topbar-unify](./specs/my-topbar-unify/README.md) | 🔄 | 「我的」页头部迁移 MainTopBarView（与书架/订阅/发现观感统一） |
+| [ng-benchmark-analysis](./specs/ng-benchmark-analysis/README.md) | ✅ | 阅读NG（legado_NG）深度对标调研+迁移设计前置（8 维全景+决策表 15 项+五份函数级分期设计 P0-P5，设计验收通过，P0 先行，实施另立 spec） |
 | [network-perf-stability](./specs/network-perf-stability/README.md) | 🔄 | 网络性能与稳定性深度优化（OkHttp/Cronet/协程/缓存/图片解密） |
 | [p0-bugfix-round1](./specs/p0-bugfix-round1/README.md) | ✅ | P0 核心 Bug 修复第一轮（2026-07-08 改动发现的 4 项） |
 | [player-mature-solutions-alignment](./specs/player-mature-solutions-alignment/README.md) | 🔄 | 播放器成熟方案对齐（可观测性+视频/图片核心能力+网络韧性，5 Phase） |
 | [player-review-and-optimization](./specs/player-review-and-optimization/README.md) | ✅ | 视频/图片播放器审查与优化整合（8 份审查报告 108 项+12 个 ADR） |
+| [read-menu-highlight-entry-restore](./specs/read-menu-highlight-entry-restore/README.md) | ✅ | 阅读页三个点菜单补回漏挂动作项 6 项+修正段落规则 EPUB 误显示（Compose 迁移漏译修复） |
 | [reader-overlay-compose](./specs/reader-overlay-compose/README.md) | 🔄 | 阅读器浮层 Compose 化（S5 骨架：菜单层+浮层壳核分离，正文零改动） |
 | [rss-classic-layout-align](./specs/rss-classic-layout-align/README.md) | ✅ | 经典订阅布局管理与书架对齐修复（margin/排序/书名/弹框等 7 项实锤） |
 | [rss-folder-cover-dialog-align](./specs/rss-folder-cover-dialog-align/README.md) | ✅ | 订阅文件夹封面弹框对齐书架（标准弹框+预览+恢复默认） |

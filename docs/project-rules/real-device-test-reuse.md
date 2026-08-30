@@ -117,7 +117,7 @@ cursor.execute("SELECT count(*), min(weight), max(weight) FROM book_sources")
 
 测试前必读：[ai_tests/docs/fixed_test_workflow.md](../../ai_tests/docs/fixed_test_workflow.md)
 
-全量测试用例：`python ai_tests/scripts/run_e2e.py --tc all`
+全量测试用例：`python ai_tests/run_e2e.py --tc all`
 
 快速 L2 验证：用 `scripts/` 下脚本
 

@@ -1,5 +1,7 @@
 # 数据库概览
 
+> **文档分工**：本文为数据库总览（计数 / 设计原则 / ER 图 / 迁移策略）；实体字段详解见 [entities.md](entities.md)（核心 21 实体）与 [entities-extensions.md](entities-extensions.md)（v90-v108 新增 35 实体）；表结构 DDL 见 [tables.md](tables.md)（核心 21 表 + 新增表速览）。全量 DDL 权威源为 `app/schemas/io.legado.app.data.AppDatabase/108.json`。
+
 ## 基本信息
 
 | 项目 | 值 |
@@ -8,10 +10,11 @@
 | 数据库引擎 | SQLite |
 | ORM | Room (AndroidX) |
 | 当前版本 | 108（以 AppDatabase.kt version 字段为准） |
-| 实体表数量 | 21 |
-| 视图数量 | 1 |
+| 实体表数量 | 56（核心 21 + 扩展期新增 35） |
+| 视图数量 | 1（book_sources_part，实体类 BookSourcePart） |
+| DAO 数量 | 43（AppDatabase.kt 中声明的 abstract dao 方法数） |
 | Schema 目录 | app/schemas/io.legado.app.data.AppDatabase/ |
-| 迁移方式 | AutoMigration (v43+) + 手动迁移 |
+| 迁移方式 | AutoMigration（v43-v89，共 46 步，其中 5 步带 spec）+ 手动 Migration（v10-v43、v89-v108，见 DatabaseMigrations.kt） |
 
 ## 设计原则
 
@@ -225,7 +228,9 @@ SELECT * FROM books WHERE books.group = 0;
 
 ---
 
-## 完整表清单
+## 完整表清单（核心 21 表）
+
+> 下表为**核心 21 张表**（2026-08 前既有）。v90-v108 扩展期新增的 **35 张表**清单见 [entities-extensions.md](entities-extensions.md)；全量 56 表 DDL 以 `app/schemas/io.legado.app.data.AppDatabase/108.json` 为准。
 
 | 表名 | 实体类 | 主键 | 说明 |
 |------|--------|------|------|
@@ -302,6 +307,8 @@ FROM book_sources;
 
 ## DAO 列表
 
+> AppDatabase.kt 中共声明 **43 个 DAO**。下表仅列核心 21 个（与核心 21 实体对应），其余 22 个（AiMemoryDao、AiAgentDao、BookHighlightDao、PlayHistoryDao、SourceRecycleBinDao、DownloadTaskDao、AutoTaskRuleDao、ParagraphRuleDao、CoverGalleryDao 等）见 `app/src/main/java/io/legado/app/data/dao/` 目录。
+
 | DAO | 核心方法 |
 |------|----------|
 | BookDao | observeAll(Flow), getBook, insert(REPLACE), delete, update, search |
@@ -332,21 +339,28 @@ FROM book_sources;
 
 ### Room 数据库迁移
 
-Legado 使用 Room 的 `Migration` 机制进行数据库版本升级。每次数据库结构变更（增/删/改表或字段）时：
+Legado 使用 Room 的 `Migration` 机制进行数据库版本升级（**Room Migration，非 Alembic**）。每次数据库结构变更（增/删/改表或字段）时：
 
 1. **递增版本号**：在 `AppDatabase.kt` 中更新 `version` 值
-2. **编写 Migration**：每个版本迁移对应一个 `Migration(startVersion, endVersion)` 对象
-3. **添加迁移到列表**：将新的 Migration 添加到 `databaseBuilder.addMigrations()` 的参数中
+2. **编写迁移**：`autoMigrations` 声明 AutoMigration，或手动迁移在 `DatabaseMigrations.kt` 中新增 `private val migration_x_y = object : Migration(x, y)`
+3. **注册迁移**：手动迁移追加到 `DatabaseMigrations.migrations` 数组（`addMigrations(*DatabaseMigrations.migrations)`）
 
-### AutoMigration (v43 起)
+**当前迁移链全貌（v10 → v108）**：
 
-绝大多数迁移使用 AutoMigration，只需声明 from/to：
+| 阶段 | 版本范围 | 方式 | 位置 |
+|------|---------|------|------|
+| 手动迁移 | v10 → v43（32 步） | `Migration` 对象 | DatabaseMigrations.kt |
+| AutoMigration | v43 → v89（46 步，5 步带 spec） | `@Database(autoMigrations = [...])` | AppDatabase.kt |
+| 手动迁移 | v89 → v108（19 步） | `Migration` 对象 | DatabaseMigrations.kt |
+
+> v89 起改回手动迁移的原因：新增表需要 `runCatching` 包裹 + `AppLog` 日志容错（如 migration_105_106 一次建 19 张表、migration_107_108 重建 download_tasks 清除僵尸列）。v105→v108 迁移链（migration_105_106 / 106_107 / 107_108）均已存在于 DatabaseMigrations.kt。
+
+### AutoMigration（v43-v89，共 46 步）
 
 ```kotlin
 autoMigrations = [
     AutoMigration(from = 43, to = 44),
-    AutoMigration(from = 44, to = 45),
-    // ... 共 46 个
+    // ... 中间各步见 AppDatabase.kt L148-194
     AutoMigration(from = 88, to = 89)
 ]
 ```
@@ -365,37 +379,39 @@ autoMigrations = [
 
 ### Schema JSON 导出
 
-每次构建时 Room 将当前数据库 Schema 导出到 `app/schemas/io.legado.app.data.AppDatabase/` 目录，文件名为 `{version}.json`。当前最新版本为 **89**。
+每次构建时 Room 将当前数据库 Schema 导出到 `app/schemas/io.legado.app.data.AppDatabase/` 目录，文件名为 `{version}.json`。当前最新版本为 **108**（108.json 含 56 张表定义）。
 
 Schema JSON 文件记录了每个版本的完整表结构，用于：
 - 编写迁移脚本时参考旧版本结构
 - 对比验证迁移后的数据库结构是否正确
 - 自动生成迁移测试
 
-### 常见迁移模式
+### 常见迁移模式（项目实际写法）
 
 ```kotlin
-// 例：新增字段（兼容旧数据）
-val MIGRATION_XX_YY = object : Migration(xx, yy) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        database.execSQL("ALTER TABLE books ADD COLUMN new_column INTEGER NOT NULL DEFAULT 0")
+// DatabaseMigrations.kt 中的实际写法：新增表（兼容旧数据，runCatching 容错）
+private val migration_101_102 = object : Migration(101, 102) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        kotlin.runCatching {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS source_recycle_bin(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    type TEXT NOT NULL DEFAULT '',
+                    /* ... */
+                )"""
+            )
+            AppLog.put("AppDatabase Migration 101→102: source_recycle_bin 表创建成功")
+        }.onFailure { e ->
+            AppLog.put("AppDatabase Migration 101→102: 表创建失败: ${e.message}")
+        }
     }
 }
 
-// 例：新增表
-val MIGRATION_XX_YY = object : Migration(xx, yy) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        database.execSQL("""
-            CREATE TABLE IF NOT EXISTS new_table (
-                id INTEGER PRIMARY KEY NOT NULL,
-                name TEXT NOT NULL
-            )
-        """.trimIndent())
-    }
-}
+// 新增字段
+db.execSQL("ALTER TABLE books ADD COLUMN new_column INTEGER NOT NULL DEFAULT 0")
 ```
 
-> **注意**：SQLite 的 `ALTER TABLE` 仅支持 `ADD COLUMN` 和 `RENAME TO`。复杂变更（如修改列类型）需要新建表 + 数据迁移 + 删除旧表的三步操作。
+> **注意**：SQLite 的 `ALTER TABLE` 仅支持 `ADD COLUMN` 和 `RENAME TO`。复杂变更（如修改列类型、删除列）需要新建表 + 数据迁移 + 删除旧表的三步操作。
 
 ### 破坏性变更流程
 
@@ -442,16 +458,23 @@ class Book(Base):
     # ... 其他字段参考 tables.md
 ```
 
-### 迁移策略（Alembic）
+### 迁移策略（Room Migration）
 
-```python
-# alembic/env.py
-from alembic import context
-from sqlalchemy import engine_from_config
+> 本项目为 Android Room 数据库，迁移机制为 **Room Migration**（非 Alembic/SQLAlchemy 生态）。Python 侧如需参照，只能借鉴其思路，不能直接套用 API。
 
-# 使用 Room Schema JSON 作为迁移基准
-# AutoMigration 对应 Alembic autogenerate
+Room 迁移核心机制：
+
+```kotlin
+// AppDatabase.kt
+Room.databaseBuilder(appCtx, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+    .fallbackToDestructiveMigration(false, 1, 2, /* ... 9 */)  // 仅 v1-v9 允许破坏性重建
+    .addMigrations(*DatabaseMigrations.migrations)             // 手动迁移链 v10→v43、v89→v108
+    .build()
 ```
+
+- **AutoMigration**（v43-v89）：声明在 `@Database(autoMigrations = [...])`，由 Room 编译期基于 schema 差异自动生成
+- **手动 Migration**（v10-v43、v89-v108）：`object : Migration(from, to)` 覆写 `migrate(db)`，逐条 `execSQL` 并以 `kotlin.runCatching` 包裹、`AppLog.put` 记录结果
+- **Schema 基准**：`app/schemas/io.legado.app.data.AppDatabase/{version}.json`，迁移后的库结构必须与对应版本 schema 严格一致，否则 Room 抛 `IllegalStateException: Migration didn't properly handle`
 
 ### 位运算查询
 
