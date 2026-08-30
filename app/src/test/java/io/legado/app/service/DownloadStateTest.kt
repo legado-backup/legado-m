@@ -30,8 +30,7 @@ class DownloadStateTest {
         assertEquals(null, task.localPath)
         assertEquals(null, task.errorCode)
         assertEquals(null, task.headersJson)
-        assertEquals(null, task.resumePointJson)
-        assertEquals(null, task.segmentsJson)
+        // resumePointJson/segmentsJson 已随下载引擎改造移除（.seg 断点文件机制），断言同步删除
     }
 
     @Test
