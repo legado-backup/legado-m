@@ -1,6 +1,6 @@
 # build-release-automation — 打包发布体系自动化优化
 
-> 状态：🔄 开发中（检查点 1 已通过，2026-08-30 开始实施）
+> 状态：✅ 已完成（2026-08-31 最终验收通过；L3 真实发版成功，Release 3.26.083022 三包齐全+tag 已推送）
 > 生成日期：2026-08-30
 
 ## 功能概述
@@ -28,5 +28,6 @@
 
 ## 状态标记
 
-- 🔄 设计中（2026-08-30）：spec 生成完毕，待检查点验收；未进入实施阶段
-- 实施前提：gh CLI 已认证、jks 本地可用（现状即满足，无新增前置）
+- ✅ 已完成（2026-08-31）：20/20 任务完成，L1 dry-run 全绿 + L2 真机验证 + L3 真实发版成功（Release 3.26.083022 三包齐全+tag 回滚锚点）
+- 使用方式：`publish.bat`（人工交互）或 `ai_tests\venv\Scripts\python.exe scripts\publish_release.py`（AI 代答，--confirm-stage/--l2-evidence）；`--dry-run` 预览
+- 遗留：Gitee token 未配置（补后 --platform both 可用）；l2_verify_video_player 待有源环境补测
