@@ -1,6 +1,6 @@
 # 构建发布自动化实施任务（build-release-automation）
 
-> **状态：🔄 开发中（检查点 2 待审核实施结果）**
+> **状态：✅ 已完成（L3 真实发版成功，待检查点 3 最终验收）**
 > 2026-08-30 · 方案：选项 1（publish_release.py 升级一键发布编排器，build-legado.bat 保持薄层，附带触发器注释 + 更新源地址修正）
 > 设计文档：[design.md](./design.md) · 事实源：docs/temp-analysis/build-release-analysis-20260830.md
 > 粒度约束：单任务 ≤10 文件 · 总计 20 条 · 五组顺序执行（组 1 前置核验 → 组 5 验证收尾）

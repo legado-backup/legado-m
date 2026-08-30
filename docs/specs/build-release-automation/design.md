@@ -207,3 +207,11 @@ flowchart LR
 | 4 | 包名选择禁令 | 编排器按用途断言：Release 仅接受 release + coexist 产物，test 包只归档不上 Release |
 | 5 | libcronet.so 校验 | 保持 exit 1 级硬门禁，迁移进校验层时禁止降级 WARN |
 | 6 | token/jks 安全 | 存放位置不变（config 已 gitignore、jks 本地持有）；输出维持 hide_token 脱敏；tag push 前打印人工确认（AD-04） |
+
+## 6. 实施发现补记（2026-08-30 L3 实跑回填）
+
+1. **libcronet so 已版本化**：cronet-bundled Maven 迁移后 APK 内条目为 `libcronet.151.0.7922.47.so`（非旧名 libcronet.so），bat 与编排器校验均改为 `libcronet*.so` 前缀匹配；package-naming.md 的校验方法描述需同步（含版本化文件名事实）。
+2. **bat so 校验五连修**：EnableDelayedExpansion 死代码 → Expand-Archive 不支持 .apk → UTF-8 条目名崩溃 → so 版本化文件名 → 校验范围应限本次构建产物（APK_BUILD_DIR，dist 含迁移前动态下载模式的历史归档包）。最终方案=.NET ZipFile.OpenRead 流式读取。
+3. **versionName 后缀**：debug 构建带 versionNameSuffix（如 3.26.083022debug），R5 一致性校验允许"精确相等或版本号前缀匹配"。
+4. **workflows 从未入库**：.github/workflows 被 .gitignore L142 忽略（远端零 CI），幽灵触发器仅存在于本地遗留文件；本地注释为双保险，不强制入库。
+5. **Gitee token 待配置**：publish_config.json gitee 段 token 未配置，L3 以 --platform github 完成；Gitee 发布待用户补 token 后可用。
