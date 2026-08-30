@@ -1,4 +1,4 @@
-﻿
+
 # Legado 核心 UI 页面深度分析
 
 > 分析基于 Legado 源码，覆盖 7 大核心 UI 模块，57+ 个源文件。所有行号均通过 Read/Grep 工具验证。
@@ -7,7 +7,7 @@
 
 ## 1. 核心 UI 架构概览
 
-`mermaid
+```mermaid
 flowchart TD
     Welcome[WelcomeActivity 欢迎页] -->|启动| Main[MainActivity 主界面]
     Welcome -->|defaultToRead| ReadBook[ReadBookActivity 阅读页面]
@@ -48,7 +48,7 @@ flowchart TD
 
     SourceManage --> SourceEdit[BookSourceEditActivity 书源编辑]
     SourceManage --> SourceDebug[BookSourceDebugActivity 书源调试]
-`
+```
 
 ---
 
@@ -141,7 +141,7 @@ extPage | L63-L65 |
 
 ### 2.6 页面委托体系（6 种翻页效果）
 
-`mermaid
+```mermaid
 classDiagram
     class PageDelegate {
         <<abstract>>
@@ -201,7 +201,7 @@ classDiagram
     HorizontalPageDelegate <|-- SlidePageDelegate
     HorizontalPageDelegate <|-- SimulationPageDelegate
     HorizontalPageDelegate <|-- NoAnimPageDelegate
-`
+```
 
 | 委托类 | 行数 | 翻页效果 | 关键行号 |
 |--------|------|----------|----------|

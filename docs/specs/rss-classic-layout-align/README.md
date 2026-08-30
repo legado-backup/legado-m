@@ -1,6 +1,6 @@
 # 经典订阅布局管理与书架对齐修复（rss-classic-layout-align）
 
-> 状态：🔄 设计中（检查点 1 待审）
+> 状态：✅ 已完成（2026-08-29 实施+编译门禁+真机验证收工，见项目记忆 rss-classic-layout-align 收工记录；状态补正于 2026-08-30，见 theme-rss-header-layout-sync F5）
 
 ## 功能概述
 

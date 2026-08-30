@@ -55,7 +55,7 @@ AppLog.put("保存成功", toast = true)
 1. **业务错误**：使用 `AppLog.put()`，重要错误加 `toast = true`
 2. **调试信息**：使用 `AppLog.putDebug()` 或 `DebugLog`
 3. **书源调试**：使用 `Debug.log()` 对象
-4. **禁止**直接使用 `android.util.Log`（release 构建会被 ProGuard 移除）
+4. **禁止**直接使用 `android.util.Log`（release 构建会被 ProGuard 移除）。例外：改造验证期允许临时使用 Log.d/Log.e 打验证日志（统一自定义 tag），验证通过后必须 Grep 确认 0 残留并移除（见 logging-during-refactoring.md 双轨制）
 5. **禁止**使用 Timber（项目未引入）
 
 ## 模块 Tag 规范

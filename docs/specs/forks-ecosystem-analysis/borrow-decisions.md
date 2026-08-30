@@ -70,7 +70,7 @@
 | N12 | **备份按需选项目（shouldBackupTarget）** | refgd | **本项目已超集**（`BackupSelectorConfig.kt` 30 个 BackupItem 勾选 + BookCacheSelectorConfig 按书勾选） |
 | N13 | **视频预加载/无缝切换体系** | refgd | **本项目已领先**（R5 嗅探+VideoPreloader+FirstFramePreloader+80% 文章预缓冲+实例池，见 analysis-report 领域 6）；仅无缝过渡队列列入 E1 评估 |
 | N14 | **AI 助手/Agent/MCP/翻译（全套）** | Rimchars/Jingshiro/NG/HapeLee | **用户明确暂不接入 AI 集成**；能力已在 analysis-report 领域 4 存档，未来启动时再评估 |
-| N15 | **订阅内容搜索（Rimchars RssSearchActivity）** | Rimchars | **本项目已有 `rss-unified-search`**（跨源并发搜索 `RssSearchModel` + `ui/rss/search/RssSearchActivity`，按 searchUrl 远程检索，详见 `docs/specs/rss-unified-search/`）；Rimchars 的 `ui/rss/article/RssSearchActivity.kt` 同样是 searchUrl 远程搜索（非本地全文），且仅单源，功能为本项目子集，无需引入 |
+| N15 | **订阅内容搜索（Rimchars RssSearchActivity）** | Rimchars | **本项目已有 `rss-unified-search`**（跨源并发搜索 `RssSearchModel` + `ui/rss/search/RssSearchActivity`，按 searchUrl 远程检索，详见 `docs/specs/archive/rss-unified-search/`）；Rimchars 的 `ui/rss/article/RssSearchActivity.kt` 同样是 searchUrl 远程搜索（非本地全文），且仅单源，功能为本项目子集，无需引入 |
 
 ---
 

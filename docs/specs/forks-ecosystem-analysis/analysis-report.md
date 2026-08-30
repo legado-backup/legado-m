@@ -196,7 +196,7 @@
 - **视频源多线路/多集**：`RssSource.ruleRoutes` 多线路 + `ruleEpisodes` 多集 + 按需采集（`model/rss/Rss.kt:153-236`），配 `RssRouteAdapter`/`RssEpisodeAdapter`
 - **图片源三层嗅探** + 垂直画布连续浏览（见领域 6/7 图片部分）
 - **订阅源自动校验**：`service/CheckRssSourceService.kt`（5 维 + weight 回填）
-- **跨源搜索（已领先）**：`model/rss/RssSearchModel.kt:46-319`（并发调度、30s 超时、去重、type 过滤）+ `ui/rss/search/RssSearchActivity.kt`（`docs/specs/rss-unified-search/` 已实施）——并发调所有源的 `searchUrl` 远程检索，聚合去重+换源，**功能为 Rimchars 单源搜索的超集**
+- **跨源搜索（已领先）**：`model/rss/RssSearchModel.kt:46-319`（并发调度、30s 超时、去重、type 过滤）+ `ui/rss/search/RssSearchActivity.kt`（`docs/specs/archive/rss-unified-search/` 已实施）——并发调所有源的 `searchUrl` 远程检索，聚合去重+换源，**功能为 Rimchars 单源搜索的超集**
 - **无本地文章全文检索**（无 FTS）——非缺失项，Rimchars 的 RssSearchActivity 同样是 `searchUrl` 远程搜索（非本地全文），本项目跨源版已覆盖
 - **无 RSS 书籍化阅读**（huajideshutiao 独有）——独立使用模式
 

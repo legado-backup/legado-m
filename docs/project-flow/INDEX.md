@@ -516,7 +516,7 @@
 
 | 关键词 | 文档 | 章节 |
 |--------|------|------|
-| 站点特征映射 | [.trae/skills/legado-source-creator/references/site-features/_INDEX.md](../.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 站点特征 |
+| 站点特征映射 | [.trae/skills/legado-source-creator/references/site-features/_INDEX.md](../../.trae/skills/legado-source-creator/references/site-features/_INDEX.md) | 5 站点特征 |
 | 交叉验证 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 子代理文件限制 | [architecture/multi-agent-analysis-spec.md](./architecture/multi-agent-analysis-spec.md) | 2 五阶段流水线 |
 | 自定义DNS | [modules/config-system.md](./modules/config-system.md) | 1 AppConfig |

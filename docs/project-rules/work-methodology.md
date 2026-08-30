@@ -13,7 +13,7 @@
 
 1. **分阶段流水线**：规范先行→数据库→崩溃→功能闭环→UI Bug→规范沉淀→真机测试
 2. **问题清单驱动**：维护 issues-found.md，5维度记录，状态回填 → [real-device-test-reuse.md](./real-device-test-reuse.md)
-3. **子代理交叉核查**：大型任务完成后用子代理全面核查 → complex-task.md
+3. **子代理交叉核查**：大型任务完成后用子代理全面核查 → complex-task-pipeline.md
 
 ## 工作模式（4条执行规则）
 

@@ -1,6 +1,6 @@
 # 数据层模块
 
-> Room 数据库层——21 个实体、1 个视图、21 个 DAO、版本 89 迁移链、位标志类型系统、TypeConverter 序列化。
+> Room 数据库层——21 个实体、1 个视图、21 个 DAO、版本 108 迁移链（以 AppDatabase.kt version 字段为准）、位标志类型系统、TypeConverter 序列化。
 
 ---
 
@@ -89,8 +89,8 @@ erDiagram
         RssStar, TxtTocRule, ReadRecord, HttpTTS, Cache,
         RuleSub, DictRule, KeyboardAssist, Server],
     views = [BookSourcePart],
-    version = 89,
-    autoMigrations = [v43→v44, v44→v45, ..., v88→v89]  // 共46步AutoMigration
+    version = 108,
+    autoMigrations = [v43→v44, v44→v45, ..., v88→v89]  // 共46步AutoMigration（v89起改用手动 Migration）
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract val bookDao: BookDao             // 21 个 DAO
@@ -390,7 +390,7 @@ autoMigrations = [
 
 ```
 Room Schema 自动输出到: app/schemas/io.legado.app.data.AppDatabase/
-版本 89 的 schema 文件: 89.json
+版本 108 的 schema 文件: 108.json
 新增迁移必须更新 schema 文件
 ```
 

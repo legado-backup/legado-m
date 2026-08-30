@@ -100,7 +100,7 @@ flowchart LR
 | # | 卡点 | 影响 | 验证方式 | 失败预案 | 状态 |
 |---|------|------|---------|---------|------|
 | **K1** | GSY 11.3.0 默认渲染类型未穿透验证 | 若默认 SurfaceView → A 期 ColorFilter 方案整体不适用 | A0.1：反编译 fork 库 GSYVideoType 静态初始化 | 切 `setRenderType(TEXTURE_TYPE)` 并回归行为差异 | ✅ **已核实（2026-08-29 无侵入反编译）**：`<clinit>` 显示 `sRenderType=iconst_0` → 默认 `TEXTURE(0)`=TextureView（javap -c gsyvideoplayer-java-11.3.0 GSYVideoType.class）；项目内 `setRenderType` 零命中未被改；L865 SurfaceView 分支为防御代码。**A 期载体成立** |
-| **K2** | TextureView 硬件层 ColorFilter 对 SurfaceTexture 内容是否生效 | A 期核心机制失效 | A0.2：最小实测 | 见 K3 | 🟡 **静态查证通过（2026-08-29）**：`setLayerType(LAYER_TYPE_HARDWARE, paint)` ColorFilter 在 layer 合成步骤生效为官方支持路径，TextureView 场景有成功案例（代价：每帧更新重录 layer，视频场景双倍带宽仍可接受）；API 21-22 有历史黑屏 bug（minSdk 23+ / API 26+ 稳定）。**最终生效性待 A0.2 最小实测**（不改源码无法运行时验证，需用户批准临时改动或独立 Demo） |
+| **K2** | TextureView 硬件层 ColorFilter 对 SurfaceTexture 内容是否生效 | A 期核心机制失效 | A0.2：最小实测 | 见 K3 | ✅ **已实测通过（2026-08-29 MEmu 运行时实证）**：负片 ColorMatrix 经 `setLayerType(LAYER_TYPE_HARDWARE, Paint)` 应用到播放中 TextureView（view 树遍历命中 800x450），截图确认画面完全反色（红↔青/绿↔洋红/白↔黑）。**关键实证：GSY 会在播放状态变化时重置渲染视图**——onViewCreated 固定延迟应用在 6 秒后失效，应用后 1 秒内生效 → A1.3 应用时机钩子（播放事件回调后重新应用）从保险措施升级为必要机制 |
 | **K3** | ColorFilter 失败后的替代技术路线未定义 | K2 失败时 A 期无方案 | A0.3：预定义两条替代路线并评估 ① 自定义 TextureView 覆写 draw + `canvas.saveLayer(paint)`（软件层，性能中） ② 直接采用 GL 管线（B 期提前，工作量重排） | 按 A0.3 评估结果修订 AD-01 | 🟡 路线已定义，评估随 A0.2 结果触发 |
 | **K4** | B/B+ 期缺"关闭增强清空 effects"路径 | 关闭后效果残留（用户感知 bug） | 设计修正：档位=关时显式 `setVideoEffects(emptyList())`（已并入 B2.1 任务） | — | ✅ 已并入 B2.1 |
 | **K5** | B+ Effect 输出 2x 与 SurfaceTexture 默认 buffer 尺寸/transform 矩阵兼容性 | 超分画面拉伸/模糊 | Bp1.2 实测（media3 输出端 setDefaultBufferSize 行为） | Effect 链末尾加下采样 pass 回原尺寸 | ⏳ 随 B+ 批验证 |

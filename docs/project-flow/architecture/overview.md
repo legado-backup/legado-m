@@ -23,7 +23,7 @@
 | UI | Android Activity + Fragment + ViewModel |
 | 规则引擎 | jsoup 1.16.2（CSS）/ JSONPath / JsoupXpath（XPath） / Rhino 1.8.1（JS） |
 | 网络 | OkHttp 3.x + Cronet（可选） |
-| 数据库 | Room v89（21 实体 + 21 DAO + 1 视图） |
+| 数据库 | Room v108（21 实体 + 21 DAO + 1 视图，版本以 AppDatabase.kt version 字段为准） |
 | Web 服务 | NanoHTTPD + Vue3 |
 | 加密 | hutool 5.8.22（书源加解密） |
 
@@ -76,7 +76,7 @@ flowchart TB
 
     subgraph INFRA["基础设施层"]
         direction LR
-        D1["数据层<br/>Room v89<br/>21实体+21DAO+1视图"]
+        D1["数据层<br/>Room v108<br/>21实体+21DAO+1视图"]
         D2["网络层<br/>OkHttp+Cronet<br/>SSL+Cookie"]
         D3["服务层<br/>NanoHTTPD+TTS<br/>WebDAV+Service"]
     end
@@ -126,7 +126,7 @@ flowchart TB
 │  └── RhinoScriptEngine (JS执行 rhino 1.8.1)         │
 ├─────────────────────────────────────────────────────┤
 │ 基础设施层                                            │
-│  ├── 数据层 (Room 21实体+21DAO+1视图 v89)            │
+│  ├── 数据层 (Room 21实体+21DAO+1视图 v108)           │
 │  ├── 网络层 (OkHttp + Cronet)                        │
 │  └── 服务层 (NanoHTTPD + WebDAV + TTS)               │
 └─────────────────────────────────────────────────────┘

@@ -4,30 +4,32 @@
 
 ## 核心原则
 
-1. **私仓为常规分支**：日常开发、AI辅助、文档编写均在私仓分支（`master-private`）进行
+1. **私仓为常规分支**：日常开发、AI辅助、文档编写均在私仓分支（`master`）进行
 2. **公仓仅AI可提交**：公仓分支（`master-public`）的提交必须由AI执行，用户不得直接操作
 3. **AI主动切换机制**：AI负责完整的公仓提交流程（私仓→公仓→提交→切回私仓），防止用户误操作
 4. **审查后提交**：AI提交公仓前必须先审查私仓代码合规性，确保无敏感文件
 5. **私仓提交优先（强制）**：任何代码/文档修改必须先提交私仓分支，再同步公仓。禁止直接同步未提交到私仓的变更
 
-## Git远程仓库配置
+## Git远程仓库配置（2026-08-30 按 git remote -v 实况校正）
 
 | 远程名称 | 地址 | 用途 |
 |---------|------|------|
-| `private` | `git@github.com:syq17496152/legado.git` | 私有仓库，全量代码 |
-| `public` | `git@github.com:LaoDengGTQ/legado-M.git` | 公开仓库，脱敏开源版本 |
+| `origin` | `https://github.com/syq17496152/legado.git` | 私有仓库，全量代码 |
+| `gitee` | `https://gitee.com/Chinashitou/legado.git` | Gitee 发布仓库（APK Release） |
+| `public` | `https://github.com/LaoDengGTQ/legado-M.git` | 公开仓库，脱敏开源版本（⚠️ 远程 URL 曾内嵌 token，已要求改用凭据管理器并轮换） |
 
-## 分支策略
+## 分支策略（实况：本地仅 master，master-public 仅存在于 public 远程）
 
 | 分支名称 | 用途 | 允许推送的远程 |
 |---------|------|---------------|
-| `master-private` | 私仓开发分支，含AI文档和敏感配置 | `private` |
-| `master-public` | 公仓分支，仅含源码+必要文档 | `public` |
+| `master` | 私仓开发分支（本地默认），含AI文档和敏感配置 | `origin` / `gitee` |
+| `master-public` | 公仓分支，仅含源码+必要文档，**仅存在于 public 远程** | `public` |
 
 **强制规则**：
-- `master-private` 分支禁止推送到 `public` 远程
-- `master-public` 分支禁止推送到 `private` 远程
-- 本地默认分支必须为 `master-private`
+- `master` 分支禁止推送到 `public` 远程
+- `master-public` 分支禁止推送到 `origin`/`gitee` 远程
+- 本地默认分支必须为 `master`
+- 公仓提交前从 `master` 拉取内容到本地临时分支或直接 `git push public master:master-public` 语义执行（以 AI 公仓提交流程为准）
 
 ## AI公仓提交流程（强制）
 
@@ -37,7 +39,7 @@ AI在提交公仓前，必须先审查当前私仓分支的代码：
 
 ```bash
 # 1. 确保在私仓分支
-git checkout master-private
+git checkout master
 
 # 2. 检查是否有未提交的变更
 git status
@@ -67,7 +69,7 @@ git checkout master-public
 
 ```bash
 # 合并私仓分支的最新更新
-git merge master-private
+git merge master
 
 # 如果合并成功但有冲突，手动解决冲突
 # 确保公仓专用的.gitignore保持有效（包含敏感文件忽略规则）
@@ -98,7 +100,7 @@ git push public master-public
 
 ```bash
 # 提交完成后，立即切回私仓分支
-git checkout master-private
+git checkout master
 ```
 
 **目的**：防止用户误操作，确保下次开发在私仓分支进行。
@@ -109,7 +111,7 @@ git checkout master-private
 
 ```bash
 # 1. 确保在私仓分支（默认分支）
-git checkout master-private
+git checkout master
 
 # 2. 添加变更文件
 git add <files>
@@ -118,7 +120,7 @@ git add <files>
 git commit -m "feat: XXX"
 
 # 4. 推送到私仓远程
-git push private master-private
+git push origin master
 ```
 
 **用户无需关心公仓提交**，公仓提交由AI负责。
@@ -213,8 +215,8 @@ while read local_ref local_sha remote_ref remote_sha; do
             echo "[ERROR] 检测到敏感文件，禁止推送到公仓："
             echo "  - $file"
             echo ""
-            echo "请删除敏感文件或切换到私仓分支（master-private）提交。"
-            echo "私仓推送命令：git push private master-private"
+            echo "请删除敏感文件或切换到私仓分支（master）提交。"
+            echo "私仓推送命令：git push origin master"
             exit 1
         fi
     done
@@ -238,11 +240,11 @@ exit 0
 
 **答**：立即提醒用户，询问是否需要将修改合并到私仓分支。如果用户确认，AI执行：
 ```bash
-git checkout master-private
+git checkout master
 git merge master-public
 git checkout master-public
 git reset --hard HEAD~1  # 撤销公仓分支的修改
-git checkout master-private
+git checkout master
 ```
 
 ### Q2: 公仓需要更新README等文档怎么办？
@@ -254,7 +256,7 @@ git checkout master-private
 
 ### Q3: 如何确认当前在哪个分支？
 
-**答**：执行 `git branch` 查看当前分支，本地默认分支应为 `master-private`。
+**答**：执行 `git branch` 查看当前分支，本地默认分支应为 `master`。
 
 ### Q4: 历史提交已包含敏感文件怎么办？
 
@@ -266,3 +268,4 @@ git checkout master-private
 
 - 2026-07-14：初版，定义私仓/公仓提交流程、敏感文件清单、AI主动切换机制
 - 2026-07-14：新增核心原则5"私仓提交优先"，反模式6"跳过私仓提交直接同步公仓"（铁证：AI直接同步公仓未先提交私仓）
+- 2026-08-30：文档规整实况校正——本地分支实为 `master`（非 master-private），远程实为 origin/gitee/public 三远程，master-public 仅存在于 public 远程；推送命令同步修正；登记 public 远程 URL 内嵌 token 的安全风险（需轮换）

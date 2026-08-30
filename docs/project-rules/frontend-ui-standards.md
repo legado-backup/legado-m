@@ -81,6 +81,7 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 2. **WebView 操作必须 UI 线程**：`destroy/setLayoutParams` 等一系列 WebView 调用必须在主线程（`shouldInterceptRequest` 在工作线程调 `destroy` 会抛异常）。
 3. `SettingsSearchBar`（Compose）与 `view_search.xml`（View）并存场景：改样式须两端同步口径（本批 ② 已统一 18dp），不能用一边改一边漏。
 4. Compose 页面内嵌 `AndroidView`/`View` 时注意 z 序与触摸事件拦截。
+5. **Compose 列表状态禁止原地修改后回流**（2026-08-30 新增，铁证：高亮规则开关不刷新）：列表数据对象必须以 `copy(...)` 创建**新实例**再交给 ViewModel/State 更新，**禁止**先改对象字段（`item.enabled = x`）再把同一实例传回列表渲染链路。原因：项目 Kotlin 2.0.20+ 强跳过模式默认开启，unstable 类型参数按**引用相等**比较，同实例回流 → 行 Composable 被跳过重组 → UI 显示过期状态。先例：`DictRuleActivity`/`TxtTocRuleActivity`/`ReplaceRuleActivity` 等全部 `copy` 模式。
 
 ---
 
@@ -95,6 +96,7 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 - [ ] 弹层用 `ComposeDialog` 家族，不新建 View 弹框
 - [ ] 样式中是否用了 `TopBarConfig`/`ThemeSpec` 而非硬编码 `MaterialTheme` 取色
 - [ ] Compose 代码：状态管理/重组/Modifier 符合 `compose-ui-engineering` skill
+- [ ] Compose 列表开关/勾选：数据对象用 `copy(...)` 新实例更新，**无原地修改字段后回流**（§4 红线 5，强跳过引用比较会吞重组）
 - [ ] 改动后按 AGENTS.md「AI 自动端到端测试」真机/模拟器验证，禁止只改不测
 
 ---
@@ -105,3 +107,4 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 - `bg_searchview.xml` 曾有 35dp 全胶囊形，已统一 18dp；新增 View 搜索框勿复制旧值。
 - 顶栏"全面迁移 MainTopBarView"会破坏 `view_search` 内联过滤 / `menu_group` 动态菜单（ADR-01 结论），遇主界面经典头优先"局部读配色"。
 - Compose 搜索框默认高可能 72dp（M3 TextField+padding），缩至 40dp 输入区（对齐 `SettingsSearchBar`）。
+- **强跳过吞重组陷阱**（2026-08-30 沉淀）：Kotlin 2.0.20+ Compose 编译器强跳过模式默认开启——含 unstable 参数（var 字段类）的 Composable 变为可跳过，unstable 参数按**引用相等**比较。表现为：原地修改数据对象后列表"看起来没反应"，退出重进才更新（重新 load 出新实例）。修复一律用 `copy()`，禁止 key/contentType 层 workaround。铁证案例：`HighlightRuleActivity` 复选框切换不刷新。

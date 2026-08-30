@@ -1,8 +1,10 @@
 # 延伸版本对比方法论规范
 
+> 本文档已收敛：延伸版本清单与活跃度数据统一以 [forks-reference.md](./forks-reference.md) 为唯一权威源（本文档旧域名 momo-b5a.pages.dev 已失效、27+ 版本数据已过时，勿再引用）。
+>
 > 当 AI 对 Legado（阅读M）项目进行网络层/前端/协程/WebView/数据管理等组件优化或功能借鉴时，**必须**遵循本规范对比开源阅读生态的其他延伸版本，避免闭门造车。
 >
-> 本规范由 2026-07-06 的"网络性能与稳定性深度分析"任务沉淀而来，固化了对比 9 个延伸版本的方法论与踩坑经验。
+> 本规范由 2026-07-06 的"网络性能与稳定性深度分析"任务沉淀而来，固化对比方法论与踩坑经验；版本清单、活跃度快照、对比优先级矩阵见 forks-reference.md。
 
 ---
 
@@ -31,87 +33,24 @@
 
 ---
 
-## 二、延伸版本清单
+## 二、版本清单与优先级矩阵（引用）
 
-> 来源：[阅读·全版本集散地](https://momo-b5a.pages.dev/%E4%B8%8B%E8%BD%BD/xz)（27+ 版本）。本规范完整列出所有延伸版本，AGENTS.md 只保留索引。
+延伸版本清单（主线/Max 系列/独立分支/独立项目）、上游活跃度快照、**对比优先级矩阵**统一见 [forks-reference.md](./forks-reference.md)，本文档不再维护副本。对比前以该文件为准选择 3-5 个优先对比版本。
 
-### 2.1 主线分支（基于原版，网络层与原版基本一致）
+## 仓库可达性预检
 
-| 版本 | git 仓库 | 特色 | 对比优先级 |
-|------|----------|------|-----------|
-| 原版阅读 | [gedoor/legado](https://github.com/gedoor/legado) | 原版，所有 fork 的源头 | ⭐⭐⭐⭐⭐ |
-| 阅读Sigma | [Luoyacheng/legado-E](https://github.com/Luoyacheng/legado-E) | 本项目 fork 源 | ⭐⭐⭐⭐⭐ |
-| 喵公子阅读 | [LegadoTeam/legado](https://github.com/LegadoTeam/legado) | 主流分支，活跃度高 | ⭐⭐⭐⭐ |
-| 阅读T | [skybbk1001/legadoT](https://github.com/skybbk1001/legadoT) | 主流分支 | ⭐⭐⭐ |
-| 阅读Archive | [Rimchars/legado](https://github.com/Rimchars/legado) | 主流分支 | ⭐⭐⭐ |
-| 阅读R | [refgd/legado](https://github.com/refgd/legado) | 主流分支 | ⭐⭐ |
-| Jingshiro阅读 | [Jingshiro/legado](https://github.com/Jingshiro/legado) | 主流分支 | ⭐⭐ |
-
-### 2.2 Max 系列（蛋蛋Max 衍生，网络层有 307/308 重定向等优化）
-
-| 版本 | git 仓库 | 特色 | 对比优先级 |
-|------|----------|------|-----------|
-| 蛋蛋阅读·Max | [DandanLLab/Legado_Max](https://github.com/DandanLLab/Legado_Max) | Max 系列源头，307/308 重定向优化 | ⭐⭐⭐⭐⭐ |
-| 怣疯阅读·Max | [youfengknight/Legado_Max](https://github.com/youfengknight/Legado_Max) | 蛋蛋Max 衍生 | ⭐⭐ |
-| Suml-1阅读·Max | [Suml-1/Legado_Max](https://github.com/Suml-1/Legado_Max) | 蛋蛋Max 衍生 | ⭐⭐ |
-
-### 2.3 独立分支（前端/MD3/跨平台改造）
-
-| 版本 | git 仓库 | 特色 | 对比优先级 |
-|------|----------|------|-----------|
-| 阅读NG | [joestar817/legado_NG](https://github.com/joestar817/legado_NG) | 网络日志标签等优化 | ⭐⭐⭐⭐ |
-| 辞晨阅读·Max | [GEd520/legados](https://github.com/GEd520/legados) | 辞晨系列 | ⭐⭐⭐ |
-| MD3阅读 | [HapeLee/legado-with-MD3](https://github.com/HapeLee/legado-with-MD3) | Material3 前端改造 | ⭐⭐⭐⭐（前端） |
-| MD3阅读-DIY | [325506/legado-with-MD3-DIY](https://github.com/325506/legado-with-MD3-DIY) | MD3 衍生 | ⭐⭐⭐（前端） |
-| 喵公子鸿蒙 | [mgz0227/legado-Harmony](https://github.com/mgz0227/legado-Harmony) | 鸿蒙适配 | ⭐⭐ |
-| Legado-Tauri | [LegadoTeam/Legado-Tauri-Release](https://github.com/LegadoTeam/Legado-Tauri-Release) | Tauri 桌面端 | ⭐⭐ |
-
-### 2.4 独立项目（非 Legado fork，可参考架构）
-
-| 版本 | git 仓库 | 特色 | 对比优先级 |
-|------|----------|------|-----------|
-| MoRealm | [keys-cherish/morealm-reader](https://github.com/keys-cherish/morealm-reader) | 独立阅读器 | ⭐⭐ |
-| 书享阅读 | [zyl140640/readbook-releases](https://github.com/zyl140640/readbook-releases) | 独立阅读器 | ⭐⭐ |
-| 轻悦时光 | [autobcb/qysg](https://github.com/autobcb/qysg) | 独立阅读器 | ⭐⭐ |
-| IReader | [IReaderorg/IReader](https://github.com/IReaderorg/IReader) | 独立阅读器 | ⭐⭐ |
-| LightNovelReader | [dmzz-yyhyy/LightNovelReader](https://github.com/dmzz-yyhyy/LightNovelReader) | 轻小说专用 | ⭐⭐ |
-
-### 2.5 对比优先级矩阵
-
-| 优化领域 | 优先对比版本 | 原因 |
-|----------|------------|------|
-| **网络层** | 蛋蛋Max > 阅读T > 阅读NG > 喵公子 | 蛋蛋Max 有 307/308 重定向；阅读T 有 SOCKS5 隧道+Brotli；阅读NG 有网络日志 |
-| **协程/多线程** | 蛋蛋Max > 阅读NG > 阅读Archive | 蛋蛋Max 修复了 CancellationException 反模式 |
-| **WebView** | 阅读Archive > 蛋蛋Max > 阅读NG | 阅读Archive 有 closed 标志 + isActiveWebView 修复范式 |
-| **前端** | 蛋蛋Max > MD3阅读 > 其他 | 仅蛋蛋Max 有前端实质增量（备份功能） |
-| **数据管理** | 蛋蛋Max > 阅读Archive | 蛋蛋Max 有 Web 端备份功能 |
-
-### 2.2 仓库可达性预检
-
-**强制规则**：对比前必须先验证仓库可达性，避免基于失效仓库做分析。
+**强制规则**：对比前必须先验证仓库可达性，避免基于失效仓库做分析。仓库列表以 forks-reference.md 为准。
 
 ```bash
-# 预检脚本（PowerShell）
-$repos = @(
-    "gedoor/legado", "Luoyacheng/legado-E", "LegadoTeam/legado",
-    "skybbk1001/legadoT", "Rimchars/legado", "refgd/legado", "Jingshiro/legado",
-    "DandanLLab/Legado_Max", "youfengknight/Legado_Max", "Suml-1/Legado_Max",
-    "joestar817/legado_NG", "GEd520/legados",
-    "HapeLee/legado-with-MD3", "325506/legado-with-MD3-DIY",
-    "mgz0227/legado-Harmony", "LegadoTeam/Legado-Tauri-Release"
-)
+# 预检脚本（PowerShell），将 $repos 替换为 forks-reference.md 中的目标仓库
+$repos = @("owner1/repo1", "owner2/repo2")
 foreach ($repo in $repos) {
     $code = (Invoke-WebRequest "https://api.github.com/repos/$repo" -Method Head -SkipHttpErrorCheck).StatusCode
     Write-Host "$repo => $code"
 }
 ```
 
-**已知失效仓库**（截至 2026-07-06）：
-- `GEd520/legados`（辞晨Max）→ 404
-- `LegadoTeam/legado`（喵公子）→ 404（可能改名或设私有）
-- `skybbk1001/legadoT`（阅读T）→ 404（可能改名或设私有）
-
-> 注：仓库状态会变化，每次对比前必须重新预检。
+> 注：仓库状态会变化（404 可能是删除/私有/改名/owner 改名），每次对比前必须重新预检；404 仓库跳过，不要基于缓存数据做分析。
 
 ---
 
@@ -121,7 +60,7 @@ foreach ($repo in $repos) {
 
 #### 3.1.1 确定对比目标
 
-根据优化领域，从 2.1 矩阵选择 3-5 个优先对比版本。
+根据优化领域，从 forks-reference.md 的优先级矩阵选择 3-5 个优先对比版本。
 
 #### 3.1.2 创建临时对比目录
 
@@ -134,9 +73,7 @@ cd temp/forks-comparison
 
 ```bash
 # 浅克隆，只取最新提交，节省时间
-git clone --depth 1 https://github.com/DandanLLab/Legado_Max.git dandan-max
-git clone --depth 1 https://github.com/joestar817/legado_NG.git legado-ng
-# ... 其他版本
+git clone --depth 1 https://github.com/{owner}/{repo}.git {别名}
 ```
 
 **重要**：
@@ -199,12 +136,12 @@ git clone --depth 1 https://github.com/joestar817/legado_NG.git legado-ng
 #### 3.3.1 对比命令
 
 ```bash
-# 单文件对比（本项目 vs 蛋蛋Max）
+# 单文件对比（本项目 vs 目标版本）
 diff -u app/src/main/java/io/legado/app/help/http/HttpHelper.kt \
-        ../dandan-max/app/src/main/java/io/legado/app/help/http/HttpHelper.kt
+        ../{别名}/app/src/main/java/io/legado/app/help/http/HttpHelper.kt
 
 # 目录对比（前端 src）
-diff -rq modules/web/src/ ../dandan-max/modules/web/src/
+diff -rq modules/web/src/ ../{别名}/modules/web/src/
 ```
 
 #### 3.3.2 差异记录格式
@@ -214,7 +151,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ```markdown
 ### X.Y 文件名差异
 
-**版本**：蛋蛋Max
+**版本**：{延伸版本名}
 **文件**：`app/src/main/java/io/legado/app/help/http/HttpHelper.kt`
 **差异类型**：新增 / 修改 / 删除
 
@@ -239,7 +176,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 1. **必须引用实际源码**，不能只描述差异
 2. **必须标注文件路径和行号**
 3. **必须评估收益和风险**
-4. **不能信任 GitHub git trees API**（见 5.1 踩坑）
+4. **不能信任 GitHub git trees API**（见 forks-reference.md 踩坑警示）
 
 ### Phase 4: 价值评估
 
@@ -286,7 +223,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ```markdown
 | 优化项 | 来源 | 收益 | 风险 | 建议 | 实施步骤 |
 |--------|------|------|------|------|----------|
-| XXX | 蛋蛋Max | ⭐⭐⭐ | 低 | 推荐借鉴 | 1. ... 2. ... |
+| XXX | {版本名} | ⭐⭐⭐ | 低 | 推荐借鉴 | 1. ... 2. ... |
 ```
 
 ---
@@ -344,40 +281,9 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 
 ## 五、踩坑经验（强制阅读）
 
-### 5.1 GitHub git trees API 缓存错误 ⚠️
+> 通用踩坑警示（git trees API 缓存、仓库 404 语义、前端源码位置、PowerShell curl 别名）见 [forks-reference.md](./forks-reference.md)「关键踩坑警示」，此处仅保留本规范独有条目。
 
-**现象**：GitHub git trees API（`/repos/{owner}/{repo}/git/trees/{sha}?recursive=1`）显示某文件存在，实际 `git clone` 后文件不存在。
-
-**案例**：2026-07-06 分析蛋蛋Max 时，API 显示存在 `xboxGamepad.ts`，实际 clone 后不存在。
-
-**应对**：
-- **所有结论以 `git clone` 实测为准**
-- API 仅用于快速预览，不能作为最终依据
-- 文件内容必须通过 `git clone` + Read 验证
-
-### 5.2 仓库 404 不等于不存在
-
-**现象**：仓库返回 404，可能是：
-1. 仓库已删除
-2. 仓库改为私有
-3. 仓库改名
-4. owner 改名
-
-**应对**：
-- 记录 404 仓库，不要基于缓存数据做分析
-- 在 [阅读·全版本集散地](https://momo-b5a.pages.dev/%E4%B8%8B%E8%BD%BD/xz) 查找是否有新地址
-- 跳过 404 仓库，不要臆测其内容
-
-### 5.3 PowerShell curl 别名冲突
-
-**现象**：PowerShell 中 `curl` 被别名到 `Invoke-WebRequest`，参数不兼容 Unix curl。
-
-**应对**：
-- 使用 `curl.exe` 强制调用真正的 curl
-- 或使用 PowerShell 原生的 `Invoke-WebRequest` / `Invoke-RestMethod`
-- 或使用 `Start-BitsTransfer`
-
-### 5.4 WebFetch 对 raw.githubusercontent.com 失败
+### 5.1 WebFetch 对 raw.githubusercontent.com 失败
 
 **现象**：WebFetch 工具获取 `raw.githubusercontent.com` 上的文件经常失败。
 
@@ -386,27 +292,18 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 - 或用 `curl.exe -sL https://raw.githubusercontent.com/...`
 - 或用 `Invoke-WebRequest -Uri ... -OutFile ...` 下载后 Read
 
-### 5.5 "前端在 assets/web/" 的误区
-
-**现象**：误以为前端源码在 `app/src/main/assets/web/`。
-
-**真相**：
-- `app/src/main/assets/web/` 是**构建产物**（vite build 输出）
-- 真正源码在 `modules/web/`
-- 延伸版本对比时必须对比 `modules/web/`，不是 `assets/web/`
-
-### 5.6 "网络层有改动" 的过度估计
+### 5.2 "网络层有改动" 的过度估计
 
 **现象**：假设所有延伸版本都有网络层改动。
 
-**真相**：9 个对比版本中，仅 3 个（蛋蛋Max、阅读NG、阅读T）有实质改动，其余 5 个与 Sigma 完全一致。
+**真相**：2026-07-06 实测 9 个对比版本中，仅 3 个有实质网络层改动，其余与本项目 fork 源完全一致。
 
 **应对**：
 - 先 `diff -rq` 快速判断是否有差异
 - 无差异的版本跳过，节省时间
 - 不要为了"对比"而对比
 
-### 5.7 并行 TaskOutput 调用丢失
+### 5.3 并行 TaskOutput 调用丢失
 
 **现象**：并行调用多个 TaskOutput 时，部分返回 "The toolcall result is missing."
 
@@ -433,17 +330,17 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ```markdown
 | 排名 | 优化项 | 来源版本 | 收益 | 风险 | 建议 |
 |------|--------|----------|------|------|------|
-| 1 | XXX | 蛋蛋Max | ⭐⭐⭐⭐⭐ | 中 | 强烈推荐借鉴 |
-| 2 | XXX | 阅读T | ⭐⭐⭐ | 低 | 推荐借鉴 |
+| 1 | XXX | {版本名} | ⭐⭐⭐⭐⭐ | 中 | 强烈推荐借鉴 |
+| 2 | XXX | {版本名} | ⭐⭐⭐ | 低 | 推荐借鉴 |
 ```
 
-### 6.3 与 AGENTS.md 的关系
+### 6.3 与权威源/主规范的关系
 
-- **AGENTS.md**：提供延伸版本清单和对比优先级（高层导航）
-- **本规范**：提供详细对比方法论和踩坑经验（执行指南）
+- **forks-reference.md**：延伸版本清单、活跃度数据、对比优先级矩阵的唯一权威源
+- **本规范**：详细对比方法论和踩坑经验（执行指南）
 - **临时分析文档**：记录每次对比的具体结果（执行证据）
 
-三者关系：AGENTS.md 指向本规范，本规范指导生成临时分析文档，临时分析文档支撑 OpenSpec 四文档设计。
+三者关系：forks-reference.md 提供对比对象，本规范指导生成临时分析文档，临时分析文档支撑 OpenSpec 四文档设计。
 
 ---
 
@@ -462,12 +359,12 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ```markdown
 ## Alternatives Considered
 
-### 方案A：借鉴蛋蛋Max 的 XXX
+### 方案A：借鉴 {版本名} 的 XXX
 - 来源：design.md 对比分析章节
 - 收益：XXX
 - 风险：XXX
 
-### 方案B：借鉴阅读T 的 XXX
+### 方案B：借鉴 {版本名} 的 XXX
 - ...
 ```
 
@@ -476,11 +373,11 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 ```markdown
 ## Architecture Decisions
 
-### ADR-001：采用 XXX 方案（借鉴蛋蛋Max）
+### ADR-001：采用 XXX 方案（借鉴 {版本名}）
 
 **Context**：本项目当前 XXX 存在 YYY 问题
 **Concern**：ZZZ
-**Decision**：借鉴蛋蛋Max 的 XXX 实现
+**Decision**：借鉴 {版本名} 的 XXX 实现
 **Goal**：AAA
 **Tradeoff**：BBB
 **Status**：Accepted
@@ -501,6 +398,7 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 - [ ] 是否记录了新的踩坑经验（如有）？
 - [ ] 是否将对比结论写入 design.md 对应章节？
 - [ ] 是否在 OpenSpec 四文档中引用了对比结果？
+- [ ] 版本清单/活跃度是否引用 forks-reference.md（而非本文档副本）？
 
 ---
 
@@ -520,3 +418,4 @@ diff -rq modules/web/src/ ../dandan-max/modules/web/src/
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-07-06 | 1.0 | 初版，由网络性能与稳定性深度分析任务沉淀 |
+| 2026-08-30 | 2.0 | 删旧保新收敛为薄壳：版本清单/活跃度/优先级矩阵移交 forks-reference.md 唯一权威源，删除失效域名与过时数据，保留独有方法论 |

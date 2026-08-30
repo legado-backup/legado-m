@@ -7,7 +7,7 @@
 | 数据库名 | legado.db |
 | 数据库引擎 | SQLite |
 | ORM | Room (AndroidX) |
-| 当前版本 | 89 |
+| 当前版本 | 108（以 AppDatabase.kt version 字段为准） |
 | 实体表数量 | 21 |
 | 视图数量 | 1 |
 | Schema 目录 | app/schemas/io.legado.app.data.AppDatabase/ |
@@ -416,7 +416,7 @@ val MIGRATION_XX_YY = object : Migration(xx, yy) {
 | AutoMigration 列表 | [AppDatabase.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/AppDatabase.kt) |
 | BookType 位标志 | [BookType.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookType.kt) |
 | BookGroup 常量 | [BookGroup.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/data/entities/BookGroup.kt) |
-| Schema v89 | [89.json](file:///f:/myself/github/WeAgentChat/temp/legado/app/schemas/io.legado.app.data.AppDatabase/89.json) |
+| Schema v108 | [108.json](file:///f:/myself/github/WeAgentChat/temp/legado/app/schemas/io.legado.app.data.AppDatabase/108.json) |
 
 ---
 
