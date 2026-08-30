@@ -37,6 +37,15 @@
 | 16e. 文件夹封面弹框验证 | `l2_verify_rss_folder_cover_dialog.py` | 订阅文件夹封面弹框 L2 验证 | `python ai_tests/scripts/l2_verify_rss_folder_cover_dialog.py` |
 | 16f. 文件夹间距验证 | `l2_verify_rss_folder_margin.py` | 订阅文件夹间距/列数滑条实时生效验证 | `python ai_tests/scripts/l2_verify_rss_folder_margin.py` |
 | 16g. 播放器 UX 验证 | `l2_verify_video_ux_fixes.py` | 视频播放器五项 UX 修复 L2 | `python ai_tests/scripts/l2_verify_video_ux_fixes.py` |
+| 16h. 阅读页三个点弹层验证 | `l2_verify_read_menu_overflow.py` | 三点弹层 7 项动作（高亮规则/字符集/目录规则/EPUB×3/段落规则修正）存在性+位置+互斥不变量+点击进管理页（read-menu-highlight-entry-restore 新增）；辅助探针 `probe_shelf.py` 输出书架层级锚点 | `python ai_tests/scripts/l2_verify_read_menu_overflow.py` |
+| 16i. 书架层级探针 | `probe_shelf.py` | dump 书架文本/可点击节点（L2 脚本开书锚点修正前置探针） | `python ai_tests/scripts/probe_shelf.py` |
+
+### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
+
+1. **残留进程占锁**：前会话遗留 `com.github.uiautomator` 进程 → 新连接报 `AccessibilityServiceAlreadyRegisteredError`。处置：`adb shell "ps -A | grep uiautomator"` 定位 PID 后 `kill -9 <pid>`；**禁止 `pkill -f uiautomator`**（命令串自匹配误杀 shell 自身，exit 143）
+2. **弹层手势敏感**：ModernActionPopup 弹层（Compose overlay 加在 decor view）上做纵向滑动手势会直接 dismiss 弹层（遮罩吞手势），脚本勿在弹层上滚动；长列表底部项断言改用可靠可见锚点 + 截图佐证
+3. **书架卡片二跳**：书架卡片形态下文本节点 clickable=False（容器可点），点击后先进书籍详情页，需二跳"阅读/继续阅读"才进阅读页
+4. **center tap 是切换语义**：阅读页点中央为菜单显隐切换，脚本判"菜单已开"后不可再盲点中央
 
 > 2026-08-30 文档规整：原步骤 5/6/8（`fix_coverage_check.py`/`batch_source_test.py`/`collect_app_log.py`）所引脚本已不存在于 `ai_tests/`，删除对应步骤；修复点覆盖验证按本文"L2 验证场景清单"（`error_patterns` 场景）与"L2 观测通道"章节执行。
 
