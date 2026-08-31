@@ -138,7 +138,9 @@ def navigate_to_video_player(device):
         try:
             # 查找并点击订阅Tab（底部导航栏）
             # 修复：实际Tab content-desc="订阅" resourceId=menu_rss，非text="订阅源"
-            rss_tab = device(resourceId="io.legado.app.debug:id/menu_rss")
+            # 2026-08-31 修复：resourceId 前缀按 config.PACKAGE 动态拼（原硬编码 io.legado.app.debug
+            # 仅匹配共存包，测试包 io.legado.miss.app.debug 下永远找不到 Tab 导致导航必败）
+            rss_tab = device(resourceId=f"{PACKAGE}:id/menu_rss")
             if rss_tab.exists:
                 rss_tab.click()
                 time.sleep(2)
