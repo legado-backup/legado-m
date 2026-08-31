@@ -1,0 +1,214 @@
+# tasks.md — 三轨总线任务编排
+
+> 格式：主任务 `- [ ] X.Y` + 子任务 `- [ ] X.Y.Z` ｜ 每波次收束必须回写本清单 + README 状态（R6）
+>
+> **子任务账本规则（防双账本，X13）**：各分期实施细节的子任务账本 = 该轨原 spec tasks/分册（权威，总线不复制）；总线独有的编排动作在本文档展开 X.Y.Z 子任务，逐项核销。**各分期开工首个动作=另立实施 spec**（依 docs/specs/TEMPLATE.md 建三件套，落 docs/specs/{分期名}/；2.1.1/3.2.1 为示范，其余分期同此执行）。**任务编号≠执行序，窗口内执行以 design §2 波次表推荐序为准。**
+>
+> **分册对照（compose spec）**：分册①=design-b1-b2-baseline-freeze.md / ②=design-b3-d4-flagship.md / ③=design-b3-pages.md / ④=design-b4-b5-pages.md。引用其余 spec 章节号以该分册实际章节为准（行号可能随并行会话漂移，以函数/小节名定位）。
+
+## 0. 编排落盘
+
+- [ ] 0.1 检查点 1：用户审查波次计划（W0-W5 + AD-01~07 + X1-X14 + §6 验证交付策略 + legadoc AD-03~06 并入裁决，R4）⏸ 阻塞后续全部任务（AskUserQuestion 通过即勾选本项作为通过记录）
+- [ ] 0.2 legadoc-benchmark-analysis/README.md 状态转正（🔄 设计中 → ✅ 设计完成，裁决后；仅替换状态字段，其余文字不动）
+- [x] 0.3 docs/INDEX.md 增加"三轨总线编排"条目 ✅（INDEX L204）
+- [ ] 0.4 V 轨活跃任务盘点登记：新建 v-track-registry.md
+  - [ ] 0.4.1 全量誊录 design §4 表（33 项登记：实质协调面 18 + 顶栏集群 4 + 低冲突 4 + 不占波次 5，含落点/协调动作/R9 边界；计数以表内实列数为准，勿自行重数）
+  - [ ] 0.4.2 登记 video-sniff 4.8e 条目（已裁决方案 A：Room v109 实占，P1 顺延 v110/P3 顺延 v111；与 db-version-registry 1.2.3 互见）
+  - [ ] 0.4.3 登记低冲突/不占波次 spec 清单（伞形容器/非代码轨/随窗插入类，含 ng P4 AI 二期暂缓声明）
+  - [ ] 0.4.4 登记 light-theme 真机延后项与 video-sniff 待真机项（供 2.6 真机合并窗口引用）
+
+## 1. W0 公共闸门
+
+- [ ] 1.1 deep-fix 剩余收口（子任务账本=ui-style-unify-deep-fix tasks §4/§5 权威，总线不复制；R3 终测合并至 2.6 执行）
+- [ ] 1.2 新建 docs/project-flow/database/db-version-registry.md
+  - [ ] 1.2.1 建表：期名/触发条件/实施时 version 基线/迁移内容/占号状态 五列；占号状态取值枚举=预占/已实占/已顺延/已销号
+  - [ ] 1.2.2 预占号登记：ng P1（v109 规划→顺延 v110 实施时自适应）/ng P3（v110 规划→顺延 v111）/B-C2（1 表）/B-C3（4 表）+ 占号规则正文（先合先得/实施时 AppDatabase.kt 实际 version+1 自适应/禁止写死规划号；**当前源码实测 version=109，v109 已被 video-sniff 4.8e 实占**）
+  - [ ] 1.2.3 登记 video-sniff 4.8e 条目：**用户已裁决方案 A（Room v108→v109）**，v109 实占（先合先得生效）→ ng P1 实施时自适应顺延 v110、P3 顺延 v111（19:27 并行会话裁决实况）
+  - [ ] 1.2.4 写入门禁条款：各分期实施 spec 开工前 R7 强制查表占号，占号后回写状态（单人场景：执行者自批+回执留痕，检查点抽查）
+- [ ] 1.3 C0 红测试先行（开工前置裁决：C0 分册 §8.1 自带 OQ Q1——LruCache 依赖 android.util，JVM 单测需 Robolectric 或降级 L2，本子任务内裁决）
+  - [ ] 1.3.1 Q1 裁决：红测试载体选 Robolectric 或降级 L2 脚本（用户裁决项）
+  - [ ] 1.3.2 编写 AnalyzeRule 缓存污染复现用例（三向量：:234-236/:327-329 裸键访问、makeUpRule 函数内 replaceRegex 残留（当前源码 :721-780，行号可能随并行改动漂移以函数名定位为准）、:742 重入半更新；用例设计账本=C0 分册 §8 测试设计）
+  - [ ] 1.3.3 红测试运行确认 FAIL（复现 bug）
+- [ ] 1.4 C0-F1 缓存污染 bug 修复（ResolvedSourceRule 不可变快照化，**改法账本=C0 分册 §3.6 复现推演 + §4.1 函数级改法与完整代码**；开工前 R7 核查 source-arch-mutual-borrow 是否并行占用 AnalyzeRule）
+  - [ ] 1.4.1 按 §4.1 实施 ResolvedSourceRule 不可变快照化
+  - [ ] 1.4.2 红测试转 GREEN
+  - [ ] 1.4.3 L3 书源基线回归（与 2.13.2 P0×C0 合并跑）
+- [ ] 1.5 补登轨 C P3-tts-multirole.md：C1 朗读原语化正交声明（插入锚点=分册 §0 前置依赖节之后新增小节；内容=C1 只要求发布 ReadAloudPosition 流，P3 为另一种引擎实现，两者正交可叠加）
+- [ ] 1.6 补登轨 C P4-visual-patterns.md：compose B3/B4 Rss 域时序协调条款（插入锚点=§5 衔接章节末尾新增小节；内容=D4/A8 已实施页纳入 P5 截图回归面）
+- [ ] 1.7 ui-standards 双栈豁免 + 轨前缀约定落盘
+  - [ ] 1.7.1 docs/project-flow/ui-standards/architecture.md 登记 MaterialSurface"语义单源、实现双栈"豁免条款（插入锚点=组件族门禁章节之后；措辞=同语义角色的 View/Compose 双实现视为单一来源，不适用双体系扩散禁令）
+  - [ ] 1.7.2 实施spec 引用约定落 docs/specs/TEMPLATE.md（编号带轨前缀：A-C3=compose 页面编号/B-C3=legadoc 分期编号，防碰撞混淆）
+- [ ] 1.8 AppLog Tag 序号规则统一（X6）
+  - [ ] 1.8.1 ng P0/P1/P2 分册"第 27 个 TAG"互斥声明改为"按落地顺序顺延"
+  - [ ] 1.8.2 C5 分册 fromTag 表登记规则改为"按实施时实际全集"
+- [ ] 1.9 被引分册头部总线修订注记（防执行者按旧口径开工）：deep-fix tasks §4 头注"R3 已合并至总线 2.6 执行" / C5 分册头注"fromTag 按 1.8.2 实际全集" / ng P1 分册头注"v109 规划号以 registry 顺延为准（当前 v110）"
+
+## 2. W1 安全与基线
+
+- [ ] 2.1 ng P0 全期实施（子任务账本=P0 分册 §10 九步依赖图（五子项↔九步映射在实施 spec 首节补表）+22 单测（T1-T22，§9.1），权威不复制）
+  - [ ] 2.1.1 另立实施 spec（引用 P0 分册为权威设计）
+  - [ ] 2.1.2 五子项按 §10 顺序实施（文件沙箱→脚本缓存命名空间→弹窗拦截→类导入灰度→网络日志回归）
+  - [ ] 2.1.3 四观察开关登记至回退预案表（8.4.2 联动）
+- [ ] 2.2 C0-F3 BookScriptObject 注册（31 行零耦合，子任务账本=C0 分册；与 ng P0 子项4 机制分层正交已实证）
+- [ ] 2.3 C0-F2 章节列表并发去重（子任务账本=C0 分册）
+- [ ] 2.4 C0-F4 exploreKinds 多因素缓存键（子任务账本=C0 分册；BookSourceExtensions.kt 与 ng P0 的 BaseSourceExtensions.kt 为两文件已实证）
+- [ ] 2.5 C0-F5 WebViewHtmlStore 大 HTML 落盘（子任务账本=C0 分册 DR-C0-9）
+- [ ] 2.6 compose B0 继承收口 + 真机合并窗口（子任务账本=compose tasks §2 + deep-fix tasks §4/§5 双引用，X13 以 deep-fix 为权威账本）
+  - [ ] 2.6.1 订阅切换专项/视频手势回归/G1-G11 回归（deep-fix R3 继承项）
+  - [ ] 2.6.2 logcat 残留=0 + compose spec 检查点 3 + B10 CacheActivity 真机回归
+  - [ ] 2.6.3 同包合并走查：light-theme S1-S9 九场景 + video-sniff 1.11/2.9 待真机项（一次打包覆盖，R8；video-sniff 项未就绪则拆包先行，其项由 W4 走查兜底）
+  - [ ] 2.6.4 registry 7.11ai 销项 + deep-fix 收口状态回写
+- [ ] 2.7 compose B1 基线校准（子任务账本=compose tasks §3 + 分册①四产物成品段）
+  - [ ] 2.7.1 pages-inventory §0/§G 成品表粘贴
+  - [ ] 2.7.2 registry 24 项粘贴 + tasks.md 冻结标注
+  - [ ] 2.7.3 顶栏集群 4 spec（my-topbar/subpage-topbar/tag-mode/topbar-icon）盘点吸收/注销（tag-mode 实施时点排 3.5 后，热点④）
+- [ ] 2.8 C5 用户日志+工程纪律（子任务账本=C5 分册；fromTag 表按实际全集登记，X6）
+- [ ] 2.9 docs/project-rules/forks-reference.md NG 条目核对（该文件已含阅读NG条目，执行前核对防重复登记；轨 C 遗留任务 5.2）
+- [ ] 2.10 bugfix-20260822 / bugfix-ui-20260824 收尾或显式冻结（用户裁决处置方式）
+- [ ] 2.11 cronet-global-enable + network-perf-stability + thread-pool-audit 与 video-sniff 4.8c 开关双逻辑合并裁决
+  - [ ] 2.11.1 三 spec 与 video-sniff 4.8c 触点清单对照
+  - [ ] 2.11.2 产出合并裁决单（保留哪套开关/文档归一），纯文档不动码
+- [ ] 2.12 ai-test-system-refinement scripts 批先行（子任务账本=该 spec tasks；产出=B2 L2 模板依赖的目录口径；**W2 进入条件之一，须于 W1 收束前完成，先于其他 2.1x 收尾**）
+- [ ] 2.13 P0 文档澄清补注 + P0×C0 合并回归
+  - [ ] 2.13.1 ng P0 分册 NetworkLog"零修改"补注"将由 ng P1 补敏感头，本期限于零语义变更"（X14）
+  - [ ] 2.13.2 ng P0×C0 合并跑一轮 L3 书源基线回归（X8）
+- [ ] 2.14 subpage-topbar-unify × compose B4 待迁页互斥声明（X2）
+  - [ ] 2.14.1 对照 B4 待迁页名单（B5/B14/B15/D2/D3/D5/D7）与顶栏 spec 页名单求交集
+  - [ ] 2.14.2 交集中的页面登记"禁止先换 View 顶栏再整页 Compose"，写入两 spec 门禁
+
+## 3. W2 地基与样板
+
+- [ ] 3.1 compose B2 样板冻结验收（子任务账本=compose tasks §4 + 分册① 35 检查点，权威不复制）
+  - [ ] 3.1.1 4.1 spacing token 编译门禁 → 4.2 L2 模板+7 脚本 → 4.3 C2 S3 接线
+  - [ ] 3.1.2 S1-S6/D9 35 检查点回执（S3 依赖 4.3 完成）
+  - [ ] 3.1.3 L2 脚本模板登记为三轨共用测试基建（AD-05）
+- [ ] 3.2 ng P1 AI 地基实施（子任务账本=P1 分册 §4.2 J1-J9 注入点 + §6 DDL（标题 v109 口径以 registry 顺延为准））
+  - [ ] 3.2.1 另立实施 spec + registry 占号（v109 规划号→**顺延 v110 实施时实占**）
+  - [ ] 3.2.2 密钥防线四层先落地（P2 前置）
+  - [ ] 3.2.3 分册补注"AiChatService 冻结=不修改既有方法，新增方法不受限"（C4 衔接澄清）
+- [ ] 3.3 C1 朗读架构原语化（子任务账本=C1 分册三步+diff 改造点）
+  - [ ] 3.3.1 OQ-2 旧键裁决（READ_ALOUD_PROGRESS 保留给 P3 接入或删除）+ 声明禁止 P3 复活旧键
+  - [ ] 3.3.2 引擎发布层/显示跟随/绘制期投影三步实施（ReadAloudPositionUpdate 五字段不扩）
+  - [ ] 3.3.3 OQ-11 off-by-one 对照表产出（P3 rebase 依赖，X4）
+- [ ] 3.4 cache-entry-relocate 收口（B2 样板冻结前；cache-entry 先行→B4-c 瘦身 About，反序重复劳动）
+- [ ] 3.5 fix-rss-search-scope + rss-folder-subtag-fix 收口（B3 Rss 域动工前置）
+- [ ] 3.6 thread-pool-audit 与 video-sniff 线程钳制定稿（W2 内首项，防回退 Phase0 钳制；非波次进入条件）
+- [ ] 3.7 ng P2 实施 spec 前置登记（X3/X14）
+  - [ ] 3.7.1 登记 MCP 工具对 C0-F4 改造后 exploreKinds 行为的依赖
+  - [ ] 3.7.2 MCP 触发源 JS 安全盲区裁决：显式挂 SourceInteractionPolicy 或登记二期（用户裁决项；ng P4 AI 应用层二期的暂缓清单落点）
+  - [ ] 3.7.3 replace 族工具可删禁 C4 净化规则的行为披露
+
+## 4. W3 旗舰攻坚
+
+- [ ] 4.1 compose B3-D4 Rss 列表旗舰（子任务账本=分册② 12 场景+五代 Adapter 收敛设计）
+  - [ ] 4.1.1 RssFragment 四波排序列队登记（S批✅→scope fix→tag-mode→A8）
+  - [ ] 4.1.2 D4 实施 + 12 场景 L2 全过
+  - [ ] 4.1.3 A8 回归清单含 video-sniff Phase0 padding 改动项
+- [ ] 4.2 compose B3 其余 9 页（A7→A8→B2→B8→B11→C3→C13→D1→E2，子任务账本=分册③；A7=ExploreFragment classic 收敛（compose tasks §5.2），产出为 B-C3 前置基线，X9；**E2 裁决**：保持 W3 实施不破轨 A 禁跳批，其 ThemeSpecPresets 产物纳入 6.1.3 P5 截图回归面兜底，X1）
+- [ ] 4.3 ng P2 MCP 服务端实施（子任务账本=P2 分册 70 工具规格表（V6 增补后）+四模块拆分）
+- [ ] 4.4 C2 多媒体插入 Phase A（子任务账本=C2 分册 Phase A）
+  - [ ] 4.4.1 OQ-1 焦点矩阵裁决（C2 开工前分期级闸门）且矩阵补 P3 多角色参与者行（X7）
+  - [ ] 4.4.2 与 C1 侧共同声明"插图占位行跳过朗读单元构建"（X5，单侧落地即可）
+  - [ ] 4.4.3 DB 占号 + 锚点数据层实施
+
+## 5. W4 长尾与听书
+
+- [ ] 5.1 compose B4-a 登记 6 项（B7/B16/C17/E5/D8/B13，子任务账本=分册④）
+- [ ] 5.2 compose B4-b 收口 5 项（B9 裁决→D3→D5→D7→D2 压轴；D3/D5/D7 须 D4 回执后）
+- [ ] 5.3 ng P3 多角色听书一期实施（子任务账本=P3 分册 diff 式改造（§4.4，实施前校准段数）+6 新表 DDL）
+  - [ ] 5.3.1 DD3 Segmenter 评审通过（P3 开工前分期级闸门）+ ng P0 合入确认 + HttpReadAloudService 释放确认（C1 已收口）
+  - [ ] 5.3.2 rebase 后补发布制接线条款：多角色逐段推进经发布层，禁止直写 durChapterPos/moveToNextPage（X4）+ OQ-11 覆盖新调用点
+  - [ ] 5.3.3 补 AudioFocusRequest 声明（X7）+ v111 占号实施（v110 归 P1）
+  - [ ] 5.3.4 D6 UI 三件（RoleBindDialog/TtsEngineManageActivity/入口行）+ ReadAloudDialog 入口挂载点若晚于 S6 冻结须补记回执
+- [ ] 5.4 C2 多媒体 Phase B-C 收尾（排版回归独占真机窗口 R8；C1 步骤③→C2 Phase B 串行；AudioBlockPlayer×C1 高亮重绘共享 CanvasRecorder 一次联测）
+- [ ] 5.5 V 轨衔接建议单（事件驱动，R9：总线只出建议单不接管）
+  - [ ] 5.5.1 video-sniff Phase3 收口事件确认（向并行会话拉取进度快照）
+  - [ ] 5.5.2 出衔接建议单：enhance-switch-governance-fix → video-back-fullscreen-fix / rss-video-player-enhancement → video-extractor-enhancement → multiline-on-demand-extraction；经并行会话确认后登记 v-track-registry（确认前不排程）
+  - [ ] 5.5.3 下载域：download-hls-complete-fix / download-manager-maturity 排 video-sniff 4.6 headersJson 落地之后的建议
+- [ ] 5.6 播放器纪律登记（X10）
+  - [ ] 5.6.1 ExoPlayer 实例/release 纪律归口文档（C2 AudioBlockPlayer+PhotoDialog+V 轨预加载器并存）
+  - [ ] 5.6.2 C2 sniffMediaExt 与 V 轨 MimeSniffer 命名文档区分 + C2 OQ-3 二期必须走 SniffEngine 登记
+
+## 6. W5 收官与视觉
+
+- [ ] 6.1 ng P5 视觉三模式实施（子任务账本=P4 分册四 data class+三分支+18 处直读清单）
+  - [ ] 6.1.1 前置确认：deep-fix Phase2 已收尾（已满足）、light-theme 已交付版本为基线（禁止回退 guard/Archive 派生，实施时逐行 diff MaterialValueHelper，X1）
+  - [ ] 6.1.2 18 处直读中 #15/#18 落 B 批文件域的协调实施
+  - [ ] 6.1.3 D4+E2 已实施页面纳入截图对比回归面（X1 E2 裁决兜底）
+- [ ] 6.2 B-C3 合集书架 + RowUi（子任务账本=C3 分册 B1-B14）
+  - [ ] 6.2.1 前置：B2 样板冻结回执 + B3-A7 ExploreFragment 回执（X9）
+  - [ ] 6.2.2 数据层实施（4 表占号+DAO+Help，可与 A 轨并行）→ UI 层实施（排 A3/A4 冻结回执后，实施后补一次回执复验，X12）
+  - [ ] 6.2.3 BookGroup 并存裁决 AD-C3-2 + 新弹框 MaterialRole.OVERLAY 声明（若 P4 分册 §P5-1 规范条款已合入）
+- [ ] 6.3 compose B4-c + B12（B15→B14→B5 列表三连 + C20 About 基于 cache-entry 瘦身内容；B12 断言文件域严格限定 manga 内核路径，X11）
+- [ ] 6.4 C4 一期 AI 净化（子任务账本=C4 分册一期；B 路线零等待；§12 开放问题 1/2 裁决；P1 验收后 0.5d 切 AiManager 门面 OQ-9）
+- [ ] 6.5 compose B5 收官（子任务账本=compose tasks §7：A6 销号+巡检+五维评分+KPI 终值落 registry+pages-inventory；kpi-final.md 为总线新增产物名，与轨 A 口径对齐后产出）
+- [ ] 6.6 KPI 终值复盘 + NG/legadoC 代差分析 + deep-fix Phase4 门禁固化（吸收 P5 MaterialRole 条款：取色+材质双检查；=W5 收尾动作 Z）
+
+## 7. 总线收束
+
+- [ ] 7.1 db-version-registry 终态核对（全部占号销号）+ v-track-registry 终态核对（挂靠项全部闭环）
+- [ ] 7.2 文档同步：docs/INDEX.md 三轨状态更新 + 各 spec README 状态对齐（R6）
+- [ ] 7.3 检查点 2：用户最终验收（验收材料=W5 全量 E2E 报告+kpi-final.md+registry 终态+热点审计结论，§8 全过为前置）
+- [ ] 7.4 经验沉淀（跨轨编排经验 → ai_memory_main.md）
+- [ ] 7.5 L4 交付级发布（用户触发：publish.bat 五阶段，--dry-run 预览先行；design §6.1-L4）
+
+## 8. 波次收束验证框架（每波次收束必跑，design §6，R10）
+
+- [ ] 8.1 L2 波次级验证
+  - [ ] 8.1.1 整包编译（build-legado.bat 测试包，0 error）
+  - [ ] 8.1.2 `./gradlew test` 全量单测通过（0 failed）
+  - [ ] 8.1.3 E2E 冒烟（ai_tests\venv\Scripts\python.exe ai_tests/run_e2e.py 核心用例集全过）
+  - [ ] 8.1.4 热点文件 git diff 审计：git status/diff 对照 14 对热点表逐文件核对，产出审计清单（变更文件→所属分期→预期内/外）
+  - [ ] 8.1.5 波次验收单核销：验收单=本清单 §8.1 逐项勾选记录；进入条件逐项核销（完成级别按 G1-G3 判定，design §6.2）+ 验证结果记录 + registry/v-track 同步（每波次收束向并行会话拉取一次进度快照）+ 本清单状态回写
+- [ ] 8.2 L3 里程碑验证
+  - [ ] 8.2.1 W2 基线包：真机安装+样板/AI/朗读三合入域走查+logcat 0 FATAL
+  - [ ] 8.2.2 W4 跨域走查：视频/朗读/Rss 三大热点域同包集中走查清单（含 W3 末 D4 首次真机）
+  - [ ] 8.2.3 W5 全量：run_e2e.py --tc all 全过 + kpi-final.md 产出
+- [ ] 8.3 分期提交门禁（每期收束，R11）
+  - [ ] 8.3.1 updateLog 基于 git diff 真实变更更新（编译前，version-delivery-sync 三步流程）
+  - [ ] 8.3.2 文档同步（INDEX/README/registry 回执/热点表状态/issues-found）
+  - [ ] 8.3.3 daemon 清场（stop-daemons.bat）
+  - [ ] 8.3.4 Grep `android.util.Log.d|e` 残留=0 + 临时日志 Tag（如 SwipeTest 类）清理确认
+  - [ ] 8.3.5 Conventional Commits 一期一提交（大型分期 B3/B4/C2 按页/Phase 子提交）
+- [ ] 8.4 回退预案就位（每期开工前）
+  - [ ] 8.4.1 bak 目录备份
+  - [ ] 8.4.2 灰度/观察开关登记（P0 四开关状态表 + C2/C3 新功能门控）
+  - [ ] 8.4.3 热点文件实施前后 diff 存档
+  - [ ] 8.4.4 回退路径确认：一期一提交单元完整性检查（保证可按分期 revert；回退后重算依赖分期占号并同步 registry）
+
+## AOAdapt 日志
+
+- [2026-08-31] 初版后用户质询"就这么随意么？不需要再全面审核一下么？"
+  - Action: 3 审核子代理并行（规范性/事实核对/遗漏排查）
+  - Observation: 3 P1+6 P2 + 事实 10/10 一致 + 14 个视频域活跃 spec 遗漏 + deep-fix 实况过时
+  - Adapt: 全修 + AD-07 V 轨挂靠 + R8/R9 + deep-fix 1.1 改写 + 新增 0.4/2.10-2.12/3.4-3.6/5.5-5.6
+
+- [2026-08-31] 二轮用户质询"共性问题怎么整合？方案有没有打架？"
+  - Action: 8 组点对点推演
+  - Observation: 真打架 3 + 正交 4 + 编号碰撞
+  - Adapt: design §5 推演矩阵 + 1.7 双栈豁免 + registry 自适应规则 + 4.8e 方案 B 提示
+
+- [2026-08-31] 三轮用户质疑"这么凑巧？没有重合冲突点么？"
+  - Action: 承认非全覆盖，3 域分组子代理矩阵式扫描（轨C×轨B 15 对/阅读朗读 DB 15 对/UI 域约 20 对）
+  - Observation: X1-X14 新发现（真冲突 4/语义交叉 4/热点新增 5 对/正交实证 2），0 对不兼容级真冲突
+  - Adapt: 热点表 9→14 对 + design §5.1 + tasks 新增 1.8/2.13/2.14/3.7 及多任务修订
+
+- [2026-08-31] 四轮用户质询"如何测试验证如何提交确保万无一失？设计文档有说明么？"
+  - Action: 诚实盘点缺验证交付专章 → 补 design §6 + spec R10/R11
+  - Observation: 四层验证体系 + 回退预案 + 提交策略成型
+  - Adapt: tasks §8 验证框架 + 7.3 验收材料前置
+
+- [2026-08-31] 五轮用户批评"设计内容要回填文档，至少要有子任务"
+  - Action: tasks.md 全量子任务化（60+ 子任务）+ 分期实施标注子任务账本引用防双账本
+  - Observation: 子任务粒度达成
+  - Adapt: 第五次提请检查点 1
+
+- [2026-08-31] 六轮用户要求"最后一次全面审查，全方位无死角"
+  - Action: 3 终审子代理并行（内部一致性/外部引用/逻辑闭环）+ 主代理源码实测 version=109
+  - Observation: 内部 6 P0（"9 对"残留/v111/README Phase1/22≠21/AD 索引断链/整合点漏项）+ 外部 4 偏差（22 单测/70 工具/kpi-final/forks 防重复）+ 逻辑 1 P0（热点⑧被波次违反）+ 8 P1（进入条件自引用/ng P4 漏网/↔无方向/5.5 接管等）
+  - Adapt: 四文档全量修复（热点单向化/进入条件可判定化/ng P4 暂缓显式/E2 裁决/5.5 事件驱动/S5 场景/7.5 L4/v111 顺延/G1-G3 改名）
+
+- [2026-08-31] 七轮用户要求"再次全面审核"
+  - Action: 2 终审子代理（重写后回归检测+可执行性演练）
+  - Observation: 回归检测：六轮 10 项修复 9 项完全落盘，热点⑧链序文字反写残留 + design §6 结构错位 + §4 算术偏差（32→31）+ P2 处置确认（P2-19/32 已修）；演练：F1 P0（"14 spec 清单"无法照单誊录，§4 表计数口径脱节→实为 18 实质协调面+33 全表）+ F2-F15（账本指位偏差 §3.6→§4.1/占号状态枚举缺/Q1 首日裁决/豁免条款落点/1.5-1.6 锚点/3.6 首项/TEMPLATE.md 模板锚点/分册对照/旧口径头注/验收单载体等）
+  - Adapt: design §4 导语重写（18 实质协调面+33 全表+计数以表为准）、热点⑧链序正写、§6 移位 File Changes 前、AD-07 18 个、裸 ng 前缀统一、W1/W2 行补 2.13/2.14/3.7、W2 推荐序 3.6 首位、W5 进入条件可判定化；tasks 补 0.4.1 誊录口径/1.2.1 枚举/1.2.4 自批/1.3 Q1 裁决/1.4 §3.6+§4.1/1.5-1.6 锚点/1.7 拆分/1.9 分册头注/头部 TEMPLATE+分册对照/2.12 W1 收束前/8.1.5 验收单载体；第七次提请检查点 1

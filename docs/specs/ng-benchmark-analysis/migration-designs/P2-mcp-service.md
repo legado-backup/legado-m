@@ -1,9 +1,10 @@
-﻿# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
+﻿﻿# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
 
 > 前置：P1 收口；依据 design.md AD-04 与 evidence-pack.md §E/§D。
 > NG 根：`F:\...legado_NG-main`（快照 3.26.082815）；本项目路径均相对 `app/src/main/java/io/legado/app/`。
 > 状态：设计前置，未审查不实施（AD-02）。本文为函数/代码级深化版，覆盖现版。
 > 深化基线：NG `web/mcp/McpServer.kt` 实测 **1743 行**（现版记 1650 有偏差）、`BookshelfMcpTools.kt` 实测 **2462 行**（现版记 479 行仅为 schema 段）、`SettingsMcpTools.kt` 771 行、`McpService.kt` 161 行、`McpHttpServer.kt` 21 行、`McpTextSanitizer.kt` 34 行。
+> V6 红队修订（2026-08-30）：写标记补正（network_log_clear/debug_log_clear→write=true，写 29→31/只读 40→38）、删类工具四道子门、§C 规格勘误 6 处、bookshelf_search 注册为独立可见工具（69→70）、McpAuth 摘要+常数时间比较、工作量 8.75→9.25d。
 
 ## 1 目标与非目标
 
@@ -33,7 +34,7 @@ graph TD
     AUTH -->|401| HS
     AUTH --> R1[McpMethodRouter<br/>isEnabled 守卫/uri 白名单<br/>GET 405/方法分发]
     R1 --> P[McpProtocol<br/>JSON-RPC 2.0 解析<br/>批量/错误码/响应构造]
-    R1 --> REG[McpToolRegistry<br/>69 个 McpToolDef 注册表<br/>name→schema+write+handler]
+    R1 --> REG[McpToolRegistry<br/>70 个 McpToolDef 注册表<br/>name→schema+write+handler]
     R1 --> RES[resources/readResource<br/>legado:// 静态资源]
     REG --> EXE[McpToolExecutor<br/>runCatching+toolResult 包装<br/>限幅/超时/串行锁]
     EXE --> D1[api/controller<br/>BookSourceController 等]
@@ -48,7 +49,7 @@ graph TD
 | 传输 | 仅 POST `/` 与 `/mcp`（uri 白名单 :96-102）；GET→405 "MCP stream is not supported"（:116-120）；notification 无 id→202 ACCEPTED 空体（:105-114） | 原样平移到 Router |
 | initialize 握手 | 响应 `protocolVersion="2025-06-18"`（:49）+ `capabilities.tools.listChanged=false` + `capabilities.resources` + `serverInfo{name,version:"0.1.0"}`（:189-201） | 原样；serverInfo.name 改本项目品牌值 |
 | notifications/initialized | `id==null && method.startsWith("notifications/")` → 返回 null 静默（:169-171） | 进 Protocol 的 request 归一 |
-| tools/list | 一次性返回全部工具数组，无 cursor 分页（:176） | Registry 聚合 69 工具；**新增**每工具 `annotations:{readOnlyHint,destructiveHint}`（NG 无，借 NG McpInternalToolCatalog.kt:20-25 McpToolSideEffect 枚举概念） |
+| tools/list | 一次性返回全部工具数组，无 cursor 分页（:176） | Registry 聚合 70 工具；**新增**每工具 `annotations:{readOnlyHint,destructiveHint}`（NG 无，借 NG McpInternalToolCatalog.kt:20-25 McpToolSideEffect 枚举概念） |
 | tools/call | result=`{content:[{type:"text",text:GSON(result)}], structuredContent:result, isError:(result.ok!=true)}`（:679-689） | Executor 统一包装 |
 | 批量 RPC | 数组→逐项处理→响应数组；空数组/非对象元素→-32600（:147-160）；**全 notification 批量返回 200 "[]" 而非 202**（handleBatch 恒非 null） | 原样（边界 F2） |
 | 错误码 | -32700 空体/解析失败（:130-135）；-32600 非对象/缺 method（:143,167）；-32601 未知方法（:182）；-32603 执行异常兜底（:184-186） | 全部收敛进 Protocol |
@@ -127,7 +128,7 @@ data class McpToolDef(
 
 object McpToolRegistry {
     private val tools by lazy {
-        McpCoreTools.defs + McpBookshelfTools.defs + McpSettingsTools.defs   // 17+36+16=69
+        McpCoreTools.defs + McpBookshelfTools.defs + McpSettingsTools.defs   // 18+36+16=70（V6：bookshelf_search 独立注册；写 31/读 39）
     }
     // → tools/list：schema + annotations(readOnlyHint=!write, destructiveHint=write)
     // D8 单一事实源模式（schema+handler 合一）建议回灌 architecture_rules（V3 提升点登记，仅登记不展开）
@@ -145,6 +146,7 @@ object McpToolRegistry {
 
 // 核心工具表（NG :223-555 本文件 20 个，删 storyboard/ai_chat 3 个后 17 个；
 // handler 委托 Executor，schema 留此，二者物理分离避免 NG 双表漂移）
+// V6：bookshelf_search 注册为独立可见工具（独立 schema 对齐 NG，共享 book_search handler）→ 核心 18 defs
 private object McpCoreTools { val defs: List<McpToolDef> }
 ```
 
@@ -202,7 +204,7 @@ object McpToolExecutor {
 | :162-187 | handleRequest | id/notification/兜底→Protocol；when(method)→Router.route |
 | :189-201 | initializeResult | Protocol |
 | :203-221 | 内部通道入口 | **不迁** |
-| :223-555 | 本文件 20 工具 schema | Registry.McpCoreTools（17）+ tools/ 两文件 |
+| :223-555 | 本文件 20 工具 schema | Registry.McpCoreTools（18，含 bookshelf_search 独立注册）+ tools/ 两文件 |
 | :558-580 | tool()/stringSchema 构造器 | Registry（schema 构造唯一副本） |
 | :582-618 | resources/readResource | Router |
 | :620-690 | callTool 骨架+包装 | Registry.call + Executor.wrap |
@@ -218,14 +220,14 @@ object McpToolExecutor {
 | McpHttpServer.kt:6-20 | NanoHTTPD 壳 | `web/mcp/McpHttpServer.kt` 平移（委托 Router） |
 | McpService.kt:29-161 | 前台服务全件 | `service/McpService.kt` 平移 |
 | McpTextSanitizer.kt:7-34 | 脱敏+区间归一 | `web/mcp/McpTextSanitizer.kt` 平移 |
-| BookshelfMcpTools.kt 全文 | 43 工具（call 表 :519-560） | tools/McpBookshelfTools（36，删 character_* 6，bookshelf_search 并入核心 book_search 别名） |
+| BookshelfMcpTools.kt 全文 | 43 工具（call 表 :519-560） | tools/McpBookshelfTools（36，删 character_* 6；bookshelf_search 按 V6 裁决注册为独立可见工具，入核心共享 book_search handler） |
 | SettingsMcpTools.kt 全文 | 16 工具 | tools/McpSettingsTools（16 全收） |
 
 ### B.7 两个 Tools 适配文件的裁剪要点
 - `tools/McpBookshelfTools.kt`（~400 行）：保留分组 4/书籍 6（book 5+stats 1）/当前书 1/章节正文 4/缓存 3/书签 4/阅读记录 4/换源 2/替换规则含 draft 三件套 8（replace 5+draft 3） = 36 工具；删 `character_*` 6（schema :351-403 + 实现 :1494-1672）。**work_key 解耦**：NG `resolveBook`（:1862-1880）与归一化（:1914-1925）依赖 `BookCharacterProfile.workKey(name,author)` 纯函数（"书名\n作者" 归一），本项目无该实体——移植纯函数为 `web/mcp/McpBookIdentity.kt`（~40 行：workKey/sameIdentity/normalizeIdentityInput，零实体依赖），`resolveBook` 三级回退（work_key→book_url→name+author）保留。内置分组保护（groupId<0 拒改，:596-604）、draft 组名 "AI草稿"（:48）、`selectChapters`（:1927-2014）/`toExclusiveRanges`（:2016-2032）/`limitText`（:2317-2326）/`sha256Hex`（:2457-2461）全量平移。
 - `tools/McpSettingsTools.kt`（~250 行）：16 工具全收（txt_toc 5 + replace 5 + dict 5 + stats 1）；保留 snake_case/camelCase 双键兼容（:346-369）与 regex 预校验（validateRegex :655-659）；replace_rule upsert 走本项目 dao 还是 `ReplaceRuleController.saveRule(postData)`（ReplaceRuleController.kt:24-37 签名已核，仅单条不回 id）→ 见 J5 裁决。
 
-## C. 15 组工具规格表（69 个工具，逐组列明）
+## C. 16 组工具规格表（70 个工具，逐组列明）
 
 实现路径缩写：`BSC`=BookSourceController、`dao`=appDb 直操作、`NG:`=NG 原行号。**写**列 = mcpAllowWrite 门控；限幅列默认值/上限。
 
@@ -237,44 +239,56 @@ object McpToolExecutor {
 | G3 | `book_source_get` | url* | BSC.getSource(parameters)（BSC.kt:61 签名同构）；NG:261/645 | 否 | — |
 | | `book_source_explore_kinds_get` | url*，timeout 1..120s | source.exploreKinds()（本项目 help/source 同名扩展）；NG:269/971 | 否 | 30s |
 | G4 | `book_source_save` | source 对象* | BSC.saveSource(GSON)；NG:281/653 | **是** | — |
-| | `book_source_delete` | urls[]* | dao mapNotNull+delete；NG:292/692 | **是** | — |
+| | `book_source_delete` | urls[]*，confirm*（V6 子门②） | dao 单事务批量 delete（appDb.withTransaction 包整批，并发对应 F6——NG 逐条 mapNotNull+delete 非原子）；删前自动导出（子门④）；NG:292/692 | **是** | 批量 ≤20/次（子门①） |
 | | `book_source_set_enabled` | urls[]*，enabled | dao enable；NG:303/714 | **是** | — |
-| G5 | `book_source_debug` | tag*，key*，mode{auto/search/detail/explore/toc/content}，timeout | Debug.callback+latch+debugRunLock 串行（本项目 Debug.kt:23/81/251 API 已核同构）；NG:318/739 | 否（耗网络） | 30s |
-| G6 | `book_search`（`bookshelf_search` 别名） | key*，scope，wait_for_finish，min_results，timeout，offset，limit，include_detail | SearchModel.CallBack（本项目 SearchModel.kt:229-235 同签名）+latch+内存分页；NG:336/791 | 否 | 50/200，30s |
+| G5 | `book_source_debug` | tag*，key*，mode{auto/search/detail/explore/toc/content}，timeout_seconds（NG :743 实测参数名） | Debug.callback+latch+debugRunLock 串行（本项目 Debug.kt:23/81/251 API 已核同构）；NG:318/739 | 否（耗网络） | 30s |
+| G6 | `book_search`；`bookshelf_search`（V6 裁决：注册为独立可见工具，tools/list 可发现，独立 schema 对齐 NG，共享 handler） | key*，scope，wait_for_finish，min_results，timeout_seconds（NG :349 实测参数名），offset，limit，include_detail | SearchModel.CallBack（本项目 SearchModel.kt:229-235 同签名）+latch+内存分页；NG:336/791 | 否 | 50/200，30s |
 | G7 | `bookshelf_group_list/get/upsert/delete`；`bookshelf_book_list/get/upsert/delete/group_update`；`bookshelf_stats_get` | group_id/group_name/book_urls/mode{add,remove,replace} | dao bookGroupDao/bookDao；内置组拒改；分组位运算；NG BookshelfMcpTools:52-139/565-860 | upsert/delete/update **是** | 列表 50/200 |
-| G8 | `bookshelf_current_book_get` / `bookshelf_chapter_list` | 书籍定位，start/end/limit/keyword/include_detail | ReadBook.book+bookDao.lastReadBook；bookChapterDao.getChapterList；NG:141,146/837-908 | 否 | 章节 100/300 |
+| G8 | `bookshelf_current_book_get` / `bookshelf_chapter_list` | 书籍定位，start/end/limit/keyword/include_detail/include_cache_status/include_all（include_all 绕过 300 章分页上限——风险注记：单响应返回全量章节元数据，LLM 上下文消耗大） | ReadBook.book+bookDao.lastReadBook；bookChapterDao.getChapterList；NG:141,146/837-908 | 否 | 章节 100/300 |
 | G9 | `bookshelf_chapter_content_get` / `text_window_get` / `chapter_snippets_get` | 章节定位+char_limit | BookHelp.getContent（本项目 BookHelp.kt:547 同签名）+McpTextSanitizer.forModel+sha256+截断标记；只读缓存不联网；NG:163,177,191/910-1123 | 否 | 正文 20K/120K；窗口 1/20 章；片段 200/2000，≤80 章 |
-| G10 | `bookshelf_cache_status_get/download/clear` | 章节选择 indexes/ranges/start-end/clear_book | BookHelp.hasContent(:488)/delContent(:575)/clearCache(:79)+CacheBook.start(appCtx,book,start,end)（CacheBook.kt:90 同签名）；本地书拒操作；NG:209-249/1125-1239 | download/clear **是** | 状态 500 章 |
+| G10 | `bookshelf_cache_status_get/download/clear` | 章节选择 indexes/ranges/start-end/clear_book；download 支持 refresh_existing（true=先删已有缓存再下载——破坏性子行为披露，V6 补录） | BookHelp.hasContent(:488)/delContent(:575)/clearCache(:79)+CacheBook.start(appCtx,book,start,end)（CacheBook.kt:90 同签名）；本地书拒操作；NG:209-249/1125-1239 | download/clear **是** | 状态 500 章 |
 | G11 | `bookshelf_bookmark_list/get/upsert/delete` | time 主键 | bookmarkDao；NG:251-286/1241-1366 | upsert/delete **是** | 50/200 |
-| G12 | `bookshelf_read_record_list/get/upsert/delete` | book_name，device_id 默认 AppConst.androidId | readRecordDao；NG:288-318/1368-1463 | upsert/delete **是** | 50/200 |
-| G13 | `bookshelf_book_sources_get` / `change_source_preview` | 书籍定位 | searchBookDao.getEnabledByNameAuthor 候选预览，不执行换源；NG:332,342/1465-1492 | 否 | — |
+| G12 | `bookshelf_read_record_list/get/upsert/delete` | book_name，device_id 默认 AppConst.androidId，sort 枚举参数（NG :1368-1463 schema 实测，枚举值平移） | readRecordDao；NG:288-318/1368-1463 | upsert/delete **是** | 50/200 |
+| G13 | `bookshelf_book_sources_get` / `change_source_preview` | 书籍定位 | 候选预览，不执行换源；V6 勘误：本项目 SearchBookDao 无 getEnabledByNameAuthor（仅 getFirstByNameAuthor，SearchBookDao.kt:50）→ M5 补新增 @Query getEnabledByNameAuthor 工作项（无 schema 变更）；NG:332,342/1465-1492 | 否 | — |
 | G14 | `bookshelf_replace_rule_list/get/upsert/delete/set_enabled` + `draft_upsert/draft_apply/rollback` | rule/rules 对象，ids | replaceRuleDao；draft 组固定"AI草稿"；NG:405-479/1674-1845 | 6 个 **是** | 50/200 |
 | G15 | `settings_rule_stats_get` + `settings_txt_toc_rule_*`(5) + `settings_replace_rule_*`(5) + `settings_dict_rule_*`(5) | id/ids/name/names，rule 对象 | txtTocRuleDao/replaceRuleDao/dictRuleDao（实体本项目均确认存在）；regex 预校验；NG SettingsMcpTools 全文 | upsert/delete/set_enabled 9 个 **是** | 50/200 |
+| G16 | `network_log_list/get/clear` / `debug_log_list/get/clear` | list：offset/limit；get：id*；clear：无参 | NetworkLog.logs/find/clear（自带脱敏层，evidence-pack §A）；AppLog.logs LogEntry 投影（time/message/throwable/level）；NG:1025-1093/1258-1316 | clear **是**（V6 补标：破坏性清空操作原漏标 write=true） | list 20/50，detail 16K/64K（debug 20/100，stack 16K/64K） |
 | — | 排除：storyboard/ai_chat 2/agent_memory 4/character 6 | — | 依赖缺失（§1） | — | — |
 
-> 写工具合计 **29 个**；只读 40 个。数字修正：现版"Bookshelf 26 工具"系把组当工具计数，实测收录 36。
+> 写工具合计 **31 个**（V6 补标 network_log_clear/debug_log_clear：破坏性清空 write=true）；只读 38 个 + 独立注册的 bookshelf_search（只读）= 39 个，总数 70。数字修正：现版"Bookshelf 26 工具"系把组当工具计数，实测收录 36。
 
 ## D. 四层安全（代码级）
 
 **L1 默认关闭开关**：`isEnabled() = BuildConfig.DEBUG || appCtx.getPrefBoolean(PreferKey.mcpService, false)`（NG McpServer.kt:84 原样——debug 测试包免配置可测，release 纯靠开关）。关闭时 Router 返回 404 "MCP service is disabled"（NG :89-95 行为）。
 
-**L2 设置项 UI 挂点**：`ui/config/OtherConfigFragment.kt` 的 `numberAction(PreferKey.webPort)`（:415-423）模板之后追加 4 个 spec：①`switch(mcpService)` 开关（联动 McpService.start/stop）②`numberAction(mcpPort)` min=1024 max=65530 ③`switch(mcpAllowWrite)` 默认 false ④`SettingActionSpec(mcpToken)` 点击生成随机 UUID 写入并显示前 8 位。AppConfig 新增 4 属性仿 `webPort` getter/setter（AppConfig.kt:2323-2326 模板）。字符串资源仿 `web_port_title`（values/strings.xml:684）。
+**L2 设置项 UI 挂点**：`ui/config/OtherConfigFragment.kt` 的 `numberAction(PreferKey.webPort)`（:415-423）模板之后追加 4 个 spec：①`switch(mcpService)` 开关（联动 McpService.start/stop）②`numberAction(mcpPort)` min=1024 max=65530 ③`switch(mcpAllowWrite)` 默认 false ④`SettingActionSpec(mcpToken)` 点击生成随机 UUID，明文一次性展示（仅生成时可见，丢失需重新生成），SP 仅存其 SHA-256 摘要（OQ-4 裁决，校验见 L3）。AppConfig 新增 4 属性仿 `webPort` getter/setter（AppConfig.kt:2323-2326 模板）。字符串资源仿 `web_port_title`（values/strings.xml:684）。
 
 **L3 token 鉴权（header 校验点）**：新增 `web/mcp/McpAuth.kt`（~60 行）。校验点在 `McpHttpServer.serve()` 委托 Router 之前（body 解析后）：
 ```kotlin
 object McpAuth {
     fun check(headers: Map<String, String>): Boolean {
-        val token = appCtx.getPrefString(PreferKey.mcpToken).orEmpty().trim()  // ***SP 存储
-        if (token.isBlank()) return true                    // 未配置=不启用（对齐 D6）
+        val digest = appCtx.getPrefString(PreferKey.mcpToken).orEmpty().trim()  // ***SP 仅存 SHA-256 摘要（OQ-4 裁决）
+        if (digest.isBlank()) return true                   // 未配置=不启用（对齐 D6）
         val auth = headers["authorization"].orEmpty()
-        return auth == "Bearer $token"                      // 与本项目 AiMcpClient.kt:198-199 出站格式对齐
+        if (!auth.startsWith("Bearer ")) return false
+        val provided = sha256Hex(auth.removePrefix("Bearer ").trim())   // 纯函数，与 BookshelfMcpTools.kt:2457-2461 同实现
+        return MessageDigest.isEqual(                       // 常数时间比较，防时序侧信道（V6 加固）
+            provided.toByteArray(), digest.toByteArray())   // 出站格式与 AiMcpClient.kt:198-199 Bearer 对齐
     }
-    fun allowWrite(): Boolean = appCtx.getPrefBoolean(PreferKey.mcpAllowWrite, false)
+    fun allowWrite(): Boolean {                             // V6 子门③：开启后 10 分钟自动回落
+        if (!appCtx.getPrefBoolean(PreferKey.mcpAllowWrite, false)) return false
+        val openedAt = appCtx.getPrefLong(PreferKey.mcpAllowWriteAt, 0L)   // SP 新增第 5 键（M1 随 4 键一并）
+        if (System.currentTimeMillis() - openedAt > 10 * 60 * 1000L) {
+            appCtx.putPrefBoolean(PreferKey.mcpAllowWrite, false)
+            return false
+        }
+        return true
+    }
 }
 ```
 失败→HTTP 401 text "unauthorized"（日志只记长度与结果，不记 token 值）。
 
-**L4 写工具二重门（确认流程）**：Registry.call 中 `def.write && !allowWrite()` → `toolResult(ok=false, warnings=["写操作未授权：请在设置中开启 MCP 写权限后重试"])`（可观测的 isError 结果而非协议错误）。开启后由 `mcpAllowWrite` 全局放行 + token 组成二重门；同时 tools/list 输出 `annotations.destructiveHint=true` 向客户端明示（MCP 标准注解），外部 LLM 侧触发自身确认流。draft 三件套保留 NG"草稿→apply→rollback"确认链（BookshelfMcpTools.kt:453-478 设计意图）。
+**L4 写工具二重门（确认流程）**：Registry.call 中 `def.write && !allowWrite()` → `toolResult(ok=false, warnings=["写操作未授权：请在设置中开启 MCP 写权限后重试"])`（可观测的 isError 结果而非协议错误）。开启后由 `mcpAllowWrite` 全局放行 + token 组成二重门；同时 tools/list 输出 `annotations.destructiveHint=true` 向客户端明示（MCP 标准注解），外部 LLM 侧触发自身确认流。V6 补标：network_log_clear/debug_log_clear 为破坏性清空操作，write=true（destructiveHint 同步覆盖）。draft 三件套保留 NG"草稿→apply→rollback"确认链（BookshelfMcpTools.kt:453-478 设计意图）——但 draft 链不覆盖 book_source 族（save/delete/set_enabled 无草稿机制），V6 据此对删类工具（入参为 urls[]/ids[]、含 settings 族 names[] 的批量删除族）扩展**四道子门**：①批量上限 ≤20 条/次；②强制二次确认参数 confirm=true——不带该参数时拒绝执行并回显待删数量（isError + warnings 提示"N 条待删除"）；③mcpAllowWrite 开启时效 10 分钟自动回落（实现于 McpAuth.allowWrite 时间戳校验，SP 新增键 mcpAllowWriteAt）；④批量删除前自动导出待删条目 JSON 到本地缓存（`files/mcp_backup/`，替代回收站，供事后恢复）。book_source_delete 相应改为单事务批量删除（appDb.withTransaction 包裹整批，对应并发边界 F6——NG 逐条 mapNotNull+delete 非原子）。
 
 **Sanitizer 正则清单**（McpTextSanitizer.kt:9-11 平移，只改出栈视图不改缓存原文）：
 1. `(?is)<img\b[^>]*data:image/[^>]*>` → 提取 alt 或空串（删 base64 内嵌图）
@@ -340,7 +354,7 @@ object McpAuth {
 | 类 | 方法 |
 |---|---|
 | `McpProtocolTest` | `parse_blank_returns32700` / `parse_malformed_returns32700` / `dispatch_batchArray` / `handleBatch_empty_returns32600` / `handleBatch_allNotifications_returnsEmptyArray`（F2 锁定）/ `handleRequest_unknownMethod_returns32601` / `handleRequest_notification_silent` / `initializeResult_schema` / `asRequiredString_blankThrows` |
-| `McpToolRegistryTest` | `listTools_count69`（数量门禁）/ `listTools_writeToolsHaveDestructiveHint`（=29）/ `call_unknownTool_throws` / `call_writeTool_deniedWhenSwitchOff` |
+| `McpToolRegistryTest` | `listTools_count70`（数量门禁）/ `listTools_writeToolsHaveDestructiveHint`（=31）/ `call_unknownTool_throws` / `call_writeTool_deniedWhenSwitchOff` |
 | `McpToolExecutorTest` | `wrap_businessError_returnsIsError`（F14）/ `toolResult_shape` |
 | `McpBookIdentityTest` | `workKey_normalizesCRLF` / `sameIdentity_caseInsensitive`（对拍 NG 纯函数语义） |
 | `McpTextSanitizerTest` | `forModel_removesBase64Image_keepsAlt` / `forModel_noAlt_placeholder` / `inclusiveChapterEnd_clamps`（NG 有同名单测可对拍） |
@@ -348,56 +362,60 @@ object McpAuth {
 
 **L2（真机，测试包 io.legado.miss.app.debug）**
 1. 设置开启 MCP（写开关保持关）→启动→通知栏显示 host:port；
-2. `npx @modelcontextprotocol/inspector --cli http://<ip>:1124/mcp`：initialize→tools/list（断言 69）→tools/call `legado_ping`、`book_source_list(limit=2)`；
+2. `npx @modelcontextprotocol/inspector --cli http://<ip>:1124/mcp`：initialize→tools/list（断言 70）→tools/call `legado_ping`、`book_source_list(limit=2)`；
 3. curl JSON-RPC 套件：畸形 JSON→-32700、未知方法→-32601、批量数组、notification→202、错误 token→401、写工具→isError；
 4. 断网切 Wi-Fi→通知地址随 NetworkChangedListener 刷新（对拍 WebService）；
 5. 关闭开关→POST→404。通过后沉淀 `ai_tests/scripts/l2_verify_mcp_smoke.py`（遵循 ai_e2e_testing_workflow）。
 
-**L3（Claude Desktop，mcp-remote 桥接）六场景——人工执行（依赖 Claude Desktop/mcp-remote 外部编排，ai_tests 无法自动化）**：① tools/list 载入 69 工具（可脚本化断言，可下沉 L2 由 l2_verify_mcp_smoke.py 覆盖）；② book_search 实搜+分页；③ chapter_content_get 响应无 `<img>` base64（脱敏生效）；④ 开写开关后 `book_source_set_enabled` 切换一源→App UI 状态同步；⑤ 未开写开关 `book_source_delete`→isError 负路径（可脚本化断言，可下沉 L2 由 l2_verify_mcp_smoke.py 覆盖）；⑥ 配置 token 后本机 AiMcpClient 回环连自家服务端（对拍双向协议一致性）。
+**L3（Claude Desktop，mcp-remote 桥接）六场景——人工执行（依赖 Claude Desktop/mcp-remote 外部编排，ai_tests 无法自动化）**：① tools/list 载入 70 工具（可脚本化断言，可下沉 L2 由 l2_verify_mcp_smoke.py 覆盖）；② book_search 实搜+分页；③ chapter_content_get 响应无 `<img>` base64（脱敏生效）；④ 开写开关后 `book_source_set_enabled` 切换一源→App UI 状态同步；⑤ 未开写开关 `book_source_delete`→isError 负路径（可脚本化断言，可下沉 L2 由 l2_verify_mcp_smoke.py 覆盖）；⑥ 配置 token 后本机 AiMcpClient 回环连自家服务端（对拍双向协议一致性）。
 
 ## I. 实施顺序依赖图与门禁
 
 ```mermaid
 graph LR
-    M1[M1 常量层<br/>PreferKey×4/EventBus/NotificationId/AppConfig/strings] --> M2[M2 McpProtocol<br/>+单测]
-    M2 --> M3[M3 Registry骨架+Executor<br/>核心 17 工具+写门]
+    M1[M1 常量层<br/>PreferKey×5/EventBus/NotificationId/AppConfig/strings] --> M2[M2 McpProtocol<br/>+单测]
+    M2 --> M3[M3 Registry骨架+Executor<br/>核心 18 工具+写门+删类四道子门]
     M3 --> M4[M4 McpService+McpHttpServer<br/>+McpAuth+McpBookIdentity]
-    M4 --> M5[M5 tools/ 全量 52 工具<br/>Bookshelf36+Settings16+Sanitizer]
+    M4 --> M5[M5 tools/ 全量 52 工具<br/>Bookshelf36+Settings16+Sanitizer<br/>+SearchBookDao @Query 补齐]
     M5 --> M6[M6 设置 UI 4 spec]
     M6 --> M7[M7 L1 单测全绿→L2→L3→脚本固化]
 ```
 门禁：M1-M6 每阶段 `./gradlew assembleAppDebug` 过（构建后 `stop-daemons.bat` 清场）；M2/M3/M5 随段跑对应单测；M7 前 Grep `android.util.Log.d|Log.e` 零残留；updateLog 在 M1 编译前更新；全程不动既有 27 端点与 DB。
+
+**规范回灌任务项（对齐 design.md「规范保证与回灌执行机制」，提升清单 P2 来源条目随期回灌）**：实施 tasks.md 强制包含"规范回灌"任务项——注册表单一事实源（P2-D8 → architecture_rules.md）。回灌完成后由验证轮复核规范文件实际变更与提升清单一致；本设计阶段不动规范原文；回灌验收三要素：触发场景+反模式示例+可 Grep 判定。
+**规范核查表执行**：实施 tasks.md 同步包含"规范核查表执行"任务项——每完成 §I 一个 M 阶段，对照 §G 规范符合性核查逐条打勾（审查可 Grep 复核勾选记录）。
 
 ## J. Open Questions
 
 1. **isEnabled 的 DEBUG 直通**（NG :84）是否保留——debug 包免配置可测 vs 误开风险（debug 包仅测试机，建议保留，待检查点裁决）。
 2. ✅【已关闭 2026-08-30】**book_search 忙时守卫**：裁决为 **MCP 侧串行 Mutex 守卫**（"忙时返回 isError"语义保留，但忙的判定不是 UI 状态）——book_search/bookshelf_search handler 入口 tryLock 共享 Mutex，失败返回 isError "上一搜索仍在进行"。证据：① 本项目 SearchModel.kt:41 `workingState = MutableStateFlow(true)` 实为 UI 搜索页实例私有的**暂停/恢复**语义（pause :209-211 / resume :213-215），非全局"忙"标志，跨模块检测需新增进程级全局状态，违反轻守卫初衷；② MCP 每次触发新建独立 `SearchModel(scope, callback)` 实例（§B.5 :791-888 平移），与 UI 实例无共享可变状态，搜索为只读操作，UI 搜索与 MCP 搜索并发本身无害（NG 亦无此守卫）；③ 真正需要防的是 MCP 自身重入（LLM 客户端连发两次 book_search 抢并发配额）——Mutex 即完整覆盖。实现点：McpToolExecutor.kt book_search handler（§B.5，标注"OQ-2 关闭引发"）。
 3. **resources 是否保留**：建议保留（3 条静态 schema，成本 ~40 行，对 LLM 首次发现友好）；prompts/list 恒空数组照 NG。
-4. **token 生成方式**：UUID 存 SP 明文（与 webDavPassword 同敏感级，已有先例）vs 只存摘要（校验时比对摘要）——倾向摘要方案，M7 前定。
+4. ✅【已关闭 2026-08-30】**token 生成方式**：裁决定死=**摘要方案**——SP 仅存 SHA-256(token) 摘要；校验时对出站 Bearer 值求 SHA-256 后用 MessageDigest.isEqual 常数时间比较（实现见 §D-L3 McpAuth.check）；明文仅生成时一次性展示，丢失需重新生成。
 5. **replace_rule upsert 走 Controller 还是 dao**：Controller.saveRule 仅单条且不回 id（ReplaceRuleController.kt:24-37），批量 upsert/回 id 需 dao；建议 replace 族走 dao、book_source 族走 Controller（与 NG :645-658 一致），实现期微调不另立设计。
 
 ## K. 工作量估算（函数粒度）
 
 | 模块 | 粒度 | 估时 |
 |---|---|---|
-| M1 常量层 | PreferKey 4 键+EventBus 1+NotificationId 1+AppConfig 4 属性+strings 8 条 | 0.25d |
+| M1 常量层 | PreferKey 5 键（+mcpAllowWriteAt）+EventBus 1+NotificationId 1+AppConfig 4 属性+strings 8 条 | 0.25d |
 | McpProtocol | parse/dispatch/handleBatch/handleRequest/3 响应构造/8 扩展 + 单测 9 法 | 0.75d |
 | McpMethodRouter | serve/route/resources/readResource/apiSummary | 0.5d |
-| McpToolRegistry | McpToolDef+listTools/call/resolve+核心 17 schema 迁移 | 1d |
+| McpToolRegistry | McpToolDef+listTools/call/resolve+核心 18 schema 迁移（含 bookshelf_search 独立注册） | 1d |
 | McpToolExecutor | wrap/toolResult+书源族 8 实现（debug/search 最重各 0.5d）+日志族 6+投影扩展 | 1.5d |
 | tools/Bookshelf | 36 工具（resolveBook/selectChapters/draft 链/group 位运算）+McpBookIdentity | 1.5d |
 | tools/Settings | 16 工具（三族 upsert 校验） | 0.75d |
 | M4 服务层 | McpService 平移改串+HttpServer+Auth+通知 | 0.5d |
 | M6 设置 UI | 4 spec+开关联动 | 0.5d |
 | M7 测试 | 单测 6 类 23 法+L2 脚本固化+L3 实测 | 1.5d |
-| **合计** | | **~8.75 人日** |
+| V6 加固项 | 删类四道子门（批量 ≤20 上限/confirm 二次确认/10min 回落/删前导出 JSON）+book_source_delete 单事务批量+SearchBookDao @Query 补齐+MessageDigest.isEqual 常数时间比较 | 0.5d |
+| **合计** | | **~9.25 人日** |
 
 ## 设计决策记录（第三轮增补）
 
 | # | 决策 | 理由 |
 |---|---|---|
 | D8 | Registry 单一事实源（McpToolDef 合并 schema+handler），替代 NG"tools() 表+callTool when"双表 | 消除 NG 双表漂移与三文件 3 份 toolResult/扩展重复；工具增删只动一处 |
-| D9 | work_key 移植为纯函数 McpBookIdentity，不引 BookCharacterProfile 实体 | 保留 36 个 Bookshelf 工具的稳定书籍寻址，同时不引入 v114 实体（evidence-pack.md §C 同名冲突） |
+| D9 | work_key 移植为纯函数 McpBookIdentity，不引 BookCharacterProfile 实体 | 保留 36 个 Bookshelf 工具的稳定书籍寻址，同时不引入 v114 实体（evidence-pack.md §C 同名冲突）；V6 补充：bookshelf_search 由并入 book_search 别名改为注册为独立可见工具（tools/list 可发现、独立 schema 对齐 NG），总数 69→70 |
 | D10 | 业务失败返回 isError 结果而非 -32603（F14） | 本项目客户端遇 JSON-RPC error 对象（含 -32603）即抛 IllegalStateException（AiMcpClient.kt:304-308），isError 可继续多轮对话 |
 | D11 | McpAuth 校验点在 McpHttpServer（Router 之前），格式 Bearer | 挂最薄层防绕过；与 AiMcpClient 出站格式逐字节对齐以支持回环对拍 |
-| D12 | 写门全局开关（mcpAllowWrite）+token 双因素，不做逐工具细粒度授权 | NG capability 级过滤属内部通道设计；外部 29 个写工具逐个授权 UI 成本过高，P2 简化，细粒度留 P4 |
+| D12 | 写门全局开关（mcpAllowWrite）+token 双因素，不做逐工具细粒度授权 | NG capability 级过滤属内部通道设计；外部 31 个写工具逐个授权 UI 成本过高，P2 简化，细粒度留 P4 |

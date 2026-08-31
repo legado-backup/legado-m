@@ -16,7 +16,7 @@
 | 6 | jsLib 观察盲区：本项目 SharedJsScope.getScope 无 policy 参数（SharedJsScope.kt:101，BaseSourceExtensions.kt:11-14 无 policy 透传） | ✅ NG getScope(:32-45) 有 policy 三参数；本项目本期不改 |
 | 7 | CacheDao 无 getByPrefix/deleteByPrefix/deleteMemoryByPrefix → 新增 @Query LIKE 前缀查询免 migration；D7 裁剪 NG registry 记账 | ✅ 全文核实，且 ：42-49 deleteSourceVariables 已有 LIKE 先例 |
 | 8 | downloadFile 语义：两侧均返回相对路径，兼容闭环成立 | ✅ 本项目 :447 / NG :501-502 |
-| 9 | 工作量 ≈7.2 人日 | §12 按函数粒度重算后维持 |
+| 9 | 工作量 ≈7.7 人日 | §12 按函数粒度重算；V6 红队补录 BaseSource.evalJS 入口包裹 +0.5d（7.2→7.7） |
 
 ---
 
@@ -28,6 +28,8 @@
 3. **弹窗拦截**：批量流程（搜索/换源）协程树中书源 `getVerificationCode/startBrowserAwait` 抛 `SourceInteractionBlockedException`，`toast/longToast` 静默+记日志
 4. **类导入策略灰度**：`RhinoClassShutter` 书源模式首期 enabled=true **只观察放行**（AppClass 类），CookieManager/CookieSyncManager 按 D11 实拦
 5. **网络日志凭据脱敏**：现状已具备（NetworkLog.kt:30/196/219/259），本期零修改仅回归验证
+
+**范围披露（V6 红队补录）**：JS 求值入口除 AnalyzeUrl/AnalyzeRule 外，`BaseSource.evalJS`（`data/entities/BaseSource.kt:327-345`）是独立求值入口，全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等）；V5 前设计仅覆盖两入口时，该面上 cache 命名空间（目标 2）与 D11 实拦（目标 4）均被绕过——"默认全开观察档"将是虚假安全感。本期已裁决补全：目标 2/4 的生效面扩展至该入口（§4.2-#17，D17，工作量 +0.5d）。
 
 **非目标（明确排除）**
 - 书籍状态写保护（NativeBook 拦截）→ 后续期（决策表 #5 两阶段）
@@ -186,10 +188,12 @@ class SourceInteractionBlockedException(action: String) : NoStackTraceException(
 | `deleteFile :747-751` | `val file = getFile(path); return FileUtils.delete(file, true)` | 无子树校验 |
 | `unArchiveFile :788-794` | `ArchiveUtils.deCompress(zipFile.absolutePath)` 固定返回 `TEMP/{md5}`（:792） | 解压输出在全局 externalCache/TEMP |
 | `downloadFile :426-448` | 写 `FileUtils.getPath(File(FileUtils.getCachePath()), md5.type)`（:430-433），返回 `path.substring(FileUtils.getCachePath().length)`（:447） | 返回相对路径；写根=getCachePath（FileUtils.kt:92-94=externalCache） |
+| `downloadFile(content, url)` 双参重载（:461-477，@Deprecated 但仍 @JavascriptInterface） | 独立实现未走单参版 ：426 链路（V6 红队发现）；现状写 getCachePath 根、返回相对路径 | 纳入沙箱化转发面（§4.2-#16）：转发单参版统一入口，双参签名保留兼容 |
 | `toast/longToast :1088-1099` | `appCtx.toastOnUi("${getTag()}: ${msg}")` | 无任何拦截 |
 | `startBrowserAwait :342-349 / getVerificationCode :354-357` | 仅 `rhinoContext.ensureActive()` 后直入 SourceVerificationHelp | 弹窗拦截接入点 |
 | `model/analyzeRule/AnalyzeUrl.kt evalJS :392-421` | `bindings["cache"] = CacheManager`（:397）、`bindings["cookie"] = CookieStore`（:396）、`source?.getShareScope(coroutineContext)`（:412） | ②④接入点 |
 | `model/analyzeRule/AnalyzeRule.kt evalJS :836-867` | `bindings["cache"] = CacheManager`（:840）；`compileScriptCache(:869-871)` 编译缓存 | ②④接入点；compileScriptCache 保持不动 |
+| `data/entities/BaseSource.kt evalJS :327-345` | 独立求值入口，全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等）；无 policy 包裹、bindings 无 cache 注入（V6 红队发现） | 第三求值入口，本期纳入（§4.2-#17，D17） |
 | `modules/rhino/.../RhinoClassShutter.kt` | matcher(:48-120)/protectedClasses(:126-143)/visibleToScripts(obj)(:145-165)/**visibleToScripts(clazz)(:167-174，:173 直接 return true 不回查 matcher)**/wrapJavaClass(:176-184)/visibleToScripts(name)(:186-188 仅 matcher) | ④增量添加；全局防护行为不变 |
 | `help/source/BaseSourceExtensions.kt :11-14` | `getShareScope = SharedJsScope.getScope(jsLib, coroutineContext) ?: cryptoScope 回退`，无 policy 参数 | 结论 #6；本期仅**追加**扩展函数不改既有 |
 | `model/SharedJsScope.kt` | `fun getScope(jsLib: String?, coroutineContext: CoroutineContext?): Scriptable?`（:101） | 本期不改（D6） |
@@ -298,23 +302,31 @@ internal object SourceSandboxExtensions {
 }
 ```
 
-**⑥ `io.legado.app.help.rhino.BookSourceGuardLog`（观察日志，仿 NG :20-30 去重模式）**
+**⑥ `io.legado.app.help.rhino.BookSourceGuardLog`（V6 红队重设计：observeClass 计数化 + 去重键 LRU 上限 + 实拦类限流采样）**
 ```kotlin
 object BookSourceGuardLog {
-    private val reportedKeys = ConcurrentHashMap.newKeySet<String>()
-    private fun put(tag: String, key: String, msg: String) {
-        if (reportedKeys.add(key)) AppLog.putDebugWithTag(tag, msg, level = AppLog.Level.INFO)
+    private const val MAX_REPORTED_KEYS = 512            // 去重键上限（V6）：防长跑内存无界
+    // observeClass 计数化（V6）：白名单决策（D5 二期）需要频次数据，"是否出现过"的去重集无法回答
+    private val observeCounters = ConcurrentHashMap<String, AtomicLong>()   // key=label+className
+    // 去重键 LRU（V6）：LinkedHashMap accessOrder + removeEldestEntry，synchronized 保护
+    private val reportedKeys = object : LinkedHashMap<String, Boolean>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>) = size > MAX_REPORTED_KEYS
     }
-    fun observeClass(sourceLabel: String?, className: String)   // tag=SourceGuard，key=label+className
-    fun blockedClass(sourceLabel: String?, className: String)   // tag=SourceGuard，CookieManager 实拦
-    fun sandboxViolation(sourceLabel: String?, action: String, pathShape: String)  // tag=SourceSandbox
-    fun blockedDialog(sourceLabel: String?, action: String)     // tag=SourceDialog
-    fun reset()                                                 // 测试用清空去重集
+    // 实拦类限流（V6）：blockedClass/sandboxViolation 不去重，每键每分钟 1 条采样
+    private val lastLoggedMinute = ConcurrentHashMap<String, Long>()
+    private fun putDedup(tag: String, key: String, msg: String)          // blockedDialog 专用（原模式）
+    private fun putSampled(tag: String, key: String, msg: String)        // 实拦类：每键每分钟首条记录
+    fun observeClass(sourceLabel: String?, className: String)            // tag=SourceGuard：计数+1；首次记 1 条，此后每满 10 的幂次记累计频次
+    fun blockedClass(sourceLabel: String?, className: String)            // tag=SourceGuard，CookieManager 实拦（不去重，限流）
+    fun sandboxViolation(sourceLabel: String?, action: String, pathShape: String)  // tag=SourceSandbox（不去重，限流）
+    fun blockedDialog(sourceLabel: String?, action: String)              // tag=SourceDialog（保持去重，入 LRU）
+    fun reset()                                                          // 测试用：清空计数/去重/限流三张表（E22 用例间约定）
 }
 ```
+- V6 重设计三点（红队裁决）：① observeClass 由去重集改 **AtomicLong 计数**——D5 二期白名单排序需"多常发生"而非"是否发生"；② reportedKeys 设 **LRU 上限 512**——原 ConcurrentHashMap.newKeySet 无界，长跑内存风险；③ blockedClass/sandboxViolation 属**实拦事件**，去重会漏报持续攻击，改**每键每分钟 1 条限流采样**（全量计数不进日志，防日志洪水）。
 - 源标识统一用 **ns 短码**（namespace.take(8)），不记源名/URL（logging_rules 脱敏铁律）；路径只记形态（如 `..` 穿越标记），不记原值。
 
-### 4.2 修改函数清单（15 项"当前→目标"）
+### 4.2 修改函数清单（17 项"当前→目标"；#16/#17 为 V6 红队补录，对应红队任务条目 #12/#13，因表内 #12/#13 已被删源清理占用而顺延编号）
 
 | # | 函数（文件:行） | 当前 | 目标 |
 |---|---|---|---|
@@ -327,12 +339,14 @@ object BookSourceGuardLog {
 | 7 | `JsExtensions.getVerificationCode`（:354-357） | ensureActive 后直入 | `requireSourceDialogAllowed("验证码")`（抛 SourceInteractionBlockedException） |
 | 8 | `JsExtensions.startBrowserAwait`（:342-349） | ensureActive 后直入 | `requireSourceDialogAllowed("验证网页")` |
 | 9 | `RhinoClassShutter.visibleToScripts(fullClassName)`（本项目 :186-188） | 仅 matcher 判定 | 前置 matcher 段不变；新增书源段：depth>0∧CookieManager 集→observer.blockedClass+return false（D11）；depth>0∧`io.legado.app.` 前缀→observer.observeClass+return true（首期放行，D5）。**visibleToScripts(clazz)(:167-174) 本期不动**（OQ-1） |
-| 10 | `AnalyzeUrl.evalJS`（:392-421） | 无策略包裹；cache=CacheManager(:397) | 函数体包 `source.withBookSourceClassPolicy { … }`；`bindings["cache"] = source.scriptCacheObject()`；cookie(:396) 不动 |
-| 11 | `AnalyzeRule.evalJS`（:836-867） | 同上（:840） | 同 #10；compileScriptCache(:869-871) 路径保持 |
+| 10 | `AnalyzeUrl.evalJS`（:392-421） | 无策略包裹；cache=CacheManager(:397) | 函数体包 `source.withBookSourceClassPolicy { … }`；`bindings["cache"] = source.scriptCacheObject()`；cookie(:396) 不动。**范围声明（V6）**：本条仅覆盖 AnalyzeUrl 单入口；独立入口 `BaseSource.evalJS` 直调面由 #17 同款覆盖（D17） |
+| 11 | `AnalyzeRule.evalJS`（:836-867） | 同上（:840） | 同 #10；compileScriptCache(:869-871) 路径保持。**范围声明（V6）**：同 #10，`BaseSource.evalJS` 直调面由 #17 覆盖 |
 | 12 | `SourceHelp.deleteBookSourceInternal`（:126-139） | 删 DB+变量缓存+限流记录 | 追加 `kotlin.runCatching { BookSourceCacheStore.clear(key) }` + `kotlin.runCatching { 删沙箱目录 externalCache/source/{ns} }`（失败仅 SourceCache 日志，不阻断删源） |
 | 13 | `SourceHelp.deleteRssSourceInternal`（:155-） | 删 RSS 相关 | 同 #12（RssSource 用 sourceUrl 作 key；沙箱对 RssSource 不生效但 clear 前缀清理无副作用） |
 | 14 | `SearchModel.startSearch`（:86-89） | `searchJob = scope.launch(searchPool!!)` | 新增属性 `interactionPolicy`（读 PreferKey）+ launch 上下文追加 `searchPool!! + interactionPolicy` |
 | 15 | `ChangeBookSourceViewModel.search`(:226-227) / `refreshList`(:377-378) | 同上形态（2 处） | 同 #14（同模式两行，合计 1 项） |
+| 16（V6 补录，红队条目 #12） | `JsExtensions.downloadFile(content, url)` 双参重载（:461-477，@Deprecated 但仍 @JavascriptInterface） | 独立实现未走单参版 ：426 链路，沙箱化后被绕过 | 函数体改为**转发单参版统一入口**（保留双参签名兼容，返回值语义不变=相对路径）；沙箱行为随 #4 生效，不新增第二套逻辑 |
+| 17（V6 补录，红队条目 #13） | `BaseSource.evalJS`（`data/entities/BaseSource.kt:327-345`） | 独立求值入口，全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等）；无包裹→该面上 cache 命名空间与 D11 均绕过 #10/#11 | 函数体包 `this.withBookSourceClassPolicy { … }` + `bindings["cache"] = scriptCacheObject()`（与 #10 同款包裹；enabled 判定 `this is BookSource` 天然排除 RssSource/cryptoScope，见 E1）；裁决理由见 D17 |
 
 ### 4.3 其余增量（新增成员/函数，不改既有函数体）
 
@@ -352,7 +366,7 @@ object BookSourceGuardLog {
 ```mermaid
 flowchart TD
     A[书源 JS 调用] --> B{入口类型}
-    B -->|evalJS| C[AnalyzeUrl:391 / AnalyzeRule:836<br/>withBookSourceClassPolicy 包裹]
+    B -->|evalJS| C[AnalyzeUrl:391 / AnalyzeRule:836 /<br/>BaseSource.evalJS:327（V6 #17）<br/>withBookSourceClassPolicy 包裹]
     C --> D[bindings 装配<br/>cache→scriptCacheObject：<br/>BookSource∧开关→BookSourceCacheStore<br/>否则→CacheManager；cookie→CookieStore 不变]
     D --> E[Script 执行]
     E --> F{JS 调用 java.xxx}
@@ -389,7 +403,7 @@ flowchart TD
 
 ---
 
-## 7. 边界条件（18 条）
+## 7. 边界条件（22 条；E19-E22 为 V6 红队补录）
 
 | # | 条件 | 行为 |
 |---|---|---|
@@ -406,11 +420,15 @@ flowchart TD
 | E11 | 单源调试页（SourceDebugActivity 等非批量流程） | 不挂 policy → 弹窗全放行；仅批量搜索/换源受限（与 NG 挂载面一致） |
 | E12 | getVerificationCode 被拦抛异常 | 单源异常被 mapParallelSafe/runCatching 吞掉，不影响其他源与 App 存活；该源本次任务失败属必要语义（D4） |
 | E13 | ThreadLocal 深度计数与协程线程切换 | policy 包裹于 evalJS 同步块，Rhino 求值同线程完成；withBookSourceClassPolicy finally 恢复防残留（NG :213-224 已验证+单测 T14 守护） |
-| E14 | jsLib 观察盲区（结论 #6） | SharedJsScope 不改：①scope 缓存命中后复用不经过首次求值 ②RssSource 上下文 enabled=false ③cryptoScope 域外——jsLib 内 import 可逃逸观察，本期接受（D6），OQ-2 二期评估 |
+| E14 | jsLib 观察盲区（结论 #6，V6 精化措辞） | 盲区精确化：**AnalyzeUrl/AnalyzeRule 的 evalJS 包裹体内（:412 调 getShareScope 处 depth=1）jsLib 首次求值已被覆盖**，残余逃逸面=①SharedJsScope 缓存命中后复用（不再经过求值）②RssSource/cryptoScope 上下文 enabled=false ③`BaseSource.evalJS` 直调入口（V6 前未覆盖，**随 #17 同款包裹关闭大半**）——剩余=SharedJsScope scope 缓存链路，二期（OQ-2/D6） |
 | E15 | visibleToScripts(clazz) 不回查 name matcher（结论 #5） | Class 对象实例级防护面与升级前一致，本期不收紧（OQ-1） |
 | E16 | CookieManager 实拦命中存量书源（D11 张力） | NG 同款实拦已上线且书源生态同源；SourceGuard blockedClass 日志可定位命中源；应急路径=临时移除 bookSourceProtectedClassNames 条目（代码级回退，见 OQ-3） |
 | E17（补） | 删源清理 IO 失败 | runCatching 包裹+SourceCache 日志，不阻断删源主流程 |
 | E18（补） | ACache 文件缓存根差异 | CacheManager 裸键 ACache.get()（cacheDir 根）与 BookSourceCacheStore 的 `cacheDir/bookSourceCache/{ns}` 是不同目录，裸键数据成为孤儿（OQ-12），互不污染 |
+| E19（V6 补） | WebView 桥弹窗旁路（WebJsExtensions.kt:44） | `lifecycleScope` 直调无 `SourceInteractionPolicy`——网页配合书源 JS 调桥 API 可绕过弹窗拦截；触发前提=网页主动配合（需网页内嵌桥调用脚本），攻击面窄；与 D8/BookSourceWebCacheStore 后置决策同域，**本期登记边界不挂 policy**，二期随 P5 一并评估 |
+| E20（V6 补） | Windows JVM 单测与真机 Linux 行为差异 | 单测跑 Windows（盘符 `C:\`、路径大小写不敏感、NTFS ADS `file:stream` 形态），真机 ext4 语义不同——T1-T10 断言全部用 `File.separator`/相对路径构造、禁止硬编码分隔符与盘符；L2 步骤 4 补真机越界断言（E5 穿越样本+E3 空/根样本真机复验），环境差异已在用例注释标注 |
+| E21（V6 补） | 沙箱孤儿目录累积 | 删源时沙箱目录删除失败（IO 占用/权限异常）→ `externalCache/source/{ns}/` 孤儿累积；缓解：runCatching+SourceCache 失败日志（E17）+ §10 步 7 门禁人工复核；无后台巡检（成本>收益），ns 同名重建无冲突，二期视 L3 数据再议 |
+| E22（V6 补） | GuardLog L2 跨用例去重/限流污染 | BookSourceGuardLog 状态（计数/去重 LRU/限流表）为进程级单例，L2 多用例连跑时前用例状态会吞后用例首条日志；**约定：L2 用例间 adb 重启 App（重启即清）**，单测内直接调 `reset()`；§9.2 各步骤独立重启后断言 |
 
 ---
 
@@ -419,7 +437,7 @@ flowchart TD
 | 规范 | 核查项 | 结论 |
 |---|---|---|
 | naming_rules | 新类后缀：*Extensions（SourceSandboxExtensions/BaseSourceExtensions 追加）、object 单例（BookSourceGuardLog）、异常类名；常量 UPPER_SNAKE（SOURCE_ROOT_FOLDER/IDENTITY_PREFIX/APP_CLASS_PREFIX） | ✅ |
-| checkstyle_rules | 不新增 launch 模式（挂载仅追加 context 元素）；kotlin.runCatching 带 `kotlin.` 前缀（§4.2-#12/#13、clear）；显式 import 无 star；注释中文+公开方法 KDoc；object 持可变状态（BookSourceGuardLog.reportedKeys=并发集）线程安全 | ✅ |
+| checkstyle_rules | 不新增 launch 模式（挂载仅追加 context 元素）；kotlin.runCatching 带 `kotlin.` 前缀（§4.2-#12/#13、clear）；显式 import 无 star；注释中文+公开方法 KDoc；object 持可变状态（BookSourceGuardLog：计数 ConcurrentHashMap+AtomicLong / 去重 LRU synchronized / 限流 ConcurrentHashMap，V6 重设计）线程安全 | ✅ |
 | exception_rules | SourceInteractionBlockedException 继承 NoStackTraceException（:27-28 NG 同款+本项目基类）；SecurityException 保留 NG 语义（平台安全异常非业务异常，OQ-6 记录裁量）；catch 块均有 putDebugWithTag 或 runCatching.onFailure | ✅ |
 | logging_rules | 全部 putDebugWithTag+recordLog 守卫；禁 android.util.Log；脱敏铁律：ns 短码替代源名、路径形态替代原值、无 URL/凭据；三维度覆盖（catch/关键操作/关键参数均落对应 tag） | ✅ |
 | database-migration-safety | CacheDao 仅新增 @Query（Room schema=表+view，查询方法不参与 schema 校验）→ **version 保持 v108 不变**；无实体/@DatabaseView 变更；R1-R6 全部不触发 | ✅ |
@@ -430,7 +448,7 @@ flowchart TD
 
 ## 9. 测试设计
 
-### 9.1 单元测试（21 个，JVM 优先；SourceSandboxExtensions/Policy 均纯 JVM）
+### 9.1 单元测试（22 个，JVM 优先；SourceSandboxExtensions/Policy 均纯 JVM；T22 为 V6 补录）
 
 **SourceSandboxPolicyTest**（对照 NG BookSourceFileAccessPolicy）
 1. `namespace_isHex64AndStable`——同 URL 稳定、异 URL 必异、64 位 hex
@@ -452,7 +470,7 @@ flowchart TD
 
 **RhinoClassShutterTest**
 15. `withBookSourceClassPolicy_reentrantDepthRestoredInFinally`——嵌套两层后 depth/label 复位
-16. `visibleToScripts_bookSourceMode_appClassObservedAndAllowed`——返回 true+observer 收到一次+重复去重
+16. `visibleToScripts_bookSourceMode_appClassObservedAndAllowed`——返回 true+observer 收到；**V6 计数化断言**：重复调用计数累加（AtomicLong）、日志首条仅 1 次+每满 10 次记累计频次、超 LRU 上限淘汰最旧键（reset 后重测）
 17. `visibleToScripts_bookSourceMode_cookieManagerBlocked`——返回 false+blockedClass 日志（D11）
 18. `visibleToScripts_nonBookSourceMode_unchanged`——depth=0 时与升级前逐行为一致
 19. `visibleToScripts_protectedMatcher_alwaysBlocked`——java.io.File 等无论模式必拒
@@ -463,6 +481,9 @@ flowchart TD
 **NetworkLogRedactRegressionTest**（现状守护，防未来回归）
 21. `sensitiveHeadersAndCredentialsRedacted`——敏感 header/token query/Bearer 出现 `[已脱敏]` 且原值不出现
 
+**JsExtensionsDownloadDualParamTest**（V6 补录，对应 §4.2-#16）
+22. `downloadFile_dualParam_delegatesToSingleParamSandbox`——双参版转发单参版：沙箱开时产物落 `externalCache/source/{ns}/`、返回相对路径可经 getFile 读回、与单参版同源同 key 行为一致；沙箱关（E2）时走旧路径与升级前一致（Windows JVM 环境差异见 E20，用例用相对路径构造）
+
 ### 9.2 L2 真机（测试包 `io.legado.miss.app.debug`，`ai_tests\venv\Scripts\python.exe`）
 
 | 步骤 | 断言 |
@@ -470,7 +491,7 @@ flowchart TD
 | 1. `quick_build_install.py` 编译+安装+L1 | 编译绿；logcat 无 FATAL |
 | 2. 导入含验证码 JS 的测试书源→批量搜索 | logcat Grep `SourceDialog|SourceGuard|SourceSandbox`（head_limit≤20，仅提取 tag 行）：拦截/观察日志出现、无崩溃栈；搜索结果正常返回（mapParallelSafe 吞单源异常） |
 | 3. 换源流程（ChangeBookSourceViewModel 两挂载行） | 同上；换源列表正常刷新 |
-| 4. 书源含 getFile/downloadFile JS 的正常源 | 文件读写成功于 `externalCache/source/{ns}/`；返回相对路径可经 getFile 读回（R1 回归锚） |
+| 4. 书源含 getFile/downloadFile JS 的正常源 | 文件读写成功于 `externalCache/source/{ns}/`；返回相对路径可经 getFile 读回（R1 回归锚）；**V6 补：downloadFile 双参重载变体（:461-477）下载后 getFile 可读回、产物同落沙箱**；越界断言（E5 穿越样本+E3 空/根样本）真机复验（E20） |
 | 5. SP 关 `bookSourceFileSandbox`→重复步骤 4 | 行为与升级前一致（回退通道验证） |
 | 6. 删除该测试书源 | logcat 无 SourceCache 失败日志；DB caches 表无 `book_source_cache_{ns}:` 残留（adb 查询） |
 | 7. `run_e2e.py --tc` 常规回归 | 搜索/正文/换源主链路无异常 |
@@ -489,9 +510,9 @@ flowchart TD
 graph TD
     S1[1 基础层：StorageScope+FileAccessPolicy<br/>+SourceSandboxExtensions] --> S2[2 JsExtensions 文件 4 函数改造<br/>（前置：updateLog 首条目）]
     S1 --> S3[3 CacheDao/CacheManager 前缀能力<br/>+BookSourceCacheStore]
-    S3 --> S4[4 evalJS 绑定切换：AnalyzeUrl/AnalyzeRule<br/>+BaseSourceExtensions.scriptCacheObject]
+    S3 --> S4[4 evalJS 绑定切换：AnalyzeUrl/AnalyzeRule<br/>/BaseSource.evalJS（V6 #17）<br/>+BaseSourceExtensions.scriptCacheObject]
     S2 --> S5[5 SourceInteractionPolicy+弹窗 4 函数<br/>+挂载 2 文件 3 行]
-    S4 --> S6[6 RhinoClassShutter 书源策略+observer<br/>+BookSourceGuardLog+evalJS 包裹]
+    S4 --> S6[6 RhinoClassShutter 书源策略+observer<br/>+BookSourceGuardLog+evalJS 包裹×3 入口]
     S4 --> S7[7 SourceHelp 删源清理 2 函数]
     S6 --> S8[8 PreferKey 4 键]
     S5 --> S9[9 全量验证 L1/L2/L3+文档同步]
@@ -506,16 +527,21 @@ graph TD
 | 3 | T11-T14 绿；`./gradlew assembleAppDebug` 编译绿 |
 | 4 | 搜索/正文 L2 冒烟：cache 读写正常、无跨源互读 |
 | 5 | L2 步骤 2/3 断言通过（拦截日志+无崩溃） |
-| 6 | T15-T19 绿；logcat SourceGuard 观察流出现且去重 |
+| 6 | T15-T19 绿；logcat SourceGuard 观察流出现（observeClass 计数化+实拦限流采样，V6 重设计后断言形态见 T16） |
 | 7 | 真机删源后 DB/内存/文件三处清理验证 |
-| 8 | 4 开关逐个翻转回退验证；updateLog 增量复核（首条目已于步 2 编译前更新，本步按 git diff 全量审计，version-delivery-sync） |
+| 8 | 4 开关逐个翻转回退验证；**V6 补①：adb 改 SP 后逐键验证开关翻转即时生效（D15 假开关防呆——实时读路径断言行为随 SP 变化，而非 AppConfig 镜像）**；**V6 补②：三求值入口（AnalyzeUrl/AnalyzeRule/BaseSource.evalJS）日志断言——各入口触发一次后 SourceGuard/SourceCache tag 均出现对应 ns 短码记录（用例间重启防 E22 污染）**；updateLog 增量复核（首条目已于步 2 编译前更新，本步按 git diff 全量审计，version-delivery-sync） |
 | 9 | `stop-daemons.bat` 清场；AGENTS 任务完成清单 7 项逐项过；issues-found 记录真机问题 |
 
 **门禁五件套（对齐 P2/P3 已有实践，自步 2 起每次构建后适用）**：① updateLog 编译前更新（首条目已于步 2 前落地）；② Grep `android.util.Log.d|Log.e` 零残留（logging-during-refactoring 门禁）；③ `stop-daemons.bat` 清场（直接 gradlew/IDE 构建后必做）；④ 真机用测试包 `io.legado.miss.app.debug`；⑤ L2 用 `ai_tests\venv\Scripts\python.exe`。
 
+**规范回灌任务项（对齐 design.md「规范保证与回灌执行机制」，提升清单 P0 来源条目随期回灌）**：实施 tasks.md 强制包含"规范回灌"任务项——① 开关消费点实时读 SP 惯用法（P0-D15 → architecture_rules.md 配置章节）；② hash 短码替代源名日志+同主题项合并（P0-D16 → logging_rules.md 脱敏原则）；③ 模块 Tag 清单刷新（7→26）+新观察模块一律升格 TAG_ 常量（→ logging_rules.md）。回灌完成后由验证轮复核规范文件实际变更与提升清单一致；本设计阶段不动规范原文；回灌验收三要素：触发场景+反模式示例+可 Grep 判定。
+**规范核查表执行**：实施 tasks.md 同步包含"规范核查表执行"任务项——每完成 §10 一个步，对照 §8 规范符合性核查表逐条打勾（审查可 Grep 复核勾选记录）。
+
 ---
 
 ## 11. Open Questions（12 条：已关闭 6 条（B 类 5+V3 关闭 1），A 类 6 条开放中）
+
+> **V6 红队诚实披露**：V5 及之前设计声明的求值入口覆盖面仅 AnalyzeUrl/AnalyzeRule 两处；`BaseSource.evalJS`（`data/entities/BaseSource.kt:327-345`）作为独立求值入口被全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等），该面上 cache 命名空间（目标 2）与 D11 实拦（目标 4）均被绕过——若不补全，"默认全开观察档"是虚假安全感。本期已裁决补全（§4.2-#17/D17，+0.5d）；OQ-2 剩余盲区随 E14 措辞精化（§7）收窄至 SharedJsScope scope 缓存链路。
 
 | # | 问题 | 背景/影响 | 裁决/状态 |
 |---|---|---|---|
@@ -545,7 +571,7 @@ graph TD
 - 机制证据（本项目 `SharedJsScope.kt:101-141`）：缓存键=md5(jsLib)（:105）；jsLib 首次求值（:113/:141）**未经 withBookSourceClassPolicy 包裹**；缓存命中（:106-107）跳过求值——jsLib 内 importClass 在 depth=0 下不受书源段拦截，且导入类对象持久驻留缓存 scope，后续规则 JS 经 jsLib 函数可触达。NG 对照：:32-45 policy 三参数 + :42-45 包裹 + :46 scopeKey 纳入 policy（NG 无此盲区）。
 - 盲区实际大小（生态量化）：skill references 全量检索，jsLib 记载用法=签名/加密辅助函数（fix-learned.md:29），唯一 import 样本=`javaImport.importPackage(javax.crypto*, android.util)`（fix-learned.md:132）；**io.legado.app.* 与 android.webkit.* 均为 0 样本** → 实际被利用概率低；且该缺口为现状一致性（升级前后行为相同），非回归。
 - 二期触发条件：SourceGuard/L3 数据出现 jsLib 链路 webkit/app 类触达 → 引入 NG 式三参数（NG :32-46 1:1 可搬，估算≈0.5 人日含单测），接受跨源共享缓存键变化。
-- 是否变更设计主体：仅 §7-E14 措辞修正（OQ-2 关闭引发，见 E14 行内标注）。
+- 是否变更设计主体：仅 §7-E14 措辞修正（OQ-2 关闭引发，见 E14 行内标注；V6 红队再精化：盲区中 BaseSource.evalJS 直调入口已由 §4.2-#17 关闭，剩余仅 SharedJsScope scope 缓存链路）。
 
 **OQ-8【关闭裁决：残余绕行面≈0；不新增 FileUtils 层观察，二期亦不立项】**
 - 用法面实证：文档记载 downloadFile 唯一消费模式=返回相对路径（js-extensions/file-operations.md:34、:41-42；advanced.md:44 downloadFileAwait 同语义），无"拼绝对路径+自建 File"模式记载。
@@ -574,14 +600,14 @@ graph TD
 | 块 | 内容（函数数） | 估算 |
 |---|---|---|
 | 基础沙箱层 | StorageScope(1)+FileAccessPolicy(6)+SourceSandboxExtensions(3)+单测 T1-T10 | 1.1 |
-| 文件 API 改造 | JsExtensions 4 函数（getFile/deleteFile/unArchiveFile/downloadFile）+readTxtFile×2 间接验证 | 0.6 |
-| 脚本缓存 | BookSourceCacheStore(12 方法+clear)+CacheDao(2)+CacheManager(1)+scriptCacheObject(1)+evalJS×2 | 0.9 |
+| 文件 API 改造 | JsExtensions 4 函数（getFile/deleteFile/unArchiveFile/downloadFile）+readTxtFile×2 间接验证+#16 双参版转发（改动微小并入） | 0.6 |
+| 脚本缓存 | BookSourceCacheStore(12 方法+clear)+CacheDao(2)+CacheManager(1)+scriptCacheObject(1)+evalJS×2（#17 第三入口 cache 注入计入类策略灰度 V6 补录项，不重复计价） | 0.9 |
 | 弹窗拦截 | SourceInteractionPolicy(2 类)+JsExtensions private 3+弹窗 4 函数+挂载 3 行 | 0.6 |
-| 类策略灰度 | RhinoClassShutter(4 新成员+1 改函数)+observer+BookSourceGuardLog(5)+evalJS 包裹 | 1.0 |
+| 类策略灰度 | RhinoClassShutter(4 新成员+1 改函数)+observer+BookSourceGuardLog(5，V6 重设计含 LRU/限流)+evalJS 包裹×3 入口（AnalyzeUrl/AnalyzeRule/BaseSource.evalJS——V6 #17 补录 +0.5d） | 1.5 |
 | 删源清理 | SourceHelp 2 函数+沙箱目录删除 | 0.2 |
 | 开关/交付 | PreferKey 4+updateLog+文档同步 | 0.5 |
-| 验证 | 单测 T1-T21(0.7)+L2 脚本与真机(0.8)+L3 回归(0.4) | 1.9 |
-| **合计** | | **≈6.8+0.4 缓冲=7.2 人日**（维持结论 #9；观察期数据收集 ≥2 周后才进入拦截档设计） |
+| 验证 | 单测 T1-T22(0.7，T22 双参转发用例并入；V6 计数化断言 T16 重写)+L2 脚本与真机(0.8，含越界真机断言 E20)+L3 回归(0.4) | 1.9 |
+| **合计** | | **≈6.8+0.4 缓冲+0.5（V6 补录 #17 BaseSource.evalJS）=7.7 人日**（结论 #9 已同步；观察期数据收集 ≥2 周后才进入拦截档设计） |
 
 ---
 
@@ -603,3 +629,4 @@ graph TD
 - **D14 visibleToScripts(clazz) 本期不动**（结论 #5）：保持 E15 现状（OQ-1 已关闭：实测防护面差≈0，见 §11.1）。
 - **D15 开关消费点实时读 SP，不进 AppConfig**：AppConfig var 属单例加载期求值（:91/:2794 形态），无设置页时改 SP 不刷新镜像；实时 getPrefBoolean 保证"一键回退"即时生效（§6）。
 - **D16 观察日志源标识=ns 短码**（namespace.take(8)）：logging_rules"源名称不记录"铁律对 NG sourceLabel（源名/URL）的项目化替代（§4.1-⑥）。
+- **D17 BaseSource.evalJS 纳入同款包裹（V6 红队范围扩展，§4.2-#17）**：该独立求值入口（`data/entities/BaseSource.kt:327-345`）被全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等）；V5 前设计仅覆盖 AnalyzeUrl/AnalyzeRule 两入口时，该面上 cache 命名空间与 D11 实拦均被绕过——不补全则"默认全开观察档"是虚假安全感。裁决=函数体包 `withBookSourceClassPolicy`+`bindings["cache"]=scriptCacheObject()`（与 #10 同款；enabled=`this is BookSource` 天然排除 RssSource/cryptoScope），工作量 +0.5d（§12 合计 7.2→7.7d）；连带 §9.2 三入口日志断言（§10 步 8）。同批补录 #16=downloadFile 双参重载（:461-477，@Deprecated 仍 @JavascriptInterface）转发单参版统一入口，堵沙箱旁路面。GuardLog 随之重设计（observeClass 计数化/LRU 512/实拦限流，§4.1-⑥）。
