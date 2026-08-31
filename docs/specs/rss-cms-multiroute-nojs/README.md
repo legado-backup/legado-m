@@ -13,9 +13,9 @@
 ## 核心能力
 
 - **大括号模板语法支持确认**：`ruleRoutes`/`ruleEpisodes` 经 `AnalyzeRule.getString()` 解析，`{{$.xxx}}` 模板由 `isRule()` 判定为子规则递归执行，语法已支持、无需新增实现。
-- **解析层 CMS 分隔格式原生支持**：增强 `parseEpisodesByLines`，原生解析 `集名$URL#集名$URL$$$...`（`$$$` 分线路 / `#` 分集 / `$` 分名址），替代 JS 方案，统一解析层所有 CMS 源受益。
+- **数据规范化层（主链路）**：MacCMS 扁平播放字段自动增量注入结构化 routes JSON，规则引擎面对的永远是结构化数据。
 - **ruleRoutes / ruleEpisodes 零 JS 规则**：多线路多集全部用纯规则表达；`ruleContent` 留空，走 type=2 多线路模式。
-- **{routeIndex} 正则选线路**：`ruleEpisodes` 以 `{routeIndex}` 占位符嵌入正则，按 0-based 序号选取第 N 线路的集列表。
+- **列表范式对齐书源目录**：`ruleRoutes` 用 `$.routes[*].name`、`ruleEpisodes` 用 `$.routes[{routeIndex}].episodes`，与 chapterList/chapterName 同心智五种模式随意写；`{routeIndex}` 占位符全模式透明；旧写法回落兼容。
 - **搜索支持**：`searchUrl` 支持 `{{page}}` / `{{key}}` 模板参数，直接对接 MacCMS `provide/vod` 采集接口。
 - **每站一源转化策略**：聚合站书源靠 loginUi 菜单切换 13 个资源站，订阅源无此机制，改为每个资源站独立一个订阅源；先以量子站验证后批量推广。
 
@@ -30,5 +30,5 @@
 1. **复用现有解析链**：`{{$.xxx}}` 大括号模板经 `isRule()` 判定为子规则递归执行，语法零改动直接可用。
 2. **增强点收敛在解析层**：CMS 分隔格式（`$$$` / `#` / `$`）支持落在 `parseEpisodesByLines` 统一增强，而非单源硬编码。
 3. **大括号模板拼接详情 URL**：`ruleLink` 使用 `https://{站点A-API域名}/api.php/provide/vod?ac=detail&ids={{$.vod_id}}` 动态拼详情地址。
-4. **replaceRegex 预处理 + 占位正则选线路**：`ruleRoutes` 以 `$.list[0].vod_play_from##\$\$\$#\n#` 把 `$$$` 转换行后解析；`ruleEpisodes` 以 `$.list[0].vod_play_url##(?:.*?\$\$\$){routeIndex}(.*?)(?:\$\$\$.*)?$##\1` 选取第 N 线路（0-based）。
+4. **列表范式对齐书源目录（v3）**：规范化层注入结构化 routes 后，`ruleRoutes` 写 `$.routes[*].name`、`ruleEpisodes` 写 `$.routes[{routeIndex}].episodes`，与书源目录 chapterList/chapterName 同心智、五种模式随意写；旧写法（`##\$\$\$##\n` 转行、L2 正则选段）经回落/兜底路径兼容。
 5. **静态分类 + 每站一源**：分类字段不走解析层（鸡生蛋设计），`sortUrl` 采用静态分类枚举（实施时拉取 API 取真实 class）；聚合站无菜单切站机制，每站一源、量子站先行验证。
