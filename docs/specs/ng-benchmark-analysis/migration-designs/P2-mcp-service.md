@@ -1,4 +1,4 @@
-﻿﻿# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
+﻿# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
 
 > 前置：P1 收口；依据 design.md AD-04 与 evidence-pack.md §E/§D。
 > NG 根：`F:\...legado_NG-main`（快照 3.26.082815）；本项目路径均相对 `app/src/main/java/io/legado/app/`。
@@ -337,7 +337,7 @@ object McpAuth {
 | naming | up 前缀/Await 后缀 | upMcpServer 平移 ✓；无新增挂起对外 API |
 | naming | 常量风格 | PreferKey 新键 camelCase（同文件既有风格 `@Suppress("ConstPropertyName")`）；MCP 内部常量 UPPER_SNAKE |
 | exception | 业务异常继承 NoStackTraceException | MCP 参数错误沿用 NG 的 IllegalArgumentException（协议语义非业务异常）；wrap 内 catch Throwable 转 isError，显式 rethrow 取消异常（V3 修正）；CancellationException 透传不吞 |
-| logging | AppLog/禁止 android.util.Log | 服务启停/鉴权失败用 `AppLog.putDebugWithTag(TAG_MCP,…)`；**新增第 27 个 Tag `TAG_MCP="McpService"`**（AppLog 现有 26 个 Tag，AppLog.kt:13-42；logging_rules 模块 Tag 表扩展点） |
+| logging | AppLog/禁止 android.util.Log | 服务启停/鉴权失败用 `AppLog.putDebugWithTag(TAG_MCP,…)`；**新增 Tag `TAG_MCP="McpService"`，序号按落地顺序顺延**（AppLog.kt:13-42 为现状参考；logging_rules 模块 Tag 表扩展点） |
 | logging | 脱敏铁律 | 服务日志只记端口/结果码；network_log_get 出栈经 NetworkLog 自带 REDACTED 层（NetworkLog.kt:26）；正文经 Sanitizer |
 | architecture | 无 DI/NanoHTTPD when 路由/EventBus 常量 | 全符合；EventBus.MCP_SERVICE 新增进 constant/EventBus.kt（WEB_SERVICE 在 :27） |
 | architecture | 大列表流式 | 不适用：限幅保证单响应 ≤120K，无需 Pipe |

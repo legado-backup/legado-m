@@ -110,6 +110,10 @@
 - [ ] 7. 同屏一致性：新建页与同类既有页（头部/背景/弹框）视觉一致
 - [ ] 8. 更新记录：ui-standards（components.md/color.md）+ migration-registry.md 同步
 
+### MaterialSurface 双栈豁免（总线登记 2026-08-31，master-track AD-04）
+
+MaterialSurface 体系（ng P5 视觉设计：MaterialSurface(Compose) 与 MaterialSurfaceStyle(View)）属"语义单源、实现双栈"——同一语义角色在 View 侧与 Compose 侧各有一实现，桥接自同一 MaterialRole 参数表。该双实现**不适用**"miuix 与 M3 双体系扩散禁令"（二者性质不同：双栈=同语义两实现；双体系=两套设计语言）。判定口径：新增组件若存在 View/Compose 同语义双实现且共享同一 Role/Token 参数源，登记为本豁免范围；除此之外仍严格执行单一组件来源门禁。
+
 ## 五、文档索引与状态
 
 | 文档 | 内容 | 状态 |

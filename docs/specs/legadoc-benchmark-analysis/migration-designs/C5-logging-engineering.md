@@ -3,6 +3,7 @@
 > 对应 `design.md` AD-06（工程纪律借入"用户日志+防泄露+产物验证"三件，不借其禁测宪法）。
 > 证据源：`evidence-pack.md` §F/§G/§L；legadoC 源码 `F:\myself\github\WeAgentChat\temp\legadoC_src\legadoC-own`。
 > 本文档为实施级设计（OpenSpec 步骤 2 输入），零源码变更。
+> 总线修订 2026-08-31：fromTag 映射表登记规则改为"按实施时 AppLog 实际全集登记"（ng P0/P1/P2 将新增 Tag），不锚定 26 TAG 基线（master-track tasks 1.8.2，X6）
 
 ## 1. 目标与非目标
 

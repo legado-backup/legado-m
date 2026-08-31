@@ -433,6 +433,10 @@ object MaterialSurfaceStyle {
 
 **先后依赖**：快照层 colors 字段权威定义依赖 H9/H11 已归位的直读语义（已满足）；Phase4 门禁依赖本设计 `MaterialRole` 条款先行合入（本设计先行）。
 
+### 5.1 与 compose-migration B3/B4 Rss 域的时序协调（总线补登 2026-08-31）
+
+compose B3-D4（RssArticleListScreen）/B3-A8（RssFragment modern 全 Compose，W3 实施）取色走 MaterialTheme.colorScheme 派生（经 LegadoTheme/ThemeSync），不触碰本设计新增/修改的 lib/theme/ThemeSnapshot*、MaterialTokens、AppSettingComponents、AppComposeDialogs、ThemeUiPalette 等文件。时序协调两点：①D4/A8 已实施页面纳入本设计 V2 截图对比回归面（含 B3-E2 ThemeSpecPresets 产物，X1 裁决兜底）；②本设计落地修改 LegadoTheme.kt 布线（LocalThemeSnapshot）后 MaterialTheme 派生语义等价，后续 Rss 域新页面接入 MaterialSurface 时须声明 MaterialRole（OVERLAY 等）。
+
 ## 6 文件变更映射表
 
 | # | 文件 | 变更类型 | 内容 |

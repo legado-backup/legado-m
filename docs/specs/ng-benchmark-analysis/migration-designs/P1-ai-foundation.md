@@ -5,6 +5,7 @@
 > NG 根：`F:\myself\github\WeAgentChat\temp\legado_NG_src\legado_NG-main`（下称 NG，路径相对 `app/src/main/java/io/legado/app/`）。
 > 本项目根：`f:\myself\github\WeAgentChat\temp\legado`（DB 基线 v108，`data/AppDatabase.kt:126`）。
 > 本文所有行号均为本轮逐文件精读实测，非沿用旧口径。
+> 总线修订 2026-08-31：DB 规划 v109 已被 video-sniff 4.8e 实占，本分期实施时按 db-version-registry 顺延 v110（master-track AD-02）
 
 ---
 
@@ -278,7 +279,7 @@ object AiProviderStore {
 | J6 | Reasoning 超参注入 | AiReasoningOptions.kt:5-42 | 原样平移 + Registry 推断回落；sensenova 踩坑参数随预设保留 |
 | J7 | 压缩摘要请求通道 | NG 私有 `buildRequestBody+executeJsonChat`（AiChatClient.kt:949-969） | **收敛走 `AiManager.generateText`**（AiTextParams(temperature=0f, disableThinking=true)），保留 `type==OPENAI` 校验 + `apiMode==chat_completions` 校验 |
 | J8 | 响应解析/rawPreview | 3 Provider parse 段 + rawPreview=body.take(1000) | 原样平移；rawPreview 仅随 AiTextResult 传递，**禁止入日志** |
-| J9 | 日志/脱敏 | NG 无系统化日志规范 | AppLog + 新增 `AppLog.TAG_AI`（现有 Tag 26 个：AppLog.kt:13-42，TAG_AI 为新增第 27 个）：只记 providerId/HTTP code/token 数/候选 URL 路径模式；apiKey/Authorization 头/完整 URL 禁止出现在任何日志与异常 message（logging_rules 铁律）；**NetworkLog 脱敏补头见 §4.6（V6 红队 HIGH-A1-4，P1 前置必改）** |
+| J9 | 日志/脱敏 | NG 无系统化日志规范 | AppLog + 新增 `AppLog.TAG_AI`（TAG_AI 新增，序号按落地顺序顺延；AppLog.kt:13-42 为现状参考）：只记 providerId/HTTP code/token 数/候选 URL 路径模式；apiKey/Authorization 头/完整 URL 禁止出现在任何日志与异常 message（logging_rules 铁律）；**NetworkLog 脱敏补头见 §4.6（V6 红队 HIGH-A1-4，P1 前置必改）** |
 
 ### 4.3 压缩核心 4 类骨架与逐桶算法表
 

@@ -201,7 +201,7 @@
 | [legado-skill-v2-rebuild](./specs/legado-skill-v2-rebuild/README.md) | 🔄 | Legado Skill V2 重建方案（基于第十轮深度审计的统一重建） |
 | [light-theme-contrast-fix](./specs/light-theme-contrast-fix/README.md) | 🔄 | 亮色主题文字对比度系统性修复（对齐 Archive 取色派生+textColorSecondary 补写+根因3 全量 21 处+Compose 槽位治理；已实施测试包 083116 已交付，真机 L2 延后） |
 | [list-residue-compose](./specs/list-residue-compose/README.md) | ✅ | 遗留列表 Compose 化收尾（CacheActivity 缓存列表+Explore 瀑布列表） |
-| [master-track-orchestration](./specs/master-track-orchestration/README.md) | 🔄 | 三轨总线编排（Compose 化 B0-B5 × legadoc C0-C5 × ng P0-P5）：W0-W5 波次调度+待优化项优先级+6 大共性问题整合+V 轨挂靠协调（18 个视频/下载/网络域实质协调面 spec）；七轮审核闭环（规范性/事实核对 10/10/矩阵式冲突扫描 X1-X14/可执行性演练） |
+| [master-track-orchestration](./specs/master-track-orchestration/README.md) | 🔄 | 三轨总线编排（Compose 化 B0-B5 × legadoc C0-C5 × ng P0-P5）：W0-W5 波次调度+6 大共性问题整合+V 轨挂靠（18 实质协调面）；七轮审核闭环，检查点 1 通过，W0 执行中（registry/v-track/补登已落盘，剩 C0-F1 真 bug 修复+deep-fix 收口） |
 | [memory-mechanism-redesign](./specs/memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
 | [multiline-on-demand-extraction](./specs/multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
 | [my-topbar-unify](./specs/my-topbar-unify/README.md) | 🔄 | 「我的」页头部迁移 MainTopBarView（与书架/订阅/发现观感统一） |

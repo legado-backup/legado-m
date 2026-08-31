@@ -399,7 +399,7 @@ flowchart TD
 
 **D15（开关读取方式）**：4 键全部**消费点实时 `appCtx.getPrefBoolean`，不进 AppConfig 属性**。理由：AppConfig 的 `var` 属性在单例首次加载时求值（AppConfig.kt:91/:2794 形态），本期 4 键无设置页 UI，改 SP 后 AppConfig 镜像不会刷新，会造出"改了不生效"的假开关；实时读 SP 为内存缓存读取，开销可忽略。
 
-**日志纪律**：统一 `AppLog.putDebugWithTag(tag, msg, level = INFO)`（recordLog 守卫零开销）；4 个 tag 升格为 AppLog `TAG_` 常量（AppLog 现有 26 个模块 Tag 常量，AppLog.kt:13-42 实测；P2 新增 TAG_MCP/P3 新增 TAG_TTS 同款先例，升格做法充分；OQ-4 已关闭）；**所有日志只含技术结构（函数名/异常类型/路径形态/ns 短码），不记录文件内容、URL 原文、源名称**（output-safety+logging_rules 铁律）。
+**日志纪律**：统一 `AppLog.putDebugWithTag(tag, msg, level = INFO)`（recordLog 守卫零开销）；4 个 tag 升格为 AppLog `TAG_` 常量（新增 4 个 Tag，序号按落地顺序顺延，以实施时 AppLog 实际全集为准；AppLog.kt:13-42 为现状实测；P2 新增 TAG_MCP/P3 新增 TAG_TTS 同款先例，升格做法充分；OQ-4 已关闭）；**所有日志只含技术结构（函数名/异常类型/路径形态/ns 短码），不记录文件内容、URL 原文、源名称**（output-safety+logging_rules 铁律）。
 
 ---
 

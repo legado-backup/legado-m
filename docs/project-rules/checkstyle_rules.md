@@ -80,6 +80,19 @@ object AppConst { ... }         // 全局常量
 - 添加 `@Entity` 注解
 - **字段全部有默认值**
 
+### 入缓存对象必须不可变或快照化（强制，2026-09-01 C0-F1 沉淀）
+
+凡进入缓存（LruCache/ConcurrentHashMap 内存缓存等）的对象，要么自身不可变（`val` 字段），要么缓存"解析产物快照"而非可变定义对象——禁止缓存命中后原地改写字段（跨请求/重入/并发下产生半更新污染，铁证：AnalyzeRule SourceRule 可变字段缓存污染，legadoC ResolvedSourceRule 快照化为根因修复方案）。
+
+```kotlin
+// 反例：缓存对象可变 + 消费时原地改写 → 二次命中读到污染值
+inner class SourceRule { internal var rule: String; internal var replaceRegex = ""
+    fun makeUpRule(result: Any?) { rule = ...; replaceRegex = ... } }  // ❌ 原地写
+// 正例：解析产物与定义分离，makeUpRule 返回不可变快照，缓存对象只读
+internal data class ResolvedSourceRule(val rule: String, val replaceRegex: String = "", ...)
+internal fun makeUpRule(result: Any?): ResolvedSourceRule { ... return ResolvedSourceRule(...) }  // ✅
+```
+
 ```kotlin
 @Parcelize
 @TypeConverters(BookSource.Converters::class)
