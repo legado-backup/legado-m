@@ -65,17 +65,20 @@ MacCMS 聚合采集书源（loginUi 菜单切 13 站）→ 视频订阅源**每�
 
 ### Selected Approach
 
-**解析层增强 + 规则层正则选线路，全链路零 JS**：
+**数据规范化层（主链路）+ 列表范式升级（对齐书源目录）+ 兜底链路，全链路零 JS**：
 
-1. **Rss.kt parseEpisodesByLines 增强**（唯一代码改动点）：识别 MacCMS 分隔格式——对每行先按 `#` 分集、再按第一个 `$` 拆分 title/url；title 缺省（无 `$` 或名为空）回退"第N集"；无 `$` 的行保持原纯 URL 逻辑不变。单函数增强，不侵入 AnalyzeRule。
-2. **ruleRoutes（线路名列表）**：`$.data[*].vod_play_from` + replaceRegex 把 `$$$` 转换行 → 得到线路名列表。
-3. **ruleEpisodes（第 N 线路集数）**：`$.data[*].vod_play_url` + replaceRegex 正则 `(?:.*?\$\$\$){routeIndex}(.*?)(?:\$\$\$|$)` 选出第 N 线路段（0-based；`{routeIndex}` 占位符由 Rss.kt #L221-L236 先替换再 getString）→ `#` 转换行 → 交给增强后的 parseEpisodesByLines 拆 `名$URL`。
-4. **ruleLink（详情链接）**：`{{$.vod_id}}` 大括号模板构造绝对 URL（`/api.php/provide/vod?ac=detail&ids={{$.vod_id}}`，域名占位符）。
+1. **数据规范化层（主链路）**：Rss.kt 新增 `normalizeMacCmsBody`——详情响应 JSON 含 `vod_play_from`/`vod_play_url` 且带 `$$$` 时，增量注入结构化 `routes: [{name, episodes:[{title,url}]}]`（原字段不动，非 JSON/无特征零侵入，item 已有 routes 时跳过），2 处 `setContent` 调用点前透明生效。
+2. **ruleRoutes 列表范式**：`getStringList` 优先取线路名列表，标准写法 `$.routes[*].name`；空时回落 `getString`+`\n` 分割（旧源兼容）。
+3. **ruleEpisodes 列表范式**：标准写法 `$.routes[{routeIndex}].episodes`——`{routeIndex}` 占位符对五种模式透明生效，结果 JSON 数组 `[{"title","url"}]` 由 `parseEpisodesResult` 既有 JSON 分支直接消费，title/url 用源数据。
+4. **兜底链路**（规范化层不触发的异常数据）：`parseEpisodesResult` 加 routeIndex 参数，结果非 JSON 数组且含 `$$$` 时隐式分组取第 N 组（越界取首组记 AppLog）+ `parseEpisodesByLines` CMS 段解析增强（`#` 分集、`$` limit=2 拆名址、缺名"第N集"、旧纯 URL 行兼容）。
+5. **L2 高级可选写法（降级保留非推荐）**：正则选段 `$.list[0].vod_play_url##(?:.*?\$\$\$){routeIndex}(.*?)(?:\$\$\$.*)?$##$1`；线路名兜底写法 `$.list[0].vod_play_from##\$\$\$##\n`（成对 `##` 分段）。
+6. **ruleLink（详情链接）**：`{{$.vod_id}}` 大括号模板构造绝对 URL（`/api.php/provide/vod?ac=detail&ids={{$.vod_id}}`，域名占位符）。
 
 **理由**：
-- 改动最小：仅增强 Rss.kt 单函数，不动 AnalyzeRule、数据库、接口签名。
+- 开发者零负担：源规则纯 JSONPath 随意写，MacCMS 扁平格式适配全部沉淀规范化层与解析层（用户 2026-08-31 检查点意见采纳）。
+- 范式同构：与书源目录 chapterList/chapterName 同心智，会写目录就会写多线路多集（用户 2026-08-31 二次意见采纳）。
 - 统一解析层：所有 MacCMS 采集订阅源一次受益，后续 12 站转化零增量解析代码。
-- 机制全部既有：大括号模板、routeIndex 占位符、replaceRegex 均为源码已验证能力，只组合不新造。
+- 机制最小变更：规范化层 2 处 setContent 调用点接入 + parseEpisodesResult 加 routeIndex 参数（2 处调用点已持有该值）+ parseEpisodesByLines 增强，不动 AnalyzeRule、数据库。
 
 ### Alternatives Considered
 
@@ -83,18 +86,19 @@ MacCMS 聚合采集书源（loginUi 菜单切 13 站）→ 视频订阅源**每�
 |------|---------|
 | ruleRoutes/ruleEpisodes 内嵌 JS（照抄原书源） | 用户明确要求不用 JS；多集环境 JS 可行但违背统一解析层诉求 |
 | 扩展 AnalyzeRule 新增 CMS 分隔符语法 | 侵入通用解析层影响书源/订阅源全部链路，风险大收益小 |
-| ruleEpisodes 返回全部线路串联、播放层按 routeIndex 过滤 | 需改 Rss.kt 多处接口签名传参，数据冗余，parseEpisodesResult 语义混乱 |
+| ruleEpisodes 全线路串联透传到播放层、播放层按 routeIndex 过滤 | 串联数据冗余，播放器职责越界（格式知识泄漏到播放层）；改为**解析层内部**隐式分组选段（已采纳为 L1 主策略） |
 | sortUrl 动态分类（先请求再渲染） | 改变分类导航架构（Tab 渲染先于请求的鸡生蛋设计），风险大，可另立项 |
 | 仅正则 replaceRegex 把 `#$` 全转行、不加解析层增强 | replaceRegex 只有一层替换，名$址格式无法拆出 title/url，播放列表质量差 |
+| 保持单字符串范式（`getString`+`\n` 分割）不变 | 列表规则（`$.xxx[*].name`）会 toString 失效，与书源目录心智割裂，用户明确否决 |
 
 ### Drawbacks（已知缺点 + 接受理由）
 
 | # | 缺点 | 接受理由 |
 |---|------|---------|
-| 1 | 第 N 线路选择正则含回溯（`(?:.*?\$\$\$){routeIndex}`），性能与正确性需真机验证 | 线路数通常 <10，回溯深度有限 |
+| 1 | routes 为规范化层隐式契约，与源自带 routes 字段冲突会被跳过规范化 | 注入前检测已存在则跳过并记日志；L2 显式写法可绕开 |
 | 2 | 线路名保持英文标识（m3u8/bilibili 等）无中文映射 | 一层 replaceRegex 无法多对多映射，显示影响小 |
 | 3 | 付费平台线路（bilibili/qq 等）无解析接口拦截能力，仅 m3u8 直链线路可用 | MacCMS 采集站主流即 m3u8 直链 |
-| 4 | URL 含 `#`/`$` 特殊字符时解析受限 | MacCMS m3u8 直链基本不含 |
+| 4 | URL 含 `#`/`$`/`$$$` 特殊字符时解析受限 | MacCMS m3u8 直链基本不含；解析容错+日志 |
 | 5 | sortUrl 静态分类，站点分类变更需更新源 | 分类相对稳定 |
 
 ### Prior Art
@@ -116,20 +120,20 @@ MacCMS 聚合采集书源（loginUi 菜单切 13 站）→ 视频订阅源**每�
 - **内容**：订阅源规则中使用 `{{$.vod_id}}` 等 JSONPath 大括号模板，由既有 AnalyzeRule 链路处理（#L740-L757 模板 + isRule() #L783-L788 子规则递归）。
 - **验收标准**：真机确认模板渲染结果与原书源 JS 等价实现一致（ruleLink 拼接、ruleRoutes/ruleEpisodes 字段提取均正确）。
 
-### R2 parseEpisodesByLines 识别 MacCMS 分隔格式
+### R2 数据规范化层 + 兜底解析
 
-- **内容**：输入行 `集名$URL#集名$URL`，按 `#` 分集、按第一个 `$` 拆分 title/url；title 缺省（无 `$` 或名为空）回退"第N集"。
-- **验收标准**：三种形态验证通过——纯 URL 行（旧行为不变）、`名$URL` 行（title=名、url=址）、混合行（两种并存均正确）。
+- **内容**：①数据规范化层 `normalizeMacCmsBody` 增量注入 routes——原字段不动、非 JSON/无特征零侵入判定、item 已有 routes 字段时跳过并记 AppLog；②兜底链路：`parseEpisodesResult` 加 routeIndex 参数，结果非 JSON 数组且含 `$$$` 时隐式分组取第 N 组（0-based，越界取首组并记 AppLog）+ `parseEpisodesByLines` CMS 段解析增强。
+- **验收标准**：①规范化前后原规则取数不变（原字段保留）；②item 已有 routes 字段时跳过规范化不覆盖；③含 `$$$` 串各 routeIndex 选段正确且互不串线。
 
-### R3 ruleEpisodes 用 {routeIndex} 正则选第 N 线路（0-based）
+### R3 ruleRoutes/ruleEpisodes 列表范式（对齐书源目录）
 
-- **内容**：replaceRegex 正则从 vod_play_url 提取第 N 个 `$$$` 分段；`{routeIndex}` 占位符由 Rss.kt #L221-L236 先替换。
-- **验收标准**：边界全覆盖——N=0（无前导 `$$$`）、单线路（无 `$$$` 分隔）、最后线路（无尾随 `$$$`）、越界 routeIndex 不崩溃；真机切线路各档集数正确且互不串线。
+- **内容**：ruleRoutes 标准写法 `$.routes[*].name`（getStringList 优先+回落）；ruleEpisodes 标准写法 `$.routes[{routeIndex}].episodes`——`{routeIndex}` 占位符对 JSONPath/CSS/XPath/JS/正则五种模式透明生效（Rss.kt #L221-L236）。
+- **验收标准**：`$.routes[*].name` 列表规则可用（getStringList 优先+回落均正确）；`$.routes[{routeIndex}].episodes` 各 routeIndex 正确互不串线、越界兜底不崩溃（取首组记 AppLog）；五种模式随意写确认。
 
-### R4 ruleRoutes 用 replaceRegex 转换线路名列表
+### R4 ruleRoutes 列表范式回落写法兼容
 
-- **内容**：`$.data[*].vod_play_from` + replaceRegex 把 `$$$` 转换行。
-- **验收标准**：详情页线路 Tab 名称列表与 vod_play_from 的 `$$$` 分段一致（英文标识原样显示，不做中文映射）。
+- **内容**：旧写法 `$.list[0].vod_play_from##\$\$\$##\n` 在 getStringList 回落路径下仍正确（回归保护）。
+- **验收标准**：新旧两种写法（`$.routes[*].name` 列表范式 / `$.list[0].vod_play_from##\$\$\$##\n` 回落写法）线路 Tab 一致（英文标识原样显示，不做中文映射）。
 
 ### R5 ruleLink 用大括号模板构造绝对详情 URL
 
