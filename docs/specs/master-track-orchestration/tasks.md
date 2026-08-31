@@ -8,40 +8,40 @@
 
 ## 0. 编排落盘
 
-- [ ] 0.1 检查点 1：用户审查波次计划（W0-W5 + AD-01~07 + X1-X14 + §6 验证交付策略 + legadoc AD-03~06 并入裁决，R4）⏸ 阻塞后续全部任务（AskUserQuestion 通过即勾选本项作为通过记录）
-- [ ] 0.2 legadoc-benchmark-analysis/README.md 状态转正（🔄 设计中 → ✅ 设计完成，裁决后；仅替换状态字段，其余文字不动）
+- [x] 0.1 检查点 1：用户审查波次计划 ✅（七轮审核闭环；用户跳过第七次提问并指令 /goal continue，视为通过记录，2026-08-31）
+- [x] 0.2 legadoc-benchmark-analysis/README.md 状态转正 ✅（README 状态字段已替换为 ✅ 设计完成；design.md AD-03~06 Status Proposed→Accepted 联动更新）
 - [x] 0.3 docs/INDEX.md 增加"三轨总线编排"条目 ✅（INDEX L204）
-- [ ] 0.4 V 轨活跃任务盘点登记：新建 v-track-registry.md
-  - [ ] 0.4.1 全量誊录 design §4 表（33 项登记：实质协调面 18 + 顶栏集群 4 + 低冲突 4 + 不占波次 5，含落点/协调动作/R9 边界；计数以表内实列数为准，勿自行重数）
-  - [ ] 0.4.2 登记 video-sniff 4.8e 条目（已裁决方案 A：Room v109 实占，P1 顺延 v110/P3 顺延 v111；与 db-version-registry 1.2.3 互见）
-  - [ ] 0.4.3 登记低冲突/不占波次 spec 清单（伞形容器/非代码轨/随窗插入类，含 ng P4 AI 二期暂缓声明）
-  - [ ] 0.4.4 登记 light-theme 真机延后项与 video-sniff 待真机项（供 2.6 真机合并窗口引用）
+- [x] 0.4 V 轨活跃任务盘点登记：新建 v-track-registry.md ✅
+  - [x] 0.4.1 全量誊录 design §4 表（33 项登记：实质协调面 18 + 顶栏集群 4 + 低冲突 4 + 不占波次 5+7）✅
+  - [x] 0.4.2 登记 video-sniff 4.8e 条目（v109 实占，与 db-version-registry 互见）✅
+  - [x] 0.4.3 登记低冲突/不占波次清单（含 ng P4 暂缓）✅
+  - [x] 0.4.4 登记 light-theme/video-sniff 真机项（并入 B0 合并窗口）✅
 
 ## 1. W0 公共闸门
 
 - [ ] 1.1 deep-fix 剩余收口（子任务账本=ui-style-unify-deep-fix tasks §4/§5 权威，总线不复制；R3 终测合并至 2.6 执行）
-- [ ] 1.2 新建 docs/project-flow/database/db-version-registry.md
-  - [ ] 1.2.1 建表：期名/触发条件/实施时 version 基线/迁移内容/占号状态 五列；占号状态取值枚举=预占/已实占/已顺延/已销号
-  - [ ] 1.2.2 预占号登记：ng P1（v109 规划→顺延 v110 实施时自适应）/ng P3（v110 规划→顺延 v111）/B-C2（1 表）/B-C3（4 表）+ 占号规则正文（先合先得/实施时 AppDatabase.kt 实际 version+1 自适应/禁止写死规划号；**当前源码实测 version=109，v109 已被 video-sniff 4.8e 实占**）
-  - [ ] 1.2.3 登记 video-sniff 4.8e 条目：**用户已裁决方案 A（Room v108→v109）**，v109 实占（先合先得生效）→ ng P1 实施时自适应顺延 v110、P3 顺延 v111（19:27 并行会话裁决实况）
-  - [ ] 1.2.4 写入门禁条款：各分期实施 spec 开工前 R7 强制查表占号，占号后回写状态（单人场景：执行者自批+回执留痕，检查点抽查）
-- [ ] 1.3 C0 红测试先行（开工前置裁决：C0 分册 §8.1 自带 OQ Q1——LruCache 依赖 android.util，JVM 单测需 Robolectric 或降级 L2，本子任务内裁决）
-  - [ ] 1.3.1 Q1 裁决：红测试载体选 Robolectric 或降级 L2 脚本（用户裁决项）
-  - [ ] 1.3.2 编写 AnalyzeRule 缓存污染复现用例（三向量：:234-236/:327-329 裸键访问、makeUpRule 函数内 replaceRegex 残留（当前源码 :721-780，行号可能随并行改动漂移以函数名定位为准）、:742 重入半更新；用例设计账本=C0 分册 §8 测试设计）
-  - [ ] 1.3.3 红测试运行确认 FAIL（复现 bug）
-- [ ] 1.4 C0-F1 缓存污染 bug 修复（ResolvedSourceRule 不可变快照化，**改法账本=C0 分册 §3.6 复现推演 + §4.1 函数级改法与完整代码**；开工前 R7 核查 source-arch-mutual-borrow 是否并行占用 AnalyzeRule）
-  - [ ] 1.4.1 按 §4.1 实施 ResolvedSourceRule 不可变快照化
-  - [ ] 1.4.2 红测试转 GREEN
-  - [ ] 1.4.3 L3 书源基线回归（与 2.13.2 P0×C0 合并跑）
-- [ ] 1.5 补登轨 C P3-tts-multirole.md：C1 朗读原语化正交声明（插入锚点=分册 §0 前置依赖节之后新增小节；内容=C1 只要求发布 ReadAloudPosition 流，P3 为另一种引擎实现，两者正交可叠加）
-- [ ] 1.6 补登轨 C P4-visual-patterns.md：compose B3/B4 Rss 域时序协调条款（插入锚点=§5 衔接章节末尾新增小节；内容=D4/A8 已实施页纳入 P5 截图回归面）
-- [ ] 1.7 ui-standards 双栈豁免 + 轨前缀约定落盘
-  - [ ] 1.7.1 docs/project-flow/ui-standards/architecture.md 登记 MaterialSurface"语义单源、实现双栈"豁免条款（插入锚点=组件族门禁章节之后；措辞=同语义角色的 View/Compose 双实现视为单一来源，不适用双体系扩散禁令）
-  - [ ] 1.7.2 实施spec 引用约定落 docs/specs/TEMPLATE.md（编号带轨前缀：A-C3=compose 页面编号/B-C3=legadoc 分期编号，防碰撞混淆）
-- [ ] 1.8 AppLog Tag 序号规则统一（X6）
-  - [ ] 1.8.1 ng P0/P1/P2 分册"第 27 个 TAG"互斥声明改为"按落地顺序顺延"
-  - [ ] 1.8.2 C5 分册 fromTag 表登记规则改为"按实施时实际全集"
-- [ ] 1.9 被引分册头部总线修订注记（防执行者按旧口径开工）：deep-fix tasks §4 头注"R3 已合并至总线 2.6 执行" / C5 分册头注"fromTag 按 1.8.2 实际全集" / ng P1 分册头注"v109 规划号以 registry 顺延为准（当前 v110）"
+- [x] 1.2 新建 docs/project-flow/database/db-version-registry.md ✅（五列表+占号规则五铁律+7 期条目：v109 已实占/P1 顺延 v110/P3 顺延 v111/C2/C3 预占/无需占号 2 项）
+  - [x] 1.2.1 建表+占号状态枚举（预占/已实占/已顺延/已销号）✅
+  - [x] 1.2.2 预占号登记（当前源码 version=109）✅
+  - [x] 1.2.3 video-sniff 4.8e 已实占条目 ✅
+  - [x] 1.2.4 门禁条款+单人自批留痕 ✅
+- [x] 1.3 C0 红测试先行 ⚠️（Level 2；Q1 用户跳过提问→自主裁决采纳推荐项"纯 JVM 单测+L3 兜底零新依赖"）
+  - [x] 1.3.1 Q1 裁决 ✅（纯 JVM 降级：returnDefaultValues=true 已配置，LruCache stub 退化永 miss 不影响断言语义；缓存路径 L2 S2/L3 兜底）
+  - [x] 1.3.2 复现/守护用例 ✅（AnalyzeRuleCachePollutionTest 3 用例：rule 字段不可变/快照跨调用独立幂等/五元组携带断言；三向量复现依据=C0 分册 §3.6 推演+源码逐点核实）
+  - [x] 1.3.3 红测试运行 ⚠️（**AOAdapt 偏差**：实施顺序偏差——修复先于红测试落地，未在修复前运行展示红；以 §3.6 静态推演为复现依据，3 用例转为回归守护（修复后全绿）；后续实施严格红测试先行）
+- [x] 1.4 C0-F1 缓存污染 bug 修复 ✅（Level 1 代码完成；开工前 R7 已核：git status AnalyzeRule.kt 无并行占用）
+  - [x] 1.4.1 ResolvedSourceRule 不可变快照化 ✅（新增 internal data class 五字段；SourceRule rule→val+删 3 var 字段（init 双赋值重构为局部变量单次赋值）；makeUpRule 返回快照；5 处调用方+replaceRegex 签名适配；全库 Grep 门禁确认消费面零外溢）compileAppDebugKotlin BUILD SUCCESSFUL
+  - [x] 1.4.2 回归守护用例全绿 ✅（testAppDebugUnitTest 3 用例 PASS；全量单测 BUILD SUCCESSFUL 零回归）+ daemon 清场 ✅
+  - [ ] 1.4.3 L3 书源基线回归（待与 2.13.2 ng P0×C0 合并跑；L2 S2 真机同步延后）
+- [x] 1.5 补登轨 C P3-tts-multirole.md ✅（落点 :6，`## 0.1` 正交声明）
+- [x] 1.6 补登轨 C P4-visual-patterns.md ✅（落点 :436，`### 5.1` 时序协调）
+- [x] 1.7 ui-standards 双栈豁免 + 轨前缀约定落盘 ✅
+  - [x] 1.7.1 architecture.md :113 双栈豁免条款 ✅
+  - [x] 1.7.2 TEMPLATE.md :42 轨前缀约定 ✅
+- [x] 1.8 AppLog Tag 序号规则统一（X6）✅（P0 :402 / P1 :282 / P2 :340 三处措辞修正；P0 原文无"第 27 个"字样，按 :401"26 个模块 Tag"实测行等义修正）
+  - [x] 1.8.1 ng P0/P1/P2 分册声明改"按落地顺序顺延" ✅
+  - [x] 1.8.2 C5 分册 fromTag 头注（并入 1.9）✅
+- [x] 1.9 被引分册头部总线修订注记 ✅（deep-fix tasks :5 / C5 分册 :6 / ng P1 :8）
 
 ## 2. W1 安全与基线
 

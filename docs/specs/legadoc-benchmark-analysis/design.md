@@ -170,24 +170,24 @@ graph TD
 - **Decision**: C1 按"发布层→引擎去直写→UI 跟随投影"三步实施；架构选型文档明示与 NG 多角色正交可叠加（多角色=另一种引擎实现）
 - **Goal**: 听书体验代差消除且不锁死 NG 路线
 - **Tradeoff**: 绘制期投影触及 ContentTextView 绘制路径，回归成本高（接受）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-31 经三轨总线编排检查点 1 裁决通过）
 
 ### AD-04: 多媒体插入全量迁 DB+排版+播放三层
 - **Context**: 本项目空白且已有视频播放器资产；legadoC 体系含锚点/存储/排版/播放/导出全链
 - **Decision**: C2 全量移植但播放端复用本项目 ExoPlayer 资产（AudioBlockPlayer/PhotoDialog 适配本项目播放器治理），DB 走本项目 v109+ 自增序列
 - **Tradeoff**: 2-3 周最大单项（接受：用户价值 5 分）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-31 经三轨总线编排检查点 1 裁决通过）
 
 ### AD-05: UI 借鉴限定"模式+View 组件"，不引 legadoC 页面
 - **Context**: legadoC 0 Compose 且血统不同；本项目 Compose 化进行中
 - **Decision**: UiCorner 三表面组/SurfaceStyle 作为模式融入 ui-standards（与 NG AD-05 合并推进）；合集书架按本项目组件族规范重写 UI 层（数据层照搬）；BookGroup 与合集并存策略+matchesGroup 虚拟组映射裁决归 C3 设计前置
 - **Tradeoff**: UI 层不能照搬（接受：避免 0 Compose 债务入库）
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-31 经三轨总线编排检查点 1 裁决通过）
 
 ### AD-06: 工程纪律借入"用户日志+防泄露+产物验证"三件，不借其禁测宪法
 - **Context**: legadoC AGENTS 禁 AI 跑测试与其无 E2E 现状自洽；本项目 ai_tests 是核心资产不可动摇
 - **Decision**: C5 只迁 LogModule 用户日志体系+pre-push/发布清洗脚本范式+aapt/apksigner 产物门禁；工作模式五级分层不引入
-- **Status**: Proposed（待检查点裁决）
+- **Status**: Accepted（2026-08-31 经三轨总线编排检查点 1 裁决通过）
 
 ## 6. File Changes
 

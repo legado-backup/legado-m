@@ -3,6 +3,10 @@
 > 状态：Proposed（待检查点裁决，未审查不实施）｜上游：[design.md](../design.md) AD-06 / 决策表 #9（修正版）｜证据：[evidence-pack.md](../evidence-pack.md) F/C 节
 > NG 源：`F:\...\legado_NG-main`（快照 3.26.082815，行号为该快照实测）｜本项目 DB v108（`AppDatabase.kt:126`）
 
+## 0.1 与 legadoc C1 朗读原语化的正交声明（总线补登 2026-08-31）
+
+本分期（多角色听书）与 legadoc C1 朗读架构原语化（docs/specs/legadoc-benchmark-analysis/migration-designs/C1-aloud-primitives.md）**正交可叠加，无硬依赖**：C1 对引擎的唯一要求=发布 ReadAloudPosition 位置流；本分期的多角色路由=另一种引擎实现，同样只需消费该流。两分期同改 HttpReadAloudService，编排已固定串行方向：**C1（W2）先行 → 本分期（W4）rebase 后实施**，且 rebase 时须补发布制接线条款（多角色逐段推进经发布层，禁止直写 durChapterPos/moveToNextPage）+ OQ-11 off-by-one 对照覆盖本分期新增调用点（见 master-track-orchestration tasks 5.3.2，X4）。
+
 ## 0 继承结论索引（前轮实测，本轮逐条源码复核，全部成立）
 
 | # | 结论 | 本轮复核锚点 |
