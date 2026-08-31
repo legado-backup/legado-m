@@ -1,4 +1,4 @@
-﻿# 文档索引
+# 文档索引
 
 > 项目所有文档的统一入口，覆盖项目规范、项目流程、功能设计、核心 Skill 五类文档。最后更新：2026-08-30（文档规整重建，历史 spec 已归档至 docs/specs/archive/）。
 
@@ -162,9 +162,9 @@
 
 ## 三、功能设计（docs/specs/）
 
-> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 63 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
+> 功能设计文档，按 OpenSpec 工作流程管理。活跃 spec 64 个，完整状态表见 [specs/INDEX.md](./specs/INDEX.md)。
 
-### 活跃 Specs（63 个）
+### 活跃 Specs（64 个）
 
 | Spec | 状态 | 说明 |
 |------|------|------|
@@ -199,7 +199,9 @@
 | [image-thread-coordination-fix-20260731](./specs/image-thread-coordination-fix-20260731/README.md) | 🔄 | 图片加载与视频切换线程协调修复（正式包反馈两类问题） |
 | [legados-forks-comparison](./specs/legados-forks-comparison/README.md) | ✅ | legados Fork 对比与集成方案（逐文件源码对比识别可集成特性） |
 | [legado-skill-v2-rebuild](./specs/legado-skill-v2-rebuild/README.md) | 🔄 | Legado Skill V2 重建方案（基于第十轮深度审计的统一重建） |
+| [light-theme-contrast-fix](./specs/light-theme-contrast-fix/README.md) | 🔄 | 亮色主题文字对比度系统性修复（对齐 Archive 取色派生+textColorSecondary 补写+根因3 全量 21 处+Compose 槽位治理；已实施测试包 083116 已交付，真机 L2 延后） |
 | [list-residue-compose](./specs/list-residue-compose/README.md) | ✅ | 遗留列表 Compose 化收尾（CacheActivity 缓存列表+Explore 瀑布列表） |
+| [master-track-orchestration](./specs/master-track-orchestration/README.md) | 🔄 | 三轨总线编排（Compose 化 B0-B5 × legadoc C0-C5 × ng P0-P5）：W0-W5 波次调度+待优化项优先级+6 大共性问题整合+V 轨挂靠协调（18 个视频/下载/网络域实质协调面 spec）；七轮审核闭环（规范性/事实核对 10/10/矩阵式冲突扫描 X1-X14/可执行性演练） |
 | [memory-mechanism-redesign](./specs/memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
 | [multiline-on-demand-extraction](./specs/multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
 | [my-topbar-unify](./specs/my-topbar-unify/README.md) | 🔄 | 「我的」页头部迁移 MainTopBarView（与书架/订阅/发现观感统一） |
@@ -235,7 +237,9 @@
 | [video-extractor-enhancement](./specs/video-extractor-enhancement/README.md) | 🔄 | 内置视频抓取能力增强（自动抓取视频链接补齐规则短板） |
 | [video-player-image-enhance](./specs/video-player-image-enhance/README.md) | ✅ | 视频播放器画质增强三级档位（色彩参数/CAS 锐化降噪/Anime4K 超分） |
 | [video-player-theme-unify](./specs/video-player-theme-unify/README.md) | ✅ | 视频播放器主题统一（控制条/弹框动态设色+硬编码色清理） |
+| [video-play-7001-videograph-fix](./specs/video-play-7001-videograph-fix/README.md) | ✅ | 视频切集 7001 渲染管线崩溃修复（media3 VideoGraph 回归：增强无条件注入空 effects 激活 GL 管线） |
 | [video-player-ux-fixes](./specs/video-player-ux-fixes/README.md) | ✅ | 视频播放器体验五项修复（下载按钮/快进灵敏度/弹框透明/标题/图标） |
+| [video-sniff-403-and-rss-classic-fix](./specs/video-sniff-403-and-rss-classic-fix/README.md) | ✅ | 视频嗅探引擎架构级重构（SniffEngine 统一播放/下载+删 WebView 播放器+拦截面扩展+经典布局修复+线程数 256，Phase 0-4 全闭环） |
 
 > 历史 spec 已归档至 docs/specs/archive/（100 个 spec 目录+2 个散件分析文档，2026-08-30 文档规整），其中 42 个为停滞设计归档待定（README 顶部有标注，可随时恢复），完整清单见 [specs/INDEX.md](./specs/INDEX.md)。
 

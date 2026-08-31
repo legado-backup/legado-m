@@ -2,7 +2,7 @@
 
 > 功能设计文档索引。活跃 spec 按 OpenSpec 工作流管理（README/spec/design/tasks 四文档）；历史 spec 已于 2026-08-30 文档规整时归档至 [archive/](./archive/)。最后更新：2026-08-30。
 
-## 一、活跃 Spec（62 个）
+## 一、活跃 Spec（63 个）
 
 状态说明：✅ 已完成/已实施/设计完成，🔄 设计中/开发中/实施中，— README 未标注状态。
 
@@ -38,6 +38,7 @@
 | [image-thread-coordination-fix-20260731](./image-thread-coordination-fix-20260731/README.md) | 🔄 | 图片加载与视频切换线程协调修复（正式包反馈两类问题） |
 | [legados-forks-comparison](./legados-forks-comparison/README.md) | ✅ | legados Fork 对比与集成方案（逐文件源码对比识别可集成特性） |
 | [legado-skill-v2-rebuild](./legado-skill-v2-rebuild/README.md) | 🔄 | Legado Skill V2 重建方案（基于第十轮深度审计的统一重建） |
+| [light-theme-contrast-fix](./light-theme-contrast-fix/README.md) | 🔄 | 亮色主题文字对比度系统性修复（对齐 Archive 取色派生+textColorSecondary 补写+根因3 全量 21 处+Compose 槽位治理；已实施测试包 083116 已交付，真机 L2 延后） |
 | [list-residue-compose](./list-residue-compose/README.md) | ✅ | 遗留列表 Compose 化收尾（CacheActivity 缓存列表+Explore 瀑布列表） |
 | [memory-mechanism-redesign](./memory-mechanism-redesign/README.md) | ✅ | 项目记忆机制改造（项目记忆独立至 .trae/memory+废弃 conv_id） |
 | [multiline-on-demand-extraction](./multiline-on-demand-extraction/README.md) | 🔄 | 多线路多集按需采集架构优化（ruleContent 返回播放页 URL+按需采集 m3u8） |
@@ -71,6 +72,8 @@
 | [video-player-image-enhance](./video-player-image-enhance/README.md) | ✅ | 视频播放器画质增强三级档位（色彩参数/CAS 锐化降噪/Anime4K 超分） |
 | [video-player-theme-unify](./video-player-theme-unify/README.md) | ✅ | 视频播放器主题统一（控制条/弹框动态设色+硬编码色清理） |
 | [video-player-ux-fixes](./video-player-ux-fixes/README.md) | ✅ | 视频播放器体验五项修复（下载按钮/快进灵敏度/弹框透明/标题/图标） |
+| [video-sniff-403-and-rss-classic-fix](./video-sniff-403-and-rss-classic-fix/README.md) | ✅ | 视频嗅探引擎架构级重构（SniffEngine 统一播放/下载+删 WebView 播放器+拦截面扩展+经典布局修复+线程数 256，Phase 0-4 全闭环） |
+| [video-play-7001-videograph-fix](./video-play-7001-videograph-fix/README.md) | ✅ | 视频切集 7001 渲染管线崩溃修复（media3 VideoGraph 回归：增强无条件注入空 effects 激活 GL 管线） |
 
 ## 二、根目录散件与模板
 
