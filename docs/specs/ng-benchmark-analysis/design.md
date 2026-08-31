@@ -65,14 +65,14 @@
 
 | 排名 | 迁移项 | 价值 | 复杂度 | 风险 | 建议 | v2 修订依据 |
 |---|------|:---:|:---:|:---:|------|------|
-| 1 | ✏️ **书源文件沙箱+缓存命名空间**（BookSourceFileAccessPolicy+StorageScope+BookSourceCacheStore） | 5 | 2 | 2 | 强烈推荐 | 规则引擎轮证实 JsExtensions 的 getFile/deleteFile/unzipFile 限 `cache/bookSourceCache/{ns}/`，且 cache 绑定（scriptCacheObject）一并解决跨源缓存互读 |
+| 1 | ✏️ **书源文件沙箱+缓存命名空间**（BookSourceFileAccessPolicy+StorageScope+BookSourceCacheStore） | 5 | 2 | 2 | 强烈推荐 | 规则引擎轮证实 JsExtensions 的 getFile/deleteFile/unzipFile 限 `cache/bookSourceCache/{ns}/`，且 cache 绑定（scriptCacheObject）一并解决跨源缓存互读；V6 红队：新增 BaseSource.evalJS 直调入口覆盖（21+ 处）与 downloadFile 双参版，工作量 7.2→7.7d |
 | 2 | ➕ **弹窗拦截 SourceInteractionPolicy** | 4 | 1 | 1 | 强烈推荐 | 仅 28 行+3 个 ViewModel 挂载点，零生态破坏；防批量搜索/换源中书源滥弹验证码 |
 | 3 | ✏️ **网络日志凭据脱敏** | 4 | 1 | 1 | ~~迁移~~→**保护项** | ⚠️P0 起草实测修正：本项目 NetworkLog.kt:30-61 已具备完整脱敏（敏感 header 集合+四组正则）+持久化，与 NG 同构且为超集——降级为"回归验证+零修改保护"，不再迁移 |
 | 4 | ✏️ **类导入策略灰度引入**（RhinoClassShutter+withBookSourceClassPolicy） | 4 | 2 | 2 | 推荐（只记日志首期） | 接入点仅 2 处（AnalyzeUrl:375/AnalyzeRule:831）；首期 enabled+只记 AppLog，收集真实 import 面后再启白名单 |
 | 5 | ✏️ **书籍状态写保护**（NativeBook 拦截+GuardLog） | 4 | 2 | 3 | 推荐（两阶段） | 先 GuardLog 观察再切拦截 |
-| 6 | **AI 供应商抽象层**（AiProvider+3 协议+12 预设+AiManager+ModelRegistry） | 5 | 3 | 2 | 推荐 | ⚠️P1 起草实测修正：本项目已有 AiProviderConfig（7 字段单协议）+供应商管理三件套 UI——P1 走**配置融合**路线（扩展现有实体承载 NG 26 字段超参），非新建双轨 |
+| 6 | **AI 供应商抽象层**（AiProvider+3 协议+12 预设+AiManager+ModelRegistry） | 5 | 3 | 2 | 推荐 | ⚠️P1 起草实测修正：本项目已有 AiProviderConfig（7 字段单协议）+供应商管理三件套 UI——P1 走**配置融合**路线（扩展现有实体承载 NG 26 字段超参），非新建双轨；V6 红队：密钥泄露链修复前置（NetworkLog 补 x-goog-api-key/备份 AES），8.8→9.3d |
 | 7 | **上下文压缩**（AiChatContextManager 核心+context_compaction.md） | 4 | 2 | 1 | 推荐 | 纯算法；须拆 750 行单文件 |
-| 8 | **外部 MCP 服务**（McpService+拆分后的 McpServer+Tools 适配） | 5 | 3 | 3 | 推荐 | 本项目已有反向 AiMcpClient，方向互补；默认关闭 |
+| 8 | **外部 MCP 服务**（McpService+拆分后的 McpServer+Tools 适配） | 5 | 3 | 3 | 推荐 | 本项目已有反向 AiMcpClient，方向互补；默认关闭；V6 红队：写工具 29→31（clear 类漏标）+删类四道子门+别名→独立注册裁决（69→70），8.75→9.25d |
 | 9 | **TTS 引擎 V2+多角色路由最小闭环**（手动绑角色先行） | 4 | 3 | 3 | 推荐 | ⚠️P3 起草实测修正：①自研 currentToneID 等字段属 AI 聊天播报链（唯一消费方 AiChatSpeechPlayer），与听书路由无交集，并存不合并 ②NG 无分镜时全兜底 NARRATION 致手动绑定失效——新增 LocalDialogueSegmenter（引号对白切分，NG 无对应物，待评审） |
 | 10 | **视觉三模式融入 ui-standards**（材质语义角色/单一调度点/快照取色） | 4 | 3 | 2 | 推荐 | 只借模式；治 H9/H11 |
 | 11 | ✏️ 按源 Cookie 命名空间隔离 | 4 | 3 | 4 | 谨慎（后置） | 12+ 调用点+与本项目 P5 修复绑定深；只借概念重实现 |
@@ -94,6 +94,7 @@ graph TD
 ```
 
 - 并行性：P5∥P0 零文件交集可并行；P3∥P1 可并行但 DB 版本号走自适应门禁（起点=实施时 AppDatabase version+1）；P4 应用层（#15）依赖 P1，不依赖 P2（内部工具走本项目 AiToolRegistry）
+- V6 红队对抗审查（第 6 轮）：三路攻击（沙箱绕过面/密钥泄露链+工具规格逐条/真实文本压力+热路径性能）产出 3 HIGH+若干中低，全部收编各分期设计；P2 工具总数 69→70
 
 实施级设计文档（设计前置，未审查不实施）：
 
@@ -125,6 +126,19 @@ graph TD
 | P5 | "同 role 材质一致"断言升级 ai_tests F-UI-THEME 常驻 | ai_tests |
 | P3 | TAG_TTS 回灌 | logging_rules.md |
 | P3 | 新组件基线登记（ReadAloudRoleBindDialog/TtsEngineManageActivity） | components.md |
+| P5-AD-P4-11 | signature 缓存+解析禁入 draw/measure/layout 硬门禁 | architecture.md §四门禁 |
+| P5-AD-P4-13 | signature 不进数据面（数据类字段废除） | checkstyle_rules.md Compose 状态小节 |
+
+### 规范保证与回灌执行机制
+
+**交付期规范保证三道关**（每期实施强制）：
+1. **规范核查表执行**：实施 spec 的 tasks.md 强制包含"规范核查表执行"任务项——每完成一个任务项，对照该期设计文档的规范符合性核查表逐条打勾（审查可 Grep 复核勾选记录）。
+2. **门禁五件套**（已有，各期设计文档 §实施顺序+门禁 处固化）。
+3. **AD-02 偏离门禁**：实施中发现设计文档/规范冲突，先回写设计文档再改代码，禁止"代码先行、文档补记"。
+
+**规范回灌执行机制**：提升清单 16 条按"随期回灌"执行——每期实施 spec 的 tasks.md 强制包含"规范回灌"任务项（列明该期对应的提升点 + 目标规范文件 + 回灌内容，分期映射见上方提升清单"来源"列），回灌完成后由验证轮（或检查点）复核规范文件实际变更与清单一致；本 spec 阶段不动规范原文。
+
+**回灌验收标准**：规范文件新增条款必须含"触发场景 + 反模式示例 + 可 Grep 判定"三要素（对齐既有沉淀规范 spec-sedimentation-mechanism 风格）。
 
 ## 5. Architecture Decisions
 
@@ -175,6 +189,13 @@ graph TD
 - **Goal**: 手动绑角色即可用，二期无缝升级
 - **Tradeoff**: 一期选角手动（接受）
 - **Status**: Accepted（2026-08-30 检查点 1 五轮审查设计验收通过）
+
+### 红队审查结论（V6）
+
+V6 红队对抗审查（第 6 轮）以三路攻击验证设计（沙箱绕过面/密钥泄露链+工具规格逐条/真实文本压力+热路径性能），产出 3 HIGH+若干中低，全部收编各分期设计：
+- **P0**：直调入口覆盖消除虚假安全感——BaseSource.evalJS 直调（21+ 处）与 downloadFile 双参版一并纳管（7.2→7.7d）；**P1**：密钥泄露链修复前置，建立四层防线（NetworkLog 补 x-goog-api-key/备份 AES，8.8→9.3d）
+- **P2**：写工具 29→31（clear 类漏标）+删类四道子门+别名→独立注册裁决（工具总数 69→70，8.75→9.25d）；**P3**：栈式扫描收编；**P5**：热路径三条款收编
+- 自本轮起，红队对抗审查为设计前置标准环节：各期实施级设计未经同强度对抗轮收编不得进入实施
 
 ## 6. File Changes
 

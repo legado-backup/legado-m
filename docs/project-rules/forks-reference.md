@@ -29,6 +29,7 @@
 | 版本 | git 仓库 | 特色 | 对比优先级 |
 |------|----------|------|-----------|
 | 阅读NG | [joestar817/legado_NG](https://github.com/joestar817/legado_NG) | 网络日志标签等优化 | ⭐⭐⭐⭐ |
+| 阅读C | [CCSSNE/legadoC](https://github.com/CCSSNE/legadoC) | **阅读R/Archive 系兄弟分支（own 分支，约周更）**：朗读架构原语化重构（全 fork 独有：发布层原语/纯函数跟随/绘制期投影/EMA 预测换页）、正文多媒体插入体系、AI 净化规则沉淀、合集书架虚拟 Book、用户日志勾选；⚠️ 0 Compose/无 CI 无 E2E 无沙箱；深度对标完成见 specs/legadoc-benchmark-analysis/ | ⭐⭐⭐⭐⭐（朗读/阅读体验域） |
 | 辞晨阅读·Max | [GEd520/legados](https://github.com/GEd520/legados) | 辞晨系列 | ⭐⭐⭐ |
 | MD3阅读 | [HapeLee/legado-with-MD3](https://github.com/HapeLee/legado-with-MD3) | Material3 前端改造 | ⭐⭐⭐⭐（前端） |
 | MD3阅读-DIY | [325506/legado-with-MD3-DIY](https://github.com/325506/legado-with-MD3-DIY) | MD3 衍生 | ⭐⭐⭐（前端） |

@@ -34,11 +34,11 @@
 
 | 分期 | 文档 | 深度 | 覆盖 |
 |------|------|------|------|
-| P0 | [P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | 605 行 | 书源安全加固 5 项：逐函数解读+6 新类 kotlin 骨架+16 边界+21 单测方法+D1-D16 |
-| P1 | [P1-ai-foundation.md](./migration-designs/P1-ai-foundation.md) | 601 行 | AI 供应商融合（AiProviderConfig v2 30 字段草案+J1-J9 注入点）+压缩 4 类+DB v109 DDL |
-| P2 | [P2-mcp-service.md](./migration-designs/P2-mcp-service.md) | 403 行 | MCP 四模块拆分（NG 行号→模块映射表）+69 工具规格表+四层安全代码级 |
-| P3 | [P3-tts-multirole.md](./migration-designs/P3-tts-multirole.md) | 446 行 | 多角色听书一期：五级路由 kotlin 草案+LocalDialogueSegmenter+7 段 diff 改造+6 新表 DDL+前端对齐 ui-standards |
-| P5 | [P4-visual-patterns.md](./migration-designs/P4-visual-patterns.md) | 547 行 | 视觉三模式：快照四 data class+MaterialSurface 三分支+18 处直读清单+与 ui-style-unify-deep-fix 衔接 |
+| P0 | [P0-source-security-hardening.md](./migration-designs/P0-source-security-hardening.md) | 629 行 | 书源安全加固 5 项：逐函数解读+6 新类 kotlin 骨架+16 边界+21 单测方法+D1-D16 |
+| P1 | [P1-ai-foundation.md](./migration-designs/P1-ai-foundation.md) | 632 行 | AI 供应商融合（AiProviderConfig v2 30 字段草案+J1-J9 注入点）+压缩 4 类+DB v109 DDL |
+| P2 | [P2-mcp-service.md](./migration-designs/P2-mcp-service.md) | 418 行 | MCP 四模块拆分（NG 行号→模块映射表）+69 工具规格表+四层安全代码级 |
+| P3 | [P3-tts-multirole.md](./migration-designs/P3-tts-multirole.md) | 461 行 | 多角色听书一期：五级路由 kotlin 草案+LocalDialogueSegmenter+7 段 diff 改造+6 新表 DDL+前端对齐 ui-standards |
+| P5 | [P4-visual-patterns.md](./migration-designs/P4-visual-patterns.md) | 566 行 | 视觉三模式：快照四 data class+MaterialSurface 三分支+18 处直读清单+与 ui-style-unify-deep-fix 衔接 |
 
 注：P5 期载体文件名为 P4-visual-patterns.md（延续创建序命名），期号以本表分期列为准
 

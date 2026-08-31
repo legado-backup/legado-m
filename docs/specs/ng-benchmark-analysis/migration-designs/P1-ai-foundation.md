@@ -20,7 +20,7 @@
 - 流式打通：NG 供应商层为非流式（`OpenAiCompatibleProvider.kt:64` `stream=false`）；本项目流式通道 `AiChatService.chatStream`（:275）保留不动（D5）。
 - `AiBalanceProvider` 余额查询裁剪出 P1（D6），`AiProviderSetting.balanceUrl/balanceJsonPath/useCustomBalanceUrl` 字段保留（随 26 字段全量迁移）。
 - Agent/Skill/ModeEntryContext 依赖链裁剪至 P4：`syncActiveSkill`/`syncModeEntryContext` 不迁，`AiChatSnapshot` 裁掉 Skill 字段（D4）。
-- MCP（P2）、替换既有 `AiContextManager`（P1 并存观察，P4 评估）、密钥 Keystore 加密（记债）。
+- MCP（P2）、替换既有 `AiContextManager`（P1 并存观察，P4 评估）、密钥 Keystore 加密（记债）（Keystore 本体仍记债；备份 AES 已由 V6 前置至 P1，见 §4.6）。
 
 ---
 
@@ -278,7 +278,7 @@ object AiProviderStore {
 | J6 | Reasoning 超参注入 | AiReasoningOptions.kt:5-42 | 原样平移 + Registry 推断回落；sensenova 踩坑参数随预设保留 |
 | J7 | 压缩摘要请求通道 | NG 私有 `buildRequestBody+executeJsonChat`（AiChatClient.kt:949-969） | **收敛走 `AiManager.generateText`**（AiTextParams(temperature=0f, disableThinking=true)），保留 `type==OPENAI` 校验 + `apiMode==chat_completions` 校验 |
 | J8 | 响应解析/rawPreview | 3 Provider parse 段 + rawPreview=body.take(1000) | 原样平移；rawPreview 仅随 AiTextResult 传递，**禁止入日志** |
-| J9 | 日志/脱敏 | NG 无系统化日志规范 | AppLog + 新增 `AppLog.TAG_AI`（现有 Tag 26 个：AppLog.kt:13-42，TAG_AI 为新增第 27 个）：只记 providerId/HTTP code/token 数/候选 URL 路径模式；apiKey/Authorization 头/完整 URL 禁止出现在任何日志与异常 message（logging_rules 铁律） |
+| J9 | 日志/脱敏 | NG 无系统化日志规范 | AppLog + 新增 `AppLog.TAG_AI`（现有 Tag 26 个：AppLog.kt:13-42，TAG_AI 为新增第 27 个）：只记 providerId/HTTP code/token 数/候选 URL 路径模式；apiKey/Authorization 头/完整 URL 禁止出现在任何日志与异常 message（logging_rules 铁律）；**NetworkLog 脱敏补头见 §4.6（V6 红队 HIGH-A1-4，P1 前置必改）** |
 
 ### 4.3 压缩核心 4 类骨架与逐桶算法表
 
@@ -308,26 +308,54 @@ object AiProviderStore {
 |---|---|---|
 | G1 | 无锚退化 | `calibration==null` → 纯本地估算（AiChatTokenCalibration.estimate 短路，:687-693）；记录估算偏差 debug 日志供后续校准 |
 | G2 | 阈值双轨触发 | 官方 usage 达阈值（calibration.contextTokens ≥ threshold，AiChatClient.kt:861-862）**或** 预测达硬窗 95%（:863-865）**或** force |
-| G3 | 压缩后复检 | 重建历史 usage 必须 < threshold，否则抛错阻断（:889-892），防"压缩了但没压够"死循环 |
+| G3 | 压缩后复检 | 重建历史 usage 必须 < threshold，否则抛错阻断（:889-892），防"压缩了但没压够"死循环；报错文案补引导："压缩后仍超阈值，请调低阈值百分比"（V6 红队 A3-3） |
 | G4 | 锚有效性四拒 | promptTokens≤0 / 历史含 summary / 工具调用数不足 / 无锚定 assistant（AiChatContextManager.kt:234-243）→ 拒建锚 |
 | G5 | 硬窗兜底 | 未启用压缩时 `estimated ≥ window` 直接抛错（:855-859），禁止静默超窗请求 |
+
+**压缩滞后带防抖（V6 红队 A3-3 新增）**：
+- **压缩后目标线**：`buildCompactedHistory` 的 recent 预算从默认 `min(20k, 窗口 20%)` 收紧为 **重建后 usage ≤ 阈值×0.6**（预算=阈值×0.6 − system − summary 的动态余量），给下一轮对话留出增长带，避免压完就贴着阈值线；
+- **防抖跳过**：`compactIfNeeded` 增加前置判断——**距上次压缩（compactionRevision 最新 Record）不足 N 条新消息（N=10，常量 `COMPACTION_DEBOUNCE_MIN_MESSAGES`）且当前估算 < 硬窗 95%** → 跳过本轮压缩（返回不触发），防止小窗口/贴线场景每轮对话都触发压缩抖动（压缩本身也消耗 token 与延迟）；
+- 单测覆盖：AiCompactionSchedulerTest 增 2 方法（防抖跳过 / 防抖不拦截硬窗 95% 触发）。
 
 **配置对齐**：压缩开关沿用 `AppConfig.aiContextCompressionEnabled`；窗口/阈值新增两 key（`aiContextWindowTokensV2` 沿 NG 7 档 32k~2M / `aiContextCompactionThresholdPercent` 0+50..95 步进 5），旧 `aiContextWindowTokens`（258k 连续值）保留给旧 AiContextManager——两套配置互不污染（并存期，见 Open Question 4）。新 key `aiContextWindowTokensV2` 默认 258_000（OQ-4 关闭引发；7 档表核对以实列档位数为准——实列为 6 档，"OQ-4 关闭"段中"7 档"已修正为"6 档"）。压缩模型缺省跟随助手模型（AiConfig.kt:372-380 语义）。
 
 ### 4.5 兜底裁剪算法（压缩摘要请求自身超窗时）
 
 ```
+MAX_TRIM_ROUNDS = 50                               // V6 红队 A3-2：迭代上限，防畸形历史死循环
 loop:
   ensureActive()                                    // 取消透传
+  round ≥ MAX_TRIM_ROUNDS → 抛 NoStackTraceException("压缩裁剪超迭代上限，历史结构异常")
   发送摘要请求（system prompt + 历史 + 固定 user 指令）
   成功 → 返回摘要（空内容报错）
   窗口超限（cause 链匹配 5 标记）→
-     trimmed = trimOldestCompactionHistoryUnit(历史)   // user 单元成组删 / tool_call 配对删
-           || shrinkLargestCompactionMessage(历史)     // 最长消息 ≥4096 chars 对半截断 + 省略标记
+     单轮裁剪目标 = 阈值×0.6                         // V6 红队 A3-2：单轮足量裁剪，减少请求数
+     按目标批量裁剪：
+       trimmed = trimOldestCompactionHistoryUnit(历史, 目标)   // user 单元成组删 / tool_call 配对删（NG 单条版改为循环删至估算 ≤ 目标）
+            || shrinkLargestCompactionMessage(历史)            // 最长消息 ≥4096 chars 对半截断 + 省略标记
      trimmed 为 false（无可裁）→ 抛 NoStackTraceException("压缩模型的上下文窗口不足")
      continue
   其他异常 → 原样抛出
 ```
+
+> A3-2 说明：NG 原实现每轮只裁 1 个单元/截 1 条消息，超窗严重时需数十次完整 LLM 请求才能收敛（token/延迟双浪费）。本项目改为单轮循环裁剪至估算 ≤阈值×0.6 再重发请求；迭代上限 50 兜底畸形历史（如 E19 的畸形 tool_call）导致的无法收敛场景。
+
+### 4.6 密钥泄露防线（V6 红队 HIGH 发现落地，P1 前置必改）
+
+**A1-4 NetworkLog 脱敏缺口（HIGH，P1 前置必改项，P2 依赖）**：
+- 缺口：`help/http/NetworkLog.kt:30-41` `sensitiveHeaderNames` 敏感头集合未覆盖 Gemini 协议鉴权头 **`x-goog-api-key`**（GoogleAiProvider.kt:18,78 使用）。P1 上线 GoogleAiProvider 即形成完整泄露链：**AI 请求头 → NetworkLog 抓包记录 → MCP network_log_get 返回给外部 LLM**（P2 上线 MCP 后由"本地泄露"升级为"外发泄露"），故必须在 P1 内补齐、P2 前生效；
+- 改造：`sensitiveHeaderNames` 集合追加 `x-goog-api-key`（小写归一比对沿用现有机制，与 `authorization`/`x-api-key` 同列）；同步自查集合中已覆盖 Bearer/x-api-key 无缺口；
+- 归属：随 T1（首个编译步）落地，单测 AiProviderHttpProtocolTest 增 1 方法断言 Gemini 请求经 NetworkLog 脱敏后头值已替换。
+
+**A1-1/A1-2 aiProviderList 备份明文泄露链（HIGH，OQ-6 从"记债推 P5"升级为 P1 内最小修复）**：
+- 缺口：P1 后 `PreferKey.aiProviderList` JSON 含 30 字段（含 `apiKey` 明文）。备份导出（本地/WebDav）沿用了"敏感字段白名单加密"惯例，但白名单只含 `webDavPassword` 等既有字段，新增的 `aiProviderList` 不在列 → 备份文件明文携带全部供应商密钥；Web 备份端点同理；
+- 改造（复用 webDavPassword AES 加密先例，**两处同步**）：
+  1. `help/backup/Backup.kt:546-549`（本地/WebDav 导出路径）：对 `aiProviderList` 键值走与 `webDavPassword` 相同的 AES 加密分支后再写入备份 JSON；
+  2. `controller/BackupController.kt:238-242`（Web 备份路径）：同样追加 `aiProviderList` AES 加密，两处加密逻辑保持同一实现（抽公共函数或复用既有加密工具，防双实现漂移）；
+- 顺手修一致性缺口：`BackupController.kt:233-253` Web 备份端点导出键集合**缺 `keyIsNotIgnore` 过滤**（本地路径有过滤、Web 路径漏掉），补齐同一过滤，消除"Web 备份比本地备份多导出内部键"的不一致；
+- 导入侧：AES 解密分支对称补齐（Backup.kt 导入路径 + BackupController 导入路径），解密失败回退尝试明文读取（兼容手工编辑的备份文件，失败则该键留空 + AppLog）。
+
+**防线总览（四层，详见 §13 D15）**：① NetworkLog 补敏感头（传输记录层）→ ② 备份 AES 加密（静态存储层）→ ③ AppLog 禁 raw/禁 apiKey（应用日志层，J9/E18）→ ④ P2 MCP Sanitizer（外发出口层，P2 落地）。
 
 ---
 
@@ -454,7 +482,7 @@ private val migration_108_109 = object : Migration(108, 109) {
 
 ---
 
-## 7 边界条件（18 条）
+## 7 边界条件（19 条）
 
 | # | 边界 | 处理 |
 |---|---|---|
@@ -476,6 +504,7 @@ private val migration_108_109 = object : Migration(108, 109) {
 | E16 | 并发写 providers（UI 编辑 vs fetchAndSaveModels 回存） | AiProviderStore 写路径 `@Synchronized`；AppConfig setter 链已有孤儿模型清理 |
 | E17 | 压缩循环期间用户取消 | 每轮 `ensureActive()`；CancellationException 原样上抛（不落 catch 日志，exception_rules 例外条款） |
 | E18 | 日志/异常泄密 | 任何异常 message 与日志禁含 apiKey/Authorization/完整 URL；HTTP 错误只透出 code+body 前 500 字符（NG 惯例）+ AppLog 侧再脱敏；源/供应商名称只记 id |
+| E19 | 畸形 tool_call 历史（AiChatToolBatchRecovery 未迁，V6 红队 A3-4 已知上限声明） | NG 同目录存在 `AiChatToolBatchRecovery`（畸形 tool_calls 配对修复器），P1 **未迁**：此类历史靠 §4.5 shrink 粗截兜底（最长消息对半截断），可能残留半截 tool_call 文本——功能不劣化但摘要质量下降。二期（P4 压缩替换评估时）评估补迁；触发条件=真机出现畸形 tool_call 导致压缩摘要质量异常 |
 
 ---
 
@@ -541,6 +570,9 @@ graph LR
 
 说明：**updateLog 时点前移：T1 首次编译前基于 git diff 完成首轮 updateLog（版本交付同步门禁①），此后 T 系列每步编译前增量维护**；T7 与 T4/T5 无依赖可并行；T8 依赖 T5（J7 收敛走 AiManager）与 T7（压缩记录实体）；T10 依赖 T3/T5；每步结束过双门禁后才进下一步；T11 完成后执行 daemon 清场（stop-daemons.bat 门禁）。
 
+**规范回灌任务项（对齐 design.md「规范保证与回灌执行机制」，提升清单 P1/交叉验证条目随期回灌）**：实施 tasks.md 强制包含"规范回灌"任务项——① Gson 缺失字段不取 Kotlin 默认值→反序列化入口 sanitize 双闸（P1-D12 → checkstyle_rules.md 新增小节）；② runCatchingSql 三副本收敛公共入口（→ database-migration-safety.md R2）；③ runCatching 禁用于取消信号边界，显式 rethrow CancellationException（→ exception_rules.md）。回灌完成后由验证轮复核规范文件实际变更与提升清单一致；本设计阶段不动规范原文；回灌验收三要素：触发场景+反模式示例+可 Grep 判定。
+**规范核查表执行**：实施 tasks.md 同步包含"规范核查表执行"任务项——每完成 §10 一个 T 步，对照 §8 规范符合性核查表逐条打勾（审查可 Grep 复核勾选记录）。
+
 ---
 
 ## 11 Open Questions（7 条）
@@ -550,7 +582,7 @@ graph LR
 3. 双调用通道（AiManager 非流式 vs AiChatService 流式）收敛时点与形态：P2 MCP 期 or P4 应用层期。
 4. ✅【已关闭 2026-08-30】上下文窗口默认值：**新 key `aiContextWindowTokensV2` 默认 258_000**（6 档表中段，UI 档位 32k/64k/128k/258k/512k/1M 与旧选择器对齐，AiConfigFragment.kt:655）。证据：① 旧 key 默认即 258k（AppConfig.kt:1289，coerce 8k..2M），生产已验证；② 本项目用户模型分布以 128k 档国产/低价模型居多，若默认 1M，压缩阈值 50%=512k token 永不触发→直接超限 400 报错（"宁早压勿超限"）；③ NG 默认 1M 是其旗舰模型生态取向，非普适；④ 与旧 key 默认一致，并存期无"同用户双窗口值"认知混乱。旗舰模型用户手动上调至 1M 档。引发设计变更：§4 配置对齐段已标注"OQ-4 关闭引发"。
 5. AiModelRegistry 冻结快照（~989 行）的更新机制：手工跟 NG / 脚本抓取 / 完全停更走 enrich 兜底。
-6. 密钥 Keystore 加密改造时点（P1 记债）：备份导出会带出明文 apiKey，需与 P5 备份流程统一脱敏。
+6. ✅【已关闭（V6 升级为 P1 内最小修复）2026-08-30】密钥 Keystore 加密改造时点：原"备份导出带出明文 apiKey、记债推 P5"方案否决。V6 红队 HIGH-A1-1/A1-2 论证泄露链真实可达（备份文件明文携带全部供应商 apiKey），升级为 **P1 内最小修复**：不引入 Keystore（完整加密体系仍留 P5 评估），仅复用 webDavPassword AES 加密先例对 `aiProviderList` 备份导出/导入做字段级加密（Backup.kt:546-549 本地/WebDav + BackupController.kt:238-242 Web 两处同步），并顺手补 Web 备份端点缺 `keyIsNotIgnore` 过滤的不一致。详见 §4.6；工作量 +0.5d（§12）。引发设计变更：§4.6 新增小节、§12 加行、§13 D15 决策。
 7. ✅【已关闭 2026-08-30】旧 `aiChatSessionList` JSON 会话导入：**一次性导入器，P1 迁移期执行（§6.2 migration 内），不放 P2 也不放弃**。证据：① 旧 JSON 上限 100 条会话（AppConfig.kt:738 `take(100)`），数据量小、结构已知，归一化逻辑现成（AppConfig.kt:686-748），导入器约 +0.3d；② 双轨读取反证：AiChatViewModel 12 处读写点（:534/:535/:579/:592/:744/:853/:860/:877/:919/:924/:943/:964）均需改双源合并+会话 ID 去重+删除双写，且旧 setter `take(100)` 并存期会静默丢弃第 101 条会话（数据丢失风险）——长期幽灵成本远超一次性导入；③ 导入 runCatching 兜底：失败留空表+旧 JSON 保留可重试，成功后旧 key 冻结只读不删（防降级回滚）。引发设计变更：§6.2 migration 草案已加导入步骤（标注"OQ-7 关闭引发"），工作量 8.5d→8.8d。
 
 **回滚方案汇总**（实施门禁配套，三条主线）：
@@ -560,7 +592,7 @@ graph LR
 
 ---
 
-## 12 工作量估算（函数粒度，合计 ~8.8 人日）
+## 12 工作量估算（函数粒度，合计 ~9.3 人日）
 
 | 块 | 文件×函数 | 估算 |
 |---|---|---|
@@ -573,11 +605,12 @@ graph LR
 | 旧 aiChatSessionList 导入器 | OQ-7 关闭引发：§6.2 migration 内一次性导入旧会话 JSON（上限 100 条，复用 AppConfig.kt:686-748 归一化） | 0.3d |
 | compress 4 类 | ≈ 28 函数 + assets 1 文件 | 1.5d |
 | UI 增量 | 协议下拉/测试连接/预设导入 ≈ 6 函数 | 0.8d |
+| V6 红队加固 | §4.6 密钥防线：NetworkLog 补 `x-goog-api-key`（A1-4）+ 备份 AES 加密两处同步与 Web 过滤补齐（A1-1/2）+ §4.5 裁剪迭代上限与单轮目标（A3-2）+ §4.4 滞后带防抖（A3-3）+ 对应单测 3 方法 | 0.5d |
 | 测试 | 单测 6 类 37 方法 + L2 场景 + L3 三轮 | 1.5d |
 | 文档同步 | updateLog（T1 首编前起，每步编译前增量，T11 收口）/issues-found/INDEX | 0.3d |
-| **明细加总** | | **9.3d** |
+| **明细加总** | | **9.8d** |
 | 削减依据 | Registry 数据表照搬不逐行评审 -0.3d；AiDefaultProviders 12 家预设参数表直接平移 -0.2d | **-0.5d** |
-| **合计（收敛目标）** | | **8.8d** |
+| **合计（收敛目标）** | | **9.3d** |
 
 ---
 
@@ -599,3 +632,4 @@ graph LR
 | D12 | sanitize 双闸：AppConfig.readAiProviders（入口闸）+ AiProviderStore.providers（读取闸） | Gson 缺失字段不取 Kotlin 默认值（结论 #5），任何绕过 AppConfig 的写入源都被第二闸兜住 |
 | D13 | 压缩摘要请求收敛走 AiManager.generateText（替代 NG 私有 buildRequestBody+executeJsonChat） | 单一请求出口便于 J1-J9 注入点统一生效与测试替身拦截 |
 | D14 | 压缩开关沿用 aiContextCompressionEnabled；窗口/阈值新增独立 key 与旧 AiContextManager 隔离 | 并存期两套语义（3 字符粗估 vs 六桶加权）互不污染，替换评估放 P4 |
+| D15 | 密钥防线四层纵深（V6 红队 HIGH 落地）：① NetworkLog `sensitiveHeaderNames` 补 `x-goog-api-key`（NetworkLog.kt:30-41，传输记录层）；② aiProviderList 备份导出/导入复用 webDavPassword AES 加密先例，Backup.kt:546-549 与 BackupController.kt:238-242 两处同步 + Web 端点补 keyIsNotIgnore 过滤（静态存储层）；③ AppLog 禁 raw/禁 apiKey（应用日志层，J9/E18 已有）；④ P2 MCP Sanitizer（外发出口层，P2 落地）。OQ-6 随之关闭（V6 升级为 P1 内最小修复，Keystore 完整体系仍留 P5） | A1-4 泄露链（AI 请求头→NetworkLog→MCP network_log_get→外部 LLM）在 P1 上线 GoogleAiProvider 即触发，等不到 P2；A1-1/2 备份明文泄露链真实可达，"记债推 P5"不可接受；四层各堵一段链路，P1 前置必改（P2 MCP 依赖①④） |

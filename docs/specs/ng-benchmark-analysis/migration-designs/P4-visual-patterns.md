@@ -203,16 +203,20 @@ data class ThemeShapeTokens(
  */
 object ThemeSnapshotResolver {
 
-    /** signature 短路：未变化直接返回 current，避免全量重推导 */
-    fun resolveIfChanged(context: Context, current: ThemeSnapshot?): ThemeSnapshot {
-        val sig = context.themeUiSignature()          // 复用现有签名，算法零改动（ThemeUiPalette.kt:149-182）
-        if (current != null && current.signature == sig) return current
-        return resolve(context, sig)
-    }
+    /**
+     * 【V6-B2 硬条款】signature 结果 context 级缓存：
+     * themeUiSignature() 单次 = 50+ 次 SP 读 + panelBgImage 真磁盘 stat（File.length/lastModified）
+     * + 1-2KB 字符串拼接，禁止随重组全量重算。resolver 内部按 context 缓存 {signature, snapshot}；
+     * 失效源仅两处（可审计）：SP 写（复用 ThemeUiPalette SP 监听打点置脏）/ ThemeSync 失效置脏；
+     * 置脏后下次调用重算 signature+snapshot 并回填缓存。算法零改动（ThemeUiPalette.kt:149-182）。
+     */
+    fun resolveIfChanged(context: Context, current: ThemeSnapshot?): ThemeSnapshot   // 缓存 signature 短路：未变返回同一实例
 
-    fun resolve(context: Context, signature: String = context.themeUiSignature()): ThemeSnapshot
+    fun resolve(context: Context): ThemeSnapshot                                     // 经缓存取 signature，禁外部直传
 
-    /** View 侧无 remember 场景的一次性解析入口（MaterialSurfaceStyle 专用） */
+    /** View 侧无 remember 场景的一次性解析入口（MaterialSurfaceStyle 专用）。
+     *  【V6-B2 硬门禁】resolve/resolveForView 禁入 draw/measure/layout 链——
+     *  MaterialSurface/Resolver 不得在 onDraw/onMeasure/onLayout 内调用（Grep 门禁见 §9-V1） */
     @JvmStatic fun resolveForView(context: Context): ThemeSnapshot
 }
 ```
@@ -232,13 +236,15 @@ object ThemeColorMath {
 }
 ```
 
-**ThemeSnapshot 附带 `signature: String` 字段**（上表省略），取值=传入的 `themeUiSignature()`，供 `resolveIfChanged` 与 palette 三入口的 `themeSignature` 字段复用。
+**【V6-B6 裁决】signature 不进数据面**（AD-P4-13）：ThemeSnapshot **不含** `signature` 字段，`AppSettingPalette.themeSignature` 字段**废除**。理由：signature 含视觉无关因子（panelBgImage 的 `lastModified`），进数据类会让任何因子变化引发全部直接读者重组。signature 降级为 resolver 内部缓存键（V6-B2 缓存条款）；palette remember 键收窄为 snapshot 实例——signature 未变时 resolveIfChanged 返回同一实例，稳定引用即稳定键。
 
 **布局步骤（LegadoTheme.kt 修改，无循环依赖论证）**：
 
 ```kotlin
 // ui/theme/LegadoTheme.kt（修改段）
-val LocalThemeSnapshot = staticCompositionLocalOf<ThemeSnapshot> {
+// 【V6-B1 裁决】dynamicCompositionLocalOf：快照引用变化只重组实际读取者（palette 三入口+MaterialSurface），
+// 非 staticCompositionLocalOf 的 LegadoTheme 全子树失效（裁决段见下方）
+val LocalThemeSnapshot = dynamicCompositionLocalOf<ThemeSnapshot> {
     error("ThemeSnapshot is not available outside LegadoTheme")   // 对齐 NgAppTheme.kt:35-37 防静默降级
 }
 
@@ -251,9 +257,10 @@ fun LegadoTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     // ① 复用现有监听+签名机制（不新增第二套 SP 监听）
     val paletteSignature = rememberThemeUiPalette().signature      // ThemeUiPalette.kt:118-147 原样
-    // ② 快照解析：签名/主题令牌变化才重算（幂等）
+    // ② 快照解析：resolver 内部 signature 缓存短路（V6-B2），signature 不外泄进数据面（V6-B6/AD-P4-13）；
+    //    paletteSignature 仅为布线层内部 remember 键（SP 监听驱动，非数据面字段）
     val snapshot = remember(context, paletteSignature, ThemeSync.version) {
-        ThemeSnapshotResolver.resolve(context, paletteSignature)
+        ThemeSnapshotResolver.resolve(context)
     }
     // ③ M3 派生轨保持现状（ThemeSpec.toM3Scheme 输入改从 snapshot.colors 取，语义等价）
     CompositionLocalProvider(LocalThemeSnapshot provides snapshot) {
@@ -262,6 +269,8 @@ fun LegadoTheme(content: @Composable () -> Unit) {
 }
 ```
 
+**【V6-B1 裁决】LocalThemeSnapshot 采用 `dynamicCompositionLocalOf`**：`staticCompositionLocalOf` 下快照引用变化→LegadoTheme content 全子树失效重组（每页所有 composable 一次性全部失效，状态读取风暴）；本快照直接读者面小且封闭——palette 三入口 + MaterialSurface，dynamic 把失效面精确收窄到实际读取者，净收益为正。代价：读取处多一层订阅簿记（可忽略量级）。防静默降级语义（default=error）保持与 NG NgAppTheme.kt:35-37 对齐不变。
+
 无循环论证：`rememberThemeUiPalette` 不读 `LocalThemeSnapshot`（其签名/监听先于快照存在），palette 三入口换源后才读快照——依赖方向单向。
 
 **palette 三入口内部换源（公共 API 不变）**：
@@ -269,7 +278,7 @@ fun LegadoTheme(content: @Composable () -> Unit) {
 | 入口 | 换源方式 | 等价性约束 |
 |---|---|---|
 | `rememberThemeUiPalette()` | 保持原样（作为签名/监听 owner），仅其 6 面字段实现可改为从快照取 | 字段语义=现直读语义，禁引入 M3 lerp |
-| `rememberAppSettingPalette()` | `page/row/border/onAccent/panelRadiusPx` 等改读 `currentThemeSnapshot().colors`；`remember` 键收窄为 snapshot | 与 AppSettingComponents.kt:126-192 逐字段等价（H9 归位成果零回退） |
+| `rememberAppSettingPalette()` | `page/row/border/onAccent/panelRadiusPx` 等改读 `currentThemeSnapshot().colors`；`remember` 键收窄为 snapshot；**废除 `themeSignature` 字段**（V6-B6/AD-P4-13：signature 含视觉无关因子，进数据面会让任何因子变化引发全部直接读者重组） | 与 AppSettingComponents.kt:126-192 逐字段等价（H9 归位成果零回退） |
 | `rememberAppDialogStyle()` | `surface/fieldSurface/stroke/dialogAlpha/E-Ink 分支` 改读快照 overlay/input/effects | 与 AppComposeDialogs.kt:119-159 逐字段等价 |
 
 ### 4.2 模式一：MaterialRole + MaterialSpec + MaterialDefaults
@@ -361,15 +370,18 @@ fun MaterialSurface(
     }
     // 内部分派（对调用方不透明）：
     // ① 无 blur（blurRadiusDp==0）→ 纯 alpha 色面（Box + drawBehind 涂 ResolvedMaterial.containerColor）
-    // ② blur 且有面板背景图层（panelImageDrawable 存在）→ 对背景图层施加 RenderEffect
-    //    （API≥31 已在 effects.blurEnabled 保证；等级→BlurEffect radius=blurLevel/10f）
+    // ② blur 且有面板背景图层（panelImageDrawable 存在）→ 绘制【预模糊缓存位图】（V6-B5/AD-P4-12）：
+    //    静态位图逐帧 RenderEffect = 中低端 GPU 每帧全宽 18dp blur，禁止；
+    //    改为预模糊一次缓存位图（key=bitmapKey+blurLevel，复用 UiCorner.kt:33-34 panelBitmapKey
+    //    "path:length:lastModified" 失效机制，源图/等级变化自动重算）；RenderEffect 仅作未缓存兜底
+    //    （首帧/缓存重建期一次性执行，不进稳态逐帧路径）
     // ③ blur 但无背景图层 → 降级为纯 alpha 色面，不伪造模糊（对齐 NgVisualSurface.kt:198-199
     //    "无 backdrop 时可靠回退，不伪造背景"契约）
     Box(modifier.materialBackground(material, shape)) { content() }
 }
 ```
 
-**blur V1 语义收敛（本设计裁决，见 §13 AD-P4-6）**：`themeCardBackgroundBlur`（0-250 等级，ThemeConfig.kt:818 写入）V1 只作用于**面板背景图层**（`UiCorner.panelImageDrawable` 的 Bitmap/Drawable 源，UiCorner.kt:150-168）——有明确位图源、可用 RenderEffect/预模糊采样低成本实现；无背景图时自动降级纯 alpha 面。不引入 backdrop 屏幕捕获（=液态玻璃非目标）。
+**blur V1 语义收敛（本设计裁决，见 §13 AD-P4-6）**：`themeCardBackgroundBlur`（0-250 等级，ThemeConfig.kt:818 写入）V1 只作用于**面板背景图层**（`UiCorner.panelImageDrawable` 的 Bitmap/Drawable 源，UiCorner.kt:150-168）——有明确位图源、可用 RenderEffect/预模糊采样低成本实现；无背景图时自动降级纯 alpha 面。不引入 backdrop 屏幕捕获（=液态玻璃非目标）。**实现方式（V6-B5/AD-P4-12）**：采用**预模糊一次缓存位图**——key=bitmapKey+blurLevel，复用 UiCorner.kt:33-34 panelBitmapKey 失效机制（源图/等级变化自动重算）；RenderEffect 降级为未缓存兜底（首帧/重建期一次性），禁止静态位图逐帧 RenderEffect（中低端 GPU 每帧全宽 18dp blur 不可接受）。
 
 **View 侧适配器**（落地 `lib/theme/MaterialSurfaceStyle.kt`；委托 UiCorner 原语，零重复实现）：
 
@@ -387,6 +399,8 @@ object MaterialSurfaceStyle {
     @JvmStatic fun apply(view: View, role: MaterialRole, radiusPx: Float)
 }
 ```
+
+**【V6-B3】View 侧失效契约**：`MaterialSurfaceStyle.apply` 一次成型、无刷新 API，View 侧不享受 CompositionLocal 重组——接入宿主必须二选一并显式声明：① **持有契约**：`ResolvedMaterial` 解析结果缓存到 view tag/宿主字段，挂 `ThemeSync`/`VALUES_CHANGED` 事件失效后重 apply（失效路径与既有豁免页兜底同源，theme-architecture.md 红线 5）；② **明文限定宿主必须 RECREATE**（`recreateOnThemeChange=true`），依赖宿主重建自然重解析。两条路径均须在接入点注释声明选型；无任一失效路径的静默接入=审查拒绝（valuesChanged 时间戳懒比对仅可作辅助兜底，不得作为唯一失效路径）。
 
 **降级链规范（条款 6 补充）**：SDK 分支、E-Ink 判定、blur 开关全部封装在 `ThemeEffectTokens`（解析期）与 `MaterialSurface`/`MaterialSurfaceStyle`（消费期）内部；对齐 NG `NgVisualSurface.kt:216` "API 级判断不出库"证据模式。
 
@@ -429,7 +443,7 @@ object MaterialSurfaceStyle {
 | 4 | `docs/project-flow/ui-standards/components.md` | 修改 | 登记 MaterialSurface/MaterialTokens/ThemeSnapshot/ThemeColorMath（基线状态） |
 | 5 | `docs/project-flow/ui-standards/how-to.md` | 修改 | MaterialSurface/MaterialSurfaceStyle 用法小节 |
 | 6 | `lib/theme/MaterialTokens.kt` | 新增 | MaterialRole/MaterialAlphaSource/MaterialSpec/ResolvedMaterial/MaterialDefaults |
-| 7 | `lib/theme/ThemeSnapshot.kt` | 新增 | ThemeSnapshot + 三组 token（含 signature 字段） |
+| 7 | `lib/theme/ThemeSnapshot.kt` | 新增 | ThemeSnapshot + 三组 token（signature 不进数据面，V6-B6/AD-P4-13） |
 | 8 | `lib/theme/ThemeSnapshotResolver.kt` + `lib/theme/ThemeColorMath.kt` | 新增 | resolve/resolveIfChanged/resolveForView；色彩数学纯函数 |
 | 9 | `ui/widget/components/MaterialSurface.kt` | 新增 | Compose 调度组件（含降级链/blur V1） |
 | 10 | `lib/theme/MaterialSurfaceStyle.kt` | 新增 | View 侧适配器（委托 UiCorner） |
@@ -446,11 +460,11 @@ object MaterialSurfaceStyle {
 | B2 | **夜间模式 N 后缀成对键** | 快照解析统一经 `ThemeRuntimeKeys` 路由（theme-architecture.md 红线 6），禁止手写 `*N` 字符串；signature 已含 night 因子 |
 | B3 | **主题切换时序** | 双事件（RECREATE+ThemeSync.bump）是唯一刷新通道（theme-architecture.md 红线 3/4）；快照重组键=signature+ThemeSync.version，禁自造第三通道；豁免页（recreateOnThemeChange=false）必须已有 ThemeSync 订阅兜底（红线 5），快照不替代该兜底 |
 | B4 | **Compose 重组/强跳过** | ThemeSnapshot 及子 token 全部 `@Immutable` 值类型（稳定类，规避强跳过引用比较陷阱，frontend-ui-standards §4 红线 5）；`remember(role, snapshot)` 键控；禁止组合体内回写快照 |
-| B5 | **View-Compose 混用** | View 侧无 CompositionLocal → `MaterialSurfaceStyle.resolveForView` 一次性解析（valuesChanged 时间戳懒比对由调用方既有 onResume 机制承担）；`AndroidView` 内 Compose 面与 View 面同 role 材质一致由参数表保证 |
+| B5 | **View-Compose 混用（双栈窗口）** | View 侧无 CompositionLocal → `MaterialSurfaceStyle.resolveForView` 一次性解析；失效路径二选一（V6-B3）：① ResolvedMaterial 缓存 view tag/字段 + 挂 ThemeSync/VALUES_CHANGED 失效重 apply，**或** ② 明文限定宿主必须 RECREATE（recreateOnThemeChange=true）；懒比对仅辅助兜底，禁止作为唯一失效路径；`AndroidView` 内 Compose 面与 View 面同 role 材质一致由参数表保证 |
 | B6 | **覆盖安装** | 零 DB/SP schema 变更（全部既有 key）、零新偏好项 → 覆盖安装天然兼容；无 Room migration |
 | B7 | **旧主题包导入** | ThemePackageManager.apply → ThemeConfig.applyTheme 单点 → VALUES_CHANGED 令牌 → signature 变化 → 快照重算；解析层只读不修复旧状态（对齐 NgThemeResolver.kt:47-49 职责） |
 | B8 | **API<31 降级** | `effects.blurEnabled` 解析期即 false（blurLevel>0 但 SDK 不满足）→ MaterialSurface 只涂 alpha 面；blur 等级 key 保留（用户升级系统后自动生效） |
-| B9 | **快照失效丢失** | signature 计算依赖 SP 读（ThemeUiPalette.kt:149-182），若未来加入非 SP 因子必须同步加入 signature（登记为 resolver 维护规则）；resolveIfChanged 短路以 signature 字符串全等为准，禁止用对象引用判断 |
+| B9 | **快照失效丢失** | signature 计算依赖 SP 读（ThemeUiPalette.kt:149-182），若未来加入非 SP 因子必须同步加入 signature（登记为 resolver 维护规则）；resolveIfChanged 短路以 resolver 缓存的 signature 字符串全等为准（V6-B2 缓存条款），禁止用对象引用判断 |
 | B10 | **多窗口/多上下文** | 解析一律用调用点 `LocalContext`/传入 context，禁 `appCtx` 直取（AppConfig 单例读除外——其内部即 appCtx，现状保留）；UiCorner.panelBitmap 全局缓存（UiCorner.kt:33-34）为既有单例，快照不复制位图只引用 Drawable |
 | B11 | **面板背景图文件变更/删除** | panelBitmapKey 含 `path:length:lastModified`（UiCorner.kt:242）自动失效；快照不缓存 Drawable 实例，只缓存色值/等级，背景图由 MaterialSurface 每次组合经 UiCorner 现取 |
 | B12 | **blur 开关中途切换**（themeCardBackgroundBlur 0↔非 0） | key 已在 signature（ThemeUiPalette.kt:165）→ 监听触发重组 → resolveIfChanged 重算 → MaterialSurface remember(role, snapshot) 失效重建 |
@@ -479,6 +493,7 @@ object MaterialSurfaceStyle {
 - `Build\.VERSION\.SDK_INT` 出现于 UI 组件且参与材质/背景分支 → 拒（降级不出库）
 - `withAlpha|graphicsLayer.*alpha|\.blur\(` 出现于四族组件内且来源非 ResolvedMaterial → 拒（材质参数外流）
 - 新增 Compose UI 面未声明 `role = MaterialRole.*` → 拒
+- `MaterialSurface|ThemeSnapshotResolver|MaterialSurfaceStyle\.resolve` 出现于 `onDraw|onMeasure|onLayout` 方法体内 → 拒（V6-B2 硬门禁：解析/signature 缓存访问禁入 draw/measure/layout 链）
 - 区分标准：形态审查看"是否四族基线组件"（checklist 1-3），材质审查看"role 声明+参数出自 spec"（material-roles.md）——两问互不替代
 
 **V2 快照层等价性 L2 截图对比**（`ai_tests\venv\Scripts\python.exe` + `ai_tests/scripts/`，禁入 `temp/`；测试包 `io.legado.miss.app.debug`）：
@@ -492,6 +507,9 @@ object MaterialSurfaceStyle {
 **V4 回潮回归断言**：ai_tests F-UI-THEME 增加"同 role 材质同源"断言——抽 2 个同 role 组件（如 SettingsCard vs AppManagementCard 均 ITEM_CARD）比对 ResolvedMaterial 解析值相等。
 
 **V5 交付门禁缺项补全（V4b 补正）**：实施批次收尾除上述技术验证外必检两项——① Grep `android\.util\.Log\.(d|e)` 确认无残留调试日志（logging-during-refactoring.md 门禁）；② 触发过 Gradle 构建（gradlew/IDE Run）后执行 `stop-daemons.bat` 清场（纯文档/无构建批次跳过）。
+
+**规范回灌任务项（对齐 design.md「规范保证与回灌执行机制」，提升清单 P5/P5-AD 来源条目随期回灌）**：实施 tasks.md 强制包含"规范回灌"任务项——① 材质语义角色条款+material-roles.md 新建（→ ui-standards architecture.md §五索引+§四门禁）；② 顶栏 alpha 槽位指引（tagBarAlpha/wallpaperAlpha/cornerScale → color.md）；③ 材质门禁三条可 Grep 断言（→ architecture.md §四 checklist，与 Phase4 门禁固化同批合入防文案漂移）；④ 高度归属显式化+BOTTOM_BAR 定位条款（→ material-roles.md）；⑤ "同 role 材质一致"断言升级 ai_tests F-UI-THEME 常驻；⑥ signature 缓存+解析禁入 draw/measure/layout 硬门禁（→ architecture.md §四门禁）；⑦ signature 不进数据面（数据类字段废除 → checkstyle_rules.md Compose 状态小节）。回灌完成后由验证轮复核规范文件实际变更与提升清单一致；本设计阶段不动规范原文；回灌验收三要素：触发场景+反模式示例+可 Grep 判定。
+**规范核查表执行**：实施 tasks.md 同步包含"规范核查表执行"任务项——每完成 §10 一个 P5 批次，对照 §8 规范符合性核查表逐条打勾（审查可 Grep 复核勾选记录）。
 
 ## 10 实施顺序依赖图
 
@@ -529,7 +547,8 @@ graph TD
 | MaterialSurfaceStyle（View）+ 高频点试点（注：OQ-3 关闭后试点面 1-2→6 文件，试点项按 6 文件复核，预估 +0.5~1 人日） | 0.5-1 人日 |
 | palette 三入口换源 + 5 处旧派生点收编 + 编译回归 | 1-1.5 人日 |
 | V2 截图对比 + V4 回潮断言回归 | 0.5 人日 |
-| **合计** | **4.5-5.5 人日**（不含 Phase4 门禁合并公共成本） |
+| V6 红队加固（B2 signature 缓存+禁 draw 链门禁 / B5 blur 预模糊缓存 / B6 signature 移出数据面） | +0.5 人日 |
+| **合计** | **5.0-6.0 人日**（不含 Phase4 门禁合并公共成本） |
 
 ## 13 设计决策记录
 
@@ -545,3 +564,6 @@ graph TD
 | AD-P4-8 | **【复审】View 直读精确口径 18 处/9 文件**（上轮 22 处为宽口径）；扩域六 getter 53 处/21 文件含主题基础设施合法直读不入收口；`ThemeStore.themeColors` 现无调用点 | 继承实质不变（游离链路存在需收口）；精确行号清单见 §3.2，收口策略（分批+豁免登记，AD-P4-6 前版 R6）不变 |
 | AD-P4-9 | **E-Ink 采用"特效清零"而非 NG "黑白硬色板"** | 本项目 E-Ink 已有 elevation 清零先例（AppConfig.kt:2138-2145）与 dialogAlpha=1f 语义（AppComposeDialogs.kt:123-127）；硬色板会整体推翻现主题视觉。Tradeoff：与 NG 快照结构不完全同构（接受） |
 | AD-P4-10 | **View 侧直读不强制一次性清零**（继承） | 大爆炸迁移违反分期收口（总设计 §0.3）；随 D1 弹框迁移顺路收敛 + 豁免登记（Open Question 3 已裁决：四路分流，见 §11-OQ3 关闭记录） |
+| AD-P4-11 | **signature 结果 context 级缓存 + resolve/resolveForView 禁入 draw/measure/layout 链**（V6-B2） | themeUiSignature() 单次=50+ 次 SP 读+panelBgImage 真磁盘 stat（File.length/lastModified）+1-2KB 拼接，resolveIfChanged 每次重组全量重算不可接受；resolver 内部按 context 缓存 {signature, snapshot}，失效源仅两处（SP 写监听打点置脏/ThemeSync 失效置脏，可审计）；硬门禁=Grep `MaterialSurface\|ThemeSnapshotResolver\|MaterialSurfaceStyle.resolve` 不得出现于 onDraw/onMeasure/onLayout（§9-V1）。Tradeoff：新增缓存置脏维护点（接受，失效源收敛为两处） |
+| AD-P4-12 | **blur 采用预模糊一次缓存位图，RenderEffect 降为未缓存兜底**（V6-B5） | 静态面板位图逐帧 RenderEffect=中低端 GPU 每帧全宽 18dp blur，不可接受；改为预模糊一次缓存位图（key=bitmapKey+blurLevel，复用 UiCorner.kt:33-34 panelBitmapKey "path:length:lastModified" 失效机制，源图/等级变化自动重算）。Tradeoff：多一份预模糊位图内存（单张，接受） |
+| AD-P4-13 | **signature 不进数据面**（V6-B6）：ThemeSnapshot 无 signature 字段、AppSettingPalette 废除 themeSignature 字段 | signature 含视觉无关因子（panelImage lastModified），进数据类会让任何因子变化引发全部直接读者重组；signature 降级为 resolver 内部缓存键（AD-P4-11），palette remember 键收窄为 snapshot 实例（signature 未变返回同一实例=稳定引用）。Tradeoff：失效归因从字段可见降为内部缓存（接受，§9-V1 门禁可判定） |

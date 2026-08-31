@@ -154,7 +154,7 @@ fun route(
 }
 ```
 
-fallbackRoutes（NG :95-140 原样迁移）：场景覆盖（恒空）→性别兜底→narrator→引擎默认，`distinctBy Triple(engine.id, voiceId, styleId)` 并剔除失败路由。**双路匹配**=speakerId 精确匹配（LocalDialogueSegmenter 一期产不出 speakerId，恒走第二路）+speakerName 归一匹配（`normalizeIdentityName` 后查 characterNameIndex，别名含 aliasesJson 展开）。`createResolved :393-449`：书内绑定优先、缺失级联到全局兜底绑定（narrator/dialogueMale/dialogueFemale/dialogueDefault），全空返回 null（无任何绑定→多角色开关虽开但路由 null→走单音色，边界 B3）。
+fallbackRoutes（NG :95-140 原样迁移）：场景覆盖（恒空）→性别兜底→narrator→引擎默认，`distinctBy Triple(engine.id, voiceId, styleId)` 并剔除失败路由。**双路匹配**=speakerId 精确匹配（LocalDialogueSegmenter 一期产不出 speakerId，恒走第二路）+speakerName 归一匹配（`normalizeIdentityName` 后查 characterNameIndex，别名含 aliasesJson 展开）。`createResolved :393-449`：书内绑定优先、缺失级联到全局兜底绑定（narrator/dialogueMale/dialogueFemale/dialogueDefault），全空返回 null（无任何绑定→多角色开关虽开但路由 null→走单音色，边界 B3）。**角色零绑定告警（V6-A11）**：createResolved 非空（存在旁白/兜底绑定）但只建角色未绑任何音色→说话段①-④全 miss→全段落⑥ engine.activeVoice（对白体验≈单音色）；Router.create 收尾检测 characters 非空且零角色绑定→AppLog.put(TAG_TTS, "角色未绑定音色，对白将使用引擎当前音色")，仅提示不阻断朗读。
 
 ### 4.3 LocalDialogueSegmenter 完整设计（NG 无对应物，DD3）
 
@@ -165,9 +165,13 @@ object LocalDialogueSegmenter {
     private val SAY_VERBS = listOf("道", "说", "喊", "问道", "答道", "笑道", "怒道",
         "喝道", "叫道", "低声道", "沉声道", "冷声道", "轻声道", "开口", "喃喃", "嘀咕",
         "吩咐", "命令道", "说道", "大声道", "淡淡道")
-    // 对白引号对（一期：中文双引号为主；含单引号/直角引号成对识别）
-    private val QUOTE_PAIRS = mapOf('“' to '”', '‘' to '’', '「' to '」', '『' to '』', '"' to '"')
-    private val DIALOGUE_REGEX = Regex("[“\"][^“”\"]+[”\"]")   // 贪婪度受 [^] 守卫，不支持跨引号
+    // 成对引号表（DD16，V6-A1 重写）：弃单一字符类正则（实锤草案 DIALOGUE_REGEX 只含“”""
+    // 两类，与"含单引号/直角引号"声明及单测⑤⑥自相矛盾），改为 QUOTE_PAIRS 表驱动
+    // 成对栈式扫描：开闭严格配对+栈匹配，杜绝跨风格错配（详见下方切分策略）
+    private val QUOTE_PAIRS = mapOf(
+        '「' to '」', '『' to '』', '“' to '”', '‘' to '’', '"' to '"')  // 英文直引号开闭同字符
+    // 代词词典（DD17）：人称代词不作 speakerName，映射性别喂路由③性别兜底
+    private val PRONOUN_GENDER = mapOf("他" to SpeakerGender.MALE, "她" to SpeakerGender.FEMALE)
 
     /** 段落切分：引号体=DIALOGUE，引号外=NARRATION；speakerName=紧邻前缀(1..12字)+动词捕获 */
     fun segment(paragraphIndex: Int, paragraphText: String): List<StoryboardSegment>
@@ -176,12 +180,12 @@ object LocalDialogueSegmenter {
 }
 ```
 
-- **切分策略**：`DIALOGUE_REGEX.findAll` 扫描段落 → 每个引号体生成 DIALOGUE segment（start/end=引号体在原文的偏移区间，含引号——合成文本由 `normalizeStoryboardSynthesisText :13-34` 统一剥引号）；两段引号之间的区间（trim 后非空且非静音）生成 NARRATION segment。
-- **speakerName 提取**：取引号开始位置向前回溯 ≤16 字符的窗口，匹配 `(人名窗口)(动词)` 结尾模式（动词∈SAY_VERBS，人名窗=非标点非引号连续串 1..12 字）；命中→speakerName=捕获组、evidence="local_prefix"、speakerGender=UNKNOWN（交给路由 ③ 性别索引/兜底链）；未命中→speakerName=null、evidence="local_quote"（走 ④⑤ 兜底）。
+- **切分策略（DD16 成对栈式扫描，替换原 DIALOGUE_REGEX.findAll 方案）**：单趟线性扫描字符流（O(n)）：遇开引号→连同其配对闭字符与起始偏移入栈；遇闭引号→仅当与栈顶期望闭字符一致时弹栈（不一致则忽略该字符，防御性跳过）；栈弹空瞬间完成一个完整引号体→生成 DIALOGUE segment（start/end=引号体在原文的偏移区间，含引号——合成文本由 `normalizeStoryboardSynthesisText :13-34` 统一剥引号）；同/异风格嵌套由栈天然支持（他说："你看「书」了吗"整体为一个引号体）；扫描结束栈非空（存在未闭合引号）→整段保守降级 NARRATION（单测④语义）；两段引号之间的区间（trim 后非空且非静音）生成 NARRATION segment。栈匹配保证「开引号只会被其配对闭引号关闭——跨风格错配用例（单测⑨）`「他说："早"` 中「未闭合时 "早" 不得被误切为对白。
+- **speakerName 提取**：取引号开始位置向前回溯 ≤16 字符的窗口，匹配 `(人名窗口)(动词)` 结尾模式（动词∈SAY_VERBS，人名窗=非标点非引号连续串 1..12 字）；命中→speakerName=捕获组、evidence="local_prefix"、speakerGender=UNKNOWN（交给路由 ③ 性别索引/兜底链）；未命中→speakerName=null、evidence="local_quote"（走 ④⑤ 兜底）。**代词性别映射（DD17）**：人名窗为人称代词时不捕获为 speakerName（单测⑧语义保留），但按内置代词词典 他→MALE/她→FEMALE 写入 speakerGender 喂给路由 ③ 性别兜底（`dialogueFallbackGender :199-206` 直接消费）——未建角色时"他说…/她…道"即可命中男/女兜底音色，纯查表零成本，替代纯排除策略提升未建角色命中率。
 - **segment 结构**：复用 StoryboardSegment（type/paragraphIndex/text/speakerName/evidence/speakerGender/start/end），identityType=NONE、nameType=命中时 PROPER_NAME、AI 专用字段（performanceContext/emotion 族）取默认值。
 - **置信度策略**：一期不做数值置信度（与 NG 手动绑定路径一致）；以 evidence 字符串区分 `local_prefix`（高置信）/`local_quote`（低置信），为二期 AI 分镜数据替换留判别位（AI 到达时 segment 来源切回分镜，Segmenter 旁路）。
 - **接口边界**：只依赖 StoryboardSegment+StoryboardSegmentType，不查库不碰路由；输入段落已过本项目 `getReadAloudText` 净化链（复用现有 contentList）。
-- **单测用例**（JVM，§10）：①无引号段→单 NARRATION；②单引号段+前缀动词→1 DIALOGUE+speakerName；③多引号段夹叙述→N-D-N 交替且 offset 单调；④引号未闭合→整段 NARRATION（正则不命中）；⑤直角引号「」→DIALOGUE；⑥英文直引号成对→DIALOGUE；⑦纯符号引号体→silent 过滤；⑧speakerName 窗口含"他说"人称代词→不捕获（人称代词表 he/she/他/她 排除）。
+- **单测用例**（JVM，§10）：①无引号段→单 NARRATION；②单引号段+前缀动词→1 DIALOGUE+speakerName；③多引号段夹叙述→N-D-N 交替且 offset 单调；④引号未闭合→栈非空→整段 NARRATION（栈式保守降级，替代原"正则不命中"措辞）；⑤直角引号「」→DIALOGUE；⑥英文直引号成对→DIALOGUE；⑦纯符号引号体→silent 过滤；⑧speakerName 窗口含"他说"人称代词→不捕获 speakerName（排除语义保留），但 speakerGender 按 DD17 代词词典映射（他→MALE/她→FEMALE）喂③性别兜底；⑨跨风格错配防护（V6-A1 新增）：`「他说："早"`→外层「未闭合栈非空→整段 NARRATION，"早"不得误切为 DIALOGUE；⑩异风格嵌套不串扰（V6-A1 新增）：`他说："你看「书」了吗"`→单个 DIALOGUE（内层「」并入引号体不拆分）。
 
 ### 4.4 HttpReadAloudService 改造（diff 式）
 
@@ -227,6 +231,9 @@ if (AppConfig.readAloudScenarioMode == 1 && ReadAloud.httpTtsEngineV2?.isScriptE
 // ⑥ upSpeechRate :573-581 分支改造（Δ5 行为改进）
 if (多角色活跃) { exoPlayer.setPlaybackSpeed(TtsSpeedPolicy.playbackRate(AppConfig.speechRatePlay)) }
 else { /* 现有 cancel+stop+重建 原样 */ }                     // 单音色保持重建（键含 speechRate）
+//    段间停顿语义（DD18，V6 裁决）：setPlaybackSpeed 全局作用于全部 MediaItem，pause_{ms}.wav
+//    停顿被等比压缩（800ms@2x→400ms）——裁决=接受该语义（"更快"直觉自洽，停顿非朗读内容不需豁免）；
+//    ExoPlayer 逐 MediaItem 豁免（停顿项恒速）留二期，登记于此不阻塞一期
 
 // ⑦ 绑定刷新钩子 refreshTtsRoute()：置空 ttsRouter+ttsEngineV2，按 ② 重新初始化（NG :1694 同义）
 ```
@@ -335,7 +342,7 @@ private val MIGRATION_109_110 = object : Migration(109, 110) {
 | TtsEngineManageActivity（新增 ~500 行） | 新包 `ui/tts/`：引擎列表（AppManagementScaffold+AppManagementTopBar 基线）+导入文本（冲突三动作弹窗：替换/重命名/取消，TtsEngineImportConflict.resolve）+启停 Switch+音色目录刷新（ensureVoiceCatalog）+运行态速度/音量/音高 | 列表管理页基线 B：AppManagementCard/AppManagementListRow+palette.settings；顶栏三基线之一（AppManagementTopBar）；菜单 AppDropdownMenu 渲染层；入口=朗读面板设置（ReadAloudConfigDialog）+"多角色引擎管理"行 |
 | 开关联动 | 切换 readAloudScenarioMode → `ReadAloud.upReadAloudClass()`（现有重建路径 :43-46）+ refreshTtsRoute；绑定弹框改动→`ReadAloud.refreshTtsRoute(requireContext())`（服务运行时） | 禁止改动 ReadAloudPlayerPanel.kt（5328 行，一期零触碰）；悬浮窗体系不动 |
 
-## 8 边界条件（≥16 条）
+## 8 边界条件（24 条；20-24 为 V6 红队补录）
 
 1. 多角色开关开但从未导入引擎→httpTtsEngineV2=null→自动走单音色+AppLog 提示"未配置脚本引擎"。
 2. 引擎存在但全部 disabled→同上降级；引擎管理页入口常驻可用。
@@ -356,6 +363,11 @@ private val MIGRATION_109_110 = object : Migration(109, 110) {
 17. streamReadAloudAudio=true 且多角色开→多角色优先走非流式分支（流式与多角色一期互斥，K-2 已裁决：强制非流式+提示，见 §12）；AppLog 提示（TAG_TTS）+ ReadAloudConfigDialog 多角色开关旁静态标注"多角色暂不支持流式合成"（仅提示不联动禁用开关，OQ-K2 关闭引发）。
 18. 段间停顿文件 pause_{ms}.wav 在 workKey 子目录外的根目录复用（文件名仅含 durationMs，跨书共享无污染）。
 19. engine.defaultSpeed/Voice 等运行态并发写→TtsEngineStore 全 @Synchronized+ensureVoiceCatalog per-engine Mutex（:501-524），与本项目规范 Mutex 并用一致。
+20. 引号未闭合跨段（V6 登记）：栈式扫描以单段为作用域，跨段引号（上段开、下段闭）→上段整段 NARRATION，且下段即使以引号开头也不触发 DIALOGUE（无跨段扫描状态机）——登记已知限制；网文跨段对白占比低可接受，二期可引入跨段扫描状态。
+21. 破折号（——）/斜杠引语对白为非目标：无引号包裹的对话形态一期不切分、整段 NARRATION——登记防误报（缺引号边界时说话人判定不可靠，误切损失大于漏切）。
+22. 非言语引号（标语/牌匾/书名/回忆引文）被误切为 DIALOGUE——接受项（一期无语义分类能力）；可选排除启发：引号前紧邻"写着/写道/心想/念道"等非言语提示词→降级 NARRATION（启发词表一期不做，随 K-1 二期评估）。
+23. 称呼后缀说话人提取为二期项："王大哥道/姐姐笑道"等称呼后缀形态（后缀不贴合动词词尾匹配窗口）一期不识别→speakerName=null 走兜底链；词表扩展随 K-1 二期评估。
+24. 缓存容量风险（V6 登记）：多角色多音色下同章缓存为 Σ(段×音色) 体积叠加，量级估算 30-75MB/章（长章/WAV/多音色叠加上限情形）——一期对策=绑定页/引擎管理页展示缓存占用入口（walkTopDown 汇总 ttsCacheDirectory :47-51）+沿用现有清理入口（removeCacheFile :508-519 子目录遍历）；自动淘汰（LRU）留二期。
 
 ## 9 规范符合性核查表
 
@@ -376,7 +388,7 @@ private val MIGRATION_109_110 = object : Migration(109, 110) {
 
 **单测（JVM，app/src/test）**
 1. Router 类：`createResolved` 级联（书内>全局/INHERIT 跳过/AUTO 无音色不可用 :476-478）；`route` 五级优先序+kind 断言（含 isSpokenRole 门控 narrator）；`fallbackRoutes` 去重+剔除失败路由；SCRIPT 门禁（SYSTEM 引擎绑定回落 fallbackEngine）。
-2. Segmenter 类：§4.3 用例 ①-⑧ + offset 连续性/单调性 + 空/超长输入。
+2. Segmenter 类：§4.3 用例 ①-⑩ + offset 连续性/单调性 + 空/超长输入 + 性能时限（V6-A10）：5 万字超长段落栈式扫描断言 ≤100ms（强制单趟 O(n) 实现，防栈操作/子串拷贝退化 O(n²)）。
 3. 缓存键类：`md5SpeakFileNameMulti`——同 text 不同 voiceId→键互异；scenarioMode single/multi 隔离；speed 变更→键变更（TtsSpeedPolicy.synthesisSpeed）；`TtsScriptEngineClient.audioCacheKey` 十元组顺序稳定。
 4. 实体映射类：Work* 五实体↔Migration DDL defaultValue 逐列一致（Room schema 导出 JSON 对照）；aliasesJson/emotionStyleMapJson round-trip（GSON fromJsonObject getOrNull 容错）。
 
@@ -405,6 +417,9 @@ graph TD
 ```
 
 门禁：①每阶段 `quick_build_install.py` 编译+L1 通过（daemon 清场 stop-daemons.bat）；**updateLog 时点前移：首次编译前**即按 version-delivery-sync 基于 git diff 更新 `app/src/main/assets/updateLog.md`（D7 阶段仅复审补漏）；②D2 后覆盖安装冒烟（R5，含逐版/跨版两条路径，见 §6 跨版升级声明）；③D5 后 Grep 无 `android.util.Log.d|e` 残留；④D5 落地 TAG_TTS 时同步 `docs/project-rules/logging_rules.md` 模块 Tag 表（现 26 行，+1 加行 TAG_TTS）；⑤DD3（LocalDialogueSegmenter）评审为 D4 显式前置——DD3 为新增件待评审，未裁决前 D4 无验收标准；⑥D7 updateLog 按 version-delivery-sync 逐文件复审（首编译前已前置更新）；⑦每次构建/打包结束后执行 `stop-daemons.bat` 清场（含 IDE/Run 与直接 gradlew 路径，防 Gradle/Kotlin daemon 残留占内存）；⑧全部完成前 AskUserQuestion 验收。
+
+**规范回灌任务项（对齐 design.md「规范保证与回灌执行机制」，提升清单 P3 来源条目随期回灌）**：实施 tasks.md 强制包含"规范回灌"任务项——① TAG_TTS 回灌（→ logging_rules.md，与门禁④同一落点一次完成）；② 新组件基线登记（ReadAloudRoleBindDialog/TtsEngineManageActivity → components.md）。回灌完成后由验证轮复核规范文件实际变更与提升清单一致；本设计阶段不动规范原文；回灌验收三要素：触发场景+反模式示例+可 Grep 判定。
+**规范核查表执行**：实施 tasks.md 同步包含"规范核查表执行"任务项——每完成 §11 一个 D 阶段，对照 §9 规范符合性核查表逐条打勾（审查可 Grep 复核勾选记录）。
 
 ## 12 Open Questions
 
@@ -444,3 +459,6 @@ graph TD
 - **DD13**：AppLog 新增 TAG_TTS 模块 Tag：logging_rules 模块 Tag 表 7→8，支撑 ai_tests `logcat -s TtsEngine` 过滤（§10-L2 步骤 3 断言依赖）。
 - **DD14**：TtsEngineSetting 实现本项目 BaseSource：沙箱（P0 文件沙箱/类灰度/弹窗拦截）与 Cookie/Header/evalJS 能力自动继承；evalJS 调用形态按本项目 `evalJS(jsStr, bindingsConfig)` DSL 适配（BaseSource.kt:327），非 NG map 直传形态。
 - **DD15**：多角色合成一期逐段串行（复用本项目"逐段合成→追加播放列表"流水线结构，边播边合成）；NG 并发调度族（prepareReadAloudAudioTasks/ReadAloudAudioTask）随流式二期引入——与现状体验一致、改动面最小。
+- **DD16（V6-A1 裁决，§4.3 重写）**：Segmenter 引号识别弃单一字符类正则（实锤草案 DIALOGUE_REGEX 只含“”“”两类，与"含单引号/直角引号"声明及单测⑤⑥自相矛盾），改为 QUOTE_PAIRS 表驱动成对栈式扫描（「」『』“”‘’"" 全表，开闭严格配对+栈匹配，单趟 O(n)）：栈匹配杜绝跨风格错配；未闭合→整段 NARRATION 保守降级；跨段引号为已知限制（边界 20）。
+- **DD17（V6 补强）**：内置代词词典 他→MALE/她→FEMALE：人称代词不捕获为 speakerName（单测⑧）的同时将代词映射写入 speakerGender 喂路由③性别兜底（dialogueFallbackGender :199-206 消费）——未建角色时"他说/她道"即可命中男/女兜底音色，纯查表零成本替代纯排除，提升未建角色命中率。
+- **DD18（V6 裁决，§4.4⑥）**：多角色本地倍速（DD11）经 setPlaybackSpeed 全局作用于全部 MediaItem→段间停顿 WAV 被等比压缩（800ms@2x→400ms）：裁决=接受该语义（"更快"直觉自洽，停顿非朗读内容不需豁免）；ExoPlayer 逐 MediaItem 豁免留二期。
