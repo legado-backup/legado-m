@@ -35,7 +35,7 @@
 > 实施结论：`s3_container_manage` 为 Compose `S3ContainerManageScreen` 宿主（运行时 removeAllViews 移除含 TitleBar 全部子 View），豁免。
 
 - [x] 4.1 `activity_about`（关于）— 已迁移 + 复杂菜单
-- [x] 4.2 `activity_explore_show`（探索详情）— 已迁移 + 页码/排序菜单
+- [x] 4.2 `activity_explore_show`（探索详情）— 已迁移 + 页码/排序菜单（⚠️ X2 互斥门禁：该页列入 compose B4-c 整页迁移名单，迁移实施时顶栏一次性收敛为 Compose 头部，禁再独立改动 View 顶栏，见 spec.md §X2）
 - [x] 4.3 `activity_cover_collection_detail`（封面收藏详情）— 已迁移
 - [x] 4.4 `activity_cover_collection_manage`（封面收藏管理）— 已迁移
 - [x] 4.5 `activity_s3_container_manage`（S3 容器管理）— 豁免：Compose `S3ContainerManageScreen` 自绘头部

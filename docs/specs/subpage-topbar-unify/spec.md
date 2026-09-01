@@ -100,3 +100,11 @@
 2. 夜间/日间主题切换：子页面头部颜色、字号自动刷新。
 3. 旧包覆盖安装：已迁移页面无 `setSupportActionBar` 残留导致的空白/崩溃。
 4. 编辑类页面（`activity_book_source_edit`）头部含自绘扩展区：`Mode.SUB` 自定义内容插槽承载，观感与未迁移前等价。
+
+## X2 互斥门禁：与 compose 整页迁移名单交叉核查（2026-09-01）
+
+总线 master-track-orchestration tasks 2.14 交叉核查：本 spec 批次 A/B/C 页名单（17 项）与 compose-migration-status-audit B4 待迁页 7 项（B5 AllBookmark / B14 ExploreShow / B15 StorageManage / D2 RssSourceEdit / D3 RssSourceDebug / D5 RssSearch+ArticleInfo / D7 RssFavorites）求交集，**唯一命中 `activity_explore_show`（ExploreShowActivity，批次 C 4.2）**。
+
+**门禁声明（ExploreShowActivity）**：该页列入 compose 整页迁移名单（compose B4-c），禁止对其实施独立的 View 顶栏改动（避免双改冲突），顶栏改造随整页 Compose 迁移一并落地。实况注记：本 spec 4.2 的 MainTopBarView(Mode.SUB) 替换已先期完成（编译通过，真机回归待设备），compose 侧整页迁移实施时须以该现状为输入，将顶栏一次性收敛为 Compose 头部；4.2 真机回归结论应同步抄送 compose spec registry 作为迁移输入基线。
+
+其余 6 项经核查不在本 spec 页名单（D3 RssSourceDebugActivity 布局为 `activity_rss_source_debug`，与 4.6 `activity_source_debug` = BookSourceDebugActivity 非同页），无互斥约束。

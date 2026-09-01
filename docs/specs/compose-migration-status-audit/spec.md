@@ -70,3 +70,11 @@
 - **正常**：三路报告交叉一致（如 Dialog 层迁移率、基建可用性）→ 直接进入结论
 - **边界（双栈页面）**：BookInfoActivity 双栈运行时分派、RssFragment classic/modern 双形态 → 按"以现代形态为准 + 显式标注双栈"归类，不简单二分
 - **异常（文档与源码矛盾）**：以源码 + migration-registry（时间更新的源码核验记录）为准，矛盾项进 R2 清单，禁止以过期文档否定实况
+
+## X2 互斥门禁：B4 待迁页 × subpage-topbar-unify（2026-09-01 核查）
+
+总线 master-track-orchestration tasks 2.14 交叉核查结论：compose B4 待迁页 7 项（B5 AllBookmarkActivity / B14 ExploreShowActivity / B15 StorageManageActivity / D2 RssSourceEditActivity / D3 RssSourceDebugActivity / D5 RssSearchActivity+RssArticleInfoActivity / D7 RssFavoritesActivity+RssFavoritesFragment）与顶栏 spec（`docs/specs/subpage-topbar-unify`）批次 A/B/C 页名单 17 项求交集，**唯一命中 B14 ExploreShowActivity**（`activity_explore_show`，顶栏批次 C 4.2）。
+
+易混淆排除（已核验源码宿主）：顶栏 4.6 `activity_source_debug` = BookSourceDebugActivity ≠ D3 RssSourceDebugActivity（布局为 `activity_rss_source_debug`）；顶栏 2.2 `activity_rss_source` = RSS 管理列表页 ≠ D2 RssSourceEditActivity；顶栏 2.3 `activity_cache_manage` ≠ B15 StorageManageActivity（`activity_storage_manage`）。D5/D7/B5 三页布局名均不在顶栏名单。
+
+**门禁声明（B14 ExploreShowActivity）**：该页列入 compose 整页迁移名单（B4-c），禁止对其实施独立的 View 顶栏改动（避免双改冲突），顶栏改造随整页 Compose 迁移一并落地。实况注记：顶栏批次 C 4.2 的 MainTopBarView(Mode.SUB) 替换已先期完成（编译通过，真机回归待设备），故本门禁落地口径为——B4-c 实施时以 MainTopBarView 现状为输入，整页迁移时顶栏一次性收敛为 Compose 头部（S2 样板/D4 组件自带头部），禁止迁后回退 View 顶栏或形成未登记的双栈并存；顶栏 4.2 真机回归结论应作为 B14 迁移输入基线。
