@@ -1,10 +1,14 @@
-﻿# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
+# P2 实施级设计（第三轮深化）— 外部 MCP 服务端迁移（决策表项 #8）
 
 > 前置：P1 收口；依据 design.md AD-04 与 evidence-pack.md §E/§D。
 > NG 根：`F:\...legado_NG-main`（快照 3.26.082815）；本项目路径均相对 `app/src/main/java/io/legado/app/`。
 > 状态：设计前置，未审查不实施（AD-02）。本文为函数/代码级深化版，覆盖现版。
 > 深化基线：NG `web/mcp/McpServer.kt` 实测 **1743 行**（现版记 1650 有偏差）、`BookshelfMcpTools.kt` 实测 **2462 行**（现版记 479 行仅为 schema 段）、`SettingsMcpTools.kt` 771 行、`McpService.kt` 161 行、`McpHttpServer.kt` 21 行、`McpTextSanitizer.kt` 34 行。
 > V6 红队修订（2026-08-30）：写标记补正（network_log_clear/debug_log_clear→write=true，写 29→31/只读 40→38）、删类工具四道子门、§C 规格勘误 6 处、bookshelf_search 注册为独立可见工具（69→70）、McpAuth 摘要+常数时间比较、工作量 8.75→9.25d。
+> **总线 3.7 前置登记（2026-09-01，master-track W2）**：
+> ① **3.7.1 MCP 工具对 C0-F4 exploreKinds 的行为依赖**：本项目 exploreKinds 已改多因素双层缓存键+isValidExploreKindsRule 校验（C0-F4，提交 5f4fd7a1c）——MCP 的发现/分类类工具读取 exploreKinds 时行为与 NG 基线不同：坏值规则不再返回（被校验拦截）且源编辑后缓存键自动重算（NG 旧键语义下可能读到陈旧分类）。P2 实施时工具规格按本项目新语义登记，禁按 NG 快照断言缓存行为。
+> ② **3.7.2 MCP 触发源 JS 安全盲区裁决（原用户裁决项，自主模式登记）**：MCP 工具触发源 JS 执行链路（如 refresh/explore 类工具）存在不经 SourceInteractionPolicy 弹窗拦截与 RhinoClassShutter 类策略的盲区——**裁决=登记暂缓至 ng P4 AI 应用层二期清单**（P2 期 MCP 工具仅在 write 门+McpAuth 基础上运行，显式挂 SourceInteractionPolicy 需评估协程树挂载点侵入性，留 P4 与 AI 应用层统一设计；暂缓清单落点=本节）。
+> ③ **3.7.3 replace 族工具行为披露**：NG 的 replace 增删改类 MCP 工具在 C4 净化规则生效域内可删除用户净化规则——P2 实施时须在工具描述（description）与文档中显式披露该能力边界（可删禁 C4 净化规则），不做代码禁用。
 
 ## 1 目标与非目标
 
