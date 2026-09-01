@@ -19,7 +19,7 @@
 
 ## 1. W0 公共闸门
 
-- [ ] 1.1 deep-fix 剩余收口（子任务账本=ui-style-unify-deep-fix tasks §4/§5 权威，总线不复制；R3 终测合并至 2.6 执行）**进展（2026-09-01）**：✅ 实况盘点=2.3.1 D1 P0 原清单 11 项已全部迁移完成（deep-fix tasks 描述陈旧）；✅ 批 A（3 处 D2 标准件收敛，提交 489d3aed7）+ 批 B（ReadRecord 两弹框换壳，提交 098da583d）+ 1 处登记保留（头像回写耦合）；编译门禁 BUILD SUCCESSFUL | **剩余**：7 残留 View 弹框+D2 用点 3 处（分批 C-F）+ deep-fix tasks §5 收尾；✅ 批 C+D（2026-09-01）：ThemeManageActivity 双表单/WaitDialog/PhotoDialog 4 处逐一 Read 复核**全登记保留**（复合编辑器非文本表单非换壳范畴/20 调用文件+取消语义耦合/全屏图片查看器特殊承载），零代码修改，updateLog 不追加，基线编译门禁复核 BUILD SUCCESSFUL
+- [x] 1.1 deep-fix 剩余收口 ✅（弹框迁移收官 2026-09-01；子任务账本=ui-style-unify-deep-fix tasks §2.3 收官记录，R3 终测合并至 2.6 执行）**批次汇总**：实况盘点（D1 P0 原清单 11 项已全迁，tasks 描述陈旧）→ 批 A（3 处 D2 标准件，489d3aed7）→ 批 B（ReadRecord 两弹框换壳，098da583d）→ 批 C+D 复核（4 处登记保留，00c729212）→ 批 E（HighlightStyle 换基类+AdvancedTitleConfig 重写，c6414fe36）→ 批 F 收官（LibraryCloudChapterDialog 新建+PageKeyDialog 换壳，66ffba414；ExploreFragment Kind/SelectionWebSearchDialog 登记保留+专项建议入册 migration-registry 六.4）| 每批编译门禁 BUILD SUCCESSFUL+分步提交 | **deep-fix 剩余**：仅 §5 收尾登记项+R3（合并 2.6）——弹框迁移实质完成；✅ 批 C+D（2026-09-01）：ThemeManageActivity 双表单/WaitDialog/PhotoDialog 4 处逐一 Read 复核**全登记保留**（复合编辑器非文本表单非换壳范畴/20 调用文件+取消语义耦合/全屏图片查看器特殊承载），零代码修改，updateLog 不追加，基线编译门禁复核 BUILD SUCCESSFUL
 - [x] 1.2 新建 docs/project-flow/database/db-version-registry.md ✅（五列表+占号规则五铁律+7 期条目：v109 已实占/P1 顺延 v110/P3 顺延 v111/C2/C3 预占/无需占号 2 项）
   - [x] 1.2.1 建表+占号状态枚举（预占/已实占/已顺延/已销号）✅
   - [x] 1.2.2 预占号登记（当前源码 version=109）✅
