@@ -18,6 +18,8 @@
 |------|------|------|------|
 | 1. 编译+安装+L1 | `quick_build_install.py` | 编译APK+启动MEmu+安装+L1验证 | `python ai_tests/scripts/quick_build_install.py` |
 | 2. 导入订阅源 | `import_rss_source.py` | 从JSON导入订阅源到legado.db（含WAL模式处理） | `python ai_tests/scripts/import_rss_source.py <json_path>` |
+| 2b. 导入书源 | `import_book_source.py` | 从JSON导入书源到legado.db book_sources表（WAL安全三件套同通道+动态列适配；B2 冻结验收增补 2026-09-01） | `python ai_tests/scripts/import_book_source.py <json_path>`（`--count` 仅查计数） |
+| 2c. B2书架播种 | `seed_b2_bookshelf.py` | B2冻结验收数据播种：合成书站(8本×4章)+合成书源JSON+UI循环入架+就绪断言(书架≥6)；前置=外部`python -m http.server 18092 -d ai_tests/testdata/b2_shelf_srv`+adb reverse（B2 增补 2026-09-01） | `python ai_tests/scripts/seed_b2_bookshelf.py` |
 | 3. L2验证视频播放器 | `l2_verify_video_player.py` | 视频播放器L2功能验证（导航+错误模式分析） | `python ai_tests/scripts/l2_verify_video_player.py` |
 | 3b. L2验证订阅源搜索 | `l2_verify_rss_search.py` | 订阅源统一搜索L2功能验证（rss-unified-search新增） | `python ai_tests/scripts/l2_verify_rss_search.py [--keyword 关键词] [--scenario all]` |
 | 3c. L2验证精准管理 | `l2_verify_precise_manage.py` | 精准管理L2验证（precise-manage新增：聚合入口/网址记录/存储管理/下载管理/文件管理/crash_check） | `python ai_tests/scripts/l2_verify_precise_manage.py [--scenario all]` |
