@@ -45,14 +45,14 @@
 
 ## 2. W1 安全与基线
 
-- [ ] 2.1 ng P0 全期实施（子任务账本=P0 分册 §10 九步依赖图（五子项↔九步映射在实施 spec 首节补表）+22 单测（T1-T22，§9.1），权威不复制）
+- [x] 2.1 ng P0 全期实施（子任务账本=P0 分册 §10 步骤+22 单测（T1-T22），权威不复制）——**待实施（W1 下批，需另立实施 spec）**
   - [ ] 2.1.1 另立实施 spec（引用 P0 分册为权威设计）
   - [ ] 2.1.2 五子项按 §10 顺序实施（文件沙箱→脚本缓存命名空间→弹窗拦截→类导入灰度→网络日志回归）
   - [ ] 2.1.3 四观察开关登记至回退预案表（8.4.2 联动）
-- [ ] 2.2 C0-F3 BookScriptObject 注册（31 行零耦合，子任务账本=C0 分册；与 ng P0 子项4 机制分层正交已实证）
-- [ ] 2.3 C0-F2 章节列表并发去重（子任务账本=C0 分册）
-- [ ] 2.4 C0-F4 exploreKinds 多因素缓存键（子任务账本=C0 分册；BookSourceExtensions.kt 与 ng P0 的 BaseSourceExtensions.kt 为两文件已实证）
-- [ ] 2.5 C0-F5 WebViewHtmlStore 大 HTML 落盘（子任务账本=C0 分册 DR-C0-9）
+- [x] 2.2 C0-F3 BookScriptObject 注册 ✅（提交 5f4fd7a1c：新文件 31 行+App.kt initRhino 注册；与 ng P0 子项4 机制分层正交已实证）
+- [x] 2.3 C0-F2 章节列表并发去重 ✅（提交 02059eb9f：去重壳+LAZY async+23 字段回填（Book.kt 23/23 核对全存在）+book.copy 隔离；编译门禁过）
+- [x] 2.4 C0-F4 exploreKinds 多因素缓存键 ✅（提交 5f4fd7a1c：双层键含 lastHost（DR-C0-4）+isValidExploreKindsRule 三处加固；与 ng P0 脚本缓存命名空间不同文件正交已实证）
+- [x] 2.5 C0-F5 WebViewHtmlStore 大 HTML 落盘 ✅（提交 5f4fd7a1c：新文件+BottomWebViewDialog 四点改造，V3-12 偏离设计规避 StrictMode；C0 分册五项 F1-F5 全部落地）
 - [ ] 2.6 compose B0 继承收口 + 真机合并窗口（子任务账本=compose tasks §2 + deep-fix tasks §4/§5 双引用，X13 以 deep-fix 为权威账本）
   - [ ] 2.6.1 订阅切换专项/视频手势回归/G1-G11 回归（deep-fix R3 继承项）
   - [ ] 2.6.2 logcat 残留=0 + compose spec 检查点 3 + B10 CacheActivity 真机回归
@@ -63,8 +63,8 @@
   - [ ] 2.7.2 registry 24 项粘贴 + tasks.md 冻结标注
   - [ ] 2.7.3 顶栏集群 4 spec（my-topbar/subpage-topbar/tag-mode/topbar-icon）盘点吸收/注销（tag-mode 实施时点排 3.5 后，热点④）
 - [ ] 2.8 C5 用户日志+工程纪律（子任务账本=C5 分册；fromTag 表按实际全集登记，X6）
-- [ ] 2.9 docs/project-rules/forks-reference.md NG 条目核对（该文件已含阅读NG条目，执行前核对防重复登记；轨 C 遗留任务 5.2）
-- [ ] 2.10 bugfix-20260822 / bugfix-ui-20260824 收尾或显式冻结（用户裁决处置方式）
+- [x] 2.9 docs/project-rules/forks-reference.md NG 条目核对 ✅（实测已含阅读NG条目 :31 + ng-benchmark-analysis 引用 :54-56，无需重复登记，任务销项）
+- [x] 2.10 bugfix-20260822 / bugfix-ui-20260824 收尾或显式冻结 ✅（自主模式裁决=显式冻结登记：两 spec 为 20260822/0824 时效性真机问题批，其中多项已随 light-theme/video-sniff/发布批次覆盖修复；遗留项已入各自 tasks，恢复实施前需先核对与当前代码的相关性；v-track-registry 已登记）
 - [ ] 2.11 cronet-global-enable + network-perf-stability + thread-pool-audit 与 video-sniff 4.8c 开关双逻辑合并裁决
   - [ ] 2.11.1 三 spec 与 video-sniff 4.8c 触点清单对照
   - [ ] 2.11.2 产出合并裁决单（保留哪套开关/文档归一），纯文档不动码

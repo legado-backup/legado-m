@@ -27,7 +27,7 @@
 2. **脚本缓存命名空间**：`bindings["cache"]` 由全局 `CacheManager` 换成按源 `BookSourceCacheStore`（DB+内存+文件三处，前缀清理），删源联动清理
 3. **弹窗拦截**：批量流程（搜索/换源）协程树中书源 `getVerificationCode/startBrowserAwait` 抛 `SourceInteractionBlockedException`，`toast/longToast` 静默+记日志
 4. **类导入策略灰度**：`RhinoClassShutter` 书源模式首期 enabled=true **只观察放行**（AppClass 类），CookieManager/CookieSyncManager 按 D11 实拦
-5. **网络日志凭据脱敏**：现状已具备（NetworkLog.kt:30/196/219/259），本期零修改仅回归验证
+5. **网络日志凭据脱敏**：现状已具备（NetworkLog.kt:30/196/219/259），本期零修改仅回归验证（总线补注 2026-09-01：NetworkLog 将由 ng P1 补敏感头集合——x-goog-api-key 等，本期限于零语义变更，不冲突）
 
 **范围披露（V6 红队补录）**：JS 求值入口除 AnalyzeUrl/AnalyzeRule 外，`BaseSource.evalJS`（`data/entities/BaseSource.kt:327-345`）是独立求值入口，全仓 21+ 处直调（ReadBookActivity/ExploreFragment/SourceLoginDialog/VideoPlayerViewModel 等）；V5 前设计仅覆盖两入口时，该面上 cache 命名空间（目标 2）与 D11 实拦（目标 4）均被绕过——"默认全开观察档"将是虚假安全感。本期已裁决补全：目标 2/4 的生效面扩展至该入口（§4.2-#17，D17，工作量 +0.5d）。
 
@@ -35,7 +35,7 @@
 - 书籍状态写保护（NativeBook 拦截）→ 后续期（决策表 #5 两阶段）
 - 类导入白名单实际拦截（决策表 #12）、按源 Cookie 命名空间（#11）、SharedJsScope scopeNamespace 隔离（结论 #6）
 - BookSourceWebCacheStore（WebView JSBridge 侧，D8）
-- NetworkLog/CookieStore/P 系列修复等已领先文件，本期禁止触碰语义
+- NetworkLog/CookieStore/P 系列修复等已领先文件，本期禁止触碰语义（总线补注 2026-09-01：NetworkLog 由 ng P1 增量补敏感头集合，本期限于零语义变更，master-track tasks 2.13.1）
 
 ---
 
