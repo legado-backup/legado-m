@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_cache.py — 缓存清理页（CacheScreen，7.11be 销项）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_cache.py [--scenario all]
@@ -91,7 +91,7 @@ def main():
         "cache-2": step_cache_2_compose_render,
         "cache-3": step_cache_3_no_crash_exit,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 

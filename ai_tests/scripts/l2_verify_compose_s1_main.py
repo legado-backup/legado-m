@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_s1_main.py — S1 主框架 Compose 迁移 L2 验证（B2 样板冻结）
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s1_main.py [--scenario all]
@@ -142,7 +142,7 @@ def main():
         "s1-3": step_s1_3_topbar_collapse,
         "s1-5": step_s1_5_config_columns,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 

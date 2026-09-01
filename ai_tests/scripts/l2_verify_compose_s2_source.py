@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_s2_source.py — S2 管理列表（BookSourceScreen 双轨）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s2_source.py [--scenario all]
@@ -215,7 +215,7 @@ def main():
         "s2-7": step_s2_7_menu_family,
         "s2-8": step_s2_8_back_hierarchy,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 

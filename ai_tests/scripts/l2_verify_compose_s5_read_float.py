@@ -183,7 +183,7 @@ def main():
         "s5-5": step_s5_5_blur_branch,
     }
     all_pass = ca.run_steps(steps, args.scenario,
-                            tag_keywords=["EffectRender", "RenderEffect"], since_ts=since_ts)
+                            tag_keywords=["EffectRender", "RenderEffect"], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 

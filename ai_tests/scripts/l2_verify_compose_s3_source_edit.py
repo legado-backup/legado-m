@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_s3_source_edit.py — S3 表单编辑器（BookSourceEditActivity）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s3_source_edit.py [--scenario all]
@@ -186,7 +186,7 @@ def main():
         "s3-5": step_s3_5_rule_complete,
         "s3-6": step_s3_6_save_validate,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=["RuleComplete"], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=["RuleComplete"], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 
