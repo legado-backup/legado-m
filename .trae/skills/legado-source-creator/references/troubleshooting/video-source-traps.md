@@ -138,3 +138,23 @@ sortUrl 枚举一级分类（电影/连续剧等 type_pid=0）时，列表响应
 `?ac=detail&ids={vod_id}` 才是单条详情；直接用列表页 URL 当详情会因 normalize 只取 list[0] 而**张冠李戴**（点 A 影片出 B 影片）。同时列表页响应与详情响应字段有差异（列表项可能缺 vod_content 等），详情数据以 ids 响应为准。
 
 **经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱65: 采集站首线路为 /share/ 分享页——自动选集必须直链优先 ⚠️ 高频
+
+**现象**：多线路源点卡片起播黑屏（播放器 UI 在但无画面），logcat 出现 `R5网络抓包: 启动, path=/share/{hash}` → `window.__videoUrls__ 解析失败`，随后 WebView 兜底加载站点前台播放器（artplayer.js 因内核旧报 SyntaxError）。
+**根因**：部分采集站 `vod_play_url` 首线路（如线路名 `feifan`）的集数地址是 `/share/{hash}` 分享页 URL（网页播放器，需 JS 二次解析），次线路（如 `ffm3u8`）才是 `.m3u8` 直链。自动选集默认取首线路 → 分享页解析失败 → 黑屏。且分享页 HTML 为空响应（0 字节），静态二次解析不可行。
+**修复**（App 侧已内置，源无需处理）：
+1. 解析层 direct-route-first：首线路无直链时自动探测其他线路并把直链线路集数一并填充（同一响应内纯内存解析，零额外网络请求）
+2. 播放层自动选集优先含 `.m3u8/.mp4` 直链的线路（`VideoUrlExtractor.isDirectVideoStreamUrl`）
+**源侧注意**：无直链线路的源（全部线路均为分享页/网页播放器）仍会走 R5 抓包兜底，可用性依赖站点前台 JS，建议优先选择带直链线路的采集站。
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱66: 顶栏分类标签展开透明度动画竞态（UI 侧，源无关）
+
+**现象**：订阅页点"筛选"展开分类，分类栏占位（顶栏高度增加）但全透明不可见。
+**根因**：`setFilterBarVisible` 的展开/收起动画互斥竞态（ViewPropertyAnimator cancel 时 withEndAction 触发 isVisible=false），停留 alpha=0。
+**修复**：改为无动画直接切换可见性（`MainTopBarView.setFilterBarVisible`）。
+**验证**：点"筛选"展开 → 分类标签（电影/连续剧/...）立即可见。
+
+**经验来源**：`[经验来源:topbar-filter-flash-fix 2026-09-01]`
