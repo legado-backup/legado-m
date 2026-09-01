@@ -1,0 +1,44 @@
+[
+  {
+    "bookSourceUrl": "http://127.0.0.1:18092",
+    "bookSourceName": "B2冻结合成源",
+    "bookSourceGroup": "回归测试",
+    "bookSourceType": 0,
+    "enabled": 1,
+    "enabledExplore": 0,
+    "enabledCookieJar": 0,
+    "searchUrl": "http://127.0.0.1:18092/search.html?kw={{key}}",
+    "ruleSearch": "{\"bookList\": \"class.bookbox\", \"name\": \"class.bk@text\", \"author\": \"class.au@text\", \"bookUrl\": \"class.bk@href\"}",
+    "ruleBookInfo": "{\"name\": \"class.btitle@text\", \"author\": \"class.bau@text\", \"intro\": \"class.bintro@text\", \"tocUrl\": \"class.btoc@href\"}",
+    "ruleToc": "{\"chapterList\": \"class.ch\", \"chapterName\": \"tag.a@text\", \"chapterUrl\": \"tag.a@href\"}",
+    "ruleContent": "{\"content\": \"class.ct@textNodes\"}"
+  },
+  {
+    "bookSourceUrl": "http://127.0.0.1:18092/s2",
+    "bookSourceName": "B2冻结合成源2",
+    "bookSourceGroup": "回归测试",
+    "bookSourceType": 0,
+    "enabled": 1,
+    "enabledExplore": 0,
+    "enabledCookieJar": 0,
+    "searchUrl": "http://127.0.0.1:18092/search.html?kw={{key}}",
+    "ruleSearch": "{\"bookList\": \"class.bookbox\", \"name\": \"class.bk@text\", \"author\": \"class.au@text\", \"bookUrl\": \"class.bk@href\"}",
+    "ruleBookInfo": "{\"name\": \"class.btitle@text\", \"author\": \"class.bau@text\", \"intro\": \"class.bintro@text\", \"tocUrl\": \"class.btoc@href\"}",
+    "ruleToc": "{\"chapterList\": \"class.ch\", \"chapterName\": \"tag.a@text\", \"chapterUrl\": \"tag.a@href\"}",
+    "ruleContent": "{\"content\": \"class.ct@textNodes\"}"
+  },
+  {
+    "bookSourceUrl": "http://127.0.0.1:18092/s3",
+    "bookSourceName": "B2冻结合成源3",
+    "bookSourceGroup": "回归测试",
+    "bookSourceType": 0,
+    "enabled": 1,
+    "enabledExplore": 0,
+    "enabledCookieJar": 0,
+    "searchUrl": "http://127.0.0.1:18092/search.html?kw={{key}}",
+    "ruleSearch": "{\"bookList\": \"class.bookbox\", \"name\": \"class.bk@text\", \"author\": \"class.au@text\", \"bookUrl\": \"class.bk@href\"}",
+    "ruleBookInfo": "{\"name\": \"class.btitle@text\", \"author\": \"class.bau@text\", \"intro\": \"class.bintro@text\", \"tocUrl\": \"class.btoc@href\"}",
+    "ruleToc": "{\"chapterList\": \"class.ch\", \"chapterName\": \"tag.a@text\", \"chapterUrl\": \"tag.a@href\"}",
+    "ruleContent": "{\"content\": \"class.ct@textNodes\"}"
+  }
+]

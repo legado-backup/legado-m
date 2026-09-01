@@ -42,12 +42,12 @@
 - [x] 4.1 AppPageSpacing token 落地（分册 §3 骨架，含与 AppListSpacing 边界注）+frontend-ui-standards 写入 ✅ 2026-09-01（`AppUiTokens.kt` 追加 `AppPageSpacing` 7 字段，与分册 §3.2 骨架逐字一致、append-only 不动存量；frontend-ui-standards §1.3.1 落档含 AppListSpacing 边界注（存量仅限列表场景、禁新代码扩散）；compileAppDebugKotlin BUILD SUCCESSFUL+daemon 清场；暂无消费方——4.2+ 样板页接入）
 - [x] 4.2 L2 脚本模板落地（分册 §4，logcat 采集带 -T 时间戳起点）+首批 7 脚本 ✅ 2026-09-01（复用层 `ai_tests/lib/compose_assert.py`（§4.2 函数库沉淀：connect 探针+uiautomator 残留清理/device_now→`logcat -d -T 'ts'` 起点/dump_bounds StaleObject 兜底/assert_window_single 弹框独立窗口/assert_bounds_moved/prefs_read 三态/run_steps 步骤注册表）+7 脚本 `ai_tests/scripts/l2_verify_compose_{s1_main,s2_source,s3_source_edit,s4_book_info,s5_read_float,s6_dialog_tiers,cache}.py`（检查点覆盖 S1-1/2/3/5、S2-1~8、S3-1~6、S4-1~4、S5-1~5、S6-1~4、7.11be 销项；S3 脚本标注依赖 4.3 接线）；质量=venv py_compile 8 文件全过+config 导入链冒烟 OK；落位口径总线 2.12 三层=族命名+.gitignore 白名单 7 行+SOP 表 16l~16r+README 族索引双登记；⚠️ 真机不执行归 4.4-4.7 冻结验收窗口，锚点真机校准点已逐处标注）
 - [ ] 4.3 C2 BookSourceEditActivity S3 接线收尾（未保存拦截/CodeView/KeyboardToolPop 真机）
-- [ ] 4.4 S1 MainActivity 冻结验收+回执 **首轮实况（2026-09-01 包 090122）**：s1-1 底栏 4 tab 切换+渲染 ✅ / s1-3 压缩态证据 ✅ / s1-2 FAIL（书架数据不足 2 屏滚动位移=0，**数据依赖型**）/ s1-5 FAIL（书架配置入口锚点待 dump 校准，脚本已标注 probe_shelf.py）；FATAL 全零
-- [ ] 4.5 S2 BookSourceActivity 冻结验收（含 copy() 强跳过验收项）+回执
-- [ ] 4.6 S3 BookSourceEditActivity 冻结验收+回执
-- [ ] 4.7 S4 BookInfo 双栈分支各过+回执
-- [ ] 4.8 S5 阅读器浮层冻结验收（3s 隐藏/单一 activeSheet/BackHandler 链/手势 R0-R4/磨砂降级/S5-7 书签高亮入口）+回执
-- [ ] 4.9 S6 弹窗族冻结验收（L1/L2/L3 三层）+回执
+- [ ] 4.4 S1 MainActivity 冻结验收+回执 **首轮实况（2026-09-01 包 090122）**：s1-1 底栏 4 tab 切换+渲染 ✅ / s1-3 压缩态证据 ✅ / s1-2 FAIL（书架数据不足 2 屏滚动位移=0，**数据依赖型**）/ s1-5 FAIL（书架配置入口锚点待 dump 校准，脚本已标注 probe_shelf.py）；FATAL 全零。**第 2 轮实况（2026-09-01 数据播种后，书架 16 本合成书）**：s1-1 ✅（"发现"tab 数据就绪后翻盘）/ s1-3 ✅ / **s1-5 ✅ 翻盘**（③校准：入口=书架顶栏 desc="菜单"→"书架布局"，弹框出现+重渲染 before=23 after=38）/ s1-2 ❌（③锚点+滚动链待校准：锚点 y<220 修正后确证列表滚动未触发——u2 d.swipe 与 shell input swipe 在脚本上下文均位移≈0，而 assert_b2_shelf.py 同方式滚动可达 15/16 本，两场景差异待复核；数据已排除）；FATAL=0
+- [ ] 4.5 S2 BookSourceActivity 冻结验收（含 copy() 强跳过验收项）+回执 **第 2 轮实况（2026-09-01）**：导航已校准打通（③：订阅 tab 顶栏 Compose 语义未暴露→am start 直拉 ui.book.source.manage.BookSourceActivity；书源列表 3 合成源）但 s2-1~8 全 FAIL=③锚点校准——**多选态功能存在**（长按批量栏实证="反选/删除"，脚本断言"全选"形态不符），拖拽 hash 不变/三视图/排序/更多菜单入口锚点均待校准；FATAL=0，无真回归证据
+- [ ] 4.6 S3 BookSourceEditActivity 冻结验收+回执 **第 2 轮实况（2026-09-01 导航校准后）**：s3-1 ✅（6 Tab 候选=5 命中下界；Tab=基本/搜索/发现/详情/目录/正文全暴露）；s3-2~6 ❌=③锚点（字段菜单 desc="更多选项"未暴露，同 s5 族）+**4.3 接线依赖（预期部分 FAIL 登记）**；导航校准=点击列表条目直进编辑页（原"长按→编辑菜单"真机不存在，长按=多选态）；FATAL=0
+- [ ] 4.7 S4 BookInfo 双栈分支各过+回执 **第 2 轮实况（2026-09-01 入口校准后）**：**4/4 ALL PASS 翻盘**——s4-1 双栈命中 BookInfoComposeActivity（③校准：有进度书点击卡片直进阅读页，详情入口=长按卡片直进，无中间菜单）/ s4-2 新栈锚点 阅读/目录/简介全 True / s4-3 无 book is null 弹框 / s4-4 顶栏菜单可点击节点=13（>5）；FATAL=0
+- [ ] 4.8 S5 阅读器浮层冻结验收（3s 隐藏/单一 activeSheet/BackHandler 链/手势 R0-R4/磨砂降级/S5-7 书签高亮入口）+回执 **第 2 轮实况（2026-09-01 菜单锚点校准后）**：阅读菜单呼出正常（③校准：center tap 后菜单条文本全暴露 text 3→17，三点按钮 desc="更多选项"未暴露→锚点改菜单条特征文本）；s5-1 ❌=**①真回归候选：菜单 3s 自动隐藏未生效（两轮不同数据条件复现，待修）**；s5-2/3 ❌=级联（s5-1 菜单态污染）；s5-4 ❌=②数据（章节缓存旧正文单页 1/1，R1 翻页无余量；合成正文已加长 30 段，需清章节缓存重验）+R0/R4 待复核；s5-5 ❌=③脚本（device_info API 读取=0 走降级分支断言失效）；FATAL=0、EffectRender 异常=0
+- [ ] 4.9 S6 弹窗族冻结验收（L1/L2/L3 三层）+回执 **第 2 轮实况（2026-09-01 入口+按钮锚点校准后）**：**4/4 ALL PASS 翻盘**——s6-1 L1 删除确认框（③校准：入口=详情页"删除书籍"，按钮文本="否/是"非"取消/删除"；宽比例 0.958/345dp≤620cap+双按钮）✅ / s6-2 L2 书架布局弹框（入口=书架菜单"书架布局"；0.958/345dp）✅ / s6-3 L3 分组管理弹框（入口=书架菜单"分组管理"；0.960/346dp≤760cap）✅ / s6-4 弹框独立窗口不变量 isolated=True+关闭后主界面回归=True ✅；FATAL=0。**cache（7.11be 销项）3/3 ALL PASS**：入口=书架菜单"缓存/导出"（③校准，"我的"页无缓存入口——源码锚点 BaseBookshelfFragment.buildMenuActions cache_export）→CacheActivity 命中+导出/全选锚点+退出无崩溃
 - [ ] 4.10 D9/VideoFragment 残余浮层核对+S5 模式回执（手势四件套复用 2.2 证据）
 
 ## 5. B3 批次（D4 旗舰专册+其余 9 页分册；设计已函数级落盘+轮 3 骨架修订）
