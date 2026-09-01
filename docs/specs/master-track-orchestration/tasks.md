@@ -59,15 +59,15 @@
   - [ ] 2.6.3 同包合并走查：light-theme S1-S9 九场景 + video-sniff 1.11/2.9 待真机项（一次打包覆盖，R8；video-sniff 项未就绪则拆包先行，其项由 W4 走查兜底）
   - [ ] 2.6.4 registry 7.11ai 销项 + deep-fix 收口状态回写
 - [ ] 2.7 compose B1 基线校准（子任务账本=compose tasks §3 + 分册①四产物成品段）
-  - [ ] 2.7.1 pages-inventory §0/§G 成品表粘贴
-  - [ ] 2.7.2 registry 24 项粘贴 + tasks.md 冻结标注
-  - [ ] 2.7.3 顶栏集群 4 spec（my-topbar/subpage-topbar/tag-mode/topbar-icon）盘点吸收/注销（tag-mode 实施时点排 3.5 后，热点④）
+  - [x] 2.7.1 pages-inventory §0/§G 成品表粘贴 ✅ 2026-09-01（compose tasks 3.1+3.2：§0 整段替换为分册 §1.1 成品总览表+统计定稿/双口径/权威源 3 注；§G 按分册 §1.2 X-01~X-22 全量执行=18 处条目技术标注+2 处清单归属+权威源增注+v2.13 变更记录；6 项维持免改核验通过）
+  - [x] 2.7.2 registry 24 项粘贴 + tasks.md 冻结标注 ✅ 2026-09-01（compose tasks 3.3+3.4：migration-registry §七 aq~bn 24 项整块追加于六.4 之后，编号顺延核验原止于 7.11ap 无冲突；ui-redesign-m3/tasks.md 头部插入分册 §1.4 冻结标注 4 条；compose tasks §3 已加基线冻结标注=校准后编号/范围不再变更、后续以 registry 增量登记）
+  - [x] 2.7.3 顶栏集群 4 spec（my-topbar/subpage-topbar/tag-mode/topbar-icon）盘点吸收/注销（tag-mode 实施时点排 3.5 后，热点④）✅ 2026-09-01（结论：四 spec 代码域均基本完成、均余真机验证尾巴，无一达"吸收完毕待归档"销档线，全部保留不注销；my-topbar 验证章节未启动属实施进行中，subpage-topbar/topbar-icon/tag-mode 均剩真机回归；吸收路径=剩余真机项并入 compose B2 检查点真机窗口合并验证；tag-mode 时点关系已按本条原文注记；详录 compose tasks §3.6）
 - [ ] 2.8 C5 用户日志+工程纪律（子任务账本=C5 分册；fromTag 表按实际全集登记，X6）
 - [x] 2.9 docs/project-rules/forks-reference.md NG 条目核对 ✅（实测已含阅读NG条目 :31 + ng-benchmark-analysis 引用 :54-56，无需重复登记，任务销项）
 - [x] 2.10 bugfix-20260822 / bugfix-ui-20260824 收尾或显式冻结 ✅（自主模式裁决=显式冻结登记：两 spec 为 20260822/0824 时效性真机问题批，其中多项已随 light-theme/video-sniff/发布批次覆盖修复；遗留项已入各自 tasks，恢复实施前需先核对与当前代码的相关性；v-track-registry 已登记）
 - [ ] 2.11 cronet-global-enable + network-perf-stability + thread-pool-audit 与 video-sniff 4.8c 开关双逻辑合并裁决
-  - [ ] 2.11.1 三 spec 与 video-sniff 4.8c 触点清单对照
-  - [ ] 2.11.2 产出合并裁决单（保留哪套开关/文档归一），纯文档不动码
+  - [x] 2.11.1 三 spec 与 video-sniff 4.8c 触点清单对照 ✅（2026-09-01：三域 24 触点对照完成——域A Cronet 开关/降级 11 触点（video-sniff 4.8c/Z7/F-07 为基准；cronet-global-enable REQ-01 默认翻转未实施与代码冲突（AppConfig.isCronet 默认 false）、REQ-03 降级链描述陈旧（代码 CronetInterceptor 已含探测/迟滞/震荡抑制/HTTP2 分级）、np-s P2-2 熔断器已被实际实现覆盖、P2-3 协程拦截器仍待评估、F-P1-6 版本口径演进）、域B 连接池 3 触点（np-s C3 已实施值 50 被 video-sniff R-P0-6 演进至 128=代码现状 HttpHelper.kt:102）、域C 线程池开关 7 触点（thread-pool-audit 审查框架×video-sniff R-P0-3~5 实施事实互补无冲突；钳制终值定稿仍归 3.6）；详见 merger-ruling-network.md §三）
+  - [x] 2.11.2 产出合并裁决单（保留哪套开关/文档归一），纯文档不动码 ✅（产出=merger-ruling-network.md；七条裁决 R1-R7：R1 开关双逻辑以 video-sniff 4.8c/design Z7+F-07 为唯一权威——isCronet 默认 false 仅控爬取链路 OkHttp builder 装配（其内自动熔断），视频链路 cronetDataFactory 无条件装配不受控，两逻辑独立不联动；R2 cronet-global-enable REQ-01 冻结待裁决（未实施+与已固化口径冲突，重新评审前禁止实施引用，其 tasks 勾选不动）；R3 降级机制归一为 CronetInterceptor 实测口径（阈值5+启动宽限300ms+half-open 探测5min/连续2次成功+震荡抑制15min+HTTP/2 降级1min+证书错误独立去重）；R4 连接池权威值 128（演进链 默认5→C3 50→R-P0-6 128）；R5 Cronet 版本以 gradle.properties 实时值为权威（当前 500.0.1，文档禁硬编码历史快照）；R6 线程钳制定稿边界归总线 3.6 不越界；R7 P2-3 协程拦截器保留待评估；§五=各 spec 归一注记落点清单 8 条（本裁决不改其 tasks 勾选）；零代码改动）
 - [x] 2.12 ai-test-system-refinement scripts 批先行 ✅（2026-09-01 销项：子任务账本=该 spec tasks 五批次全勾且已提交 ee13b2f75；scripts 批=批次 D（删 52+引用复核）+批次 E pytest 295×2 全绿，无遗留实施项；**B2 L2 模板依赖的目录口径已明确（三层）**：①落位 `ai_tests/scripts/` 命名族 `l2_verify_*`/`verify_*`；②入库=.gitignore 默认忽略+白名单固化行（现存 3 白名单脚本与磁盘精确一致，清单已落 README）；③登记=SOP 固定脚本表+README 脚本族索引双落点（SOP 补现状注记+补登 16j 画质增强脚本）。细节登记=该 spec tasks 4.6 | **W2 进入条件之一已满足**）
 - [ ] 2.13 P0 文档澄清补注 + P0×C0 合并回归
   - [ ] 2.13.1 ng P0 分册 NetworkLog"零修改"补注"将由 ng P1 补敏感头，本期限于零语义变更"（X14）

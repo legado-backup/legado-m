@@ -170,3 +170,44 @@
 | F2 | `ui/book/read/config/PageKeyDialog.kt` | ComponentDialog+ComposeView 换壳 ComposeDialogFragment + AppDialogFrame（Confirm 档）；硬件翻页键拦截由 Compose onPreviewKeyEvent 承担（字段聚焦 ⟺ 原 dialog onKeyDown focusedField≠None，语义等价，BACK/DEL 仍走系统路径）；调用点 BaseReadBookActivity/MoreConfigDialog 改 showDialogFragment 标准 API | [x] ✅ 已完成（compileAppDebugKotlin 通过 2026-09-01） |
 | F3 | `ui/main/explore/ExploreFragment.kt` showDiscoverKindsDialog（发现 Kind 选择） | **登记保留**：非「标题+动态 Kind 列表+点击回调」简单结构——5 种 Kind 控件（url/button/toggle/select/text）均经 SourceLoginJsExtensions 执行源 JS 并以 reUiView 回调直接引用 ItemFindBookBinding 重渲染 flexbox，叠加 SwipeRefreshLayout/RotateLoading/自定义窗口尺寸与 View 强耦合；等价迁移需整体重写源 JS 交互协议，风险大于收益 | [ ] 保留（专项重写需连 SourceLogin JS 扩展交互契约一并设计，建议单开专项） |
 | F4 | `ui/book/read/SelectionWebSearchDialog.kt`（626 行，划词搜索） | **登记保留**：BottomSheet 主体为 WebView 承载——WebViewPool 池化复用 + hideCss 注入（JS/HTML 双通道）+ shouldInterceptRequest 重写主文档 + BottomSheetBehavior.isDraggable 与 WebView canScrollVertically/触摸事件联动 + 返回键 WebView 历史栈；引擎 chip 列表仅一排小件，部分迁移收益极低且 AndroidView 桥接引入新风险 | [ ] 保留（专项重写建议：整体重设计为 Compose 壳 + AndroidView 包 WebView，先固化「sheet 拖拽 ↔ WebView 滚动」联动契约再动壳；编辑入口 SelectionSearchEngineManageDialog 已是 ComposeDialogFragment 无需再动） |
+
+## 七、compose-migration-status-audit 基线校准登记（B1/B2 批次，2026-08-30）
+
+> 权威源 = `docs/specs/compose-migration-status-audit/design.md` 页级总表（AD-01：进度以本表为唯一权威，本块为 B1 校准+B2 冻结的登记落点）。
+> 证据字段规范：每项含【源码路径 | 核验方式 | 核验日期】；核验方式取值：源码核验 / Grep setContent+ComposeView / 真机 L2（脚本+截图+logcat）。
+
+### B1 登记核对（🔁，16 项）
+
+| 任务编号 | 文件（现状） | 现状 | 核验方式 | 日期 | 备注 |
+|---------|------------|------|---------|------|------|
+| 7.11aq | `ui/replace/ReplaceRuleActivity.kt`+`ReplaceEditActivity.kt` | [x] 已核对（AppManagementScaffold 全 Compose + Edit 桥接） | Grep setContent + composeView | 2026-08-30 | design C4；registry 7.11ag 镜像 |
+| 7.11ar | `ui/highlight/HighlightRuleActivity.kt` | [x] 已核对（HighlightRuleScreen 全 Compose；强跳过修复 ✅） | 源码核验 | 2026-08-30 | design C5 |
+| 7.11as | `ui/dict/rule/DictRuleScreen.kt` | [x] 已核对（Activity setContent→Screen） | 源码核验 | 2026-08-30 | design C6；inventory 标 View 滞后已校正 |
+| 7.11at | `ui/file/FileManageScreen.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design C9 |
+| 7.11au | `ui/download/DownloadManageScreen.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design C10 |
+| 7.11av | `ui/urlrecord/UrlRecordScreen.kt`（+FilterSheet） | [x] 已核对 | 源码核验 | 2026-08-30 | design C11 |
+| 7.11aw | `ui/source/recycle/RecycleBinScreen.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design C12 |
+| 7.11ax | `ui/image/`（Gallery/Detail 双页） | [x] 已核对 | 源码核验+二次 Grep 复核 | 2026-08-30 | design C15 |
+| 7.11ay | `ui/autoTask/AutoTaskScreen.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design C16 |
+| 7.11az | `ui/about/ReadRecordScreen.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design F3 |
+| 7.11ba | `ui/config/BackupConfigFragment.kt:64` | [x] 已核对（继承 ComposeSettingFragment） | 源码核验 | 2026-08-30 | design E1；registry 7.11al 镜像 |
+| 7.11bb | `ui/config/CoverConfigFragment.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design E3；7.11ak 镜像 |
+| 7.11bc | `ui/config/WelcomeConfigFragment.kt` | [x] 已核对 | 源码核验 | 2026-08-30 | design E6；7.11ak 镜像 |
+| 7.11bd | `ui/config/OtherConfigFragment.kt:55` | [x] 已核对 | 源码核验 | 2026-08-30 | design E4；7.11al 镜像 |
+| 7.11be | `ui/book/cache/CacheScreen.kt` | [ ] 待真机回归（纯 Compose 已核；缺真机回归报告） | 真机 L2（l2_verify_compose_cache.py） | 2026-08-30 登记 | design B10；registry 7.11ai 销项=B0 |
+| 7.11bf | `ui/rss/subscription/RuleSubScreen.kt` | [ ] 待收尾核对（桥接已有，回执归 B4） | 源码核验+真机 | 2026-08-30 登记 | design D8 |
+
+### B2 样板冻结回执（✅回，8 项；冻结=验收回执而非重写，AD-06）
+
+| 任务编号 | 文件（现状） | 现状 | 所属组件 | 核验方式 | 备注 |
+|---------|------------|------|---------|---------|------|
+| 7.11bg | `ui/main/MainActivity.kt` | [ ] 待冻结回执（PillNav 已接线；S1 验收检查点见 design-b1-b2 §2.1） | S1 主框架 | 真机 L2 | design A1 |
+| 7.11bh | `ui/main/my/MyFragment.kt` | [ ] 待冻结回执（XML 壳+ProfileScreen3Level） | S1 我的页 | 真机 L2 | design A2 |
+| 7.11bi | `ui/main/bookshelf/BookshelfScreen.kt` | [ ] 待冻结回执（Phase3 已过；12 菜单 View 红线登记说明） | S1 书架 | 真机 L2+红线登记 | design A3/A4 |
+| 7.11bj | `ui/book/read/ReadBookActivity.kt` | [ ] 待冻结回执（MenuLayer 等浮层 Compose，Phase4；S5 验收 §2.5） | S5 全屏沉浸 | 真机 L2 | design B1 |
+| 7.11bk | `ui/book/info/BookInfoActivity.kt`+`BookInfoComposeActivity.kt` | [ ] 待冻结回执（双栈运行时分派，X4 禁回退；分支各过） | S4 详情 | 真机 L2 | design B6 |
+| 7.11bl | `ui/book/source/manage/BookSourceScreen.kt` | [ ] 待冻结回执（S2 双轨已接线；验收 §2.2 全表） | S2 管理列表 | 真机 L2 | design C1 |
+| 7.11bm | `ui/book/source/edit/BookSourceEditActivity.kt` | [ ] 待接线+冻结回执（5 处 Compose 接线，View 内核保留） | S3 表单编辑 | 真机 L2 | design C2；🔨+✅回 复合 |
+| 7.11bn | `ui/video/VideoPlayerActivity.kt`+`VideoFragment.kt`（F6 同族） | [ ] 待冻结回执（顶栏+设置面板 Compose；手势四件套复用 R3 4.2） | S5 模式 | 真机 L2 | design D9/F6 |
+
+> 回执完成判定：对应 S 样板 §2 检查点全过 + L2 脚本落盘（ai_tests/scripts/l2_verify_compose_{page}.py）+ 截图/logcat 证据归档 + 本表 [ ]→[x]。完成后同步刷新 pages-inventory §0 快照。

@@ -2,6 +2,12 @@
 
 > 本 spec 交付 **设计文档**（1-7）+ 实施 Phase0-3（8-11）+ 设计文档完善 v2（12，用户评审后补充）+ 实施者深度复盘补证（14，2026-08-11）。设计阶段不写代码；实施阶段动 `ui/widget/components/` 等 src。当前状态：✅ 设计完成 → 🔄 实施 Phase0-3 完成，Phase4-5 待执行；设计 v2 完善中待用户评估（12.10）；实施者复盘补证已并入 11.9/14。
 
+> ⚠️ **冻结标注（2026-08-30，compose-migration-status-audit AD-01）**：本文档（含 pages-inventory 三件套）已冻结为**历史参考**。
+> ① 迁移进度查询/回执一律以 `docs/project-flow/ui-standards/migration-registry.md` 为**唯一权威**（AD-01），本文勾选状态不再更新；
+> ② 页面实况以 `docs/specs/compose-migration-status-audit/design.md` 页级总表为准，pages-inventory §0/§G 已按其一次性校准（B1 批次，变更记录 v2.13）；
+> ③ 现行批次路线 B0→B1→B2→B3→B4→B5 见 compose-migration-status-audit design.md AD-07，本文 §12 批次条目仅作历史对照；
+> ④ 本文功能点清单/v2.8 预审违例编号（V 系列）仍为页面级有效资产，迁移开工时按条目引用，不因冻结失效。
+
 ## 1. 需求分析（已完成）
 - [x] 1.1 确认需求范围（仅设计，保留暗夜紫，学习开源 fork）
 - [x] 1.2 阅读相关源码（ThemeStore/LegadoTheme/ComposeActivitySupport/themeConfig.json）

@@ -4,17 +4,21 @@
 > 每一页 = 功能点清单（源码探针佐证）+ 当前技术栈 + 归属骨架类型 + 迁移优先级 + 真机覆盖状态。
 > 新增/优化页面时**必须先在此登记**，再进 ui-standards.md 套骨架、选组件、写真机用例。
 
-## 0. 总览（84 页面类 · 按功能域）
+## 0. 总览（84 页面类 · 按功能域 · 2026-08-30 按 compose-migration-status-audit 页级总表校准）
 
 | 功能域 | 页面数 | 已 Compose | 未 Compose |
 |--------|-------|-----------|-----------|
-| A 主框架/我的 | 8 | 3（书架1/2、MyFragment） | 5 |
-| B 阅读器核心 | 16 | 0 | 16 |
-| C 书源/规则/工具 | 20 | 7（debug 工具族） | 13 |
-| D RSS/订阅 | 13 | 0 | 13 |
-| E 配置子页 | 6 | 0 | 6 |
-| F 其它（about/透明窗） | 6 | 0 | 6 |
-| **合计** | **69 页面类 + 15 抽象/壳 = 84** | **10.7%** | **89.3%** |
+| A 主框架/我的 | 8 | 3（A1 PillNav 接线、A2 ProfileScreen3Level、A3+A4 书架 BookshelfScreen） | 4（A7/A8 待迁移、A5 红线、A6 已删待销号） |
+| B 阅读器/书籍 | 16 | 8（B1 浮层 S5、B2 接线就位、B6 双栈新栈、B7 壳接线、B9 桥接、B10 CacheScreen、B11 结果列表、B16 桥接态） | 7（B3/B4、B5、B8、B14、B15 待迁移 + B12/B13 内核红线页） |
+| C 书源/规则/工具 | 20 | 13（C1/C2/C4/C5/C6/C9/C10/C11/C12/C15/C16/C17/C19） | 7（C3/C13/C20 待迁移 + C7/C8/C14/C18 红线） |
+| D RSS/订阅 | 9 组（13 页面类） | 3（D1 已全量接线、D8 桥接、D9 顶栏+设置面板） | 6（D2~D5、D7 待迁移 + D6 红线） |
+| E 配置子页 | 6 | 6（E1~E6 均 ComposeSettingFragment，E5 已 PreciseManageScreen） | 0 |
+| F 其它 | 6 | 2（F3 ReadRecordScreen、F6=D9） | 3（F1/F2 待迁移、F4 红线、F5=C14） |
+| **合计** | **69 页面类 + 15 抽象/壳 = 84** | **33/60 行（55%，行口径）** | **27 行** |
+
+> 统计定稿（compose-migration-status-audit design.md 2026-08-30 交叉审核轮 3 修订）：🧱 红线/N 保留 9 组 ｜ ✅回+🔁 登记/回执 30 项 ｜ 🔨 待迁移/收尾 20 行（结构性迁移 14：D4/A7/A8/B8/C3/C13 瘦身/B5/B14/B15/D2/D3/D5/D7/C20；轻量收尾 6：B2/B11/E2/B9/B12/B13）｜ 🗑 清理 1 项。
+> 口径说明（双口径并存，勿混用）：①「已 Compose」结构口径 = 纯 Compose 或已接线混血（B2/B9/B11/B16 已接线但留收尾任务，结构计入已、任务计入 🔨）；②任务口径 = registry 登记与回执项（🔁/✅回）。分母 60 = design.md 总表行数（A3/A4、C14/F5、F6/D9、F1/F2、E1/E3/E6 为共享行）。
+> 进度权威源 = `docs/project-flow/ui-standards/migration-registry.md`（AD-01），本表为快照镜像，每次 registry 回执后同步刷新。
 
 > 技术栈术语：`View`=纯 XML View（VMBaseActivity/BaseActivity + ViewBinding）；`Compose`=纯 Compose 渲染；`混血`=XML 壳内嵌 ComposeView。
 > 骨架类型：`S1 主框架Tab` `S2 列表管理页` `S3 表单/编辑器页` `S4 详情/阅读页` `S5 全屏沉浸页` `S6 弹窗/透明窗`（详见 ui-standards.md）。
@@ -142,11 +146,11 @@
 - 远程 WebDav：目录浏览/服务器配置 ServersDialog/日志/帮助/排序；"加入书架"；startRead 未下载→showRemoteBookDownloadAlert；addToBookShelfAgain
 
 ### B10. CacheActivity（缓存管理，665行）
-- 路径 `ui/book/cache/`｜技术 **View**｜骨架 S2｜优先级 P2
+- 路径 `ui/book/cache/`｜技术 **纯 Compose**（CacheScreen LazyColumn；CacheAdapter/item_download.xml 已删，2026-08-30 校准，registry 7.11ai）｜骨架 S2｜优先级 P2
 - 功能点：按分组加载（flowByGroup+4排序）；菜单（下载当前章起/全部/停止/导出全部/启用替换/自定义导出开关/不带章节名/导出WebDav/导出图片/并行导出/导出文件夹/导出文件名JS/导出类型 txt|epub/导出字符集/缓存并发率 Dialog/日志/缓存分项统计 buildStorageBreakdown 逐项删除）；自定义导出 Dialog（全部或章节范围+验证/每卷章数/epub文件名JS实时解析）；ExportBookService 进度；事件 UP_DOWNLOAD/UP_DOWNLOAD_STATE/SAVE_CONTENT；item 长按下载菜单
 
 ### B11. SearchActivity + SearchContentActivity（搜索/全文搜索）
-- 路径 `ui/book/search/` + `ui/book/searchContent/`｜技术 **View**｜骨架 S2｜优先级 P1
+- 路径 `ui/book/search/` + `ui/book/searchContent/`｜技术 **View+Compose 壳**（结果列表/输入帮助已 Compose；全文搜索区残余，2026-08-30 校准，registry 7.11ah）｜骨架 S2｜优先级 P1
 - 搜索页：SearchView 提交→viewModel.search；结果 SearchAdapter 滚动自动加载；书架内模糊搜索 Flexbox；历史关键字 Flexbox+清空+删除+回填；fbStartStop；输入帮助；菜单（精准搜索/搜索范围 Dialog/书源管理/日志/动态分组）；空结果 alert；单条→BookInfoActivity
 - 全文搜索页：SearchView→逐章搜本地/已缓存（IO协程+ensureActive+fbStop+进度）；结果列表（章节名/行号/命中/缓存标记）；点击→postEvent(SEARCH_RESULT)+IntentData 回传阅读器定位；菜单（启用替换/正则）；ivSearchContentTop/Bottom
 - 🔎 **v2.8 预审（2026-08-11，explore 深审 18 kt+12 布局+5 菜单+2 实体，含 SearchContent/RssSearch/RssArticleInfo 三关联页，见 tasks.md 12.16p）**：骨架判定 **S2 列表管理页**（B11 一致；**归类疑点：D5 将 RssArticleInfoActivity 混归 S2，源码实为仿 BookInfoActivity 的 S4 详情页**——ArcView+CardView 封面/多源列表/底部操作栏 RssArticleInfoActivity:39-45 自述仿书源，P1 开工前需裁决）。**已符合 14 项（C1-C14）**：三搜索包 Kotlin 硬编码色 0（布局全 @color token）/方向跟随系统/暗色安全（applyThemeColors 修复暗色白块 :118-136）/DiffUtil payload 规避 §4.3（SearchAdapter:23-52 areContentsTheSame 恒 false 强制刷新绕开 SearchBook equals 只比主键/RssSearchAdapter:41-82 同款）/日志规范 AppLog.put/协程 execute 链/菜单项全资源化/搜索历史类型隔离（type=0 书源:132-149/type=1 订阅源 RssSearchViewModel:147-164）/搜索防抖（ConflateLiveData(1000)+onQueryTextChange 触发 stop）/搜索范围持久化（SearchScope:148-155 save→AppConfig.searchScope/searchGroup）/空结果引导闭环（:438-459 alert 引导关精准搜索/切分组）/结果缓存安全（SearchBookStoragePolicy 512KB 行预算防 CursorWindow 崩溃）/触控 ≥48dp（110dp 封面撑行高）/订阅源搜索为 fork 正向资产。**违例 21 项（V1-V21）**：V1 三页顶栏全私有 TitleBar 非 GlassTopAppBar（activity_book_search.xml:9-16/activity_rss_search.xml:9-16/activity_search_content.xml:8-14）；V2 用 androidx SearchView 私有子类（SearchView.kt 110 行）搜索词不升 VM（view_search.xml:2-19 17 页共享+SearchActivity:86-88,186-218）SettingsSearchBar 孤儿零接线；V3 搜索历史 FlexboxLayoutManager 原生容器非 Compose FlowRow（SearchActivity:224,227/RssSearchActivity:231）；V4 状态未收敛（Activity 6 私有态:89-94+2 Flow Job:91-92，VM 5 LiveData+可变公有 searchKey/hasMore:26-33，Room Flow collect 在 Activity:311/381/394）；V5 SearchScope stateLiveData 非 StateFlow（SearchScope.kt:32）；**V6 全文搜索配置存 companion object 静态可变**（SearchContentViewModel:17-27 6 公有可变字段+Activity 直写 companion:87-101 进程内全局共享，三搜索页均无 onSaveInstanceState/rememberSaveable 旋转丢全丢）；V7 三态全缺（仅 2dp 线性条 RefreshProgressBar activity_book_search.xml:18-22/空结果 alert 弹窗非占位:440/错误仅 toast:58 无重试按钮）；V8 4 处私有弹窗（SearchScopeDialog 自绘 RadioGroup+FastScrollRecyclerView dialog_search_scope.xml 114 行/alertClearHistory:524-532/空结果 alert/ChangeRssArticleSourceDialog）非 L2 族；V9 OptionsMenu+手写动态分组状态机（SearchActivity:110-156 onMenuOpened removeGroup+动态 add+setGroupCheckable/RssSearchActivity:109-164 类型+分组双动态菜单/menu.transaction{} 每开必重建）非 AppDropdownMenu；V10 用户可见硬编码中文 7 处（SearchActivity:440,444,452 搜索结果为空/分组空结果/activity_book_search.xml:16 标题搜索/activity_rss_search.xml:16 订阅源搜索）；V11 日志硬编码中文 6 处（AppLog）；V12 view_search.xml:19 defaultQueryHint="搜索" 硬编码共享 17 页接线页全部继承（M1 前置）；V13 公共组件 SettingsSearchBar.kt:53 "搜索设置" 硬编码中文（接线即继承 M1 前置）；V14 英文 strings.xml 中文值 strings.xml:1447 search_result="搜索结果:"；V15 占位符规范（SearchContentActivity:160-171,193-241 @SuppressLint(SetTextI18n) 拼接非 %1$s）；V16 私有 BadgeView 复制 BadgeDot 能力（item_search.xml:36-43+item_rss_search.xml:43-50）+FAB 停止图标手写显隐；V17 无障碍（item_fillet_text.xml:6-18 chip 高约 27dp<48dp padding4dp+14sp/activity_search_content.xml:29 tools:ignore=SpeakableTextPresentCheck/item_search.xml:22 UnusedAttribute 掩盖）；V18 无 GroupHeader/分组 Chips/徽标（分组筛选仅菜单动态组）；V19 无多选批量（搜索场景可论证低优先级归 P2）；V20 三页未包 LegadoTheme（M3 34 槽位未接入）；V21 三搜索页+详情页均无回执。**fork 差距**：功能面完整超 fork（流式聚合/书架模糊搜索/历史双类型隔离/精准搜索/分页/搜索范围多选/rss 统一搜索为 fork 独有）；缺 MoRealm SearchResultCard 加架动画+字数/状态/收藏心/HapeLee RuleListScaffold 壳/MoRealm GroupModeChips+统计条。**P1 开工序**（对齐 C1 样板）：M1（V12/V13 共享布局+公共组件 i18n 清零）→ M2（GlassTopAppBar+SettingsSearchBar+Dialog 族+AppDropdownMenu+EmptyStatePlaceholder 接线 V1/V2/V7/V8/V9/V18/V20）→ M3（StateFlow 状态收敛 V4/V5/V6）→ M4（i18n/无障碍/BadgeDot/回执 V10-V17/V21）
@@ -193,18 +197,18 @@
 - 功能点：调试搜索+快捷前缀（++目录/--正文/text_my/xt/fx/info）；发现调试 initExploreKinds（标题::URL 长按 selector 切分类）；流式输出 observe{state,msg}；菜单（扫码/查看搜索/书籍/目录/正文 HTML 源码 TextDialog/刷新发现/帮助）；帮助面板焦点显隐
 
 ### C4. ReplaceRuleActivity + ReplaceEditActivity（替换净化）
-- 路径 `ui/replace/`｜技术 **Compose 顶栏/菜单/底部（ReplaceRuleTopBar + ReplaceEdit 顶栏菜单底部栏 Compose，2026-08-14，tasks.md 12.46）**｜骨架 S2+S3｜优先级 P2
+- 路径 `ui/replace/`｜技术 **全 Compose（列表）**：AppManagementScaffold 接管，recyclerView removeView；Edit 页 Compose 桥接维持（ReplaceRuleTopBar + ReplaceEdit 顶栏菜单底部栏 Compose，2026-08-14，tasks.md 12.46；2026-08-30 校准，registry 7.11ag）｜骨架 S2+S3｜优先级 P2
 - 列表页：搜索（enabled/disabled/no_group/group:xxx）；菜单（添加/分组管理/启用停用筛选/删除选中/在线/本地/扫码导入/帮助）；多选（启用停用/置顶置底/导出JSON）；onDestroy 全局刷新 ContentProcessor.upReplaceRules；拖拽排序滑选
 - 编辑页：字段 name/group/**pattern**/cb_use_regex/replacement/scope_title/scope_content/scope/excludeScope/timeout(3000)；菜单（全屏编辑/保存/复制粘贴）；KeyboardToolPop+正则帮助
 - ✅ **v2 实施（2026-08-14，tasks.md 12.46）**：列表页（ReplaceRuleActivity）顶栏/搜索/菜单 Compose 化（ReplaceRuleTopBar + SettingsSearchBar + 快捷筛选），列表内核（RecyclerView 拖拽排序/滑选多选/SelectActionBar 批量）View 保留（AD-20 内核桥接）；编辑页（ReplaceEditActivity）顶栏 GlassTopAppBar + 菜单下沉 AppDropdownMenu（全屏编辑/保存/复制规则/粘贴规则）+ 底部保存/取消栏（12dp 圆角 48dp），字段区 View 内核保留（EditText 行内编辑 + KeyboardToolPop + 正则帮助）；VM 数据逻辑零改动，全量功能保留（红线合规）；FR-11 真机验证归 V-8（待统一验证）
 
 ### C5. HighlightRuleActivity（高亮规则）
-- 路径 `ui/highlight/`｜技术 **Compose（HighlightRuleScreen 全 Compose，2026-08-14，tasks.md 12.47）**｜骨架 S2｜优先级 P2
+- 路径 `ui/highlight/`｜技术 **Compose**（HighlightRuleScreen 全 Compose，2026-08-14，tasks.md 12.47；强跳过修复 ✅，2026-08-30 校准，registry 7.11ar）｜骨架 S2｜优先级 P2
 - 功能点：列表+拖拽排序；**数据存 SharedPreferences**（HighlightRuleStore 非 Room）；菜单（添加/分组管理/预设 HighlightPresetRuleDialog/恢复默认 MERGE|OVERWRITE 双确认/导入剪贴板JSON去重/导出）；item 编辑删除置顶置底开关；onDestroy 同步 ReadBook.upHighlightRules
 - ✅ **v2 实施（2026-08-14，tasks.md 12.47）**：Compose 混合架构（activity_highlight_rule.xml 单 ComposeView + HighlightRuleScreen.kt 全 UI），复用公共组件 GlassTopAppBar/SettingsSearchBar/EmptyStatePlaceholder/AppMenuSheet，新增搜索过滤（按规则名即时筛选）；VM 数据逻辑零改动，Dialog 族（编辑/分组/预设/恢复/导入/导出）全量保留，无功能删减（红线合规）；FR-11 真机验证归 V-8（待统一验证）
 
 ### C6. DictRuleActivity（词典规则）
-- 路径 `ui/dict/rule/`｜技术 **View**｜骨架 S2+S3｜优先级 P3
+- 路径 `ui/dict/rule/`｜技术 **纯 Compose**（DictRuleScreen，Activity setContent→Screen；2026-08-30 校准，registry 7.11as）｜骨架 S2+S3｜优先级 P3
 - 功能点：列表+滑选+拖拽；菜单（添加/本地在线扫码导入/**导入默认**/帮助）；多选（启用停用/导出）；编辑全屏 Dialog 三字段 name/urlRule/showRule（带规则补全）；全屏编辑；dismiss 未保存拦截
 
 ### C7. CodeEditActivity（代码编辑器，sora 内核）
@@ -217,20 +221,20 @@
 - 功能点：loadUrl/loadDataWithBaseURL+JS 接口（WebJsExtensions nameJava/WebCacheManager nameCache/lockOrientation/onCloseRequested）；网页全屏 customWebView+按钮全屏；进度；长按图片保存/选目录；下载监听 Download.start；Cookie setCookie；scheme 拦截（legado/yuedu→OnLineImport）；SSL proceed；console 日志；**Cloudflare 挑战检测 `window._cf_chl_opt`**；**源验证模式 saveVerificationResult**；菜单（刷新/浏览器打开/复制URL/完成/全屏/网页日志/禁用删除源）；返回键三级回退
 
 ### C9. FileManageActivity + HandleFileActivity（文件管理/选择）
-- 路径 `ui/file/`｜技术 **View**｜骨架 S2+S6｜优先级 P3
+- 路径 `ui/file/`｜技术 **纯 Compose**（FileManageScreen；2026-08-30 校准，registry 7.11at）｜骨架 S2+S6｜优先级 P3
 - FileManage：路径导航条 PathAdapter（root+逐级跳）；文件列表（上级/文件夹/文件）；搜索过滤；长按删除；返回键回上级
 - HandleFile：mode 分发（DIR_SYS/DIR/FILE/EXPORT/IMAGE）；系统目录选择器/应用内 FilePickerDialog/**手动输入目录**（校验 isExternalStorage）/系统文件选择器/图片选择/**手动输入图片链接**；EXPORT 上传 URL 或存本地；统一 Intent 回传；存储权限
 
 ### C10. DownloadManageActivity（下载管理）
-- 路径 `ui/download/`｜技术 **View**｜骨架 S2｜优先级 P3
+- 路径 `ui/download/`｜技术 **纯 Compose**（DownloadManageScreen；2026-08-30 校准，registry 7.11au）｜骨架 S2｜优先级 P3
 - 功能点：**5 Tab**（全部/运行中/暂停/完成/失败）；**500ms 轮询** DownloadState.queryAllTaskStatus；过滤+startTime 倒序；任务点击状态菜单（删除/重试/打开+复制路径+删除）；清除完成失败任务
 
 ### C11. UrlRecordActivity（URL 记录）
-- 路径 `ui/urlrecord/`｜技术 **View**｜骨架 S2｜优先级 P3
+- 路径 `ui/urlrecord/`｜技术 **纯 Compose**（UrlRecordScreen+FilterSheet；2026-08-30 校准，registry 7.11av）｜骨架 S2｜优先级 P3
 - 功能点：搜索；**四维过滤**（domain/sourceName/method/status+清除）；菜单（开关记录/过滤/清除7天/30天/全部）；item 着色（method GET蓝/POST紫/status 2xx绿/4xx橙/错误红）；点击详情复制URL
 
 ### C12. RecycleBinActivity（源回收站）
-- 路径 `ui/source/recycle/`｜技术 **View**｜骨架 S2｜优先级 P3
+- 路径 `ui/source/recycle/`｜技术 **纯 Compose**（RecycleBinScreen；2026-08-30 校准，registry 7.11aw）｜骨架 S2｜优先级 P3
 - 功能点：sourceRecycleBinDao.flowAll；SelectActionBar 主按钮**恢复**；恢复冲突检测 hasConflict 覆盖确认；菜单（清空回收站/帮助）；选择模式删除选中；item 恢复/删除
 
 ### C13. SourceLoginActivity（登录）
@@ -242,12 +246,12 @@
 - 功能点：相机扫码（仅二维码 QR_CODE_HINTS+全区域+0.8f）；相册选图；回调返回扫描文本；扫描后停止连续识别
 
 ### C15. ImageGalleryActivity + ImageDetailActivity（图片浏览）
-- 路径 `ui/image/`｜技术 **View**（V4 垂直画布架构）｜骨架 S5｜优先级 P2
+- 路径 `ui/image/`｜技术 **纯 Compose**（Gallery/Detail 双 Activity 已 Compose 化，V4 垂直画布架构保留；2026-08-30 校准，registry 7.11ax）｜骨架 S5｜优先级 P2
 - Gallery：垂直长画布扁平化所有文章图；分页加载（PAGINATION_THRESHOLD+isInitialScrollDone）；智能预加载（速度阈值2.0px/ms+150ms 去抖）；快滚 Glide pause/resume；**WebView 串行预热**（Cloudflare 403→I-P0-2 降级重载 5s 兜底）；降级链回调（onWebViewFallback/onWebModeFallback）；**横向大图模式**（ViewPager2 全屏淡入/平滑回滚）；旋转工具栏；沉浸式；页码双显（横向 n/total+画布右下悬浮）；长按保存/分享/复制URL；工具栏（收藏/刷新/浏览器打开/日志）；返回键退横向
 - Detail：独立大图页 ViewPager2+共享元素过渡；onSaveInstanceState 存 index
 
 ### C16. AutoTaskActivity + AutoTaskEditActivity（自动任务）
-- 路径 `ui/autoTask/`｜技术 **View**｜骨架 S2+S3｜优先级 P3
+- 路径 `ui/autoTask/`｜技术 **纯 Compose**（AutoTaskScreen；2026-08-30 校准，registry 7.11ay）｜骨架 S2+S3｜优先级 P3
 - 列表页：搜索；菜单（添加/本地在线导入/日志）；多选（启用停用/导出JSON/**批量设置 cron** CronSchedule.parse 校验）；item 点击编辑/开关/日志/拖拽
 - 编辑页：字段（cb_enable/cb_cookie/name/cron 频率 Spinner 每天|每小时|自定义/comment/script minLines4/header/jsLib/concurrentRate/loginUrl/loginUi/loginCheckJs）；菜单（保存校验/调试任务 TODO toast/登录/复制粘贴/帮助）；未保存拦截
 
@@ -269,7 +273,7 @@
 - 🔎 **v2.8 复审（2026-08-11，见 tasks.md 12.16k）3 违例**：① **硬编码中文 60 处**（§6.1 i18n 违例，实测分布 EncodeTools 19/HttpDebug 16/TimestampConvert 8/CurlTest 6/PingTest 6/RegexTest 4/DebugTools 1——工具文案/占位符/输出格式标签）② **硬编码色 11 处**（§7 第 13 步，CurlTest 2/PingTest 5/RegexTest 4）③ **实施回执缺失**（§3.3，工具族 7 Screen 均无回执模板）。修复归入 P4 一致性巡检（工具页为枝叶，非 P1 支干样板）。
 
 ### C20. AboutActivity + AboutFragment + ReadRecordActivity
-- 路径 `ui/about/`｜技术 **View**（PreferenceFragmentCompat/RecyclerView）｜骨架 S2｜优先级 P3
+- 路径 `ui/about/`｜技术 **拆分标注（2026-08-30 校准，registry 7.11az）：About View 维持（PreferenceFragmentCompat/RecyclerView）；ReadRecord 纯 Compose（ReadRecordScreen）**｜骨架 S2｜优先级 P3
 - About：公众号文字高亮；菜单（市场评分/分享）
 - AboutFragment：开源贡献者/更新日志 MD Dialog/**检查更新** giteeUpdate+UpdateDialog/发邮件/license/disclaimer/privacyPolicy MD/复制公众号/crashLog CrashLogsDialog/saveLog zip 打包/crashLog/logcat/**createHeapDump 堆转储**
 - ReadRecord：搜索实时过滤；排序子菜单（书名/时长/最近，持久化）；menu_enable_record 开关；顶部总时长+"清除"确认；item 单击查书（存在跳读/不存在跳搜索）；行内删除单条
@@ -327,21 +331,21 @@
 ## E. 配置子页（6 页面类，均在 ui/config/）
 
 ### E1. BackupConfigFragment
-- 技术 **View**（PreferenceFragment，pref_config_backup）｜骨架 S2｜优先级 P2
+- 技术 **ComposeSettingFragment**（2026-08-30 校准，源码核验 registry 7.11ba：BackupConfigFragment.kt:64 继承 ComposeSettingFragment）｜骨架 S2｜优先级 P2
 - 功能点：WebDav 配置（URL/账号/密码掩码"*"repeat/目录/设备名，变更实时 upWebDavConfig）；备份路径选择；web_dav_backup 备份（权限+可写检查）；web_dav_restore 恢复（WebDav 文件选择器+**长按备份名删除/重命名**）；import_old 导入旧数据；restore_ignore 忽略项 multiChoice；长按→本地 zip 恢复；菜单（帮助/日志）
 
 ### E2. ThemeConfigFragment
-- 技术 **View**（PreferenceFragment，pref_config_theme）｜骨架 S2｜优先级 P1
+- 技术 **ComposeSettingFragment**（7.11ak；遗留 15 项违例归 B3，2026-08-30 校准）｜骨架 S2｜优先级 P1
 - 功能点：主题色 6 项（日/夜 主色/强调/背景/导航栏，ColorPreference 明暗校验）；bgImage/bgImageN 背景图（选图/模糊 SeekBar/删除三选）；barElevation/fontScale NumberPicker；**themeList 主题列表 Dialog**；saveDayTheme/saveNightTheme 保存；coverConfig/welcomeStyle 跳子配置；launcherIcon 换图标；状态栏/导航栏切换重建
 - ⚠️ 主题权威源为 ThemeStore+ThemeSpec（AD-01），此页为唯一改主题入口，**34 槽位只在运行时推导，不改 themeConfig.json 格式**
 - 🔎 **v2.8 预审（2026-08-11，explore 深审 ThemeConfigFragment+ConfigActivity 壳+ColorPreference+ThemeListDialog+ThemeConfig/ThemeSpec/ThemeStore，见 tasks.md 12.16p）**：骨架判定 **S2 配置列表页**（E2 一致，等价 SettingsClickRow/SettingsToggleRow 组合语义；无搜索需求可豁免 SettingsSearchBar）。**已符合 12 项（C1-C12）**：骨架归类正确/**主题权威源迁移红线完全合规零越界**（34 槽位只在运行时推导 LegadoTheme:41-49→ThemeSpec:34-93 toM3Scheme 无写入动作；themeConfig.json 格式不改 Config 保持 9 历史字段 ThemeConfig.kt:511-521 save 写 GSON 原格式 :146-150 validateConfig 旧字段 :226-236；SharedPreferences 旧 key 不改 applyTheme 直读 cPrimary 等 :427-473）/换肤即时切换无全量 animateColor（postEvent(RECREATE) ThemeConfig.kt:69-74）/明暗校验功能正确（onSaveColor 白天禁太暗/夜间禁太亮 :89-108）/页面层硬编码 UI 色 0（listView.setEdgeEffectColor(primaryColor):114 走 token+XML 全 @color）/无页面私有 PopupMenu（顶栏仅 menu_theme_mode 1 项 MenuProvider 注入 :115,128-142）/Pref listener 注册注销配对+runCatching 链（:118-126/:350-386）/方向跟随系统/无障碍部分达标（图标 48dp+contentDescription item_theme_config.xml:19-42）/资源层双语主体合规（pref_config_theme 18 title/summary 全 @string+values-zh 补齐）/阅读器红线未越界（主题切换仅 SharedPreferences+EventBus 不碰数据库，未改 ReadBookConfig 每书配色）/背景图下载逻辑正确（url→Content-Type 判扩展名→MD5 文件名 :347-411）。**违例 15 项（V1-V15）**：V1 顶栏私有 TitleBar 非 GlassTopAppBar（activity_config.xml:8-13+ConfigActivity:30-33 setTitle）；V2 页面零 Compose 未包 LegadoTheme（PreferenceFragmentCompat 纯 View 体系 M3 34 槽位未接入本页）；V3 状态管理无 ViewModel+Flow（SharedPreferences 直读直写+onSharedPreferenceChanged 散落 :80-121，ConfigViewModel:16-51 为占位未被本页使用）；V4 themeList 私有全屏 Dialog（ThemeListDialog:23-120 BaseDialogFragment+setLayout(0.9f,0.9f)+RecyclerView+VerticalDivider，§6 S6 L2 明确 AppSelectDialog 替代主题列表）；V5 4 类私有弹窗布局（保存主题 DialogEditTextBinding:223-244/背景图三选 selector:246-282/模糊 SeekBar DialogImageBlurringBinding:284-310/删除确认 alert ThemeListDialog:73-81）；V6 NumberPicker 非 L2 族（io.legado.app.ui.widget.number.NumberPickerDialog :177-203）；V7 i18n 硬编码中文 7 处（:351 下载背景图片中.../:383 设定成功/ThemeListDialog:65 格式不对,添加失败/:85 主题分享/theme_list.xml:7 剪贴板导入/ThemeConfig.kt:120 未缓存在线背景图/278/290）；V8 硬编码英文字面量 :226 editView.hint="name"；V9 主题子系统 toast/日志硬编码中文 4 处（ThemeConfig.kt:120,278,290,321 AppLog.put 设置主题出错）；V10 硬编码色 ColorPreference.kt:28 Color.BLACK/:135 getPersistedInt(-0x1000000)/:261 取色器默认值非 UI 色建议登记豁免（巡检项）；V11 ThemeListDialog 三态不齐（RotateLoading 私有/空态裸 tv_msg/无错误态 dialog_recycler_view.xml:29-45）；V12 无 §3.3 回执；**V13 AD-01/AD-04 内置 4 套 ThemeSpec 未落地**（ThemeSpec.kt 仅 data class 无预设表，全仓 grep 米白|暖黄|纯黑 0 命中，themeConfig.json 17 套含暗夜紫 :91 但缺米白/暖黄/纯黑 3 套新内置）——功能范围问题非格式问题，**需用户裁决归 P1 或 P2**；V14 选主题双重重建隐患（ThemeConfig.applyConfig applyDayNight→RECREATE ThemeConfig.kt:319+onSharedPreferenceChanged 再触发 upTheme :150-156 两次 applyTheme+RECREATE，recreate 幂等无功能错误 P1 优化项）；V15 无障碍缺口（dialog_recycler_view.xml:27 tools:ignore=SpeakableTextPresentCheck+selectBgAction 三选弹窗触控未确认 ≥48dp）。**fork 差距**：MoRealm 用 Room themes 表+6 内置主题——**不引 Room 表（生态/风险），补内置 4 套预设待裁决 V13**；MoRealm readerBackground/readerText 随主题实体——**不学**（ReadBookConfig 每书配色红线）；ThemeSpec.toM3Scheme 已采纳背景锚定中性面思路（surface=lerp(bg,White/Black,0.04/0.10) ThemeSpec.kt:43-45）；HCT 引擎不引（受限）；RECREATE 即时切换已采纳。**P1 通用五件套**：V1 GlassTopAppBar→V2 零 Compose→V3 状态收敛→V4-V6 弹窗族收敛→V7-V9 i18n 11 处+裁决 V13
 
 ### E3. CoverConfigFragment
-- 技术 **View**（PreferenceFragment，pref_config_cover）｜骨架 S2｜优先级 P3
+- 技术 **ComposeSettingFragment**（2026-08-30 校准，源码核验 registry 7.11bb）｜骨架 S2｜优先级 P3
 - 功能点：默认封面图日/夜（选图/删除）；coverRule 封面规则→CoverRuleConfigDialog；coverShowName(N)/coverShowAuthor(N) 联动（作者依赖书名 enabled）；变更 BookCover.upDefaultCover
 
 ### E4. OtherConfigFragment
-- 技术 **View**（PreferenceFragment，pref_config_other）｜骨架 S2｜优先级 P2
+- 技术 **ComposeSettingFragment**（2026-08-30 校准，源码核验 registry 7.11bd：OtherConfigFragment.kt:55 继承 ComposeSettingFragment）｜骨架 S2｜优先级 P2
 - 功能点：大量 NumberPicker（预下载/线程/搜索线程/缓存线程/RSS并发/图片并发/Web端口/位图缓存/图片保留/编辑最大行）；userAgent/customHosts(JSON 校验)；videoSetting→SettingsDialog；默认书目录 TreeUri；cleanCache/clearWebViewData/shrinkDatabase（确认框）；localPassword；checkSource→CheckSourceConfig；uploadRule→DirectLinkUploadConfig；debug_tools→DebugToolsActivity；开关（记录日志/调试浮球/processText 文本选择分享/显示发现-RSS/语言重启/自动刷新）
 
 ### E5. PreciseManageFragment
@@ -349,7 +353,7 @@
 - 功能点：聚合入口 4 项（URL记录/存储管理/下载管理/文件管理）
 
 ### E6. WelcomeConfigFragment
-- 技术 **View**（PreferenceFragment，pref_config_welcome）｜骨架 S2｜优先级 P3
+- 技术 **ComposeSettingFragment**（2026-08-30 校准，源码核验 registry 7.11bc）｜骨架 S2｜优先级 P3
 - 功能点：欢迎页图片日/夜（选图/删除，支持 http 下载 AnalyzeUrl+BitmapUtils.cropBitmapToAspectRatio 屏幕比例裁剪）；文字/图标开关已注释留空
 
 ---
@@ -370,13 +374,14 @@
 ## G. 迁移路线图（主干 → 支干 → 枝叶 · 全 Compose 边界：正文/内核保留 View）
 
 > 策略依据（AD-24）：主干 = 公共资产（已完成 Phase0-3 的组件库/主题/骨架/状态范式）；支干 = 每类骨架 S1-S6 的样板页（首做并冻结验收）；枝叶 = 同类剩余页直接复用样板。样板页分配见 `ui-standards.md` §9.2。
+> ⚠️ 本路线图为 08-16 冻结历史参考；现行批次=B0~B5（compose-migration-status-audit design.md AD-02），进度权威源=migration-registry（AD-01，2026-08-30 校准增注）。
 
 | 层/阶段 | 目标 | 页面清单 | 验收 |
 |---------|------|---------|------|
 | **主干 已改造** | 公共资产地基 | 书架1/2、MyFragment、debug 7 工具（组件库 19 文件/主题 34 槽位/骨架/状态范式全部建立） | 已真机验证 |
 | **支干 P1 样板页** | 每类骨架冻结范本 | S1→MainActivity（PillNav）、S2→BookSourceActivity、S3→BookSourceEditActivity、S4→BookInfoActivity、S5→阅读器浮层 Sheet 化、S6→登录/导入 Dialog 族 | 样板页功能点全过 + 回执模板示范（FR-11） |
-| **枝叶 P2 次优高频** | 复用支干样板 | Explore、Rss、Search、Toc、BookSourceDebug、Replace、Highlight、SourceLogin、BookManage、Cache、ReadManga、Audio、ImageGallery、Video、Config 3 子页（Backup/Theme/Other） | 同型页骨架一致（照抄样板）+ 真机覆盖 + 回执 |
-| **枝叶 P3 长尾低频** | 收尾全量 | 其余所有 View 页（导入/存储/文件/下载/记录/回收站/自动任务/词典/TxtToc/BookInfoEdit/Welcome/About/ReadRecord/URL记录/SS阅读） | 全量页面 Compose + 巡检 0 私有重复 + 回执 |
+| **枝叶 P2 次优高频** | 复用支干样板 | Explore、Rss、Search、Toc、BookSourceDebug、SourceLogin、BookManage、ReadManga、Audio、Video、D1 收尾、E2 违例修复（2026-08-30 校准：Replace/Highlight/Cache/ImageGallery/Config 3 子页已移出——均已 Compose） | 同型页骨架一致（照抄样板）+ 真机覆盖 + 回执 |
+| **枝叶 P3 长尾低频** | 收尾全量 | 其余所有 View 页（导入族、存储、BookInfoEdit、Welcome、About、TxtToc 列表、E5、C17 等 🔨 项；2026-08-30 校准：文件/下载/记录/回收站/自动任务/词典/ReadRecord 已移出——均已 Compose） | 全量页面 Compose + 巡检 0 私有重复 + 回执 |
 | **N 不迁移** | 内核/第三方 | 阅读器正文（AD-02）、CodeEdit（sora）、WebView（WebViewPool）、QrCode（camera-scan）、透明窗（协议分发） | 壳换 Compose 浮层即可 |
 
 > 逐页真机功能点覆盖测试为**每页 Compose 化强制门禁**（见 ui-standards.md §7 与 tasks.md），使用 `ai_tests\venv\Scripts\python.exe` + MEmu；每页完成必须填 §3.3 实施回执。
@@ -384,6 +389,7 @@
 ---
 
 ## H. 变更记录
+- 2026-08-30 v2.13：§0/§G 按 compose-migration-status-audit 页级总表一次性校准（B1 批次），列 18 处技术标注校正+2 处清单归属校正+1 处权威源增注（X-01~X-22，6 项维持免改核验通过）。
 - 2026-08-16 v2.12：深化迭代 12.19 收尾 C4 技术标注核对（2026-08-16，源码核验）——C1 BookSourceActivity 技术 **View→View+Compose 壳**（BookSourceScreen/BookSourceItems Compose 化，ComposeView 桥接双轨）；C2 BookSourceEditActivity 技术 **View→View+Compose 壳**（composeTopBar/TabBar/QuickToolbar/Fields/BottomBar 5 处 Compose 接线）；B7 BookInfoEditActivity 技术 **View→View+Compose 壳**（BookInfoEditScreen 全 Compose+ComposeView 桥接）；D1 RssSourceActivity/D9 VideoPlayerActivity 复核维持 **View+Compose 壳** 标注正确。
 - 2026-08-11：建立全量 84 页面类功能点核对表（4 路源码探针佐证）；登记技术栈/骨架/优先级/真机状态。
 - 2026-08-11 v2：§G 改为「主干→支干→枝叶」三阶段路线图，每类骨架 S1-S6 指定样板页（AD-24）；每页实施回执为强制门禁（§3.3/AD-23）。
