@@ -45,10 +45,10 @@
 
 ## 2. W1 安全与基线
 
-- [x] 2.1 ng P0 全期实施（子任务账本=P0 分册 §10 步骤+22 单测（T1-T22），权威不复制）——**待实施（W1 下批，需另立实施 spec）**
-  - [ ] 2.1.1 另立实施 spec（引用 P0 分册为权威设计）
-  - [ ] 2.1.2 五子项按 §10 顺序实施（文件沙箱→脚本缓存命名空间→弹窗拦截→类导入灰度→网络日志回归）
-  - [ ] 2.1.3 四观察开关登记至回退预案表（8.4.2 联动）
+- [x] 2.1 ng P0 全期实施 ✅（实施 spec=ng-p0-source-security-impl；S1/S3 提交 1643f1c03+S2/S4 提交 289f898e0（随并行 rss-cms 批次）+T1-T22 单测 b652fb1af（21 用例全 PASS/全量 243 绿/T6 沙箱偏差修复）；四观察开关已登记（bookSourceFileSandbox/blockSourceDialogs/bookSourceCacheScoped/bookSourceClassPolicyLog，默认 false 观察档）| **唯一遗留**：L2 真机回归归 2.6 合并窗口）
+  - [x] 2.1.1 另立实施 spec（ng-p0-source-security-impl，引用 P0 分册为权威）
+  - [x] 2.1.2 五子项按 §10 顺序实施（S1 文件沙箱/S2 缓存命名空间/S3 弹窗拦截/S4 类导入灰度/S5 零修改回归）
+  - [x] 2.1.3 四观察开关登记至回退预案表（8.4.2 联动——开关清单+默认关+AppConfig getter 实时读）
 - [x] 2.2 C0-F3 BookScriptObject 注册 ✅（提交 5f4fd7a1c：新文件 31 行+App.kt initRhino 注册；与 ng P0 子项4 机制分层正交已实证）
 - [x] 2.3 C0-F2 章节列表并发去重 ✅（提交 02059eb9f：去重壳+LAZY async+23 字段回填（Book.kt 23/23 核对全存在）+book.copy 隔离；编译门禁过）
 - [x] 2.4 C0-F4 exploreKinds 多因素缓存键 ✅（提交 5f4fd7a1c：双层键含 lastHost（DR-C0-4）+isValidExploreKindsRule 三处加固；与 ng P0 脚本缓存命名空间不同文件正交已实证）

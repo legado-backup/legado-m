@@ -17,14 +17,14 @@
 
 ## 执行清单
 
-- [ ] 1 S1 文件沙箱实施（StorageScope/FileAccessPolicy 新类+AnalyzeUrl/JsExtensions 等 5 处函数收敛+开关）
-- [ ] 2 S3 弹窗拦截实施（SourceInteractionPolicy 新类+批量流程挂载 2 文件 3 行+开关）
-- [ ] 3 S2 脚本缓存命名空间实施（BookSourceCacheStore+CacheDao @Query+evalJS 三入口接入+开关）
-- [ ] 4 S4 类导入灰度实施（RhinoClassShutter 观察档+CookieManager 实拦）
-- [ ] 5 S5 回归验证（T21 单测防回归）
-- [ ] 6 22 单测（T1-T22，§9.1）落地
-- [ ] 7 编译门禁+全量单测+daemon 清场+提交
-- [ ] 8 L2 真机回归（§8.2 场景：沙箱路径/弹窗拦截观察/缓存前缀）→ 归 W1 收束
+- [x] 1 S1 文件沙箱实施 ✅（提交 1643f1c03：BookSourceStorageScope/BookSourceFileAccessPolicy/SourceSandboxExtensions 三新类+JsExtensions 8 函数收敛；偏差：开关默认 false 更保守/#16 双参保留 hex 写盘语义仅统一原语）
+- [x] 2 S3 弹窗拦截实施 ✅（提交 1643f1c03：SourceInteractionPolicy+SourceInteractionBlockedException+挂载 SearchModel:95/ChangeBookSourceViewModel:234/:385，policy 左置规避 deprecated）
+- [x] 3 S2 脚本缓存命名空间实施 ✅（提交 289f898e0，随并行 rss-cms 批次：CacheDao getByPrefix/deleteByPrefix @Query+BookSourceCacheStore 三步清理 D7+三入口切换 D17+删源联动 SourceHelp；核验与分册一致）
+- [x] 4 S4 类导入灰度实施 ✅（提交 289f898e0：RhinoClassShutter D5 观察档+D11 CookieManager 实拦+withBookSourceClassPolicy finally 恢复+BookSourceGuardLog V6 计数化节流/LRU 512/分钟限流）
+- [x] 5 S5 回归验证 ✅（T21 NetworkLogRedactRegressionTest PASS，敏感头 7 类/token query/Bearer/JSON 凭据脱敏断言）
+- [x] 6 22 单测（T1-T22）落地 ✅（提交 b652fb1af：4 测试文件 21 用例全 PASS，全量 243 tests 0 failures；T11-T14/T22 登记 L2（Room/ACache 依赖归 8 项）；T6 发现真实实现偏差——resolvePath Windows JVM File 拼接语义不拒绝根外绝对路径，已修复（显式 isAbsolute 判定+根内校验）并解除 @Ignore）
+- [x] 7 编译门禁+全量单测+daemon 清场+提交 ✅
+- [ ] 8 L2 真机回归（§8.2 场景：沙箱路径/弹窗拦截观察/缓存前缀）→ 归 W1 收束（与总线 2.6 B0 真机合并窗口同批）
 
 ## AOAdapt 日志
 
