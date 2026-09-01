@@ -12,6 +12,8 @@
 
 每步对应固定脚本（位于 `ai_tests/scripts/`）：
 
+> **现状注记（2026-09-01，总线 2.12 目录口径核定）**：`.gitignore` 对 `ai_tests/scripts/*.py` 默认忽略、仅白名单固化脚本入库；当前目录**仅存 3 个白名单固化脚本**（步骤 3c `l2_verify_precise_manage.py` / 步骤 15 `verify_no_crash.py` / 步骤 16j `l2_verify_image_enhance_governance.py`）。下表其余条目为历史批次登记，对应脚本已随治理批次移除（备份 `bak/ai-test-refinement-20260830/`），留作场景口径参考；新 L2 脚本落位口径（族命名+白名单入库+双登记）见 [README 脚本族索引](../README.md)。
+
 | 步骤 | 脚本 | 说明 | 用法 |
 |------|------|------|------|
 | 1. 编译+安装+L1 | `quick_build_install.py` | 编译APK+启动MEmu+安装+L1验证 | `python ai_tests/scripts/quick_build_install.py` |
@@ -39,6 +41,7 @@
 | 16g. 播放器 UX 验证 | `l2_verify_video_ux_fixes.py` | 视频播放器五项 UX 修复 L2 | `python ai_tests/scripts/l2_verify_video_ux_fixes.py` |
 | 16h. 阅读页三个点弹层验证 | `l2_verify_read_menu_overflow.py` | 三点弹层 7 项动作（高亮规则/字符集/目录规则/EPUB×3/段落规则修正）存在性+位置+互斥不变量+点击进管理页（read-menu-highlight-entry-restore 新增）；辅助探针 `probe_shelf.py` 输出书架层级锚点 | `python ai_tests/scripts/l2_verify_read_menu_overflow.py` |
 | 16i. 书架层级探针 | `probe_shelf.py` | dump 书架文本/可点击节点（L2 脚本开书锚点修正前置探针） | `python ai_tests/scripts/probe_shelf.py` |
+| 16j. 画质增强治理 L2 | `l2_verify_image_enhance_governance.py` | T1 效果链正向 / T3 守卫反向自动断言（prefs 置数+重启+真实播放+logcat 断言 buildEffects/applyImageEnhanceEffects），T2/T4/T5/T7 输出真机手动清单（enhance-switch-governance-fix v2 新增，白名单固化入库） | `python ai_tests/scripts/l2_verify_image_enhance_governance.py` |
 
 ### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
 

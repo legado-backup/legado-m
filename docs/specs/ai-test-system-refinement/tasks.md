@@ -41,6 +41,7 @@
 - [x] 4.3 删除站点一次性脚本 11 个 ✅
 - [x] 4.4 删除重复版本链旧版 21 个 ✅（scripts/ 205→153）
 - [x] 4.5 引用复核 ✅（0 文件残留；components-capability-inventory.md 20 处文档残留引用清理：删 2 节+17 行+改写 2 行+计数修正 4 处）
+- [x] 4.6 目录口径收尾登记（2026-09-01，销总线 2.12）✅（scripts/ 后续治理已收敛至 3 个白名单固化脚本（l2_verify_precise_manage / verify_no_crash / l2_verify_image_enhance_governance，与 .gitignore 白名单精确对应）；**B2 L2 模板依赖的目录口径三层明确**：①落位 `ai_tests/scripts/`+族命名（`l2_verify_*`/`verify_*`）；②入库=.gitignore 默认忽略+白名单固化行；③登记=SOP 固定脚本表+README 脚本族索引双落点——README 补「目录口径」段（现状清单+白名单机制+落位指引）、SOP 补现状注记并补登 16j 画质增强治理脚本（0141ed69f 入库时漏登记））
 
 ## 5. 批次E 验证
 

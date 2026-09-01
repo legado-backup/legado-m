@@ -64,7 +64,7 @@
 
 - [ ] 6.1 B4-a 登记核对 6 项：B7（§B4-1）/B16（§B4-3）/C17（§B4-10）/E5（§B4-12）/D8（§B4-9）/B13 主题对齐（§B4-13）🔁
 - [ ] 6.2 B4-b 收口 5 项：B9 底栏裁决（§B4-2）→D3（§B4-6）→D5（§B4-7）→D7（§B4-8，经 ReadRss.readRss 上行链）→D2 压轴（§B4-5，宿主统一包裹 LegadoTheme）
-- [ ] 6.3 B4-c 迁移 4 项：B5/B14/B15 列表三连（§B4-4 共用模板）+C20 About 全新迁移（§B4-11，AnnotatedString）
+- [ ] 6.3 B4-c 迁移 4 项：B5/B14/B15 列表三连（§B4-4 共用模板；⚠️ B14 ExploreShow 列入顶栏 spec X2 互斥门禁，顶栏随整页迁移一次性收敛为 Compose，禁独立改动 View 顶栏，见 spec.md §X2）+C20 About 全新迁移（§B4-11，AnnotatedString）
 - [ ] 6.4 B4 特殊：B12 漫画壳层对齐 S5（§B4-13，内核零改动断言）
 
 ## 7. B5 收官（可执行清单=design-b4-b5-pages §B5）
