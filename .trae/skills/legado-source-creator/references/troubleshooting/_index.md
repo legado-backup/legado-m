@@ -60,11 +60,11 @@
 - **自进化写入规则**：当完成新的源修复案例或发现新的问题分类时追加
 
 ### video-source-traps.md
-> **一句话描述**：视频订阅源（type=2）特有陷阱，含URL转换/嗅探/播放页链路/导入验证/MacCMS解析
+> **一句话描述**：视频订阅源（type=2）特有陷阱，含URL转换/嗅探/播放页链路/导入验证/MacCMS解析/多线路多集
 
-- ✅ 包含：`##`字符串替换操作符（陷阱40）、ruleContent为空嗅探模式（陷阱41）、播放页链路验证（陷阱42）、导入源后字段验证（陷阱43）、视频播放URL转换完整链路（陷阱49）
+- ✅ 包含：`##`字符串替换操作符（陷阱40）、ruleContent为空嗅探模式（陷阱41）、播放页链路验证（陷阱42）、导入源后字段验证（陷阱43）、视频播放URL转换完整链路（陷阱49）、**MacCMS多线路多集免JS标准写法 routes 规范化+列表范式（陷阱60）**、**采集站UA限流列表只剩1条（陷阱61，header 配浏览器UA）**、**父分类无数据（陷阱62）**、**sortUrl {{page}} 双括号（陷阱63）**、**ruleLink 必须 ids= 参数（陷阱64）**
 - ❌ 不包含：JS语法错误（→ rhino-js-traps.md）、动态域名解析（→ dynamic-domain-traps.md）、源类型配置陷阱（→ source-type-traps.md）
-- **触发关键词**：视频源, type=2, ##, URL转换, 嗅探, ruleContent为空, 播放页, 列表链接, 详情页, 导入验证, DELETE+INSERT, WAL, MacCMS, player_data, m3u8, ExoPlayer
+- **触发关键词**：视频源, type=2, ##, URL转换, 嗅探, ruleContent为空, 播放页, 列表链接, 详情页, 导入验证, DELETE+INSERT, WAL, MacCMS, player_data, m3u8, ExoPlayer, 多线路, ruleRoutes, ruleEpisodes, routes, routeIndex, vod_play_url, vod_play_from, UA限流, 列表1条, 分页, 采集站
 - **自进化写入规则**：当发现新的视频订阅源特有陷阱或播放页解析问题时追加
 
 ### dynamic-domain-traps.md

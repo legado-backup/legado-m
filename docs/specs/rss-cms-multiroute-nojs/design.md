@@ -149,6 +149,51 @@ splitSourceRule(L538)
 
 落盘注意：规则文本中的 `\` 写入源 JSON 时一律双写（`\\$`）；换行用 JSON `\n` 转义；`{routeIndex}` 为占位符原样保留，不做 JSON 转义。
 
+### 2.5 E. 目标书源逐字段适配样例（MacCMS 聚合采集书源"资源采集" → 量子站订阅源）
+
+原书源每个规则在适配后的去向（原书源 = 用户提供的 MacCMS 聚合采集书源，13 资源站 loginUi 菜单切换）：
+
+| 原书源字段 | 原写法 | 适配后订阅源字段 | 适配说明 |
+|-----------|--------|----------------|---------|
+| exploreUrl | `@js:` 请求 API 拉 class 数组动态生成分类 | sortUrl | 静态枚举 `分类名::URL&&&…`（分类字段不走解析层，实施时请求真实 class 填入，AD-04） |
+| searchUrl | `{{getUrl(ziyuan,M("资源站"))}}/api.php/provide/vod?ac=detail&pg={{page}}&wd={{key}}` | searchUrl | 菜单选站 → 写死该站 API 域名，`{{page}}`/`{{key}}` 占位符保留 |
+| ruleSearch.bookUrl | `@js:baseUrl.replace(/&pg=.*/,'&ids={{$.vod_id}}')` | ruleSearch 对应字段（实施时核实 RssSource 搜索字段名） | **JS 改大括号模板**：`https://{站点A-API域名}/api.php/provide/vod?ac=detail&ids={{$.vod_id}}` 绝对 URL |
+| ruleSearch.name | `$.vod_name##\.mp4$` | ruleTitle | 原样复用（列表项与搜索项同构） |
+| ruleSearch.coverUrl / intro | `$.vod_pic` / `$.vod_content` | ruleImage / ruleDescription | 直接映射；列表项备注用 `$.vod_remarks` |
+| ruleToc.chapterList（约 40 行 JS：拆 `$$$`/`#`/`$` + 付费平台拼解析接口） | `@js:` 整段 | ruleRoutes + ruleEpisodes | **全部由规范化层 + 列表范式替代，零 JS**（见 §2.1/§2.2） |
+| ruleContent.content | `@js:` 网页嗅探（DPlayer `url:`/`main=` 正则）+ 附加 referer headers | ruleContent | **留空**，播放机制见下 |
+| ruleContent.subContent（弹幕拉取转换） | `@js:` dmku 接口弹幕转 XML | 不适配 | Out of Scope（本项目播放器弹幕体系独立，后续批次） |
+| loginUi（资源站/解析接口菜单） | `@js:` 生成 select 菜单 | 不适配 | 每站一源（AD-05） |
+
+**ruleContent 留空后的播放机制（嗅探职责转移）**：
+
+1. 多线路模式下 ruleContent 不参与——集数地址由 ruleEpisodes 直接给出进播放器；
+2. 地址为 m3u8/mp4 **直链**（MacCMS 采集站主流）→ 直接起播，无需嗅探；
+3. 地址为**网页型**（付费平台线路等）→ 播放器内置嗅探链（多路规则嗅探 + 降级链）兜底，职责上替代原书源 ruleContent 内的 `@js` 嗅探段——覆盖面差异需真机验证（任务 5.4，风险表已列）；
+4. 差异点：原书源为网页嗅探附加 referer headers，本项目 RssEpisode 暂无 headers 字段；MacCMS 采集站 m3u8 通常无 referer 校验，Drawbacks 已记录接受。
+
+**预计适配后订阅源写法（量子站，域名实施时替换真实值）**：
+
+```json
+{
+  "rssSourceUrl": "{站点A-API域名}",
+  "rssSourceName": "站点A采集",
+  "type": 2,
+  "sortUrl": "电影::https://{站点A-API域名}/api.php/provide/vod?ac=detail&pg={{page}}&t=1&&&剧集::…t=2&&&…",
+  "searchUrl": "https://{站点A-API域名}/api.php/provide/vod?ac=detail&pg={{page}}&wd={{key}}",
+  "ruleArticles": "$.list[*]",
+  "ruleTitle": "$.vod_name##\\.mp4$",
+  "ruleImage": "$.vod_pic",
+  "ruleDescription": "$.vod_remarks",
+  "ruleLink": "https://{站点A-API域名}/api.php/provide/vod?ac=detail&ids={{$.vod_id}}",
+  "ruleRoutes": "$.routes[*].name",
+  "ruleEpisodes": "$.routes[{routeIndex}].episodes",
+  "ruleContent": ""
+}
+```
+
+（实际字段名以 RssSource 实体为准，实施时对照；ruleRoutes/ruleEpisodes 的兜底写法见 §2.2 末尾。）
+
 ## 3. Architecture Decisions
 
 > Y-Statement 模板：Context / Concern / Decision / Goal / Tradeoff / Status
