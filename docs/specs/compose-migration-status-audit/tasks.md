@@ -42,7 +42,7 @@
 - [x] 4.1 AppPageSpacing token 落地（分册 §3 骨架，含与 AppListSpacing 边界注）+frontend-ui-standards 写入 ✅ 2026-09-01（`AppUiTokens.kt` 追加 `AppPageSpacing` 7 字段，与分册 §3.2 骨架逐字一致、append-only 不动存量；frontend-ui-standards §1.3.1 落档含 AppListSpacing 边界注（存量仅限列表场景、禁新代码扩散）；compileAppDebugKotlin BUILD SUCCESSFUL+daemon 清场；暂无消费方——4.2+ 样板页接入）
 - [x] 4.2 L2 脚本模板落地（分册 §4，logcat 采集带 -T 时间戳起点）+首批 7 脚本 ✅ 2026-09-01（复用层 `ai_tests/lib/compose_assert.py`（§4.2 函数库沉淀：connect 探针+uiautomator 残留清理/device_now→`logcat -d -T 'ts'` 起点/dump_bounds StaleObject 兜底/assert_window_single 弹框独立窗口/assert_bounds_moved/prefs_read 三态/run_steps 步骤注册表）+7 脚本 `ai_tests/scripts/l2_verify_compose_{s1_main,s2_source,s3_source_edit,s4_book_info,s5_read_float,s6_dialog_tiers,cache}.py`（检查点覆盖 S1-1/2/3/5、S2-1~8、S3-1~6、S4-1~4、S5-1~5、S6-1~4、7.11be 销项；S3 脚本标注依赖 4.3 接线）；质量=venv py_compile 8 文件全过+config 导入链冒烟 OK；落位口径总线 2.12 三层=族命名+.gitignore 白名单 7 行+SOP 表 16l~16r+README 族索引双登记；⚠️ 真机不执行归 4.4-4.7 冻结验收窗口，锚点真机校准点已逐处标注）
 - [ ] 4.3 C2 BookSourceEditActivity S3 接线收尾（未保存拦截/CodeView/KeyboardToolPop 真机）
-- [ ] 4.4 S1 MainActivity 冻结验收+回执
+- [ ] 4.4 S1 MainActivity 冻结验收+回执 **首轮实况（2026-09-01 包 090122）**：s1-1 底栏 4 tab 切换+渲染 ✅ / s1-3 压缩态证据 ✅ / s1-2 FAIL（书架数据不足 2 屏滚动位移=0，**数据依赖型**）/ s1-5 FAIL（书架配置入口锚点待 dump 校准，脚本已标注 probe_shelf.py）；FATAL 全零
 - [ ] 4.5 S2 BookSourceActivity 冻结验收（含 copy() 强跳过验收项）+回执
 - [ ] 4.6 S3 BookSourceEditActivity 冻结验收+回执
 - [ ] 4.7 S4 BookInfo 双栈分支各过+回执

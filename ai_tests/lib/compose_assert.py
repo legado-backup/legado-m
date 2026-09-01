@@ -203,13 +203,14 @@ def shot(d, name: str):
 
 
 def run_steps(steps: dict, scenario: str = "all", tag_keywords: list = None,
-              since_ts: str = None) -> bool:
-    """步骤注册表执行 + logcat 判定 + 汇总退出码（§4.1 main 骨架统一通道）"""
+              since_ts: str = None, ctx=None) -> bool:
+    """步骤注册表执行 + logcat 判定 + 汇总退出码（§4.1 main 骨架统一通道）
+    ctx=设备会话（uiautomator2 device），注入每个步骤函数首参 fn(ctx)"""
     results = {}
     for sid, fn in steps.items():
         if scenario in ("all", sid):
             try:
-                results[sid] = bool(fn())
+                results[sid] = bool(fn(ctx))
             except Exception as e:  # 单步异常不中断其余步骤
                 print(f"[EXC] {sid}: {type(e).__name__}")
                 results[sid] = False

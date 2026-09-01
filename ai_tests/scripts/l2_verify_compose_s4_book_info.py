@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_s4_book_info.py — S4 详情双栈（BookInfo）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s4_book_info.py [--scenario all]
@@ -143,7 +143,7 @@ def main():
         "s4-3": step_s4_3_old_stack_compat,
         "s4-4": step_s4_4_menu_sunken,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 

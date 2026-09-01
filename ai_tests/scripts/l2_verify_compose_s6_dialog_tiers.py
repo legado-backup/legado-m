@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """l2_verify_compose_s6_dialog_tiers.py — S6 弹窗族三层（L1/L2/L3 尺寸档）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s6_dialog_tiers.py [--scenario all]
@@ -147,7 +147,7 @@ def main():
         "s6-3": step_s6_3_l3_management,
         "s6-4": step_s6_4_window_invariant,
     }
-    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts)
+    all_pass = ca.run_steps(steps, args.scenario, tag_keywords=[], since_ts=since_ts, ctx=d)
     sys.exit(0 if all_pass else 1)
 
 
