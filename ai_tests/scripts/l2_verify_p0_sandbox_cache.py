@@ -316,8 +316,8 @@ def main():
     log(f"场景: {args.scenario} | 设备: {HOST} | 包: {PACKAGE}")
     log("=" * 60)
 
-    probe = sh("get-state", timeout=10)
-    if probe.returncode != 0:
+    probe = sh("echo", "device_ok", timeout=10)
+    if probe.returncode != 0 or b"device_ok" not in probe.stdout:
         log("❌ 设备不可连接（MEmu 未启动或 ADB 未就绪）")
         sys.exit(2)
     if not sh_su("id -u").stdout.strip().endswith(b"0"):
