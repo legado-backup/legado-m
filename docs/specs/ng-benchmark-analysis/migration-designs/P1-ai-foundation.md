@@ -136,6 +136,7 @@ graph TD
 - `data/dao/` 现有 AI DAO 6 个（AiAgentDao/AiMemoryDao/AiImageGroupDao/AiGeneratedImageDao/AiReadAloudRoleCacheDao/AiReadAloudUsageRecordDao）——**无聊天会话 DAO**，v109 需新建。
 - `help/ai/AiContextManager.kt:8-12` — 现聊天压缩：`CHARS_PER_TOKEN=3`、`RECENT_MESSAGE_COUNT=10`、`COMPRESS_TRIGGER_PERCENT=90`、`TARGET_PERCENT=35`；`:93-103` 估算=`ascii/4 + nonAscii + 1`（粗估）；`:105-124` 摘要=逐条 900 字符截断拼接（**无模型参与，纯本地**）。P1 不动（并存观察）。
 - `help/ai/AiChatService.kt` — `chat:96→chatStream:275`、`fetchModels:243`、`requestCompletionStream:622`；OpenAI 兼容直连+流式，**冻结不改**。
+  - **冻结语义澄清（C4 衔接，总线 3.2.3，2026-09-01）**：冻结 = 不修改既有方法（签名/实现/行为），**新增方法不受限**——C4 AI 净化及后续分期可在本类追加新方法，不触碰既有 `chat`/`chatStream`/`fetchModels` 等存量方法。
 - `AppConfig.kt:1284-1290` — `aiContextCompressionEnabled`（默认 false）/`aiContextWindowTokens`（默认 258_000，coerce 8k..2M）。
 - `help/ai/` 现有 35 文件（Glob 实测），无 `provider/`、无 `compress/` 子包——命名空间干净。
 
