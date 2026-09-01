@@ -60,17 +60,42 @@ AppLog.put("保存成功", toast = true)
 
 ## 模块 Tag 规范
 
-为便于 ai_tests 按模块过滤日志，AppLog 定义了 7 个模块 Tag 常量：
+> 登记规则（总线 X6，2026-09-01 快照）：本表按 `constant/AppLog.kt` TAG 常量**实际全集**登记（30 个），不锚定历史 26 TAG 基线；ng P1/P2 等分期新增 Tag 按落地顺序顺延，**新增/修改 TAG 时必须同步更新本表与下节 fromTag 映射**（对照流程：Grep `TAG_` 常量定义 + `putDebugWithTag` 调用点全集 + 字面量 tag）。
 
-| Tag 常量 | 值 | 覆盖模块 |
-|---------|-----|---------|
-| `TAG_WEB_BOOK` | `"WebBook"` | BookInfo / BookList / WebBook / BookContent / BookChapterList / SearchModel |
-| `TAG_ANALYZE` | `"AnalyzeRule"` | AnalyzeByJSonPath / AnalyzeRule / AnalyzeUrl / AnalyzeByJSoup / AnalyzeByXPath / AnalyzeByRegex |
-| `TAG_HTTP` | `"HttpHelper"` | HttpHelper / SSLHelper / OkHttpExceptionInterceptor / StrResponse / CookieStore |
-| `TAG_WEB_VIEW` | `"BackstageWebView"` | BackstageWebView |
-| `TAG_DATA` | `"DataLayer"` | data/ 下 DAO 及仓库类 |
-| `TAG_RSS` | `"Rss"` | Rss / RssParserByRule / RssSearchModel / CheckRssSource |
-| `TAG_CONTENT` | `"ContentProcess"` | ContentProcessor / BookHelp / BookContent |
+| Tag 常量 | 值 | 归属模块（C5 预登记） | 调用点状态 |
+|---------|-----|---------|------|
+| `TAG_WEB_BOOK` | `"WebBook"` | SOURCE_NETWORK | 在用（WebBook/BookList/BookInfo 等） |
+| `TAG_ANALYZE` | `"AnalyzeRule"` | SOURCE_NETWORK | 在用（AnalyzeByJSonPath/AnalyzeRule 等） |
+| `TAG_HTTP` | `"HttpHelper"` | SOURCE_NETWORK | 在用（AnalyzeUrl 等） |
+| `TAG_WEB_VIEW` | `"BackstageWebView"` | SOURCE_NETWORK | ⚠️ 死常量（0 调用点，BackstageWebView 类未打点） |
+| `TAG_DATA` | `"DataLayer"` | GENERAL | 在用（BookshelfFragment1/2） |
+| `TAG_RSS` | `"Rss"` | RSS | 在用（Rss/RssSearchModel/RssParserByRule/VideoPlay） |
+| `TAG_CONTENT` | `"ContentProcess"` | READING | 在用（BookHelp/ContentProcessor/Rss 正文） |
+| `TAG_SOURCE_MECHANISM` | `"SourceMechanism"` | SOURCE_NETWORK | 在用（SourceNetworkClient/SourceContentFilter 等 6 文件） |
+| `TAG_IMAGE_CANVAS` | `"ImageCanvas"` | IMAGE | 在用（ImageCanvasViewModel/Adapter/Gallery） |
+| `TAG_IMAGE_DETAIL` | `"ImageDetail"` | IMAGE | 在用（ImageDetailActivity/Adapter） |
+| `TAG_IMAGE_PLAY` | `"ImagePlay"` | IMAGE | 在用（ImagePlay.kt） |
+| `TAG_IMAGE_SNIFF` | `"ImageSniff"` | IMAGE | 在用（ImageUrlExtractor/ImageSnifferWebView） |
+| `TAG_CRYPTO_SCOPE` | `"CryptoScope"` | SOURCE_NETWORK | 在用（SharedJsScope B1） |
+| `TAG_DECOMPRESS` | `"Decompress"` | SOURCE_NETWORK | 在用（DecompressInterceptor B2） |
+| `TAG_NETWORK_LOG` | `"HttpLog"` | SOURCE_NETWORK | 在用（NetworkLog B4） |
+| `TAG_SEARCH_STORAGE` | `"SearchStorage"` | GENERAL | 在用（SearchBookDao B5） |
+| `TAG_BOOK_ORIGIN_MIGRATE` | `"BookOriginMigrate"` | SOURCE_NETWORK | 在用（BookSourceEditActivity B6） |
+| `TAG_SOURCE_RECYCLE_BIN` | `"SourceRecycleBin"` | SOURCE_NETWORK | 在用（SourceRecycleBinHelp B7） |
+| `TAG_SPECIAL_CONTENT` | `"SpecialContent"` | READING | 在用（ContentProcessor B8） |
+| `TAG_SHELF_PROGRESS` | `"ShelfProgress"` | READING | ⚠️ 死常量（0 调用点，B9 未打点） |
+| `TAG_MEMORY_PRESSURE` | `"MemoryPressure"` | PERFORMANCE | 在用（MemoryPressure B13） |
+| `TAG_CACHE_STATS` | `"CacheStats"` | PERFORMANCE | 在用（CacheManageViewModel B11） |
+| `TAG_CACHE_CONCURRENT` | `"CacheConcurrent"` | PERFORMANCE | 在用（ConcurrentRateLimiter B12） |
+| `TAG_WEBDAV_BACKUP` | `"WebDavBackup"` | GENERAL | 在用（AppWebDav 以字面量形式传参，值同常量） |
+| `TAG_HIGHLIGHT_STYLE` | `"HighlightStyle"` | READING | 在用（HighlightRuleMatcher/CssStyleParser B15） |
+| `TAG_THOUGHT_EXPORT` | `"ThoughtExport"` | READING | 在用（ThoughtObsidianExporter B16） |
+| `TAG_SOURCE_SANDBOX` | `"SourceSandbox"` | SOURCE_NETWORK | ⚠️ 死常量（0 调用点，ng P0-S1 沙箱未以该 Tag 打点） |
+| `TAG_SOURCE_DIALOG` | `"SourceDialog"` | SOURCE_NETWORK | 在用（JsExtensions P0-S3） |
+| `TAG_SOURCE_CACHE` | `"SourceCache"` | SOURCE_NETWORK | 在用（SourceHelp/BookSourceCacheStore P0-S2） |
+| `TAG_SOURCE_GUARD` | `"SourceGuard"` | SOURCE_NETWORK | 在用（BookSourceGuardLog P0-S4） |
+
+统计：30 常量 = SOURCE_NETWORK 14 / READING 5 / IMAGE 4 / PERFORMANCE 3 / GENERAL 3 / RSS 1；死常量 3（TAG_WEB_VIEW / TAG_SHELF_PROGRESS / TAG_SOURCE_SANDBOX，保留待后续分期接线，不删除）。
 
 ai_tests 可通过 `adb logcat -s WebBook:E AnalyzeRule:E` 精确过滤模块日志；文件日志可按 Tag grep 定位模块。
 
@@ -136,3 +161,37 @@ AppLog.putDebugWithTag(AppLog.TAG_HTTP, "请求路径=/path/{id} code=${response
 - cookie/token/key/secret 隐藏为 `***`
 - 源名称不记录，只记源 ID 编号
 - 日志消息格式：操作描述 + 关键参数（脱敏后）
+- **app.log 持久化门禁（C5 R4 预固化）**：C5 实施后 `AppLog.put` 系与 `putDebugWithTag` 将落盘 `filesDir/app.log`（重启可恢复、可复制外传），脱敏从"建议"升级为 persist 前置门禁——未经上述脱敏的消息禁止进入持久化路径；data URI 仍由 `truncateSafely` 专项截断；L2 测试断言 app.log 无 `cookie=`/data URI 全文/完整 URL 模式。
+
+## 用户日志模块归属规范（C5 双层架构·预登记）
+
+> 权威设计：`docs/specs/legadoc-benchmark-analysis/migration-designs/C5-logging-engineering.md`（§3.2 双层架构 / §4.1 LogModule / §7 规范提升点 1）。本节为其实施级**预登记**（2026-09-01，对应总线 tasks 2.8/X6）：`constant/LogModule.kt` 尚未实施（C5 分册 P1 登记为独立批次），实施时**照本节登记表执行**，并以 `LogModuleFromTagTest` 全量断言守护。
+
+### 双层架构（共存不冲突三铁律）
+
+1. **AI 层输出通道不变**：TAG 常量 → `LogUtils.d` + `Log.e(logcat)` 的采集链路是 ai_tests 契约（`adb logcat -s <TAG>:E`），C5 不触碰任何 tag 透传逻辑；勾选体系只作用于用户可见视图，与 logcat 采集正交。
+2. **用户层归属自动兜底**：`AppLog.put/putError/putWarn/putInfo` 不要求调用方传模块，`classify(调用方类名)` 自动归属，未匹配归 GENERAL——存量调用点零改动。
+3. **AI 埋点显式映射**：`putDebugWithTag` 走 `LogModule.fromTag(tag)` 显式映射表（即上节"归属模块"列），映射 miss 时 fallback `callerModule()`，不丢日志。
+
+### classify 三原则（legadoC LogModule.kt 纪律沉淀）
+
+1. **单点归类**：模块归属只在 `LogModule.classify` 单点判定，调用方零打标。
+2. **钉定表防双命中**：跨关键词组双命中类（如 `textfile$JsExtensions` 同含 tts/source 词根）必须进 `pinnedByClassPrefix` 显式钉定表，**禁止靠 when 分支顺序裁决**；双命中类实施前经归属表驱动单测全量断言。
+3. **未匹配归兜底**：classify 未命中一律归 GENERAL，保证不丢日志、不需逐调用点改写。
+
+### fromTag 映射表登记与新增 Tag 规则（X6）
+
+- 映射全集 = 上节 30 TAG 常量表（快照 2026-09-01）；**不锚定 26 TAG 历史基线**（分册头注总线修订 2026-08-31）。
+- 新增/修改 TAG（ng P1/P2 等）按落地顺序顺延，同一次提交内同步：AppLog 常量 → 本文档两表 → fromTag 代码分支 → LogModuleFromTagTest 断言。
+- 死常量（TAG_WEB_VIEW/TAG_SHELF_PROGRESS/TAG_SOURCE_SANDBOX）保留登记不删除，接线时直接按本表归属模块实现。
+
+### 字面量 tag 调用点现状（实施时收编清单）
+
+| 字面量值 | 调用点 | 与常量关系 | 实施建议 |
+|---------|--------|-----------|---------|
+| `"WebDavBackup"` | AppWebDav.kt（3 处） | = `TAG_WEBDAV_BACKUP` 值 | 收编为常量引用 |
+| `"DeviceInfo"` | DeviceInfoHelper.kt（2 处，ExoPlayer 播放域） | 无常量 | 新增 TAG 常量并归 VIDEO（顺延登记本表） |
+| `"RssSourceEdit"` | RssSourceEditViewModel.kt（1 处） | 无常量 | 新增 TAG 常量并归 RSS（顺延登记本表） |
+| `"CrashReport"` | MainActivity.kt（1 处，崩溃上报） | 无常量 | 新增 TAG 常量并归 GENERAL（顺延登记本表） |
+
+> 未收编前这些字面量在 fromTag 中 miss → `callerModule()` 兜底，行为可接受；C5 实施批次按上表顺延收编。
