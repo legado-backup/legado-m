@@ -186,7 +186,7 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
 
 > **目录口径（2026-09-01 核定，总线 2.12 产出，B2 L2 模板脚本落位依据）**：
 > 1. **落位**：测试辅助/L2 验证脚本统一落 `ai_tests/scripts/`，按族前缀命名（下表）。
-> 2. **入库**：`.gitignore` 对 `/ai_tests/scripts/*.py` **默认全部忽略**，仅白名单（`!` 行）固化脚本入库——脚本固化为长期资产时必须同步加白名单行。**当前白名单 4 个（与磁盘现存精确一致）**：`l2_verify_precise_manage.py`（精准管理 L2）/ `verify_no_crash.py`（双包无崩溃）/ `l2_verify_image_enhance_governance.py`（画质增强治理 L2）/ `l2_verify_p0_sandbox_cache.py`（P0 书源沙箱+缓存命名空间 L2，ng-p0-source-security-impl）。
+> 2. **入库**：`.gitignore` 对 `/ai_tests/scripts/*.py` **默认全部忽略**，仅白名单（`!` 行）固化脚本入库——脚本固化为长期资产时必须同步加白名单行。**当前白名单 4 个（与磁盘现存精确一致）**：`l2_verify_precise_manage.py`（精准管理 L2）/ `verify_no_crash.py`（双包无崩溃）/ `l2_verify_image_enhance_governance.py`（画质增强治理 L2）/ `l2_verify_p0_sandbox_cache.py`（P0 书源沙箱+缓存命名空间 L2，ng-p0-source-security-impl）。**B2 增补（2026-09-01，compose-migration-status-audit 4.2）**：白名单+7=11 个，新增 `l2_verify_compose_s1_main.py`/`l2_verify_compose_s2_source.py`/`l2_verify_compose_s3_source_edit.py`/`l2_verify_compose_s4_book_info.py`/`l2_verify_compose_s5_read_float.py`/`l2_verify_compose_s6_dialog_tiers.py`/`l2_verify_compose_cache.py`（Compose 迁移 L2，复用层 `ai_tests/lib/compose_assert.py`，logcat -T 时间戳起点；真机执行归冻结验收 4.4-4.7 窗口）。
 > 3. **登记**：新脚本必须登记 [SOP 固定脚本表](./docs/fixed_test_workflow.md)（SOP 自身维护规则强制），本节族口径随治理状态更新。
 > 4. **历史**：治理前 205 个平铺脚本已分批收敛（52 个删于 2026-08-30 ai-test-system-refinement，备份 `bak/ai-test-refinement-20260830/`；其余随后续治理批次移除），下表族前缀为**前瞻口径**，现存实例以上述白名单为准。
 
@@ -194,7 +194,7 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
 
 | 族 | 前缀 | 用途 |
 |------|------|------|
-| L2 验证族 | `l2_verify_*` | 功能点 L2 真机验证（视频/订阅/主题/高亮/文件夹等） |
+| L2 验证族 | `l2_verify_*` | 功能点 L2 真机验证（视频/订阅/主题/高亮/文件夹等）；Compose 迁移系列 `l2_verify_compose_*` 7 脚本（B2 样板冻结 4.2 落盘，复用层 `lib/compose_assert.py`，logcat -T 时间戳起点） |
 | 模式切换验证族 | `verify_*` | 用户场景回归验证（模式切换/会话重置/无崩溃/嗅探回归等） |
 | 导航辅助族 | `nav_*` / `goto_*` | 脱敏导航到目标页面（只输出编号不输出名称） |
 | 诊断族 | `diag_*` | 诊断辅助（已于 2026-08-30 ai-test-system-refinement 治理中清理，备份 `bak/ai-test-refinement-20260830/`） |

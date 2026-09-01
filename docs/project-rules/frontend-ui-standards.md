@@ -32,6 +32,24 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 - 全局字号刻度基线 `text_14sp`（`res/values/dimens.xml`）；Compose 正文统一 `MaterialTheme.typography.bodyMedium`（14sp，对齐 `text_14sp`），由主题统一管理，禁止页面内散落魔数字号。
 - 顶部栏常用高度：`bookshelf_title_select_height` 42dp、`top_bar_regular_action_size`（现代形态动作按钮）、`bookshelf_tag_bar_height` 38dp。
 
+#### 1.3.1 页面级 spacing token（`AppPageSpacing`，B2 冻结 2026-08-30 设计/2026-09-01 落地）
+
+- 定义位置：`io.legado.app.ui.widget.compose.AppUiTokens.kt#AppPageSpacing`，全部取值落在 **4dp grid 整格**。
+- 存量 `AppListSpacing`（6/8/12）保留不动：6dp 为**登记豁免半格，仅限列表场景继续使用，禁止新代码扩散**。
+- Token 清单（取值冻结，修改需走检查点审查，治理级别等同 `AppShapes`）：
+
+| Token | 取值 | 用途 | 样板落点 |
+|---|---|---|---|
+| `PageHorizontal` | 16dp | 页面左右安全边距（对齐 M3 常规） | S1~S6 全部页面根容器 |
+| `PageTop` | 8dp | 顶栏下内容起始间距 | S2/S3/S4 |
+| `SectionGap` | 16dp | 区块与区块之间（表单分组间） | S3 分组、S4 信息区 |
+| `CardGap` | 12dp | 卡片与卡片之间 | S2 网格、S4 卡片列 |
+| `ItemGapInline` | 8dp | 行内元素间（图标-文字） | 全部 |
+| `ListBottom` | 24dp | 滚动列表尾部留白（无底栏页） | S2/S3 |
+| `NavBridgeBottom` | 88dp | 列表尾部 FAB+导航桥接避让 | S1 书架、S2 |
+
+- 落地规则：①B2 起新迁移页面 spacing 一律引用 `AppPageSpacing`，禁止页面内 `16.dp` 等魔数（`Modifier.padding` 字面量 grep 纳入 B5 巡检项）；②豁免登记：阅读器正文内核（红线）、WebView 页内样式、第三方 LyricViewX 不适用本 token。
+
 ### 1.4 颜色与主题
 - **三套主题概念分工（勿混）**：`LegadoTheme`（Compose 主题）/ `ThemeSpec`（可配置主题规格）/ `TopBarConfig`（顶栏管理专属配置）。
 - 满足用户的"顶栏管理设色→主界面所有头部生效"，遵循本批 ③ 的 **局部读配色** 范式：`MainTopBarView` 天然读 `TopBarConfig`；传统 `TitleBar` 如需读顶栏配色，置 `app:topBarColorManaged="true"` 并实现 `refreshTopBarAppearance()`（影响面收窄到主界面头部，保留内联搜索/动态菜单）。
@@ -96,6 +114,8 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 - [ ] 弹层用 `ComposeDialog` 家族，不新建 View 弹框
 - [ ] 样式中是否用了 `TopBarConfig`/`ThemeSpec` 而非硬编码 `MaterialTheme` 取色
 - [ ] Compose 代码：状态管理/重组/Modifier 符合 `compose-ui-engineering` skill
+- [ ] **源码核验已做**（skill 必读源码段）：设计 Token 源码 + 选中组件封装函数体 + 相邻实现已核对，未凭函数名/文档猜测行为
+- [ ] **扫描验证已做**（skill 交付纪律）：新增 `Color(/.dp/.sp/RoundedCornerShape(` 与基础布局 import 已逐项对照 Token 表与组件目录，命中数与处置已记入实施回执
 - [ ] Compose 列表开关/勾选：数据对象用 `copy(...)` 新实例更新，**无原地修改字段后回流**（§4 红线 5，强跳过引用比较会吞重组）
 - [ ] 改动后按 AGENTS.md「AI 自动端到端测试」真机/模拟器验证，禁止只改不测
 
