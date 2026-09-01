@@ -53,7 +53,7 @@
 - [x] 2.3 C0-F2 章节列表并发去重 ✅（提交 02059eb9f：去重壳+LAZY async+23 字段回填（Book.kt 23/23 核对全存在）+book.copy 隔离；编译门禁过）
 - [x] 2.4 C0-F4 exploreKinds 多因素缓存键 ✅（提交 5f4fd7a1c：双层键含 lastHost（DR-C0-4）+isValidExploreKindsRule 三处加固；与 ng P0 脚本缓存命名空间不同文件正交已实证）
 - [x] 2.5 C0-F5 WebViewHtmlStore 大 HTML 落盘 ✅（提交 5f4fd7a1c：新文件+BottomWebViewDialog 四点改造，V3-12 偏离设计规避 StrictMode；C0 分册五项 F1-F5 全部落地）
-- [ ] 2.6 compose B0 继承收口 + 真机合并窗口（子任务账本=compose tasks §2 + deep-fix tasks §4/§5 双引用，X13 以 deep-fix 为权威账本）
+- [ ] 2.6 compose B0 继承收口 + 真机合并窗口 **进展（2026-09-01 真机窗口第 1 轮，包 3.26.090115）**：✅ 2.6.2 logcat 残留=0（verify_no_crash 两轮重启 FATAL/RT/CC 全零 PASS；源码 android.util.Log 零残留；⚠️ 发现并行会话 TopBarDebug 调试日志在 MainTopBarView 未清——移交并行会话）；✅ P0 L2（新脚本 l2_verify_p0_sandbox_cache 首跑：S2 缓存命名空间+S1 沙箱环境就绪双 PASS，开关生效+DB 前缀基线+FATAL=0；T11-T14/T22 手动触发清单已输出）；🟡 2.6.1 R3 继承项：视频手势回归场景 A（灵敏度）/C（P5 全屏）PASS+六项错误全零，**场景 B 亮度手势模拟器像素判定失灵（prefs_ok=True 逻辑层通）→ 真机 MI 9 手动复验**；订阅切换专项 verify_rss_mode_switch 脚本失配（modernRssPage 键读不到，疑似并行 rss-cms 改订阅形态存储）→ **移交并行会话收口后复跑**；🟡 2.6.3 light-theme S1-S9=视觉判定型，手动走查清单已盘点（S1/S2 可后续仿亮度差模板补自动化）；video-sniff 1.11 S6 复跑待订阅切换脚本修复后同跑 | **剩余**：2.6.1 B 场景真机复验/2.6.4 registry 销项（待全部场景闭合）/2.13.2 L3 书源基线
   - [ ] 2.6.1 订阅切换专项/视频手势回归/G1-G11 回归（deep-fix R3 继承项）
   - [ ] 2.6.2 logcat 残留=0 + compose spec 检查点 3 + B10 CacheActivity 真机回归
   - [ ] 2.6.3 同包合并走查：light-theme S1-S9 九场景 + video-sniff 1.11/2.9 待真机项（一次打包覆盖，R8；video-sniff 项未就绪则拆包先行，其项由 W4 走查兜底）
