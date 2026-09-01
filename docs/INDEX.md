@@ -214,7 +214,7 @@
 | [read-menu-highlight-entry-restore](./specs/read-menu-highlight-entry-restore/README.md) | ✅ | 阅读页三个点菜单补回漏挂动作项 6 项+修正段落规则 EPUB 误显示（Compose 迁移漏译修复） |
 | [reader-overlay-compose](./specs/reader-overlay-compose/README.md) | 🔄 | 阅读器浮层 Compose 化（S5 骨架：菜单层+浮层壳核分离，正文零改动） |
 | [rss-classic-layout-align](./specs/rss-classic-layout-align/README.md) | ✅ | 经典订阅布局管理与书架对齐修复（margin/排序/书名/弹框等 7 项实锤） |
-| [rss-cms-multiroute-nojs](./specs/rss-cms-multiroute-nojs/README.md) | 🔄 | 视频订阅源多线路多集零JS解析增强（CMS分隔格式解析层原生支持+{routeIndex}正则选线路+大括号模板）+MacCMS聚合采集书源转化 |
+| [rss-cms-multiroute-nojs](./specs/rss-cms-multiroute-nojs/README.md) | ✅ | 视频订阅源多线路多集零JS解析增强（CMS分隔格式解析层原生支持+列表范式对齐书源目录+大括号模板上下文修复）+MacCMS聚合采集书源转化 |
 | [rss-folder-cover-dialog-align](./specs/rss-folder-cover-dialog-align/README.md) | ✅ | 订阅文件夹封面弹框对齐书架（标准弹框+预览+恢复默认） |
 | [rss-folder-subtag-fix](./specs/rss-folder-subtag-fix/README.md) | 🔄 | 订阅文件夹样式点进文件夹头部误显标签/箭头修复 |
 | [rss-image-load-optimization](./specs/rss-image-load-optimization/README.md) | 🔄 | 图片订阅源加载优化（参考书源：URL 缓存+采样解码+并发预下载） |

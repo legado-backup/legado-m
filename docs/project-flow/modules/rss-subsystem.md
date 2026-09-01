@@ -165,6 +165,16 @@ getContent(scope, rssArticle, ruleContent, rssSource)
     └── analyzeRule.getString(ruleContent)                — 执行规则提取
 ```
 
+### 多线路多集（type=2 视频源，rss-cms-multiroute-nojs）
+
+`type=2 且 ruleRoutes/ruleEpisodes 非空`时走多线路按需采集模式（ruleContent 不参与）：
+
+- **数据规范化**：`Rss.normalizeMacCmsBody(body)` 在 `setContent` 前调用——检测 MacCMS 扁平字段（`vod_play_from`/`vod_play_url` 含 `$$$`）时在响应 JSON **顶层增量注入** `routes: [{name, episodes:[{title,url}]}]`（原字段不动、非 JSON/无特征/routes 已存在时零侵入），调用点 2 处（`getRoutesContentAwait`/`getEpisodesAwait`）
+- **规则写法（列表范式，与书源目录同构）**：`ruleRoutes: $.routes[*].name`、`ruleEpisodes: $.routes[{routeIndex}].episodes`（`{routeIndex}` 占位符先替换再解析，对五种模式透明）
+- **ruleRoutes 采集**：`getStringList` 优先（结果逐项按 `\n` 展开兼容旧 replaceRegex 转行产物），空则回落 `getString`+`\n` 分割（旧写法 `$.list[0].vod_play_from##\$\$\$##\n`）
+- **集数解析**（`parseEpisodesResult`）：JSON 数组 `[{"title","url"}]`/`["url"]` → 多线路串兜底（含 `$$$` 时按 routeIndex 隐式分组，越界回落首组记 WARN）→ CMS 段解析（`parseEpisodesByLines`：行含 `$` 按 `#` 分集、`$` limit=2 拆名/址，缺名补"第N集"；纯 URL 行兼容不变）
+- **切换线路**：`getEpisodesAwait`（VideoPlay.switchToRoute）重新请求详情+按 routeIndex 取对应线路集数
+
 ### 登录检测
 
 [loginCheckJs](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/model/rss/Rss.kt#L53) 用于检测 RSS 源是否失效/需登录：

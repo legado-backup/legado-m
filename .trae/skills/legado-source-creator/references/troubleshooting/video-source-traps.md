@@ -83,3 +83,58 @@ Legado 规则引擎支持 `##` 操作符对提取的字符串进行替换，语�
 **完整链路**：列表页 → ruleLink 转换URL → 播放页 → ruleContent="" 嗅探 → m3u8 播放
 
 **经验来源**：`[经验来源:URL转换范式]`
+
+## 陷阱60: MacCMS 多线路多集免 JS 标准写法（routes 规范化 + 列表范式）
+
+MacCMS 采集站多线路多集是扁平编码字符串（`$$$` 分线路、`#` 分集、`$` 分名址），**解析层自动规范化**——源规则零 JS：
+
+```json
+{
+  "type": 2,
+  "ruleArticles": "$.list[*]",
+  "ruleTitle": "$.vod_name##\\.mp4$",
+  "ruleImage": "$.vod_pic",
+  "ruleLink": "https://{API域名}/api.php/provide/vod?ac=detail&ids={{$.vod_id}}",
+  "ruleRoutes": "$.routes[*].name",
+  "ruleEpisodes": "$.routes[{routeIndex}].episodes",
+  "ruleContent": ""
+}
+```
+
+**要点**：
+1. `{{$.vod_id}}` 大括号模板拼详情**绝对 URL**（相对路径会被 isUrl 拼接出错误地址）
+2. `{routeIndex}` 占位符（0-based）切线路时注入，对五种解析模式透明
+3. ruleContent 留空走多线路模式（集数地址由 ruleEpisodes 直出）
+4. 兜底旧写法仍可用：`$.list[0].vod_play_url`（隐式 `$$$` 分组）或 `##\$\$\$##\n` replaceRegex 转行
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱61: 采集站 UA 限流——列表只剩 1 条数据 ⚠️ 高频
+
+**现象**：列表只有 1 条、分页消失；logcat `bodyLen=2226`（正常应几十~几百 KB）；本机/模拟器 curl 同 URL 却正常（305KB）。
+**根因**：采集站 CDN/WAF 按客户端指纹（应用默认 UA）返回受限响应。
+**修复**：源 `header` 配浏览器 UA：
+```json
+"header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\"}"
+```
+**验证**：logcat `RSS自定义规则解析完成 文章数=20`（≥10 正常；=1 即命中）。
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱62: MacCMS 父分类（type_pid=0）无数据
+
+sortUrl 枚举一级分类（电影/连续剧等 type_pid=0）时，列表响应仅 81 字节（`list:[]`）——实际内容在**子分类**。生成 sortUrl 前先 `GET /api.php/provide/vod` 看 class 数组的 type_pid，只枚举子分类；同时按内容政策过滤不合适分类。
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱63: sortUrl 页码占位符必须 `{{page}}` 双括号
+
+单括号 `{page}` 不被 AnalyzeUrl 替换，原样发出导致站点 System Error（HTML 响应，列表空）。分类分隔符用 `&&&`（解析已修复 `&&` 优先级残留 `&` 问题），名址用 `::`。
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
+
+## 陷阱64: ruleLink 详情链接必须用 `ids=` 参数
+
+`?ac=detail&ids={vod_id}` 才是单条详情；直接用列表页 URL 当详情会因 normalize 只取 list[0] 而**张冠李戴**（点 A 影片出 B 影片）。同时列表页响应与详情响应字段有差异（列表项可能缺 vod_content 等），详情数据以 ids 响应为准。
+
+**经验来源**：`[经验来源:rss-cms-multiroute-nojs 2026-09-01]`
