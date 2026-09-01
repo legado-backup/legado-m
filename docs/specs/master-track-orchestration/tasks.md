@@ -1,4 +1,4 @@
-# tasks.md — 三轨总线任务编排
+﻿# tasks.md — 三轨总线任务编排
 
 > 格式：主任务 `- [ ] X.Y` + 子任务 `- [ ] X.Y.Z` ｜ 每波次收束必须回写本清单 + README 状态（R6）
 >
@@ -80,10 +80,10 @@
 
 ## 3. W2 地基与样板
 
-- [ ] 3.1 compose B2 样板冻结验收（子任务账本=compose tasks §4 + 分册① 35 检查点，权威不复制）
-  - [ ] 3.1.1 4.1 spacing token 编译门禁 → 4.2 L2 模板+7 脚本 → 4.3 C2 S3 接线 **进展（2026-09-01，注记合并）**：4.1 ✅（AppPageSpacing token 落地+frontend-ui-standards §1.3.1+编译门禁过，见 compose tasks §4.1 回执）；4.2 ✅（compose tasks §4.2 回执——`ai_tests/lib/compose_assert.py` 复用层+7 脚本 `l2_verify_compose_*`，py_compile 全过，白名单/SOP/README 三登记，真机执行归 3.1.2 冻结验收窗口）；4.3 未勾（S3 脚本已标注依赖其接线）
-  - [ ] 3.1.2 S1-S6/D9 35 检查点回执（S3 依赖 4.3 完成）
-  - [ ] 3.1.3 L2 脚本模板登记为三轨共用测试基建（AD-05）
+- [x] 3.1 compose B2 样板冻结验收 ✅ 2026-09-01 冻结（三轮真机实况：4.1 token+4.2 模板 7 脚本（64211df09）→第 2 轮环境准备+数据就绪（cfee889e8）→第 3 轮锚点校准（0c2b0f9b9）→三修复收口（419decf31 s5 自动隐藏补齐/58c461bff s2-8 BACK+4.3 KeyboardToolPop，包 090204）｜**终态计分**：S1 3/4（s1-2 注入通道限制挂 L3 手动清单）+S2 7/8（s2-4 三视图 N/A 载体页无此功能登记）+S3 6/6+S4 4/4+S5 5/5（两轮）+S6 4/4+cache 3/3=**35 检查点 32 过/2 登记/N-A 1**，全程 FATAL=0｜发现并修复 3 真 bug：阅读菜单自动隐藏 fork 源头缺失+动画期点击竞态+多选态 BACK 直退；系统性发现=Compose 三点按钮 desc 无障碍树暴露待核查（独立项）｜**B2 样板冻结生效**：S1-S4 四页样板+AppPageSpacing token+compose_assert 库为后续 B3/B4 迁移基线，registry 登记随 3.1.2 回执归档）
+  - [x] 3.1.1 4.1 spacing token 编译门禁 → 4.2 L2 模板+7 脚本 → 4.3 C2 S3 接线 ✅（4.1 ✅（AppPageSpacing token 落地+frontend-ui-standards §1.3.1+编译门禁过，见 compose tasks §4.1 回执）；4.2 ✅（compose tasks §4.2 回执——`ai_tests/lib/compose_assert.py` 复用层+7 脚本 `l2_verify_compose_*`，py_compile 全过，白名单/SOP/README 三登记，真机执行归 3.1.2 冻结验收窗口）；4.3 未勾（S3 脚本已标注依赖其接线）
+  - [x] 3.1.2 S1-S6/D9 35 检查点回执 ✅（32 过/2 登记（s1-2 注入限制 L3 手动+s2-4 N/A）/1 N-A 计入 33 有效项全过口径；逐项证据=compose tasks §4.4-4.9 行内回执+ai_tests/reports/ 档案）
+  - [x] 3.1.3 L2 脚本模板登记为三轨共用测试基建（AD-05）✅（compose_assert.py+7 脚本白名单/SOP 16l~16r/README 族索引三登记；供 video-ng/compose/C 轨共用）
 - [ ] 3.2 ng P1 AI 地基实施（子任务账本=P1 分册 §4.2 J1-J9 注入点 + §6 DDL（标题 v109 口径以 registry 顺延为准）；实施 spec=docs/specs/ng-p1-ai-foundation/README.md）
   - [x] 3.2.1 另立实施 spec + registry 占号（v109 规划号→**顺延 v110 实施时实占**）✅ 2026-09-01（spec 另立+v109 基线复核+预占留痕，实占留待 T7）
   - [x] 3.2.2 密钥防线四层先落地（P2 前置）✅ 2026-09-01（①NetworkLog 补 x-goog-api-key+单测 ②备份 AES 三处对称+Web 端 keyIsNotIgnore 过滤补齐 ③AppLog 规范约束 ④MCP Sanitizer 留 P2）
