@@ -92,9 +92,9 @@
   - [ ] 3.3.1 OQ-2 旧键裁决（READ_ALOUD_PROGRESS 保留给 P3 接入或删除）+ 声明禁止 P3 复活旧键
   - [ ] 3.3.2 引擎发布层/显示跟随/绘制期投影三步实施（ReadAloudPositionUpdate 五字段不扩）
   - [ ] 3.3.3 OQ-11 off-by-one 对照表产出（P3 rebase 依赖，X4）
-- [ ] 3.4 cache-entry-relocate 收口（B2 样板冻结前；cache-entry 先行→B4-c 瘦身 About，反序重复劳动）
+- [x] 3.4 cache-entry-relocate 收口（B2 样板冻结前；cache-entry 先行→B4-c 瘦身 About，反序重复劳动）✅ 2026-09-01（代码实施核实已随 e706bae53 全量入库：6 文件与 design 表逐项一致+strings 5 key 双语言到位+Grep 复核路由/诊断方法零残留；spec tasks 2.1-2.8+3.1-3.3+3.7 勾选，3.4-3.6 模拟器 L2 挂总线 2.6.2 真机窗口；updateLog L193-195 已登记；收口零代码改动未触发编译门禁；B4-c 瘦身 About 前置解除）
 - [ ] 3.5 fix-rss-search-scope + rss-folder-subtag-fix 收口（B3 Rss 域动工前置）
-- [ ] 3.6 thread-pool-audit 与 video-sniff 线程钳制定稿（W2 内首项，防回退 Phase0 钳制；非波次进入条件）
+- [x] 3.6 thread-pool-audit 与 video-sniff 线程钳制定稿（W2 内首项，防回退 Phase0 钳制；非波次进入条件）✅（2026-09-01 纯文档定稿，零代码改动：**①钳制终值确认**（代码实测六点全就位，与 merger-ruling F4/F5/F6 一致）——R-P0-3 AppConfig updateCacheThreadCount coerceIn(1,256)（:2884）+UI max=256（OtherConfigFragment:460），searchThreadCount coerceIn(1,128)（:2877）+UI max=128（:448）；R-P0-4 WebViewPool coerceAtMost(15)（:61）；R-P0-5 CacheBookService minOf(…,128)（:46）+ **ImageCanvasViewModel minOf 双处（:87/:126）已实施**（merger-ruling C4 留核项就此闭合）；R-P0-6 ConnectionPool(128,5,MINUTES)（HttpHelper:102）；**②文档归一**=thread-pool-audit spec.md 三处落盘（头部"线程钳制定稿"注记块=权威值清单+防回退声明+偏差登记；R1.3/Scenario 3 基线 50→128 注记，merger-ruling §五注记清单 thread-pool-audit 两行就此执行完毕）；**③防回退声明**=Phase0 钳制（R-P0-3~6）禁止回退至 64/50/无钳制旧值，重审以权威值为唯一输入基线；**④附带偏差登记**=thread-pool-audit 清单 #5/#6 MainViewModel upTocPool 线程数来源实为 AppConfig.threadCount（默认 16，setter 无 coerceIn）+min(…,MAX_THREAD=9) 兜底（MainViewModel.kt:56-58），非 updateCacheThreadCount，归 thread-pool-split-config 校正；updateLog 不追加（无用户可见行为变化），编译门禁不触发（零代码））
 - [ ] 3.7 ng P2 实施 spec 前置登记（X3/X14）
   - [ ] 3.7.1 登记 MCP 工具对 C0-F4 改造后 exploreKinds 行为的依赖
   - [ ] 3.7.2 MCP 触发源 JS 安全盲区裁决：显式挂 SourceInteractionPolicy 或登记二期（用户裁决项；ng P4 AI 应用层二期的暂缓清单落点）
