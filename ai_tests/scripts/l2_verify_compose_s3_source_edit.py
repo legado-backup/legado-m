@@ -186,7 +186,10 @@ def step_s3_4_keyboard_tool(d) -> bool:
         return False
     time.sleep(1.0)
     xml = d.dump_hierarchy()
-    tool_cnt = len(re.findall(r'<node[^>]*(?:content-desc="(?:撤销|恢复|undo|redo|教程)"|text="(?:撤销|恢复|教程)")', xml))
+    # B2 第 4 轮锚点校准（090204 探针实证）：KeyboardToolPop 三 header 实锚=text 符号
+    # ❓(教程)/↩️(撤销)/↪️(重做)，无 content-desc、无中文词——原"撤销/恢复/教程"锚点
+    # 自脚本落盘起从未匹配过（与 4.3 接线无关的第二重 FAIL 因素）；中文词分支保留兼容
+    tool_cnt = len(re.findall(r'<node[^>]*(?:content-desc|text)="(?:❓|↩\uFE0F?|↪\uFE0F?|撤销|恢复|undo|redo|教程)"', xml))
     ca.shot(d, "l2_s3_s4_toolpop")
     # 不发 BACK 收键盘（B2 第 3 轮实证：编辑页无返回拦截，BACK=直接退页污染后续步骤；
     # 键盘/工具条由下一步守卫与盲点 Done 自愈）
