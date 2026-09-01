@@ -22,20 +22,15 @@
 
 - [x] 3.1 编译前基于 git diff 更新 app/src/main/assets/updateLog.md ✅ 2026-08-28（08/28 块首追加订阅搜索范围优化条目，日期头唯一）
 - [x] 3.2 编译通过 ✅ 2026-08-28（build-legado.bat 测试包 BUILD SUCCESSFUL 6m18s，APK legado_miss_app_3.26.082813.apk 已归档 output\apk\test\；启动前 Get-CimInstance 校验发现 Gradle/Kotlin daemon 残留已先 stop-daemons.bat 清理，构建后 bat 内置清场）
-- [ ] 3.3 模拟器真机验证（测试包 io.legado.miss.app.debug）：
-  - ① 文件夹视图进分组→搜索结果仅该分组内源
-  - ② 类型视图进类型文件夹/胶囊→搜索结果仅该类型源
-  - ③ 进"未分组"→仅未分组源
-  - ④ 根目录"全部"→全局搜索不变
-  - ⑤ 搜索页顶部范围显示为友好文案（非原始 token），手动切换范围能力仍可用
-- [ ] 3.4 回归验证：现代形态源内搜索（RssFragment:897）不变、设置页订阅源搜索入口（MySettingsData:283）全局不变、书源搜索（SearchScope）不受影响
-- [ ] 3.5 Grep 确认无 android.util.Log 调试日志残留、无临时注释代码
+- [x] 3.3 模拟器真机验证（测试包 io.legado.miss.app.debug）✅ 2026-09-02（MEmu 127.0.0.1:21503 包 3.26.090204；脚本 `l2_verify_rss_search_scope.py`；数据=合成源 6 个（127.0.0.1:18093 本地 RSS feed+adb reverse，testdata/rss_search_scope_test.json）+真实源测试期禁用（验证后已恢复 enabled=1）；判定通道 A=appLog"启动RSS搜索 源数量=N"（RssSearchModel INFO 落盘），通道 B=结果页合成标题前缀集合；**①分组范围 PASS**：进"娱乐"文件夹→搜索→源数量=1+仅 SC- 前缀；**②类型范围 PASS**：类型胶囊"图片"→@type:1→源数量=1+仅 SB-；**③未分组范围 PASS**：进"未分组"文件夹→@no_group→源数量=1+仅 SG-；**④根目录全部 PASS**：源数量=6（6 源并发 12 篇合并）；**⑤范围显示+手动切换 PASS**：搜索页更多菜单 dump 证据=当前组名/网页/图片/视频友好文案+零 token 泄漏（@type:/@no_group 原文未出现），点击"全部书源"→重搜源数量=6；附加核实=receiptIntent 显式 save=false，浏览上下文范围不持久化污染 AppConfig.rssSearchScope）
+- [x] 3.4 回归验证 ✅ 2026-09-02（脚本 `l2_verify_rss_search_regression.py`：**①现代形态源内搜索 PASS**——modernRssPage=true 选源→顶栏搜索→范围=source.sourceGroup（"科技"组）→源数量=2，RssFragment openRssSearch 分组传参不变；**②设置页订阅源全局搜索入口 PASS**（MySettingsData:286）→scope=null 全局→源数量=6；**③书源搜索 PASS**——SearchActivity（书源 SearchScope）搜"回归样本读物"合成书锚点命中 5 处，B2 书源链路不受影响）
+- [x] 3.5 Grep 确认无 android.util.Log 调试日志残留、无临时注释代码 ✅ 2026-09-02（改动文件 RssSearchScope.kt/RssFragment.kt/RssSourceDao.kt 全零命中；全库命中 12 文件均为既有基础设施 import，非本次改动引入）
 
 ## 4. 文档同步与收尾
 
-- [ ] 4.1 tasks.md 全部标记完成级别；真机问题记录到 issues-found 与项目记忆
-- [ ] 4.2 文档同步：docs/INDEX.md 状态更新；docs/project-flow/task-navigation.md 若模块锚点有变则更新；docs/project-flow/modules/ 订阅搜索相关文档核对
-- [ ] 4.3 🛑 提交用户最终验收（检查点 3），验收后 README.md 状态改"✅ 已完成"
+- [x] 4.1 tasks.md 全部标记完成级别；真机问题记录到 issues-found 与项目记忆 ✅ 2026-09-02（本 tasks 1-4 全勾；观察项（非阻塞）登记 issues-found：搜索页同关键词菜单切换范围时 stateLiveData observer 与 reSearchIfNeeded 双触发重搜（searchId 相差 ~5ms，第二次取消第一次，最终结果正确）——属 rss-unified-search 既有逻辑非本 spec 范围，留给 B3 Rss 域动工时顺带核查；项目记忆由总线收口回执统一落）
+- [x] 4.2 文档同步：docs/INDEX.md 状态更新；docs/project-flow/task-navigation.md 若模块锚点有变则更新；docs/project-flow/modules/ 订阅搜索相关文档核对 ✅ 2026-09-02（INDEX 两 spec 状态已更新为已完成（3.3 验收门留用户）；task-navigation 模块锚点无变化（未动文件路径/类名）；新增验证脚本已双登记 SOP 脚本表+README 脚本族索引）
+- [ ] 4.3 🛑 提交用户最终验收（检查点 3），验收后 README.md 状态改"✅ 已完成"（2026-09-02 收口注记：代码+真机验证+文档同步全部就绪，仅剩此用户验收门）
 
 ## AOAdapt 日志
 

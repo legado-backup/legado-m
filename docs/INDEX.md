@@ -176,6 +176,7 @@
 | [enhance-switch-governance-fix](./specs/enhance-switch-governance-fix/README.md) | 🔄 | 画质增强治理修复（总开关失灵/预设脱节/无长度响应 OOM/滑条帧级开销） |
 | [cache-toggle-rename-rss-all-label](./specs/cache-toggle-rename-rss-all-label/README.md) | ✅ | 文案调整：视频缓存开关改名「播放时缓存」+订阅「全部」分组标签缩短 |
 | [compose-migration-status-audit](./specs/compose-migration-status-audit/README.md) | 🔄 | 前端 Compose 化进度全景审计+推进设计（页级 69 类总表+B0-B5 批次+4 实施级分册，5 轮交叉审核 ACCEPT-WITH-NOTES，设计完成待实施） |
+| [compose-skill-audit-upgrade](./specs/compose-skill-audit-upgrade/README.md) | ✅ | Compose Skill 对标 APC 增强（资料优先级声明+开工声明+必读源码+选用阶梯+扫描验证+交付纪律+audit 审查矩阵+Preview 规则，红队审查 3E+7W 全修闭环） |
 | [config-needs-restart-fix](./specs/config-needs-restart-fix/README.md) | ✅ | 配置修改需重启生效统一修复（订阅顶栏残留+书架布局不生效）+视效对齐 archive |
 | [cookie-management-fix](./specs/cookie-management-fix/README.md) | ✅ | Cookie 管理链路修复（WebView/CookieStore/OkHttp 同步断裂 6 问题） |
 | [cronet-global-enable-20260731](./specs/cronet-global-enable-20260731/README.md) | 🔄 | Cronet 默认自动启用与扩展使用方案（P0 全局启用已落地） |
@@ -186,7 +187,7 @@
 | [download-manager-optimize](./specs/download-manager-optimize/README.md) | ✅ | 下载管理深度优化（P1 正确性+引擎健壮性+IDM 动态分段引擎） |
 | [exoplayer-resilience](./specs/exoplayer-resilience/README.md) | ✅ | ExoPlayer 韧性优化（MimeSniffer 识别链+WebView 降级两层防护） |
 | [fix-highlight-rule-toggle-refresh](./specs/fix-highlight-rule-toggle-refresh/README.md) | ✅ | 高亮规则管理页复选框切换不即时刷新修复（Compose 跳过引用比较） |
-| [fix-rss-search-scope](./specs/fix-rss-search-scope/README.md) | 🔄 | 订阅搜索范围上下文修复（分组/标签/类型内搜索按上下文收窄） |
+| [fix-rss-search-scope](./specs/fix-rss-search-scope/README.md) | 🔄 | 订阅搜索范围上下文修复（分组/标签/类型内搜索按上下文收窄；2026-09-02 真机验证 3.3 五场景+3.4 三回归全 PASS+文档同步完成，仅剩 4.3 用户验收门） |
 | [folder-cover-ratio-archive-align](./specs/folder-cover-ratio-archive-align/README.md) | 🔄 | 文件夹封面比例对齐 Archive（0.7→0.75 消除拉长失真） |
 | [folder-cover-replace-bugfix](./specs/folder-cover-replace-bugfix/README.md) | ✅ | 书架/订阅文件夹自定义封面替换失效回归修复 |
 | [folder-view-welcome-refactor](./specs/folder-view-welcome-refactor/README.md) | ✅ | 书源/订阅源文件夹视图重构+欢迎页增强+前端样式审计 |
@@ -216,7 +217,7 @@
 | [rss-classic-layout-align](./specs/rss-classic-layout-align/README.md) | ✅ | 经典订阅布局管理与书架对齐修复（margin/排序/书名/弹框等 7 项实锤） |
 | [rss-cms-multiroute-nojs](./specs/rss-cms-multiroute-nojs/README.md) | ✅ | 视频订阅源多线路多集零JS解析增强（CMS分隔格式解析层原生支持+列表范式对齐书源目录+大括号模板上下文修复）+MacCMS聚合采集书源转化 |
 | [rss-folder-cover-dialog-align](./specs/rss-folder-cover-dialog-align/README.md) | ✅ | 订阅文件夹封面弹框对齐书架（标准弹框+预览+恢复默认） |
-| [rss-folder-subtag-fix](./specs/rss-folder-subtag-fix/README.md) | 🔄 | 订阅文件夹样式点进文件夹头部误显标签/箭头修复 |
+| [rss-folder-subtag-fix](./specs/rss-folder-subtag-fix/README.md) | ✅ | 订阅文件夹样式点进文件夹头部误显标签/箭头修复（isTagMode 守卫；2026-09-02 真机走查 3.2/3.3/3.4 三项全 PASS 收口） |
 | [rss-image-load-optimization](./specs/rss-image-load-optimization/README.md) | 🔄 | 图片订阅源加载优化（参考书源：URL 缓存+采样解码+并发预下载） |
 | [rss-video-player-enhancement](./specs/rss-video-player-enhancement/README.md) | 🔄 | 订阅源视频播放器增强（多集选择/调试日志/自动抓取 R1-R5） |
 | [sniff-migration-booksource](./specs/sniff-migration-booksource/README.md) | ✅ | 嗅探与滑动切换能力迁移至书源（图片/视频嗅探+上下滑动切换） |
