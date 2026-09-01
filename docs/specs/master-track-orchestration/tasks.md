@@ -72,8 +72,8 @@
   - [x] 2.11.2 产出合并裁决单（保留哪套开关/文档归一），纯文档不动码 ✅（产出=merger-ruling-network.md；七条裁决 R1-R7：R1 开关双逻辑以 video-sniff 4.8c/design Z7+F-07 为唯一权威——isCronet 默认 false 仅控爬取链路 OkHttp builder 装配（其内自动熔断），视频链路 cronetDataFactory 无条件装配不受控，两逻辑独立不联动；R2 cronet-global-enable REQ-01 冻结待裁决（未实施+与已固化口径冲突，重新评审前禁止实施引用，其 tasks 勾选不动）；R3 降级机制归一为 CronetInterceptor 实测口径（阈值5+启动宽限300ms+half-open 探测5min/连续2次成功+震荡抑制15min+HTTP/2 降级1min+证书错误独立去重）；R4 连接池权威值 128（演进链 默认5→C3 50→R-P0-6 128）；R5 Cronet 版本以 gradle.properties 实时值为权威（当前 500.0.1，文档禁硬编码历史快照）；R6 线程钳制定稿边界归总线 3.6 不越界；R7 P2-3 协程拦截器保留待评估；§五=各 spec 归一注记落点清单 8 条（本裁决不改其 tasks 勾选）；零代码改动）
 - [x] 2.12 ai-test-system-refinement scripts 批先行 ✅（2026-09-01 销项：子任务账本=该 spec tasks 五批次全勾且已提交 ee13b2f75；scripts 批=批次 D（删 52+引用复核）+批次 E pytest 295×2 全绿，无遗留实施项；**B2 L2 模板依赖的目录口径已明确（三层）**：①落位 `ai_tests/scripts/` 命名族 `l2_verify_*`/`verify_*`；②入库=.gitignore 默认忽略+白名单固化行（现存 3 白名单脚本与磁盘精确一致，清单已落 README）；③登记=SOP 固定脚本表+README 脚本族索引双落点（SOP 补现状注记+补登 16j 画质增强脚本）。细节登记=该 spec tasks 4.6 | **W2 进入条件之一已满足**）
 - [ ] 2.13 P0 文档澄清补注 + P0×C0 合并回归
-  - [ ] 2.13.1 ng P0 分册 NetworkLog"零修改"补注"将由 ng P1 补敏感头，本期限于零语义变更"（X14）
-  - [ ] 2.13.2 ng P0×C0 合并跑一轮 L3 书源基线回归（X8）
+  - [x] 2.13.1 ng P0 分册 NetworkLog"零修改"补注"将由 ng P1 补敏感头，本期限于零语义变更"（X14）✅（a35ed638d）
+  - [ ] 2.13.2 ng P0×C0 合并跑一轮 L3 书源基线回归（X8）**进展（2026-09-01 真机窗口）**：🟡 部分——①单测层 243 全绿（b652fb1af，含 C0-F1 快照化守护+P0 21 用例）②真机 L1 两轮重启崩溃全零（b5a0df088）③真实书详情链路核心断言 PASS（book is null 弹框未出现+阅读/删除入口 OK——C0-F1 规则解析真实链路通）④订阅源搜索 L3 受阻：090115 包含并行 rss-cms 未提交 RssFragment 半成品（订阅页搜索锚点 SearchView 失配，与 verify_rss_mode_switch 失配同源）→ **完整 L3 复跑与 2.6.1 订阅切换专项同一等待条件（并行收口后同包复跑）**；verify_book_info_no_null 更多菜单段脚本自身 TypeError（tap_center 缺参）已登记脚本修复项
 - [x] 2.14 subpage-topbar-unify × compose B4 待迁页互斥声明（X2）✅ 2026-09-01
   - [x] 2.14.1 对照 B4 待迁页名单（B5/B14/B15/D2/D3/D5/D7）与顶栏 spec 页名单求交集 —— 交集={B14 ExploreShowActivity}（唯一命中：顶栏批次 C 4.2 `activity_explore_show`；易混淆项已核验排除——顶栏 4.6 `activity_source_debug`=BookSourceDebugActivity ≠ D3 RssSourceDebug，顶栏 2.2 `activity_rss_source`=管理列表页 ≠ D2 编辑页）
   - [x] 2.14.2 交集中的页面登记"禁止先换 View 顶栏再整页 Compose"，写入两 spec 门禁 —— B14 门禁声明已写入两 spec.md §X2 + 两 tasks.md 对应行加注（含实况注记：顶栏 4.2 替换已先期完成，收敛口径=B14 整页迁移时顶栏一次性收敛为 Compose，禁回退双栈）
