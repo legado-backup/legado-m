@@ -12,7 +12,7 @@
 
 每步对应固定脚本（位于 `ai_tests/scripts/`）：
 
-> **现状注记（2026-09-01，总线 2.12 目录口径核定）**：`.gitignore` 对 `ai_tests/scripts/*.py` 默认忽略、仅白名单固化脚本入库；当前目录**仅存 3 个白名单固化脚本**（步骤 3c `l2_verify_precise_manage.py` / 步骤 15 `verify_no_crash.py` / 步骤 16j `l2_verify_image_enhance_governance.py`）。下表其余条目为历史批次登记，对应脚本已随治理批次移除（备份 `bak/ai-test-refinement-20260830/`），留作场景口径参考；新 L2 脚本落位口径（族命名+白名单入库+双登记）见 [README 脚本族索引](../README.md)。
+> **现状注记（2026-09-01，总线 2.12 目录口径核定）**：`.gitignore` 对 `ai_tests/scripts/*.py` 默认忽略、仅白名单固化脚本入库；当前目录**仅存 3 个白名单固化脚本**（步骤 3c `l2_verify_precise_manage.py` / 步骤 15 `verify_no_crash.py` / 步骤 16j `l2_verify_image_enhance_governance.py`）。下表其余条目为历史批次登记，对应脚本已随治理批次移除（备份 `bak/ai-test-refinement-20260830/`），留作场景口径参考；新 L2 脚本落位口径（族命名+白名单入库+双登记）见 [README 脚本族索引](../README.md)。**B2 增补（2026-09-01，compose-migration-status-audit 4.2）**：+7 白名单固化脚本（本表 16l~16r，`l2_verify_compose_*` 系，复用层 `ai_tests/lib/compose_assert.py`；真机执行归冻结验收 4.4-4.7）。
 
 | 步骤 | 脚本 | 说明 | 用法 |
 |------|------|------|------|
@@ -43,6 +43,13 @@
 | 16i. 书架层级探针 | `probe_shelf.py` | dump 书架文本/可点击节点（L2 脚本开书锚点修正前置探针） | `python ai_tests/scripts/probe_shelf.py` |
 | 16j. 画质增强治理 L2 | `l2_verify_image_enhance_governance.py` | T1 效果链正向 / T3 守卫反向自动断言（prefs 置数+重启+真实播放+logcat 断言 buildEffects/applyImageEnhanceEffects），T2/T4/T5/T7 输出真机手动清单（enhance-switch-governance-fix v2 新增，白名单固化入库） | `python ai_tests/scripts/l2_verify_image_enhance_governance.py` |
 | 16k. P0 沙箱/缓存命名空间 L2 | `l2_verify_p0_sandbox_cache.py` | P0 书源安全 S1 文件沙箱/S2 缓存命名空间环境就绪断言（T11-T14+T22 可验证子集）：prefs 写开关（bookSourceCacheScoped/bookSourceFileSandbox）+重启回读、caches 表 `book_source_cache_%` 前缀基线计数（三件套拉库本地查）、externalCache/source/ hex64 目录基线校验、FATAL=0；T11-T14/T22 触发项与 T14 删源清理输出手动清单（ng-p0-source-security-impl 新增，白名单固化入库，总线 2.12 落位口径） | `python ai_tests/scripts/l2_verify_p0_sandbox_cache.py [--scenario cache\|sandbox\|both]` |
+| 16l. Compose S1 主框架 L2 | `l2_verify_compose_s1_main.py` | 底栏接线/双击回顶/顶栏压缩/书架配置即时生效（S1-1/2/3/5；compose-migration-status-audit B2 模板，复用层 `lib/compose_assert.py`，logcat -T 时间戳起点防历史污染） | `python ai_tests/scripts/l2_verify_compose_s1_main.py [--scenario all]` |
+| 16m. Compose S2 管理列表 L2 | `l2_verify_compose_s2_source.py` | 滑选多选/拖拽排序/批量操作/三视图/排序选项/搜索筛选/菜单族/返回层级（S2-1~8；全程脱敏只输出计数/布尔/hash） | `python ai_tests/scripts/l2_verify_compose_s2_source.py [--scenario all]` |
+| 16n. Compose S3 表单编辑器 L2 | `l2_verify_compose_s3_source_edit.py` | 6 Tab 遍历/未保存拦截/CodeView 全屏（CodeEditActivity 类名断言）/KeyboardToolPop/规则补全/保存校验（S3-1~6；⚠️ 依赖 tasks 4.3 C2 接线完成） | `python ai_tests/scripts/l2_verify_compose_s3_source_edit.py [--scenario all]` |
+| 16o. Compose S4 详情双栈 L2 | `l2_verify_compose_s4_book_info.py` | 双栈分派栈顶类名断言/新栈核心锚点/旧栈 book is null 回归/菜单下沉（S4-1~4；verify_book_info_no_null 口径） | `python ai_tests/scripts/l2_verify_compose_s4_book_info.py [--scenario all]` |
+| 16p. Compose S5 阅读浮层 L2 | `l2_verify_compose_s5_read_float.py` | 3s 自动隐藏/单一 activeSheet/BackHandler 优先级链/手势 R0-R4/磨砂 API31 分支（S5-1~5；R3 双指缩放=手动清单） | `python ai_tests/scripts/l2_verify_compose_s5_read_float.py [--scenario all]` |
+| 16q. Compose S6 弹窗族 L2 | `l2_verify_compose_s6_dialog_tiers.py` | L1 Confirm/L2 Form/L3 Management 三宽度档断言+弹框独立窗口不变量（S6-1~4；dp=px/density cap 容差 8dp） | `python ai_tests/scripts/l2_verify_compose_s6_dialog_tiers.py [--scenario all]` |
+| 16r. Compose 缓存清理页 L2 | `l2_verify_compose_cache.py` | CacheScreen 可达（CacheActivity 类名）/Compose 渲染锚点/无崩溃退出（registry 7.11be 销项） | `python ai_tests/scripts/l2_verify_compose_cache.py [--scenario all]` |
 
 ### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
 
