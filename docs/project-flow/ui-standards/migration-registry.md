@@ -159,3 +159,14 @@
 | **遮罩白字豁免（登记）** | `BookshelfScreen.kt` 书名遮罩（showBookname==2）+ ShelfStatusBadge 角标白字 | 对齐 archive 纯白字叠印/白字角标，属 color.md「中性灰浮层/遮罩」语义豁免（Color.White 仅用于深底遮罩/角标上前景，非页面级取色） | [x] ✅ 已登记 |
 | 范围外遗留（登记不处置） | `BookshelfItems.kt` GeneratedCover（MaterialTheme.primary/onPrimary） | 非本次改动文件，后续同型归位批次处理 | [ ] 登记 |
 | 真机 L2 场景 A-F | 订阅 modern→classic 顶栏 / 书架配置即时生效 / K7 迁移 | 用户裁决延后，归 R2 复测 | [ ] 待测 |
+
+## 六.4 弹框迁移收官批 F 登记（dialog-migration-final-batch-f，2026-09-01）
+
+> deep-fix 弹框迁移收官批 4 处；样板 = `SourcePickerDialog`（ComposeDialogFragment + AppDialogFrame + LegadoTheme + DisposeOnViewTreeLifecycleDestroyed），标准件 = `ui/widget/compose/ComposeDialogAdapters.kt`。守门原则：等价迁移 > 登记保留。
+
+| 处 | 文件 | 处置 | 状态 |
+|----|------|------|------|
+| F1 | `ui/book/read/ReadBookActivity.kt` 书库云端章节选择（原 showLibraryCloudChapterDialog/createLibraryCloudChapterRow/libraryCloudActionText 约 130 行 View 代码） | AlertDialog+LinearLayout 动态章节行 → 新 `LibraryCloudChapterDialog`（ComposeDialogFragment + AppDialogFrame scrollContent=false + LazyColumn heightIn(max=420.dp)，分组头+行卡片：标题/时间/整行与「读取」=读取回调、「删除」=删除回调）；删除确认仍走 showComposeTextInputDialog，调用点改 showDialogFragment 标准 API，回调行为等价 | [x] ✅ 已完成（compileAppDebugKotlin 通过 2026-09-01） |
+| F2 | `ui/book/read/config/PageKeyDialog.kt` | ComponentDialog+ComposeView 换壳 ComposeDialogFragment + AppDialogFrame（Confirm 档）；硬件翻页键拦截由 Compose onPreviewKeyEvent 承担（字段聚焦 ⟺ 原 dialog onKeyDown focusedField≠None，语义等价，BACK/DEL 仍走系统路径）；调用点 BaseReadBookActivity/MoreConfigDialog 改 showDialogFragment 标准 API | [x] ✅ 已完成（compileAppDebugKotlin 通过 2026-09-01） |
+| F3 | `ui/main/explore/ExploreFragment.kt` showDiscoverKindsDialog（发现 Kind 选择） | **登记保留**：非「标题+动态 Kind 列表+点击回调」简单结构——5 种 Kind 控件（url/button/toggle/select/text）均经 SourceLoginJsExtensions 执行源 JS 并以 reUiView 回调直接引用 ItemFindBookBinding 重渲染 flexbox，叠加 SwipeRefreshLayout/RotateLoading/自定义窗口尺寸与 View 强耦合；等价迁移需整体重写源 JS 交互协议，风险大于收益 | [ ] 保留（专项重写需连 SourceLogin JS 扩展交互契约一并设计，建议单开专项） |
+| F4 | `ui/book/read/SelectionWebSearchDialog.kt`（626 行，划词搜索） | **登记保留**：BottomSheet 主体为 WebView 承载——WebViewPool 池化复用 + hideCss 注入（JS/HTML 双通道）+ shouldInterceptRequest 重写主文档 + BottomSheetBehavior.isDraggable 与 WebView canScrollVertically/触摸事件联动 + 返回键 WebView 历史栈；引擎 chip 列表仅一排小件，部分迁移收益极低且 AndroidView 桥接引入新风险 | [ ] 保留（专项重写建议：整体重设计为 Compose 壳 + AndroidView 包 WebView，先固化「sheet 拖拽 ↔ WebView 滚动」联动契约再动壳；编辑入口 SelectionSearchEngineManageDialog 已是 ComposeDialogFragment 无需再动） |
