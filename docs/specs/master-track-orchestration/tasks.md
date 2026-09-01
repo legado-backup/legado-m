@@ -1,4 +1,4 @@
-﻿# tasks.md — 三轨总线任务编排
+# tasks.md — 三轨总线任务编排
 
 > 格式：主任务 `- [ ] X.Y` + 子任务 `- [ ] X.Y.Z` ｜ 每波次收束必须回写本清单 + README 状态（R6）
 >
@@ -101,7 +101,7 @@
 
 - [ ] 4.1 compose B3-D4 Rss 列表旗舰（子任务账本=分册② 12 场景+五代 Adapter 收敛设计）
   - [x] 4.1.1 RssFragment 四波排序列队登记 ✅ 2026-09-01（S批✅→scope fix ✅ 3.5 收口 722e95583→tag-mode ✅（tag-mode-unify 代码域完成）→A8（D4 本体，前置全解除）；Rss 域工作区已清空（并行会话收口 4c9b331af）；**D4 分批计划**：批1 组件层新包 ui/rss/article/compose（§2 state holder+三形态+Cover+边界态，纯新增）→批2 宿主接线（§3.4 双模式分派+§5 RssSortActivity）→批3 五代 Adapter 删除（§6）+12 场景 L2（§8））
-  - [ ] 4.1.2 D4 实施 + 12 场景 L2 全过（**批 1 组件层 ✅ 2026-09-02**：新包 ui/rss/article/compose 6 文件纯新增（§2 枚举/state holder/Screen/三形态 ArticleItem/Cover+宽高比缓存/footer 空态骨架），compileAppDebugKotlin BUILD SUCCESSFUL+daemon 清场；⚠️ glide-compose beta08 两处失实实证（GlideImage 无 onResourceReady+传递 glide 5.0.5 与项目 4.16.0 版本对抗）→ CustomTarget 桥替代零依赖变更，L1 复用 EmptyStatePlaceholder/Shelf 骨架；扫描 Color(/.sp/RoundedCornerShape(=0、.dp=6 全登记；回执全文=compose tasks §5.1.a；批 2 宿主接线+批 3 Adapter 删除+12 场景 L2 未动）
+  - [ ] 4.1.2 D4 实施 + 12 场景 L2 全过（**批 1 组件层 ✅ 2026-09-02**：新包 ui/rss/article/compose 6 文件纯新增（§2 枚举/state holder/Screen/三形态 ArticleItem/Cover+宽高比缓存/footer 空态骨架），compileAppDebugKotlin BUILD SUCCESSFUL+daemon 清场；⚠️ glide-compose beta08 两处失实实证（GlideImage 无 onResourceReady+传递 glide 5.0.5 与项目 4.16.0 版本对抗）→ CustomTarget 桥替代零依赖变更，L1 复用 EmptyStatePlaceholder/Shelf 骨架；扫描 Color(/.sp/RoundedCornerShape(=0、.dp=6 全登记；回执全文=compose tasks §5.1.a；批 2 宿主接线+批 3 Adapter 删除+12 场景 L2 未动；**批 2 宿主接线 ✅ 2026-09-02**：§3.4 双模式分派+§5 RssSortActivity 全 Compose 落地（改动 11 文件：新 RssArticleListBridge/RssSortScreen+壳瘦身 RssArticlesFragment+RssSortActivity ViewPager 家族退役+VM StateFlow（§3.1 uiState/articlesFlow.debounce+§5.2 articleStyleFlow）+fragment 布局缩壳 ComposeView；RssFragment 零改动除 gotoTop 走 scrollToTop 新 API；compileAppDebugKotlin BUILD SUCCESSFUL+stop-daemons 清场；勘误=RssFavoritesFragment 复用 fragment_rss_articles 布局为分册漏项→独立 fragment_rss_favorites.xml 零行为变化；灰度=五代 Adapter 保留未删但分派已切新组件、无 feature flag；扫描 Color(/.sp/RoundedCornerShape(=0、.dp=4 全登记；Level 1 代码完成，真机/L2 归批 3；回执=compose tasks §5.1.b（物理行序在 5.1.a 之前，内容互不影响）；批 3 五代 Adapter 删除+12 场景 L2 未动）
   - [ ] 4.1.3 A8 回归清单含 video-sniff Phase0 padding 改动项
 - [ ] 4.2 compose B3 其余 9 页（A7→A8→B2→B8→B11→C3→C13→D1→E2，子任务账本=分册③；A7=ExploreFragment classic 收敛（compose tasks §5.2），产出为 B-C3 前置基线，X9；**E2 裁决**：保持 W3 实施不破轨 A 禁跳批，其 ThemeSpecPresets 产物纳入 6.1.3 P5 截图回归面兜底，X1）
 - [ ] 4.3 ng P2 MCP 服务端实施（子任务账本=P2 分册 70 工具规格表（V6 增补后）+四模块拆分）
