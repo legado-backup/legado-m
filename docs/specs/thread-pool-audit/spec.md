@@ -1,5 +1,17 @@
 # 需求规格 - 线程池配置全面审查
 
+> **线程钳制定稿（总线 master-track-orchestration tasks 3.6，2026-09-01，随 merger-ruling-network 裁决 R6 边界落盘）**
+>
+> 1. **权威钳制值**（代码实测锚点，与 video-sniff R-P0-3~6 实施事实/merger-ruling F4/F5/F6 一致）：
+>    - `searchThreadCount` 默认 32 + `coerceIn(1, 128)`（AppConfig.kt:2877）｜UI max=128（OtherConfigFragment.kt:448）
+>    - `updateCacheThreadCount` 默认 16 + `coerceIn(1, 256)`（AppConfig.kt:2884）｜UI max=256（OtherConfigFragment.kt:460）
+>    - WebViewPool `coerceAtMost(15)`（WebViewPool.kt:61）
+>    - CacheBookService `minOf(…, 128)`（CacheBookService.kt:46）
+>    - ImageCanvasViewModel `minOf(…, 128)` 双处（ImageCanvasViewModel.kt:87/:126，裁决单 C4 留核项已确认实施）
+>    - OkHttp `ConnectionPool(128, 5, TimeUnit.MINUTES)`（HttpHelper.kt:102）
+> 2. **防回退声明**：video-sniff Phase0 钳制（R-P0-3~6）为已定稿实施事实，任何后续重构/审查/优化任务**禁止回退**至旧值（64/50/无钳制）；本 spec 为审查型框架，重审时以上述权威值为唯一输入基线。
+> 3. **审查基线偏差登记**：本 spec 清单 #5/#6（MainViewModel upTocPool）线程数来源实为 `AppConfig.threadCount`（默认 16，setter 无 coerceIn）+ `min(…, AppConst.MAX_THREAD=9)` 兜底（MainViewModel.kt:56-58），**非** updateCacheThreadCount——归 thread-pool-split-config 实施时校正，不属本定稿范围。
+
 ## Intent（意图）
 
 全面审查项目中所有线程池配置的合理性，识别资源浪费、泄漏风险、性能瓶颈，提出优化建议。
@@ -79,6 +91,7 @@
 - **R1.1** 列出所有 `FixedThreadPool` 创建点（8 个），记录：文件位置、行号、线程数来源、用途、关闭时机
 - **R1.2** 列出 `Dispatchers.IO` 的所有使用点（20+ 处），按业务场景归类（搜索、缓存、校验、网络、其他）
 - **R1.3** 记录 OkHttp 连接池配置：`ConnectionPool(50, 5, MINUTES)` 的位置、参数含义、与其他网络组件的协同关系
+  > 📌 定稿注记（总线 3.6 / merger-ruling 裁决 R4）：基线数字已演进——现状 `ConnectionPool(128, 5, TimeUnit.MINUTES)`（HttpHelper.kt:102，video-sniff R-P0-6 覆盖），重审时以 128 为输入；本条 50 为时点快照。
 - **R1.4** 记录 `globalExecutor`（`ExecutorService.kt:6`）的类型（`newSingleThreadExecutor`）、用途、生命周期
 - **R1.5** 记录 `DispatchersMonitor` 的触发条件（`recordLog = true`）、监控开销、对主链路的影响
 
@@ -139,6 +152,8 @@
 4. 输出 `Dispatchers.IO` 使用清单与优化建议
 
 ### Scenario 3: 审查 OkHttp 连接池配置
+
+> 📌 定稿注记（总线 3.6 / merger-ruling 裁决 R4）：本场景基线数字 50 已陈旧，现状 = 128（HttpHelper.kt:102，video-sniff R-P0-6）；空闲连接数与线程池总量的匹配度讨论按 128 重估；50→128 演进链见 merger-ruling-network.md §四 R4。
 
 1. 定位 `ConnectionPool(50, 5, MINUTES)` 配置点（`HttpHelper.kt:101`）
 2. 评估参数合理性：
