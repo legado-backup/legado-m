@@ -78,9 +78,11 @@ def build_server_dir(root: Path) -> Path:
             for j in range(1, N_CHAPTER + 1))
         (root / f"toc{i}.html").write_text(f"<html><body>{chs}</body></html>", encoding="utf-8")
     # 正文页 × 4（8 本书复用；每章 30 段保证多页翻页余量——B2 校准：8 段仅 1 页致 R1 翻页断言无余量）
+    # 2026-09-02 结构修正：文本必须是 div.ct 的直接 TextNode（规则 class.ct@textNodes 只取
+    # 直接文本节点，不进 <p> 子元素——此前 <p> 包裹导致解析恒空=ContentEmptyException）
     para = CONTENT_ANCHOR + "：本段为本地合成回归数据，用于验证解析链路。"
     for j in range(1, N_CHAPTER + 1):
-        body = "".join(f"<p>{para}（{CH_PREFIX}{j:02d}-第{k}段）</p>" for k in range(1, 31))
+        body = "".join(f"{para}（{CH_PREFIX}{j:02d}-第{k}段）<br>" for k in range(1, 31))
         (root / f"c{j}.html").write_text(
             f'<html><body><div class="ct">{body}</div></body></html>', encoding="utf-8")
     return root
