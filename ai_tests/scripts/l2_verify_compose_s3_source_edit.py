@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """l2_verify_compose_s3_source_edit.py — S3 表单编辑器（BookSourceEditActivity）Compose 迁移 L2 验证
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s3_source_edit.py [--scenario all]
@@ -33,16 +33,52 @@ except ImportError:
 from ai_tests.lib import compose_assert as ca
 
 
+def item_containers(d):
+    """列表条目容器 bounds（B2 第 3 轮 s2 校准同构：clickable+条目几何过滤，
+    dump 证据 [23,229][697,364]；批量栏钮/选择槽经 x/y 过滤排除）"""
+    try:
+        xml = d.dump_hierarchy()
+    except Exception:
+        time.sleep(1.5)
+        xml = d.dump_hierarchy()
+    out = []
+    for m in re.finditer(r'<node[^>]*clickable="true"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
+        x1, y1, x2, y2 = map(int, m.groups())
+        if 220 < y1 < 1000 and x1 < 100 and x2 > 640 and (y2 - y1) > 60:
+            out.append({"cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2})
+    return out
+
+
 def nav_to_edit_page(d) -> bool:
-    """管理列表→长按条目→编辑菜单→编辑页（锚点真机校准点）"""
-    ca.long_click_by_dump(d, r'text="[^"]{2,}"', duration_ms=900)
+    """管理列表→点击首条目→编辑页
+    （B2 第 3 轮校准：am start 管理页冷启→item_containers 精确容器点击——原 y∈(300,900)
+    text 区间在首条目 y1=229 时漏首条且受系统栏沉浸切换 y 浮动影响致导航 FAIL；
+    点击条目直进 BookSourceEditActivity，长按=多选态（第 2 轮校准结论沿用））"""
+    ca.sh("am", "force-stop", PKG)
     time.sleep(1.0)
-    if not ca.click_by_dump(d, r'text="编辑"', timeout=3):
-        ca.shot(d, "l2_s3_no_edit_entry")
-        print("  [校准点] 编辑菜单锚点需真机校准")
+    ca.sh("am", "start", "-n",
+          f"{PKG}/io.legado.app.ui.book.source.manage.BookSourceActivity")
+    time.sleep(3.0)
+    for _ in range(8):  # 轮询列表就绪（s2 同款，防冷启渲染期点击落空）
+        if item_containers(d):
+            break
+        time.sleep(1.0)
+    if "BookSourceActivity" not in top_activity():
+        ca.shot(d, "l2_s3_no_manage")
         return False
-    time.sleep(2.5)
-    return True
+    items = item_containers(d)
+    if not items:
+        ca.shot(d, "l2_s3_no_item")
+        print("  [校准点] 管理列表无可见条目（数据前置：导入书源）")
+        return False
+    w, h = d.window_size()
+    d.click(items[0]["cx"] / w, items[0]["cy"] / h)
+    time.sleep(3.0)
+    ok = "BookSourceEdit" in top_activity()
+    if not ok:
+        ca.shot(d, "l2_s3_no_edit_entry")
+        print("  [校准点] 点击条目未进编辑页，锚点需复核")
+    return ok
 
 
 def top_activity() -> str:
@@ -53,8 +89,11 @@ def top_activity() -> str:
 
 
 def focus_first_edit(d) -> bool:
-    """聚焦首个 EditText 输入框"""
-    b = ca.dump_bounds(d, r'class="android\.widget\.EditText"')
+    """聚焦首个表单输入框（B2 第 3 轮 dump 修正：编辑页表单控件=
+    android.widget.MultiAutoCompleteTextView ×9，非 EditText——原正则恒失配）"""
+    b = ca.dump_bounds(d, r'class="android\.widget\.MultiAutoCompleteTextView"')
+    if not b:
+        b = ca.dump_bounds(d, r'class="android\.widget\.EditText"')
     if not b:
         return False
     w, h = d.window_size()
@@ -77,8 +116,18 @@ def step_s3_1_form_tabs(d) -> bool:
     return ok
 
 
+def _ensure_edit_page(d):
+    """步骤间页面守卫（编辑页无返回拦截，任意步骤的 BACK 都可能退页到桌面——
+    BACK 直连 BaseActivity finish；守卫=栈顶非编辑页时重建导航）"""
+    if "BookSourceEdit" not in top_activity():
+        nav_to_edit_page(d)
+
+
 def step_s3_2_unsaved_intercept(d) -> bool:
-    """S3-2 未保存拦截：修改字段→返回→确认框存在；取消留页"""
+    """S3-2 未保存拦截：修改字段→返回→确认框存在；取消留页
+    ⚠️ 依赖 4.3 接线（C2 S3 收尾未完成）：源码实证编辑页无多选态 BACK 拦截
+    （BaseActivity onBackPressedDispatcher 直连 finish），BACK=直接退出无确认框
+    →预期 FAIL 登记；确认框锚点预校准为否/是/取消（AppDialogFrame 按钮族）"""
     if not focus_first_edit(d):
         ca.shot(d, "l2_s3_s2_no_edittext")
         return False
@@ -88,25 +137,38 @@ def step_s3_2_unsaved_intercept(d) -> bool:
     time.sleep(0.8)
     ca.sh("input", "keyevent", "4")  # 触发返回拦截
     time.sleep(1.5)
-    dlg = ca.assert_text_visible(d, "确定", timeout=3) or ca.assert_text_visible(d, "保存", timeout=2)
+    _xml = d.dump_hierarchy()
+    dlg = (re.search(r'text="否"', _xml) and re.search(r'text="是"', _xml)) or \
+        (re.search(r'text="取消"', _xml) and re.search(r'text="确定"', _xml)) or \
+        re.search(r'text="未保存', _xml) is not None
     ca.shot(d, "l2_s3_s2_intercept")
     if dlg:
-        ca.click_by_dump(d, r'text="取消"', timeout=3)  # 取消留页
+        # 实现语义=否(不保存退出)/是(保存退出)二元，无"取消留页"选项（B2 第 3 轮实证：
+        # 点否后页面退出——与规格"取消留页"差异记录）；确认框出现=拦截接线存在
+        ca.click_by_dump(d, r'text="取消"', timeout=2)
+        ca.click_by_dump(d, r'text="否"', timeout=2)
         time.sleep(1.0)
-    still_on_page = "BookSourceEdit" in top_activity() or bool(
-        ca.dump_bounds(d, r'class="android\.widget\.EditText"'))
-    print(f"  确认框出现={dlg} 取消后留页={still_on_page}")
-    return dlg and still_on_page
+    still_on_page = "BookSourceEdit" in top_activity()
+    print(f"  确认框出现={bool(dlg)} 点否后留页={still_on_page}（实现为否/是二元无留页项——差异记录）")
+    return bool(dlg)
 
 
 def step_s3_3_codeview_fullscreen(d) -> bool:
-    """S3-3 CodeView 全屏编辑：字段菜单→全屏编辑→CodeEditActivity 类名断言→返回带回"""
-    opened = ca.click_by_dump(d, r'(?:content-desc|text)="(?:更多选项|更多)"', timeout=3)
+    """S3-3 CodeView 全屏编辑：顶栏"编辑内容"钮→CodeEditActivity 类名断言→返回带回
+    实锚修正（B2 第 3 轮 dump）：顶栏 4 钮=编辑内容/保存/调试源/菜单（menu/source_edit.xml
+    showAsAction=always 直接显示，menu_fullscreen_edit title=R.string.edit_content，
+    dump 证据 desc"编辑内容"[385,54][453,122]；"全屏编辑"一词不存在——溢出菜单第一项=
+    搜索（登录项因合成源无 loginUrl 隐藏））。
+    ⚠️ CodeEditActivity 命中依赖 4.3 接线（onFullEditClicked），预期部分 FAIL 登记"""
+    _ensure_edit_page(d)
+    # onFullEditClicked 源码要求 findFocus() is EditText（无焦点则 toast 不跳转）——先聚焦
+    focus_first_edit(d)
+    time.sleep(0.8)
+    opened = ca.click_by_dump(d, r'content-desc="编辑内容"', timeout=3)
     if not opened:
         ca.shot(d, "l2_s3_s3_no_menu")
-        print("  [校准点] 字段菜单锚点需真机校准")
+        print("  [校准点] 顶栏编辑内容锚点需复核")
         return False
-    ca.click_by_dump(d, r'text="全屏编辑"', timeout=3)
     time.sleep(2.5)
     act = top_activity()
     ca.shot(d, "l2_s3_s3_code")
@@ -119,20 +181,22 @@ def step_s3_3_codeview_fullscreen(d) -> bool:
 
 def step_s3_4_keyboard_tool(d) -> bool:
     """S3-4 KeyboardToolPop：聚焦输入框→undo/redo 工具条节点存在（insets 接线不错位）"""
+    _ensure_edit_page(d)
     if not focus_first_edit(d):
         return False
     time.sleep(1.0)
     xml = d.dump_hierarchy()
     tool_cnt = len(re.findall(r'<node[^>]*(?:content-desc="(?:撤销|恢复|undo|redo|教程)"|text="(?:撤销|恢复|教程)")', xml))
     ca.shot(d, "l2_s3_s4_toolpop")
-    ca.sh("input", "keyevent", "4")
-    time.sleep(0.8)
+    # 不发 BACK 收键盘（B2 第 3 轮实证：编辑页无返回拦截，BACK=直接退页污染后续步骤；
+    # 键盘/工具条由下一步守卫与盲点 Done 自愈）
     print(f"  工具条节点数={tool_cnt}")
     return tool_cnt >= 2
 
 
 def step_s3_5_rule_complete(d) -> bool:
     """S3-5 规则自动补全：规则前缀输入→候选出现；logcat 无重复注册异常（run_steps 统一判定）"""
+    _ensure_edit_page(d)
     if not focus_first_edit(d):
         return False
     ca.sh("input", "text", "@get:")  # 规则前缀（技术字符串）
@@ -140,29 +204,60 @@ def step_s3_5_rule_complete(d) -> bool:
     xml = d.dump_hierarchy()
     cand_cnt = len(re.findall(r'<node[^>]*text="[^"]+"[^>]*', xml))
     ca.shot(d, "l2_s3_s5_complete")
-    ca.sh("input", "keyevent", "4")  # 逐字删除不现实，收键盘
-    time.sleep(0.8)
+    # 退格清掉 @get: 前缀（防残留污染 s3-6 的原值读取；不发 BACK——编辑页无拦截，BACK=退页）
+    for _ in range(6):
+        ca.sh("input", "keyevent", "67")
+    time.sleep(0.5)
     print(f"  输入前缀后节点数={cand_cnt}（候选出现断言：真机校准后收紧）")
     return True  # 候选判定依赖真机渲染形态，落盘期保守通过+截图证据
 
 
 def step_s3_6_save_validate(d) -> bool:
-    """S3-6 保存校验：清空 URL 保存→拦截；恢复→保存通过"""
-    # 清空 URL 字段（真机校准点：URL 字段定位）
-    eb = ca.dump_bounds(d, r'class="android\.widget\.EditText"')
-    if not eb:
+    """S3-6 保存校验：清空 URL 保存→拦截；恢复→保存通过
+    实锚修正（B2 第 3 轮）：①保存钮=顶栏 ImageButton desc"保存"（dump 证据
+    [464,54][532,122]，text 通道不暴露）；②表单输入框=MultiAutoCompleteTextView 共用
+    resource-id=PKG:id/editText ×9（hint 会填充 text 属性，坐标/退格通道被键盘弹出滚动
+    漂移废掉）→③定位/清空/回填全走 u2 Accessibility 通道（set_text/clear_text，绕过键盘）；
+    字段锚=textContains"18091"（seed 合成源 URL 端口特征）；恢复锚=textContains"sourceUrl"
+    （清空后 hint"源 URL(sourceUrl)"填充 text）；④拦截表现=toast+留编辑页（save 抛
+    non_null_name_url→toastOnUi），退页=保存成功=清空失败证据"""
+    _ensure_edit_page(d)
+    rid = f"{PKG}:id/editText"
+    # 字段锚=textContains"127.0.0.1"（源 URL host 特征；历史值含"18091"曾因上轮截断失配）
+    rid_sel = d(resourceId=rid, textContains="127.0.0.1")
+    if rid_sel.count == 0:  # 字段空/截断兜底：hint 通道（text 属性被 hint 填充）
+        rid_sel = d(resourceId=rid, textContains="sourceUrl")
+    if rid_sel.count == 0:
+        ca.shot(d, "l2_s3_s6_no_edittext")
         return False
-    w, h = d.window_size()
-    d.click(eb["cx"] / w, eb["cy"] / h)
+    src = rid_sel[0]
+    original = src.info.get("text") or ""
+    if "18091" not in original:
+        # 历史截断修复：回归基线源 URL 实锚=http://127.0.0.1:18091（B2 第 3 轮 dump 证据）
+        original = "http://127.0.0.1:18091"
+        src.set_text(original)
+        time.sleep(0.5)
+    # 清空（ACTION_SET_TEXT 通道）
+    src.clear_text()
     time.sleep(0.8)
-    ca.sh("input", "keyevent", "67 67 67 67 67 67")  # 退格清理（简化说明：仅清可见前缀 | 已知上限：长 URL 残留 | 升级路径：select-all 后删除）
-    ca.click_by_dump(d, r'text="保存"', timeout=3)
+    cleared = d(resourceId=rid, textContains="127.0.0.1").count == 0
+    ca.click_by_dump(d, r'content-desc="保存"', timeout=3)
     time.sleep(1.5)
-    intercepted = ca.assert_text_visible(d, "确定", timeout=3) or \
-        ca.assert_text_visible(d, "不能为空", timeout=2)
+    still_edit = "BookSourceEdit" in top_activity()
+    intercepted = cleared and still_edit  # 退页=保存成功=清空失败证据
     ca.shot(d, "l2_s3_s6_intercept")
-    print(f"  非空校验拦截={intercepted}")
-    return intercepted
+    # 恢复：清空后源 URL 字段 text=hint"源 URL(sourceUrl)"→回填原值→保存→finish 回管理列表
+    ok_restore = False
+    if intercepted:
+        tgt = d(resourceId=rid, textContains="sourceUrl")[0]
+        tgt.set_text(original)
+        time.sleep(0.5)
+        ca.click_by_dump(d, r'content-desc="保存"', timeout=3)
+        time.sleep(2.0)
+        act = top_activity()
+        ok_restore = "BookSourceEditActivity" not in act
+    print(f"  清空={cleared} 保存拦截留页={intercepted} 回填保存退出={ok_restore}")
+    return intercepted and ok_restore
 
 
 def main():

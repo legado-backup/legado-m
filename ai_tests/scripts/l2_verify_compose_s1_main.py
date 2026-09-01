@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """l2_verify_compose_s1_main.py — S1 主框架 Compose 迁移 L2 验证（B2 样板冻结）
 
 执行方式（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_compose_s1_main.py [--scenario all]
@@ -36,12 +36,14 @@ TAB_PAT = lambda t: f'(?:content-desc|text)="{t}"'
 
 
 def top_text_bounds(d):
-    """书架列表首项=可见 text 节点中 top 最小者（probe_shelf 锚点口径）"""
+    """书架列表首项=可见 text 节点中 top 最小者（probe_shelf 锚点口径）
+    B2 校准 2026-09-01：y<220 排除顶栏/分组标签条吸顶元素（实测 y=139 节点
+    滚动时位置不变，致位移断言恒 0——数据 16 本亦然，确证锚点假象）"""
     xml = d.dump_hierarchy()
     best = None
     for m in re.finditer(r'<node[^>]*text="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
         txt, x1, y1, x2, y2 = m.group(1), *map(int, m.groups()[1:])
-        if not txt or y1 < 100:  # 排除状态栏/顶栏区域文本
+        if not txt or y1 < 220:  # 排除状态栏/顶栏/吸顶分组标签条区域文本
             continue
         if best is None or y1 < best[1]:
             best = (txt, y1, (x1 + x2) // 2, (y1 + y2) // 2)
@@ -67,15 +69,35 @@ def step_s1_1_bottom_nav(d) -> bool:
 
 
 def step_s1_2_double_tap_top(d) -> bool:
-    """S1-2 双击回顶：滚动≥2屏→双击当前 tab→首项 bounds.y 回顶部区间"""
+    """S1-2 双击回顶：滚动≥2屏→双击当前 tab→首项 bounds.y 回顶部区间
+    滚动注入（B2 第 3 轮修正）：u2 touch down→逐段 move→up 序列——shell input swipe 与
+    u2 d.swipe 在脚本上下文对书架 LazyGrid 位移=0（第 2 轮遗留问题），dbg_drag_probe.py
+    scroll 模式实证 u2 touch 序列滚动有效（书架 240→374）；触摸锚=屏中央 (360,900)→(360,300)"""
     first0 = top_text_bounds(d)
     if first0 is None:
         ca.shot(d, "l2_s1_s2_no_list")
         return False
-    for _ in range(2):  # 滚动 ≥2 屏
-        d.swipe(0.5, 0.7, 0.5, 0.2)
-        time.sleep(1.0)
+
+    def _swipe_touch():
+        # 通道 A：u2 touch down→逐段 move→up（dbg_drag_probe scroll 同款；
+        # 第 3 轮补充：25px/0.05s 慢速步进模拟人手速度，快扫 50px/0.03s 曾 flaky）
+        d.touch.down(360, 900)
+        for y in range(900, 300, -25):
+            d.touch.move(360, y)
+            time.sleep(0.05)
+        time.sleep(0.3)
+        d.touch.up(360, 300)
+
+    for _ in range(2):
+        _swipe_touch()
+        time.sleep(1.2)
     first1 = top_text_bounds(d)
+    if first1 is None or abs(first1[1] - first0[1]) < 100:
+        # 通道 B：shell input swipe 长时长（800ms 慢滑，fling 语义差异互补）
+        for _ in range(2):
+            ca.sh("input", "swipe", "360", "900", "360", "250", "800")
+            time.sleep(1.2)
+        first1 = top_text_bounds(d)
     ca.shot(d, "l2_s1_s2_scrolled")
     if first1 is None or abs(first1[1] - first0[1]) < 100:
         print(f"  [WARN] 滚动位移不足 before_y={first0[1]} after_y={first1 and first1[1]}")
@@ -108,12 +130,15 @@ def step_s1_3_topbar_collapse(d) -> bool:
 
 
 def step_s1_5_config_columns(d) -> bool:
-    """S1-5 书架配置即时生效：配置弹框改列数→确定→网格重渲染"""
-    # 入口=书架顶栏菜单（真机校准点：displayId 锚点以 dump 为准）
-    opened = ca.click_by_dump(d, r'(?:content-desc|text)="(?:书架设置|配置|更多)"', timeout=3)
+    """S1-5 书架配置即时生效：配置弹框改列数→确定→网格重渲染
+    （B2 真机校准 2026-09-01：入口=书架顶栏 desc="菜单"→'书架布局'，BaseBookshelfFragment
+    moreButton→configBookshelf，原'书架设置|配置|更多'文本锚点不存在）"""
+    opened = ca.click_by_dump(d, r'content-desc="菜单"', timeout=3)
+    if opened:
+        opened = ca.click_by_dump(d, r'text="书架布局"', timeout=3)
     if not opened:
         ca.shot(d, "l2_s1_s5_no_entry")
-        print("  [校准点] 书架配置入口锚点需真机 dump 校准（probe_shelf.py）")
+        print("  [校准点] 书架菜单/书架布局锚点需复核")
         return False
     time.sleep(1.0)
     ca.shot(d, "l2_s1_s5_dialog")
@@ -133,7 +158,16 @@ def main():
     ap.add_argument("--scenario", default="all", help="all | s1-1 | s1-2 | s1-3 | s1-5")
     args = ap.parse_args()
     d = ca.connect()
+    # B2 第 3 轮校准：书架触摸滚动生效条件矩阵（dbg_drag_probe 对照）=冷启+页面切换
+    # （force-stop→app_start 冷启→am start 管理页→am start 主入口；单缺切换或温启均位移=0）
+    ca.sh("am", "force-stop", PKG)
+    time.sleep(1.0)
     ca.ensure_env(d)
+    ca.sh("am", "start", "-n",
+          f"{PKG}/io.legado.app.ui.book.source.manage.BookSourceActivity")
+    time.sleep(3.0)
+    ca.sh("am", "start", "-n", f"{PKG}/io.legado.app.ui.main.MainActivity")
+    time.sleep(4.0)
     since_ts = ca.device_now()  # logcat -T 起点（防历史日志污染）
 
     steps = {
