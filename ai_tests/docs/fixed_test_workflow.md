@@ -42,6 +42,7 @@
 | 16h. 阅读页三个点弹层验证 | `l2_verify_read_menu_overflow.py` | 三点弹层 7 项动作（高亮规则/字符集/目录规则/EPUB×3/段落规则修正）存在性+位置+互斥不变量+点击进管理页（read-menu-highlight-entry-restore 新增）；辅助探针 `probe_shelf.py` 输出书架层级锚点 | `python ai_tests/scripts/l2_verify_read_menu_overflow.py` |
 | 16i. 书架层级探针 | `probe_shelf.py` | dump 书架文本/可点击节点（L2 脚本开书锚点修正前置探针） | `python ai_tests/scripts/probe_shelf.py` |
 | 16j. 画质增强治理 L2 | `l2_verify_image_enhance_governance.py` | T1 效果链正向 / T3 守卫反向自动断言（prefs 置数+重启+真实播放+logcat 断言 buildEffects/applyImageEnhanceEffects），T2/T4/T5/T7 输出真机手动清单（enhance-switch-governance-fix v2 新增，白名单固化入库） | `python ai_tests/scripts/l2_verify_image_enhance_governance.py` |
+| 16k. P0 沙箱/缓存命名空间 L2 | `l2_verify_p0_sandbox_cache.py` | P0 书源安全 S1 文件沙箱/S2 缓存命名空间环境就绪断言（T11-T14+T22 可验证子集）：prefs 写开关（bookSourceCacheScoped/bookSourceFileSandbox）+重启回读、caches 表 `book_source_cache_%` 前缀基线计数（三件套拉库本地查）、externalCache/source/ hex64 目录基线校验、FATAL=0；T11-T14/T22 触发项与 T14 删源清理输出手动清单（ng-p0-source-security-impl 新增，白名单固化入库，总线 2.12 落位口径） | `python ai_tests/scripts/l2_verify_p0_sandbox_cache.py [--scenario cache\|sandbox\|both]` |
 
 ### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
 

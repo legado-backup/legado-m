@@ -186,7 +186,7 @@ Layer 0: 源码驱动层（V3，阶段 12-13）
 
 > **目录口径（2026-09-01 核定，总线 2.12 产出，B2 L2 模板脚本落位依据）**：
 > 1. **落位**：测试辅助/L2 验证脚本统一落 `ai_tests/scripts/`，按族前缀命名（下表）。
-> 2. **入库**：`.gitignore` 对 `/ai_tests/scripts/*.py` **默认全部忽略**，仅白名单（`!` 行）固化脚本入库——脚本固化为长期资产时必须同步加白名单行。**当前白名单 3 个（与磁盘现存精确一致）**：`l2_verify_precise_manage.py`（精准管理 L2）/ `verify_no_crash.py`（双包无崩溃）/ `l2_verify_image_enhance_governance.py`（画质增强治理 L2）。
+> 2. **入库**：`.gitignore` 对 `/ai_tests/scripts/*.py` **默认全部忽略**，仅白名单（`!` 行）固化脚本入库——脚本固化为长期资产时必须同步加白名单行。**当前白名单 4 个（与磁盘现存精确一致）**：`l2_verify_precise_manage.py`（精准管理 L2）/ `verify_no_crash.py`（双包无崩溃）/ `l2_verify_image_enhance_governance.py`（画质增强治理 L2）/ `l2_verify_p0_sandbox_cache.py`（P0 书源沙箱+缓存命名空间 L2，ng-p0-source-security-impl）。
 > 3. **登记**：新脚本必须登记 [SOP 固定脚本表](./docs/fixed_test_workflow.md)（SOP 自身维护规则强制），本节族口径随治理状态更新。
 > 4. **历史**：治理前 205 个平铺脚本已分批收敛（52 个删于 2026-08-30 ai-test-system-refinement，备份 `bak/ai-test-refinement-20260830/`；其余随后续治理批次移除），下表族前缀为**前瞻口径**，现存实例以上述白名单为准。
 
