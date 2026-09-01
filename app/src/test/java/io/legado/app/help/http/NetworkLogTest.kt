@@ -39,6 +39,21 @@ class NetworkLogTest {
     }
 
     @Test
+    fun formatHeaders_redactsGeminiApiKeyHeader() {
+        // P1-A1-4：Gemini 协议鉴权头 x-goog-api-key 必须脱敏，
+        // 防"AI 请求头→NetworkLog 抓包记录→MCP network_log_get→外部 LLM"泄露链（P2 前置）
+        val headers = Headers.Builder()
+            .add("x-goog-api-key", "AIzaSyExampleKey123")
+            .add("X-Goog-Api-Key", "AIzaSyUpperKey456")
+            .build()
+        val result = NetworkLog.formatHeaders(headers)
+        assertTrue(result.contains("x-goog-api-key: [已脱敏]"))
+        assertTrue(result.contains("X-Goog-Api-Key: [已脱敏]"))
+        assertTrue(!result.contains("AIzaSyExampleKey123"))
+        assertTrue(!result.contains("AIzaSyUpperKey456"))
+    }
+
+    @Test
     fun redactCredentialsForLog_redactsBearerAndBasic() {
         val text = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9 Basic dXNlcjpwYXNz"
         val result = NetworkLog.redactCredentialsForLog(text)

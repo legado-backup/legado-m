@@ -26,3 +26,4 @@
 ## 变更记录
 
 - 2026-08-31：本文件建立；v109 实占条目（video-sniff 4.8e）登记；ng P1/P3/B-C2/B-C3 预占（tasks 1.2 核销）
+- 2026-09-01：总线 3.2.1 完成——P1 实施 spec 另立（`docs/specs/ng-p1-ai-foundation/README.md`），复核 v109 实占基线（AppDatabase version=109 实测一致）；P1 维持"预占（顺延 v110）"，T7 DB 实施时实占（步骤清单见该 spec §1）

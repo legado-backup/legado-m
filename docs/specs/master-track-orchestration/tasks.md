@@ -84,14 +84,14 @@
   - [ ] 3.1.1 4.1 spacing token 编译门禁 → 4.2 L2 模板+7 脚本 → 4.3 C2 S3 接线
   - [ ] 3.1.2 S1-S6/D9 35 检查点回执（S3 依赖 4.3 完成）
   - [ ] 3.1.3 L2 脚本模板登记为三轨共用测试基建（AD-05）
-- [ ] 3.2 ng P1 AI 地基实施（子任务账本=P1 分册 §4.2 J1-J9 注入点 + §6 DDL（标题 v109 口径以 registry 顺延为准））
-  - [ ] 3.2.1 另立实施 spec + registry 占号（v109 规划号→**顺延 v110 实施时实占**）
-  - [ ] 3.2.2 密钥防线四层先落地（P2 前置）
-  - [ ] 3.2.3 分册补注"AiChatService 冻结=不修改既有方法，新增方法不受限"（C4 衔接澄清）
-- [ ] 3.3 C1 朗读架构原语化（子任务账本=C1 分册三步+diff 改造点）
-  - [ ] 3.3.1 OQ-2 旧键裁决（READ_ALOUD_PROGRESS 保留给 P3 接入或删除）+ 声明禁止 P3 复活旧键
-  - [ ] 3.3.2 引擎发布层/显示跟随/绘制期投影三步实施（ReadAloudPositionUpdate 五字段不扩）
-  - [ ] 3.3.3 OQ-11 off-by-one 对照表产出（P3 rebase 依赖，X4）
+- [ ] 3.2 ng P1 AI 地基实施（子任务账本=P1 分册 §4.2 J1-J9 注入点 + §6 DDL（标题 v109 口径以 registry 顺延为准）；实施 spec=docs/specs/ng-p1-ai-foundation/README.md）
+  - [x] 3.2.1 另立实施 spec + registry 占号（v109 规划号→**顺延 v110 实施时实占**）✅ 2026-09-01（spec 另立+v109 基线复核+预占留痕，实占留待 T7）
+  - [x] 3.2.2 密钥防线四层先落地（P2 前置）✅ 2026-09-01（①NetworkLog 补 x-goog-api-key+单测 ②备份 AES 三处对称+Web 端 keyIsNotIgnore 过滤补齐 ③AppLog 规范约束 ④MCP Sanitizer 留 P2）
+  - [x] 3.2.3 分册补注"AiChatService 冻结=不修改既有方法，新增方法不受限"（C4 衔接澄清）✅ 2026-09-01（已写入 P1 分册 §3.4）
+- [x] 3.3 C1 朗读架构原语化（子任务账本=C1 分册三步+diff 改造点）✅ 2026-09-01（代码三步全落地，compileAppDebugKotlin BUILD SUCCESSFUL + stop-daemons 清场；L2 十步真机/l2_verify_aloud_primitives.py/L3 回归挂后续批次）
+  - [x] 3.3.1 OQ-2 旧键裁决（READ_ALOUD_PROGRESS 保留给 P3 接入或删除）+ 声明禁止 P3 复活旧键 ✅ 2026-09-01（**裁决=删除**：全库 Grep 实证 READ_ALOUD_PROGRESS 零发布者（E2 观察者孤儿化）+ TTS_PROGRESS 零观察者死事件——两常量+help/readaloud/ReadAloudProgressState.kt 整体删除，ReadBookActivity E2 观察者改接 READ_ALOUD_POSITION；理由=C1 原语化目标为发布层唯一通道，保留旧键即双通道风险；分册 §10.2 已写"禁止 P3 复活旧键"强制声明，多角色一律经 publishAloudPosition 接线）
+  - [x] 3.3.2 引擎发布层/显示跟随/绘制期投影三步实施（ReadAloudPositionUpdate 五字段不扩）✅ 2026-09-01（**改动 18 文件**：新建 model/ReadAloudPosition.kt（2 data class 五字段不扩）+service/ReadAloudProgress.kt；ReadAloud.kt 位置原语 5 函数+seek 命令层；EventBus/AppLog/IntentAction/PreferKey 常量；BaseReadAloudService 契约注释+prepareReadAloudChapter/resolveParagraphStartPos 拆分+upTtsProgress 发布制（启动代数守卫）+seek 两套+advanceToPrev/NextChapter 派生跟随+switchReadAloudChapterKeepingView+onDestroy clearAloudPosition；TTS EMA+页界预测+speakGeneration（D7/D8 拆除）；HTTP lastCharDurationMs 流式兜底（D6 拆除）；ReadBook skipReadAloudSyncOnce+loadTextChapterForReadAloud+readAloud(pageIndex) 参数+CallBack.onManualPageChanged（D1-D5 拆除+H6）；ReadBookActivity 观察者重写（observeEventSticky+isCurrentPosition 闸门+唯一跟随写点）+原语 A/B+shouldFollowAloudAdvance/isViewBehindAloud 纯函数+restartFromPage/resolveTrueParagraphStart+M6 归一+forcePageFollow 开关（ReadAloudConfigDialog+strings 双语言）；TextLine.isReadAloud var→val 绘制投影+TextPage/TextPageFactory 删存储态 H1-H5+ReadView.invalidateReadAloudHighlight；OQ-5 裁决=位置事件喂面板/OQ-7 裁决=挂 markReadAloudUserNavigation 汇合点；单测 ReadAloudProgressValidateTest 6 用例全绿，分册 §8.1 其余用例依赖 Android 运行时归 L2）
+  - [x] 3.3.3 OQ-11 off-by-one 对照表产出（P3 rebase 依赖，X4）✅ 2026-09-01（落 C1 分册新增 §13：13.1 十个发布调用点旧值→新值对照（统一章节绝对字符位，段推进/起点=readAloudNumber 不再 +1）+13.2 引擎页界判定口径六点（保持不变）+13.3 段号↔字符位换算规则六条（getParagraphNum(x+1) 的 +1 补偿必带）+13.4 实施期行为修正三项（M3 起点偏移统一/AD-C1-3 跨章续播/M2 流式兜底）；P3 rebase（总线 5.3.2）按 §13.3 强制执行）
 - [x] 3.4 cache-entry-relocate 收口（B2 样板冻结前；cache-entry 先行→B4-c 瘦身 About，反序重复劳动）✅ 2026-09-01（代码实施核实已随 e706bae53 全量入库：6 文件与 design 表逐项一致+strings 5 key 双语言到位+Grep 复核路由/诊断方法零残留；spec tasks 2.1-2.8+3.1-3.3+3.7 勾选，3.4-3.6 模拟器 L2 挂总线 2.6.2 真机窗口；updateLog L193-195 已登记；收口零代码改动未触发编译门禁；B4-c 瘦身 About 前置解除）
 - [ ] 3.5 fix-rss-search-scope + rss-folder-subtag-fix 收口（B3 Rss 域动工前置）
 - [x] 3.6 thread-pool-audit 与 video-sniff 线程钳制定稿（W2 内首项，防回退 Phase0 钳制；非波次进入条件）✅（2026-09-01 纯文档定稿，零代码改动：**①钳制终值确认**（代码实测六点全就位，与 merger-ruling F4/F5/F6 一致）——R-P0-3 AppConfig updateCacheThreadCount coerceIn(1,256)（:2884）+UI max=256（OtherConfigFragment:460），searchThreadCount coerceIn(1,128)（:2877）+UI max=128（:448）；R-P0-4 WebViewPool coerceAtMost(15)（:61）；R-P0-5 CacheBookService minOf(…,128)（:46）+ **ImageCanvasViewModel minOf 双处（:87/:126）已实施**（merger-ruling C4 留核项就此闭合）；R-P0-6 ConnectionPool(128,5,MINUTES)（HttpHelper:102）；**②文档归一**=thread-pool-audit spec.md 三处落盘（头部"线程钳制定稿"注记块=权威值清单+防回退声明+偏差登记；R1.3/Scenario 3 基线 50→128 注记，merger-ruling §五注记清单 thread-pool-audit 两行就此执行完毕）；**③防回退声明**=Phase0 钳制（R-P0-3~6）禁止回退至 64/50/无钳制旧值，重审以权威值为唯一输入基线；**④附带偏差登记**=thread-pool-audit 清单 #5/#6 MainViewModel upTocPool 线程数来源实为 AppConfig.threadCount（默认 16，setter 无 coerceIn）+min(…,MAX_THREAD=9) 兜底（MainViewModel.kt:56-58），非 updateCacheThreadCount，归 thread-pool-split-config 校正；updateLog 不追加（无用户可见行为变化），编译门禁不触发（零代码））
