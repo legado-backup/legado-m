@@ -1,0 +1,35 @@
+[
+  {
+    "bookSourceUrl": "https://hhzyapi.com/api.php/provide/vod",
+    "bookSourceName": "AI-Test-L0",
+    "bookSourceGroup": "AI测试",
+    "bookSourceType": 4,
+    "bookSourceComment": "video-booksource-multiroute 真机 L0：ruleToc/ruleContent 全空，MacCmsNormalizer 直产卷章（测试专用源，from maccms-nojs 已验证订阅源）",
+    "enabled": true,
+    "enabledCookieJar": false,
+    "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\", \"Referer\": \"https://hhzyapi.com/api.php/provide/vod/\"}",
+    "searchUrl": "https://hhzyapi.com/api.php/provide/vod?ac=detail&pg={{page}}&wd={{key}}",
+    "ruleSearch": {
+      "bookList": "$.list[*]",
+      "name": "$.vod_name",
+      "kind": "$.type_name",
+      "wordCount": "$.vod_remarks",
+      "intro": "$.vod_content",
+      "coverUrl": "$.vod_pic",
+      "bookUrl": "https://hhzyapi.com/api.php/provide/vod?ac=detail&ids={{$.vod_id}}"
+    },
+    "ruleBookInfo": {
+      "name": "$.vod_name",
+      "intro": "$.vod_content",
+      "coverUrl": "$.vod_pic",
+      "tocUrl": ""
+    },
+    "ruleToc": {},
+    "ruleContent": {
+      "content": ""
+    },
+    "lastUpdateTime": 0,
+    "customOrder": 0,
+    "weight": 0
+  }
+]
