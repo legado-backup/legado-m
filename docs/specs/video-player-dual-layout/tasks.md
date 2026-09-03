@@ -74,6 +74,14 @@
 - [x] W2 编译验证：assembleAppDebug BUILD SUCCESSFUL（3.26.090401，经历 3 轮修复：ic_picture_in_picture 资源缺失→ic_screen；ViewGroup 未 import；install Success + 启动 0 FATAL）
 - [x] W2-L2：「下一部」语义修正（VideoPlaylistHolder.neighborOf 队列判定，书架直进无队列=正确隐藏）；commit 744ecf2d1 已推 origin/master
 
+## 9. W3 修复批次（2026-09-04 用户第二轮真机反馈：只修复+编译+打测试包）
+
+- [x] ①订阅源无「下一部」：switchLegacyFilm 接入订阅源文章列表（switchToArticle）+ bindLegacyInfo 同步刷新（✅）
+- [x] ②无「上一部」：新增 tv_prev_film（◀ 上一部）+ 对称逻辑（✅）
+- [x] ③全屏返回信息区丢失：toggleFullScreen 退出分支统一恢复 data+legacyActions（根因=原 book 分支才恢复）（✅）
+- [x] ④订阅源图片未带：showRssLegacyInfo article 兜底链补 rssStar/rssRecord.toRssArticle()（✅）
+- [x] W3 编译+打包：legado_miss_app_3.26.090406.apk（✅ 用户要求只修复+编译，L2 留用户验）
+
 ## AOAdapt 日志（续）
 
 - [x] 2026-09-03 红队 R1-R3（3 子代理并行，源码级核验）
