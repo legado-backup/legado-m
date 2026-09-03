@@ -4,6 +4,14 @@
 
 ---
 
+## 🔴 进行中的工作 → 设计中
+
+- [书源视频对标订阅源](./specs/video-booksource-align-rss/README.md) - 书源视频单页化+列表驱动上滑+公共采集链组件（根治直链地址不正确/播放信息不匹配/上滑卡死三类反复问题）✅ 已实施（2026-09-03，S1-S4 真机验证通过）
+- [视频播放器双布局模式](./specs/video-player-dual-layout/README.md) - 内置抖音沉浸式(默认)+传统(上播放器下信息区)双布局可配置，设置中心化到「我的→视频播放器设置」，播放页仅保留即时生效项，嗅探/采集链零改动 🔄 设计中
+- [UI 主题纳管与弹框交互优化](./specs/ui-theme-governance-polish/README.md) - 6 项 UI 问题修复：订阅布局弹框开关主题化+登录弹框按钮收纳+主题编辑器保存感知+字号滑条偏左+沉浸顶栏开关修复+管理页透明度设置 🔄 设计中
+
+---
+
 ## 一、项目规范（docs/project-rules/）
 
 > AI Agent 编码时必须遵循的项目特有规则，按需加载。
@@ -157,6 +165,7 @@
 | [ui-standards/page-skeleton.md](./project-flow/ui-standards/page-skeleton.md) | §9.4 页面骨架（Scaffold） |
 | [ui-standards/spacing-corner-typography.md](./project-flow/ui-standards/spacing-corner-typography.md) | §9.3 间距/圆角/字体规范 |
 | [ui-standards/theme-architecture.md](./project-flow/ui-standards/theme-architecture.md) | §9.7 主题体系架构总纲：三大体系+红线禁令 |
+| [ui-standards/theme-token-bridge.md](./project-flow/ui-standards/theme-token-bridge.md) | §9.8 主题语义 Token 与双栈桥接（View/Compose 统一取色角色表+Compose 全面化迁移守则+colorScheme 桥接演进） |
 
 ---
 
@@ -168,6 +177,8 @@
 
 | Spec | 状态 | 说明 |
 |------|------|------|
+| [archive-theme-parity-audit](./specs/archive-theme-parity-audit/README.md) | ✅ | Archive 主题体系对齐全面审计（源码最新基线+配置项 1:1+Red zip 已兼容）+5 轮红队设计+超越实施 AD-01~07（顶栏玻璃感/.red+SEND 关联/colorScheme 桥接收敛/内置色板现代化/Compose 编辑器/Red 元数据/Material You）+语义 Token 新规范，L2 真机验证闭环 |
+| [theme-topbar-default-glass](./specs/theme-topbar-default-glass/README.md) | ✅ | 默认顶栏死黑修复+玻璃感（defaultBackgroundColor 跟主题背景色+92% 微透，已并入 archive-theme-parity-audit AD-01 实施并 L2 验证） |
 | [bookshelf-refresh-and-title-font](./specs/bookshelf-refresh-and-title-font/README.md) | ✅ | 书架下拉刷新转圈不消失+顶栏标题字号不统一修复 |
 | [bugfix-20260822](./specs/bugfix-20260822/README.md) | 🔄 | 20260822 真机反馈 6 类问题+12 处 FATAL 崩溃+运行时异常专项修复 |
 | [build-release-automation](./specs/build-release-automation/README.md) | ✅ | 打包发布体系优化：publish_release.py 一键发布编排器（L3 真实发版成功，Release 三包齐全+tag 锚点） |
@@ -216,6 +227,8 @@
 | [reader-overlay-compose](./specs/reader-overlay-compose/README.md) | 🔄 | 阅读器浮层 Compose 化（S5 骨架：菜单层+浮层壳核分离，正文零改动） |
 | [rss-classic-layout-align](./specs/rss-classic-layout-align/README.md) | ✅ | 经典订阅布局管理与书架对齐修复（margin/排序/书名/弹框等 7 项实锤） |
 | [rss-cms-multiroute-nojs](./specs/rss-cms-multiroute-nojs/README.md) | ✅ | 视频订阅源多线路多集零JS解析增强（CMS分隔格式解析层原生支持+列表范式对齐书源目录+大括号模板上下文修复）+MacCMS聚合采集书源转化 |
+| [video-booksource-multiroute](./specs/video-booksource-multiroute/README.md) | 🔄 | 视频书源多线路多集兼容：ruleToc/ruleContent 映射+规范化双结构+解析分级L0-L3+详情抽屉（不动现有字段解析） |
+| [video-playlist-continuity](./specs/video-playlist-continuity/README.md) | 🔄 | 视频播放行为统一：多集下滑下一集/末集下滑接播列表下一个视频，全入口列表注入盘点 |
 | [rss-folder-cover-dialog-align](./specs/rss-folder-cover-dialog-align/README.md) | ✅ | 订阅文件夹封面弹框对齐书架（标准弹框+预览+恢复默认） |
 | [rss-folder-subtag-fix](./specs/rss-folder-subtag-fix/README.md) | ✅ | 订阅文件夹样式点进文件夹头部误显标签/箭头修复（isTagMode 守卫；2026-09-02 真机走查 3.2/3.3/3.4 三项全 PASS 收口） |
 | [rss-image-load-optimization](./specs/rss-image-load-optimization/README.md) | 🔄 | 图片订阅源加载优化（参考书源：URL 缓存+采样解码+并发预下载） |
