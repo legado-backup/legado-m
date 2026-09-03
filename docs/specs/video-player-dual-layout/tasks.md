@@ -82,6 +82,14 @@
 - [x] ④订阅源图片未带：showRssLegacyInfo article 兜底链补 rssStar/rssRecord.toRssArticle()（✅）
 - [x] W3 编译+打包：legado_miss_app_3.26.090406.apk（✅ 用户要求只修复+编译，L2 留用户验）
 
+## 10. W3b 修复批次（2026-09-04 用户验收反馈：按钮不生效/图片思路校正）
+
+- [x] ①按钮不生效根因：a) W3 部分修改被并行会话回写还原（setupLegacyMode 仍是旧绑定）b) 信息区/按钮依赖 bindLegacyInfo 一次性调用，而订阅源数据异步分阶段到达 → 事件挂钩修复：VIDEO_SUB_TITLE legacy 分支 + UP_VIDEO_INFO legacy 分支尾部挂 showRssLegacyInfo()+upNextFilmVisible()（✅）
+- [x] ②命中分析：上一部/下一部并入功能按钮行（action_prev/action_next 与下载按钮同构，ic_skip_previous/ic_skip_next），tv_prev_film/tv_next_film 移除（✅）
+- [x] ③「上一部/下一部」= 沉浸式上滑/下滑同链确认：switchLegacyFilm 订阅源文章模式走 switchToArticle（与沉浸式翻页同一 API）（✅ 日志实锤 offset=1→switchToArticle index=1→标题切换）
+- [x] ④临时诊断日志移除（✅ Grep 0 残留）
+- [x] W3b 验证：模拟器装机实测——第1篇→点下一部→标题切"后羿射日"+「◀ 上一部」出现；0 FATAL；最终包 legado_miss_app_3.26.090407.apk（✅）
+
 ## AOAdapt 日志（续）
 
 - [x] 2026-09-03 红队 R1-R3（3 子代理并行，源码级核验）
