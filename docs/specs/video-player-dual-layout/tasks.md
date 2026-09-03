@@ -66,12 +66,13 @@
 
 ## 8. W2 修复批次（2026-09-04 用户真机验收反馈，见 spec.md W2 增补）
 
-- [x] B1 全屏按钮：setupPlayerView 内 fullscreen 常显+移到倍速前（仅传统布局实例）；toggleFullScreen legacy 分支补顶栏/信息区显隐（⚠️ 编译验证中）
-- [x] B2 功能按钮区：legacy_actions（下载/收藏/悬浮窗/设置）复用沉浸式同链（Download.start/onFragmentStarClicked/startFloatingWindow/VideoSettingsPanel BottomSheet）+ 收藏图标随 rssStar 同步（⚠️）
-- [x] B3 页面平铺去二级页：移除 iv_chapter 二级目录页入口；信息区重排；「线路」「选集」区块标题；显隐联动各分支（⚠️）
+- [x] B1 全屏按钮：setupPlayerView 内 fullscreen 常显+移到倍速前（仅传统布局实例）；toggleFullScreen legacy 分支补顶栏/信息区显隐（✅ L2：点击倍速位置命中倍速弹窗=移位生效证据；显隐控制栏节点 uiautomator 时序窗口未抓到，代码链完整）
+- [x] B2 功能按钮区：legacy_actions（下载/收藏/悬浮窗/设置）复用沉浸式同链（Download.start/onFragmentStarClicked/startFloatingWindow/VideoSettingsPanel BottomSheet）+ 收藏图标随 rssStar 同步（✅ L2 dump：四按钮全部渲染）
+- [x] B3 页面平铺去二级页：移除 iv_chapter 二级目录页入口；信息区重排；「线路」「选集」区块标题；显隐联动各分支（✅ L2 dump+截图：hhyun/hhm3u8 线路 chips+全集完结选集平铺）
 - [x] B4 命名：video_layout_mode_immersive 改"沉浸式"（✅）
-- [x] B5 订阅源列表信息自动对接：showRssLegacyInfo 增强（title/description→content 去标签/计数行/封面链）+ 单URL 优雅降级（⚠️）
-- [x] W2 编译验证：assembleAppDebug（✅/❌ 以 AOAdapt 后续记录为准）
+- [x] B5 订阅源列表信息自动对接：showRssLegacyInfo 增强（title/description→content 去标签/计数行/封面链）+ 单URL 优雅降级（✅ 编译通过；书源路径截图确认封面海报+名称渲染）
+- [x] W2 编译验证：assembleAppDebug BUILD SUCCESSFUL（3.26.090401，经历 3 轮修复：ic_picture_in_picture 资源缺失→ic_screen；ViewGroup 未 import；install Success + 启动 0 FATAL）
+- [x] W2-L2：「下一部」语义修正（VideoPlaylistHolder.neighborOf 队列判定，书架直进无队列=正确隐藏）；commit 744ecf2d1 已推 origin/master
 
 ## AOAdapt 日志（续）
 
