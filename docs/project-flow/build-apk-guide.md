@@ -642,16 +642,22 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14.4-bin.zip
 
 ### 4.10 打包后清理构建进程（强制门禁）
 
-> **背景（2026-08-21 铁证）**：打包后残留 `Gradle daemon`（实测 4.2GB）+ `Kotlin daemon`（实测 2.9GB）不退出，`--no-daemon` 只禁 Gradle 复用、**管不住 Kotlin daemon**（它带 `--daemon-autoshutdownIdleSeconds=7200`，空闲 2 小时才自退）；Gradle daemon 默认空闲 3 小时才退。频繁打包必堆积，可打爆 32G 内存。
+> **背景（2026-09-03 local-build-speedup 基线实测更新）**：打包前清场（删 Kotlin daemon 缓存 + `--stop` + `--no-daemon`）会导致 Kotlin 增量编译快照每次丢失、`compileAppDebugKotlin` 准全量重编——实测增量打包 7m33s 的根因。daemon 复用是提速核心，内存安全改由三重保险保障：
+> ① jvmargs Xmx 限幅（debug 3g 命令行注入 / release 4g 走 properties，防 R8 OOM）
+> ② `org.gradle.daemon.idletimeout=600000` 空闲 10 分钟自退（连带回收 Kotlin daemon）
+> ③ `daemon-stop` 手动清场入口
+> 另实测：打包过程内存峰值 93.5% 中 java 仅占 7.6GB（24%），模拟器/IDE/系统缓存 ~22GB（69%）才是驻留大头。
 
-**强制要求**：无论哪种打包入口，**构建完成后必须执行清理**，防止残留 daemon 堆积：
+**daemon 管理方式（按打包入口）**：
 
-| 打包入口 | 清理方式 |
+| 打包入口 | daemon 行为 |
 |---------|---------|
-| `build-legado.bat` | 已内置 `:STOP_DAEMON`，结束自动清场，无需手动 |
-| 直接 `gradlew assembleApp*` / IDE | 构建结束后执行 `stop-daemons.bat` |
+| `build-legado.bat`（debug） | 复用 daemon + 降堆 3g 注入；失败自动清场；成功后等 10min 自退 |
+| `build-legado.bat`（release） | 复用 daemon + 走 properties 4g（R8 防回归）；失败自动清场 |
+| `ai_tests/scripts/quick_build_install.py` | 编译成功保留 daemon，失败自动清场 |
+| 直接 `gradlew assembleApp*` / IDE | 建议构建后 `build-legado.bat daemon-stop` 清场（或等 10min 自退） |
 
-核心命令等价于：
+手动清场命令（`build-legado.bat daemon-stop` 等价于）：
 ```powershell
 # 1. 停 Gradle daemon（连带停由其拉起的 Kotlin daemon）
 .\gradlew --stop
@@ -661,11 +667,14 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $
 ```
 
 配套内存约束（`gradle.properties`）：
-- `org.gradle.jvmargs` → `-Xmx3g`（Gradle daemon 堆上限，原 6g）
-- `kotlin.daemon.jvmargs=-Xmx3g`（显式限制 Kotlin daemon 堆）
-- `org.gradle.daemon.idletimeout=600000`（Gradle daemon 空闲 10 分钟自退，默认 3h）
+- `org.gradle.jvmargs` → `-Xmx4g`（release R8 上限；debug 由 bat 命令行注入降为 3g）
+- `kotlin.daemon.jvmargs=-Xmx4g`（debug 由 bat 注入降为 3g）
+- `org.gradle.configuration-cache=true`（版本号已 ValueSource 化，缓存安全）
+- `org.gradle.parallel=true`（3 模块并行）
+- `org.gradle.daemon.idletimeout=600000`（空闲 10 分钟自退）
 
-> ✅ 已落地：`stop-daemons.bat`（根目录）一键清场 + `build-legado.bat` 内置 `:STOP_DAEMON` + `gradle.properties` 三处内存/回收配置。AI 打包后若走了非 bat 入口，必须补跑 `stop-daemons.bat`。
+> ⚠️ CC 陷阱（ValueSource 实测）：ValueSource 内不可用 `ExecOperations.exec`（CC 上下文中静默失败，versionCode 回退 1），需用 `ProcessBuilder` + 显式 `workingDir`；Groovy 脚本嵌套类必须显式 import。debug 打包命令行 `-Dorg.gradle.jvmargs` 会**整体替换** properties 参数串，必须完整复制仅改 Xmx。
+> ✅ 已落地：`build-legado.bat` daemon 复用 + `daemon-stop` 入口 + `quick_build_install.py` 失败才清场 + 版本号 ValueSource 化。设计文档：`docs/specs/local-build-speedup/`。
 
 ---
 
