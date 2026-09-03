@@ -108,6 +108,22 @@
 - **R10 布局分发全场景覆盖（P1 修正）**：onCreate、initFromIntent（新会话）、悬浮窗/通知恢复（clonePlayState 链按 layoutMode 分发）、onNewIntent（legacy 拆卸分支 + GSY 全屏窗口复位）四场景布局一致，无"被硬拽回沉浸式"漂移
 - **R11 设置可达性与搜索（P1 新增）**：`OtherConfigFragment` 既有"视频播放器设置"弹框入口改为跳转全局页；`pref_config_other.xml` 同步防死条目；设置搜索页收录全局页关键条目（layoutMode/playerType/autoPlay/videoCache 等，ownerConfigTag=VIDEO_PLAYER）
 
+## W2 增补（2026-09-04 用户真机验收反馈，Goal 模式实施）
+
+用户装机体验后提出 5 项修正（原文字段见项目记忆 2026-09-04 条目），全部折入本期：
+
+| # | 反馈 | 设计处置 |
+|---|------|---------|
+| B1 | 传统布局全屏按钮要在播放器右下角、倍速前面，支持全屏切换 | `setupPlayerView()` 内将 GSY 底部栏 `fullscreen` 按钮设为常显并移到 `playback_speed` 之前（仅传统布局实例生效，不影响沉浸式）；点击走 Activity `toggleFullScreen` legacy 分支（startWindowFullscreen/backFromFull），全屏时同步隐藏 Compose 顶栏与信息区 |
+| B2 | 沉浸式核心功能（下载/收藏等）传统布局缺失 → 下部专门按钮区 | 新增 `legacy_actions` 按钮行：下载（`Download.start` 同链）/ 收藏（`onFragmentStarClicked` 同链 + 图标随 `rssStar` 切换）/ 悬浮窗 / 设置（`VideoSettingsPanel` BottomSheet 同组件）；置于信息区与选集区之间 |
+| B3 | 右下角列表丑陋 + 不要二级子页面，页面平铺；样式模仿参考截图，基于 ui-standards 规范化 | 移除 `iv_chapter` 二级目录页入口；信息区重排（标题加粗18sp/副信息行12sp/简介滚动区）；新增「线路」「选集」区块标题（14sp bold）；列表横向平铺、clipToPadding=false、主题色取色（primaryText/tv_text_summary），无硬编码色 |
+| B4 | "抖音沉浸式"改名"沉浸式" | `video_layout_mode_immersive` 文案改为"沉浸式" |
+| B5 | 订阅源可能没有目录/正文图片等信息，要自动对接列表信息 | `showRssLegacyInfo` 增强对接链：名称=videoTitle→rssArticle.title；副信息行=列表计数（第N篇·共M篇/第N集·共M集）；简介=rssArticle.description→content 去HTML标签纯文本兜底；封面=rssArticle.image→rssEpisode.cover→默认占位图；单URL模式优雅降级仅标题 |
+
+**命名口径（全局生效）**：两种布局正式名称为 **沉浸式**（默认）/ **传统布局**。
+
+对 R3/R4/R9 的修订以本节为准。
+
 ## Scenarios
 
 ```gherkin
