@@ -57,9 +57,10 @@ def step1_build():
     """步骤1: 编译APK"""
     print("\n=== 步骤1: 编译APK ===")
     result = run_cmd(".\\gradlew.bat assembleAppDebug", cwd=str(PROJECT_ROOT), timeout=600)
-    # 编译结束立即清理 daemon（无论成败都清，防止 gradle/kotlin daemon 残留堆积）
-    cleanup_daemons()
+    # 2026-09-03 local-build-speedup（R8）：编译成功默认保留 daemon 复用增量快照
+    # （idletimeout=600000 空闲 10min 自退兜底）；仅编译失败时清场，防止异常状态残留
     if result.returncode != 0:
+        cleanup_daemons()
         print("❌ 编译失败")
         return None
 
