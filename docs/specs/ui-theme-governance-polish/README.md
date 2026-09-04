@@ -1,6 +1,6 @@
-# UI 主题纳管与弹框交互优化（ui-theme-governance-polish）
+﻿# UI 主题纳管与弹框交互优化（ui-theme-governance-polish）
 
-> 状态：🔄 设计中
+> 状态：✅ 设计完成（🔄 开发中）
 > 创建：2026-09-03
 > 类型：UI 优化 + Bug 修复 + 主题体系扩展
 
@@ -18,6 +18,7 @@
 | P4 | 默认字号滑块居中 + 文字显示一半 | fallback 硬编码 `12f`（范围中点）+ 双重固定高度裁切 | 默认值偏左（10f）+ 高度策略改自适应 + 截断点扩展排查清单 |
 | P5 | 管理页沉浸顶栏开关不生效 | REGULAR 顶栏风格用户（首装暗夜紫预设/顶栏包）`isRegular=true` 时开关分支被短路成死代码 | 顶栏背景决策链三级化（显式自定义→沉浸开关→默认主色）+ 壁纸调制维度保留，保证全用户群开关有效 |
 | P6 | 管理页组件底色不透明，缺透明度设置 | 主题体系无透明度配置 | 新增"管理页背景透明度"设置项（coerceIn+E-Ink 豁免），**管理族全部宿主**消费（Scaffold 顶栏+根背景+非 Scaffold 管理页根背景）；弹框面板复用既有 dialogAlpha 机制；弹框域 Checkbox/RadioButton 三处取色离群本期清零 |
+| P7 | 设置本地密码弹框是孤岛未托管（用户追加） | MainActivity 备份链路 `setLocalPassword()` 用旧 View 体系 `alert()`+DialogEditTextBinding，脱离 AppDialogFrame 托管体系 | 迁移至既有托管组件 `showComposeTextInputDialog`（AppDialogFrame 体系）+ ComposeTextInputDialog 新增可选 onNegative 回调保留"取消→置空"语义 |
 
 ## 文档索引
 

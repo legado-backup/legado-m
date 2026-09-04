@@ -127,3 +127,10 @@ MaterialSurface 体系（ng P5 视觉设计：MaterialSurface(Compose) 与 Mater
 | `migration-registry.md` | 迁移登记（含 ui-style-unify-deep-fix 批次 H/D/S） | 跟踪中 |
 
 > 迁移状态权威源：`docs/specs/ui-style-unify-deep-fix/issue-list.md`（H1-H14/D1-D4/S1-S6）+ `tasks.md`；本文档为「常驻规范 + 禁止项」，改迁移状态时必须同步两处。
+## ui-theme-governance-polish 增量登记（2026-09-03）
+
+- **开关组件纳管**：全项目裸 `Switch(`（全限定名+短名）仅允许存在于 `LegadoMiuixComponents.kt`（组件内部 fallback）与预览画布（ThemeEditorScreen，门禁注释豁免）两处；`LegadoMiuixSwitch` 新增可选参数 `stroke: Color?`（未选中态 border 描边，双渲染路径共用 modifier）与 `compact: Boolean`（38x22dp mini 自绘，关阴影），默认值零影响
+- **AppDialogFrame titleTrailing 槽**：标题行右侧低频操作收纳位（登录弹框/换源弹框已迁入），默认 null 零影响
+- **管理页背景透明度消费链**：`AppConfig.manageBgAlphaFraction`（coerceIn 双向+E-Ink 强制 1f+单 key 不分日夜）→ AppManagementScaffold（顶栏终色乘法合成 wallpaperFactor*fraction+根背景绘制层）→ BaseActivity `manageBackgroundAlphaEnabled()` 钩子（applyBackgroundTint 单点覆盖三刷新链路，管理族封闭清单 33 宿主 override true）。弹框面板透明度由既有 dialogAlpha 机制承担，禁止 manageBgAlpha 作用于 AppDialogFrame
+- **TopBarConfig.hasCustomBackground()**：显式自定义背景色判定必须走 resolveBackgroundColor 兜底后值比较，禁止 `backgroundColor != null`（恒真陷阱）
+- **弹框托管**：DialogEditTextBinding 旧 View 输入弹框已全量清零，新输入弹框一律用 `showComposeTextInputDialog`（含 onPositive/onNeutral/onNegative/onDismissed 回调）

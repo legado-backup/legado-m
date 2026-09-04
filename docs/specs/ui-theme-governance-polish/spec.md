@@ -23,6 +23,7 @@
 - P5：`AppManagementScaffold` 沉浸顶栏开关语义修复
 - P6：新增管理页透明度配置（PreferKey + ThemeConfig 设置项 + 消费链：Scaffold 5 页 + **非 Scaffold 管理族宿主根背景本期全部接入**）
 - P6 扩展：**弹框域 Checkbox/RadioButton 三处离群（SingleChoiceDialog/ServersDialog/SettingsSelectableRow）本期取色修复**
+- P7（用户 2026-09-03 追加 bug）：**设置本地密码弹框托管**——MainActivity 备份链路的 `setLocalPassword()` 仍用旧 View 体系 `alert()` + DialogEditTextBinding（孤岛），迁移至既有托管组件 `showComposeTextInputDialog`
 
 ### Out of Scope
 
@@ -45,6 +46,7 @@
 5. **P5**：`AppManagementScaffold` 顶栏背景决策链整合沉浸开关，三级化：TopBarConfig 显式自定义背景色（`resolveBackgroundColor` 兜底后值比较，自定义包 JSON 可为 null，禁止裸 `!= null` 或裸值比较）→ `immersiveManageBar` 开关（沉浸=融入背景）→ 默认主色；内容色 `contrastOn` 基于不透明基色决策（先于 alpha）；既有 REGULAR 壁纸 alpha 调制维度保留（与透明度在同一调制点应用，防"仅设壁纸"用户壁纸被遮死）；wallpaperFile/cornerRadius 的 isRegular 门控不变；保证 REGULAR 与非 REGULAR 全用户群开关均有效。
 6. **P6**：新增 `PreferKey.manageBgAlpha`（0~100 整数，默认 100 不透明；**读取与写入双向 `coerceIn(0,100)`**——`Color.copy(alpha)` 超界抛异常，脏 pref 会使管理页全崩；**E-Ink 模式强制 fraction=1f** 白底黑字契约；单 key 不分日夜显式决策；`remember(themeVersion)` 单次读取防重组直读 prefs），ThemeConfigFragment 主题设置页复用既有 `SettingSliderSpec` 新增滑条（拖动中 draft+refreshSettings 实时回显，`onValueChangeFinished` 提交写入+RECREATE，拖动中不重建）；**消费链本期覆盖管理族全部宿主**：`AppManagementScaffold` 根 Column 显式背景绘制层 + 顶栏终色（透出层=windowBackground，alpha 统一在调制点应用一次）+ 非 Scaffold 管理族宿主（ThemeManageActivity/TopBarManageActivity 等）根背景接入；弹框面板透明度**复用既有 `AppConfig.dialogAlpha` 机制**（已存在，本期不重复新增，防双 alpha 叠乘）；`AppDialogFrame` 取色链结构不动。参考 archive 的透明度处理思路，但配置项命名、滑条档位、默认值按本项目风格自定。
 7. **P6 扩展（无二期，全部本期）**：弹框域 Checkbox/RadioButton 三处离群取色修复（SingleChoiceDialog:78/ServersDialog:216/SettingsSelectableRow:94 → AppDialogStyle/palette 映射）；换源弹框三点菜单迁移至 titleTrailing 槽。
+8. **P7（用户追加 bug）**：MainActivity `setLocalPassword()`（L2222-2244，备份链路 LocalConfig.password==null 时触发）由 View 体系 `alert()`+DialogEditTextBinding 迁移至既有托管组件 `showComposeTextInputDialog`（AppCompatActivity 重载，ComposeDialogAdapters.kt:418 → ComposeTextInputDialog/AppDialogFrame 体系）；`ComposeTextInputDialog` 及两个 adapter 重载新增可选 `onNegative: (() -> Unit)? = null` 回调（默认 null 零影响），保留旧"取消→password=''"语义。
 
 ### Alternatives Considered
 
@@ -115,6 +117,12 @@
 2. **管理族全部宿主**消费该透明度：`AppManagementScaffold`（顶栏终色 + 根背景绘制层，透出层为 windowBackground）+ 非 Scaffold 管理族宿主经 **BaseActivity 统一钩子**（`manageBackgroundAlphaEnabled()` + applyBackgroundTint 消费 fraction，单点覆盖 onCreate/RECREATE/onResume 三条刷新链路，豁免页宿主不丢 alpha）；弹框面板透明度复用既有 `AppConfig.dialogAlpha` 机制（UI 入口已存在，不新增，防叠乘）
 3. 读取与写入双向 `coerceIn(0,100)`；E-Ink 模式强制不透明（fraction=1f）；覆盖安装后新 key 有默认值，脏值/无值均无崩溃风险
 
+### R7 弹框托管纳管（P7）
+
+1. **DialogEditTextBinding 孤岛家族全部同迁**（用户裁决）：MainActivity 备份链路设置本地密码 + AiChatActivity/HandleFileActivity（2 处）/DictRuleActivity/TxtTocRuleActivity/BaseReadBookActivity/BookCharacterEditActivity/BookshelfManageActivity/CacheActivity 等 9 文件全部迁移至托管 Compose 组件（AppDialogFrame 体系），视觉随主题取色，与其他弹框形态一致
+2. 行为语义等价：确定→密码落盘并继续流程；取消→password 置空且不继续；两条入口（MainActivity 备份链路 / OtherConfigFragment 设置页）行为一致
+3. `ComposeTextInputDialog` 新增可选 `onNegative` 回调（默认 null），既有全部调用点零影响
+
 ## Scenarios
 
 ### S1: 升序开关随主题变色
@@ -151,3 +159,8 @@
 **Given** 覆盖安装新包
 **When** 打开书架布局弹框、换源弹框、登录弹框、主题编辑器
 **Then** 全部正常打开无崩溃，既有设置项行为不变
+
+### S8: 设置本地密码弹框托管（P7）
+**Given** 本地密码未设置（LocalConfig.password == null），用户在备份链路触发
+**When** 弹出"设置本地密码"弹框
+**Then** 弹框为托管 Compose 形态（AppDialogFrame 体系，随主题取色圆角描边）；输入密码点确定→落盘并继续备份流程；点取消→password 置空且不继续；设置页入口（OtherConfigFragment）行为不变
