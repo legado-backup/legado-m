@@ -135,7 +135,16 @@ flowchart LR
   - 清单契约：1.5 产出**封闭清单**（逐页列入/豁免+理由 + recreateOnThemeChange 真值列），作为 7.5/S6 验收基准；ConfigActivity 是否纳入由清单裁决并书面记录
   - `AppDialogFrame` 为全 App 通用弹框骨架（82 处调用点/74 文件），面板底色已消费全局 `AppConfig.dialogAlpha`（按日夜分 key，**UI 入口已存在**：ThemeManageActivity L659 setupDialogAlphaRow/L817-834 滑条）——弹框面板透明度**由既有 dialogAlpha 机制承担（已存在，复用非新增）**，manageBgAlpha 不作用于弹框面板，防全 App 弹框误伤及双 alpha 叠乘；dialogAlpha×manageBgAlpha 双低组合（同 <40%）可读性属用户自选风格，书面登记接受
 - **弹框域取色离群清零（用户裁决无二期）**：dialog 域 Checkbox/RadioButton 三处离群（SingleChoiceDialog:78 裸 RadioButton + colorScheme 直读、ServersDialog:216 裸 RadioButton、SettingsSelectableRow:94 无参 CheckboxDefaults.colors()）本期替换为 AppDialogStyle/palette 主题化取色，修复后 dialog 域无 colorScheme 直读离群点。实施细节：ServersDialog 的 ServersRow（L202-208）作用域无 style，需加参传入或行内调 rememberAppDialogStyle()；SettingsSelectableRow 取色来源用既有 rememberAppSettingPalette()（该文件 L40 已 import）；SingleChoiceDialog 为 M3 AlertDialog 容器（L53），容器色由 M3 scheme 派生属登记豁免（仅修 RadioButton/文字色），8.4 验收注明"容器为默认派生色"
-- archive 参考说明：archive 有类似透明度处理，但本项目的配置入口归入主题设置页、默认值 100%、管理族宿主作用域，均为自有设计决策
+
+### P7: 设置本地密码弹框托管（用户追加 bug）
+
+- **根因**：MainActivity `setLocalPassword()`（L2222-2244，备份链路 LocalConfig.password==null 时触发）用旧 View 体系 `alert()`+`DialogEditTextBinding` 自定义视图——AppDialogFrame/LegadoTheme 托管体系外的孤岛；同文件设置页入口 OtherConfigFragment L729 已是托管形态（showComposeTextInputDialog），两入口形态不一致
+- **迁移方案**：改调既有 `AppCompatActivity.showComposeTextInputDialog`（ComposeDialogAdapters.kt:418 → ComposeTextInputDialog，AppDialogFrame 体系已核实：style=rememberAppDialogStyle/LegadoMiuixActionButton actions）：
+  - `okButton { password=... }` → `onPositive { LocalConfig.password = it }`
+  - `onDismiss { block.resume(null) }` → 保留（迁移后由原 suspendCancellableCoroutine 链路承载，需确认 dismiss 路径 resume 不丢——Compose 弹框 dismissAllowingStateLoss 后原 alert 的 onDismiss 等价物为 DialogFragment onDismiss，语义平移）
+  - `cancelButton { password="" }` → **新增可选 `onNegative` 回调**：ComposeTextInputDialog（AppComposeDialogs.kt:335）加 ARG 与 negative 按钮 onClick 回调（默认 null 行为不变），两个 adapter 重载（Fragment L166/AppCompatActivity L418）同步加参
+  - 删除 MainActivity 的 DialogEditTextBinding import
+- **同族全部同迁（用户裁决 2026-09-03）**：DialogEditTextBinding 孤岛家族 9 文件（MainActivity/AiChatActivity:483/HandleFileActivity:191,222/DictRuleActivity:317/TxtTocRuleActivity:350/BaseReadBookActivity/BookCharacterEditActivity/BookshelfManageActivity/CacheActivity）全部迁移至 showComposeTextInputDialog，迁移模式与 P7 本体相同（逐一核对 onPositive/onNegative/dismiss 语义映射）；BookCharacterEditActivity/BaseReadBookActivity/BookshelfManageActivity/CacheActivity 仅 import 未实际 inflate 的以 Grep 复核后直接清 import
 
 ## Architecture Decisions
 
@@ -214,7 +223,9 @@ sequenceDiagram
 | `app/src/main/java/io/legado/app/ui/adapter/SourceFolderConfigDialog.kt` | 修改 | SourceFolderAscendingRow 换既有 LegadoMiuixSwitch + toMiuixPalette（L790-793） | P1 |
 | `app/src/main/java/io/legado/app/ui/widget/compose/LegadoMiuixComponents.kt` | 修改 | 既有 LegadoMiuixSwitch 新增可选 `stroke: Color? = null` + `compact: Boolean = false` 参数（border modifier 实现 stroke、compact 关阴影，默认值零影响；M3 fallback 分支同步） | P1 |
 | `app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfConfigDialog.kt` | 修改 | BookshelfMiniSwitch 迁移至公共组件（传 style.stroke + compact），删除私有实现，视觉统一 | P1 |
-| `app/src/main/java/io/legado/app/ui/widget/compose/AppComposeDialogs.kt` | 修改 | AppDialogFrame 增加 titleTrailing 槽（标题行 Row+weight 保留 Ellipsis；面板取色链不动） | P2 |
+| `app/src/main/java/io/legado/app/ui/widget/compose/AppComposeDialogs.kt` | 修改 | AppDialogFrame 增加 titleTrailing 槽（标题行 Row+weight 保留 Ellipsis；面板取色链不动）；ComposeTextInputDialog 新增可选 onNegative 回调（默认 null） | P2/P7 |
+| `app/src/main/java/io/legado/app/ui/widget/compose/ComposeDialogAdapters.kt` | 修改 | showComposeTextInputDialog 两个重载（Fragment L166/AppCompatActivity L418）新增可选 onNegative 参数 | P7 |
+| `app/src/main/java/io/legado/app/ui/main/MainActivity.kt` | 修改 | setLocalPassword() 迁移 showComposeTextInputDialog（L2222-2244），删除 DialogEditTextBinding import | P7 |
 | `app/src/main/java/io/legado/app/ui/book/changesource/ChangeBookSourceDialog.kt` | 修改 | 内容区三点菜单迁移至 titleTrailing 槽（L414-477，菜单项不变） | P2 |
 | `app/src/main/java/io/legado/app/ui/widget/compose/ComposeDialogFragment.kt` | 修改 | 新增 `onBackIntercepted()` 开放钩子（默认 false），handleDialogBack 接入 | P3 |
 | `app/src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt` | 修改 | 3 按钮收进三点菜单（零新资源），actions 仅留"确定"（L266-298） | P2 |
