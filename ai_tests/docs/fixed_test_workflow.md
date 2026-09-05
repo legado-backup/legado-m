@@ -52,6 +52,7 @@
 | 16p. Compose S5 阅读浮层 L2 | `l2_verify_compose_s5_read_float.py` | 3s 自动隐藏/单一 activeSheet/BackHandler 优先级链/手势 R0-R4/磨砂 API31 分支（S5-1~5；R3 双指缩放=手动清单） | `python ai_tests/scripts/l2_verify_compose_s5_read_float.py [--scenario all]` |
 | 16q. Compose S6 弹窗族 L2 | `l2_verify_compose_s6_dialog_tiers.py` | L1 Confirm/L2 Form/L3 Management 三宽度档断言+弹框独立窗口不变量（S6-1~4；dp=px/density cap 容差 8dp） | `python ai_tests/scripts/l2_verify_compose_s6_dialog_tiers.py [--scenario all]` |
 | 16r. Compose 缓存清理页 L2 | `l2_verify_compose_cache.py` | CacheScreen 可达（CacheActivity 类名）/Compose 渲染锚点/无崩溃退出（registry 7.11be 销项） | `python ai_tests/scripts/l2_verify_compose_cache.py [--scenario all]` |
+| 16s. 批量 UI 修复 0905 L2 | `l2_verify_ui_batch_fix_0905.py` | T1 崩溃弹框回归/T2 订阅头部收口/T3 三点菜单 6 项/T4 发现页分组反馈（像素差）/T5 死菜单清理/T6 无卷视频书沉浸式集数/T7 有卷回归/T8 布局切换+选集切换帧差判定（ui-batch-fix-0905 新增）；辅助 `diag_video_books.py` 查视频书库存 | `python ai_tests/scripts/l2_verify_ui_batch_fix_0905.py [--scenario all\|t1..t8]` |
 
 ### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
 

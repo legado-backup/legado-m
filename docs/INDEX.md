@@ -11,6 +11,7 @@
 - [UI 主题纳管与弹框交互优化](./specs/ui-theme-governance-polish/README.md) - 7 项 UI 问题修复：订阅布局弹框开关主题化+登录弹框按钮收纳+主题编辑器保存感知+字号滑条偏左+沉浸顶栏开关修复+管理页透明度设置+本地密码弹框托管（八轮红队+N1-N3 已闭环）🔄 开发中（真机反馈转入 followup）
 - [管理页样式统一与交互回归修复](./specs/ui-theme-governance-followup/README.md) - 真机反馈 5 类问题：发现页视频上滑误报（队列注入被 revert 移除）+书架手势三修+发现页标签闪烁+透明度 v2 预混模型全域生效+管理族子页面顶栏列表统一（24 页分型矩阵）🔄 设计中
 - [本地打包提速](./specs/local-build-speedup/README.md) - daemon 复用+debug 降堆+configuration cache+版本号 ValueSource 化，增量打包 7m33s→≤4min，内存峰值 93.5%→≤91%（基线实测支撑，红队 2 轮闭环）🔄 实施完成，R1 计时补测待并行会话合并
+- [批量 UI 修复 0905](./specs/ui-batch-fix-0905/README.md) - 4 项用户反馈：崩溃弹框误弹回归+视频书源沉浸式左下角线路/集数+发现页分组弹窗 Bug 与全前端死菜单清理+经典订阅头部收口（搜索留外/六项收三点/删分组信息列举）✅ 开发完成（T1-T8 L2 真机验证，待用户验收）
 
 ---
 
