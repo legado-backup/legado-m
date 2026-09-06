@@ -1,6 +1,7 @@
 # 日志规范
 
 > 基于 Legado 项目源码深度分析提取的项目特有日志约定。
+> 2026-09-06 同步 log-system-upgrade：recordLog 默认值按包类型区分 + DEBUG 级完整记录 + 内存容量 500 + 日志管理中心（ui/log/LogActivity）。
 
 ---
 
@@ -9,13 +10,15 @@
 ### 第一层：AppLog（核心日志，面向用户/调试）
 
 - 文件：`constant/AppLog.kt`
-- 单例对象，维护内存日志列表（最多 100 条）
+- 单例对象，维护内存日志列表（上限 500 条，`MAX_LOG_SIZE` 常量；最新在前，超限移除最旧）
 - 方法：
   - `put(message, throwable?, toast?)` — 记录日志 + 写文件 + Debug Logcat
   - `putNotSave(message, throwable?)` — 仅内存 + Logcat
   - `putDebug(message, throwable?)` — 仅 `AppConfig.recordLog` 开启时记录
+  - `logs` — @Synchronized 快照（UI 侧读取安全，规避并发 CME）
+  - `removeLogs(entries)` — 多选删除（按对象引用 `===` 匹配，规避 data class equals 误删重复项与索引漂移）
 - `toast = true` 时直接 Toast 提示用户
-- 日志可在 App 内通过 `AppLogDialog` 查看
+- 日志可在 App 内通过 `AppLogDialog`（轻量弹框，约 20 处入口）或「日志管理」全屏页查看
 
 ```kotlin
 AppLog.put("执行preUpdateJs规则失败 书源:${bookSource.bookSourceName}", it)
@@ -27,7 +30,7 @@ AppLog.put("保存成功", toast = true)
 - 文件：`utils/LogUtils.kt`
 - 基于 `java.util.logging.Logger`，Logger 名 `"Legado"`
 - 使用自定义 `AsyncFileHandler`（异步写入，避免 IO 阻塞）
-- 日志文件存储在 `externalCacheDir/logs/`，自动清理 7 天前
+- 日志文件存储在 `externalCacheDir/logs/`，自动清理 7 天前（含 `.lck` 锁文件）
 - 日志级别由 `AppConfig.recordLog` 控制
 
 ### 第三层：DebugLog（纯 Logcat 调试日志）
@@ -36,10 +39,17 @@ AppLog.put("保存成功", toast = true)
 - 仅在 `BuildConfig.DEBUG` 时输出到 Logcat
 - 提供 e/d/i/w 四个级别
 
+## recordLog 开关语义（log-system-upgrade AD-01/AD-02）
+
+- **默认值按包类型区分**：无用户偏好值时，debug 测试包默认 `true`、release 正式包默认 `false`（`AppConfig.recordLog` getter 按 `BuildConfig.DEBUG` 取默认）；用户显式设置后以设置为准（两类包行为一致）
+- **单一权威开关**：`开 = 全量四级记录（内存 + 文件）`；`关 = 仅 ERROR/WARN/INFO 进内存`（DEBUG 级丢弃）
+- release 包下 DEBUG 级 logcat 输出仍由 `BuildConfig.DEBUG` 守卫（避免噪音）；ERROR/WARN/INFO 无条件输出 logcat（线上可采集）
+
 ## 辅助工具
 
 - `printOnDebug()` 扩展函数（`LogUtils.kt`）：Throwable 扩展，仅 Debug 模式打印堆栈
 - `Debug` 对象（`model/Debug.kt`）：书源调试专用日志，带时间戳，支持 UI 回调显示
+- `ui/log/LogActivity`（日志管理中心，log-system-upgrade）：全屏 4 Tab——应用日志（搜索/级别筛选/多选删除/详情/复制）、崩溃日志（查看/单删/多删/分享）、文件日志（尾部 500 行截断查看/删除）、堆转储（大小/删除）；顶栏一键清除（确认+占用文件跳过）+ 导出 logs.zip（`ui/log/LogExporter` 复用精准管理 saveLog）；支持 Intent extra `EXTRA_INITIAL_TAB` 直达指定 Tab
 
 ## 日志标签约定
 
