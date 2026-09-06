@@ -60,16 +60,17 @@ flowchart LR
 - **ChangeLog**: 初版
 
 ### AD-04: 新建全屏 Compose 日志管理中心，Dialog 体系保留
-- **Version**: v1.0
+- **Version**: v1.1
 - **UpdateTime**: 2026-09-06
 - **Context**: 现有 AppLogDialog（约 20 处入口）/CrashLogsDialog 为 Dialog 形态，无搜索/多选删除/文件列表；精准管理页三件套入口分散
 - **Concern**: 日志管理交互（多选、搜索、4 类数据源）在 Dialog 内承载极差；但 Dialog 入口分布广，全量迁移风险大
-- **Decision**: 新建 `ui/log/LogActivity`（Compose + TabRow 4 Tab），作为日志管理唯一全功能入口；AppLogDialog/CrashLogsDialog 及其 20 处入口**原样保留**（轻量查看场景），精准管理页新增「日志管理」入口并整合「崩溃日志」跳转。实施遵循 `ui-standards/architecture.md` 四组件族基线与取色唯一基线，禁止硬编码色
-- **Goal**: 全功能集中、既有入口零破坏、可增量演进
+- **Decision**: 新建 `ui/log/LogActivity`（Compose + TabRow 4 Tab），作为日志管理唯一全功能入口；AppLogDialog/CrashLogsDialog 及其 20 处入口**原样保留**（轻量查看场景）。实施遵循 `ui-standards/architecture.md` 四组件族基线与取色唯一基线，禁止硬编码色
+- **v1.1 修订（用户反馈收口）**：精准管理页「崩溃日志」「保存日志」「创建堆转储」三项菜单移除，仅保留「日志管理」入口；右上角按规范收口为三个竖点（MoreVert）+ AppDropdownMenu 溢出菜单承载全部操作（多选/创建堆转储/导出日志/一键清除）；createHeapDump 逻辑自 PreciseManageFragment 平移至 LogActivity（完成后 onFinally 刷新列表）；崩溃日志=切换 Tab 即达
+- **Goal**: 全功能集中、菜单收口统一、可增量演进
 - **Tradeoff**: 短期内 Dialog 与全屏页并存，功能有重叠（接受：演进期过渡态）
 - **Status**: Accepted
 - **Superseded-by**: 无
-- **ChangeLog**: 初版
+- **ChangeLog**: v1.0 初版；v1.1 用户反馈收口修订（三点溢出菜单+三件套菜单移除+createHeapDump 迁移）
 
 ### AD-05: 文件查看采用尾部截断策略
 - **Version**: v1.0
