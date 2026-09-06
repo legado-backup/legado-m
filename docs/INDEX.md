@@ -6,6 +6,8 @@
 
 ## 🔴 进行中的工作 → 设计中
 
+- [UI 设置体验修复包](./specs/archive/2026-09-06-ui-settings-fix-pack/README.md) - 三项 UI 体验修复：主界面底栏搜索框显隐入口补齐（设置页快捷开关+两层配置防回滚）+ fontScale 放大组件文字截断逐点修复（12 处 height→heightIn(min)）+ 恢复被误删调用链的优化版取色器 ColorPickerSheet（扩展跟随默认）✅ 已完成并归档（2026-09-06 验收通过，commit 13574ae41）
+- [主界面头部透明对齐Archive](./specs/main-topbar-transparent-align/README.md) - 四Tab头部透明失效根因修复：恢复 MaterialValueHelper backgroundColor 透明原语（背景图→TRANSPARENT 分支被删）+BaseActivity decorView 着色策略对齐（P0/P1 diff 实证，overlay/blur 排除）🔄 设计中
 - [书源视频对标订阅源](./specs/video-booksource-align-rss/README.md) - 书源视频单页化+列表驱动上滑+公共采集链组件（根治直链地址不正确/播放信息不匹配/上滑卡死三类反复问题）✅ 已实施（2026-09-03，S1-S4 真机验证通过）
 - [视频播放器双布局模式](./specs/video-player-dual-layout/README.md) - 内置抖音沉浸式(默认)+传统(上播放器下信息区)双布局可配置，设置中心化到「我的→视频播放器设置」，播放页仅保留即时生效项，嗅探/采集链零改动（五轮红队闭环，/goal 实施中）🔄 开发中
 - [UI 主题纳管与弹框交互优化](./specs/ui-theme-governance-polish/README.md) - 7 项 UI 问题修复：订阅布局弹框开关主题化+登录弹框按钮收纳+主题编辑器保存感知+字号滑条偏左+沉浸顶栏开关修复+管理页透明度设置+本地密码弹框托管（八轮红队+N1-N3 已闭环）🔄 开发中（真机反馈转入 followup）
@@ -13,7 +15,7 @@
 - [本地打包提速](./specs/local-build-speedup/README.md) - daemon 复用+debug 降堆+configuration cache+版本号 ValueSource 化，增量打包 7m33s→≤4min，内存峰值 93.5%→≤91%（基线实测支撑，红队 2 轮闭环）🔄 实施完成，R1 计时补测待并行会话合并
 - [批量 UI 修复 0905](./specs/ui-batch-fix-0905/README.md) - 4 项用户反馈：崩溃弹框误弹回归+视频书源沉浸式左下角线路/集数+发现页分组弹窗 Bug 与全前端死菜单清理+经典订阅头部收口（搜索留外/六项收三点/删分组信息列举）✅ 开发完成（T1-T8 L2 真机验证，待用户验收）
 - [真机回归修复 0906](./specs/video-regression-fix-0906/README.md) - 4 项真机反馈：嗅探播放下滑（ExoPlayer 4003 解码竞态重建重试+DoH 死节点熔断+token 竞态观测）+书源切布局死窗（短路重采集）+书源上滑失效（队列兜底注入+集内降级，AD-01 边界增补）+分类列表页三点死按钮接线（45 文件日志脱敏分析+3 路源码探索）✅ 开发完成（S1-S3+T1-T8 L2 真机回归，待用户验收）
-- [日志系统升级改造](./specs/log-system-upgrade/README.md) - 测试包默认详细日志（recordLog 按包类型默认值+DEBUG 级完整落盘+内存 100→500）+ 全屏日志管理中心（应用/崩溃/文件/堆转储 4 Tab：搜索、多选删除、详情、分享、一键清除、导出）✅ 开发完成（S3 L2 抽样验证四 Tab 可达，待用户验收；接管会话修复 @get:Synchronized 编译错误）
+- [日志系统升级改造](./specs/log-system-upgrade/README.md) - 测试包默认详细日志（recordLog 按包类型默认值+DEBUG 级完整落盘+内存 100→500）+ 全屏日志管理中心（应用/崩溃/文件/堆转储 4 Tab：搜索、多选删除、详情、分享、一键清除、导出；右上角三点收口+精准管理三件套菜单收口至统一入口）✅ 开发完成（L1 全勾+编译通过+S3 L2 抽样四 Tab 可达，待用户打包验收）
 
 ---
 
