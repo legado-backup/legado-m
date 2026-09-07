@@ -72,9 +72,11 @@
 - [x] 4.1 CacheManageActivity：composeHost + AppManagementScaffold 重写（**ViewModel 复用；ItemTouchHelper→LazyColumn 拖拽重实现**；多选/排序/清理确认全保留）
   - 留痕 (L1 编译过，7 轮收敛)：**AOAdapt 前提修正**——子代理源码穿透实测本页无 ItemTouchHelper/无多选/无拖拽（排序为对话框比较器），"拖拽重实现"描述不成立，按保真原则未新增拖拽；交付=新建 CacheManageScreen（Scaffold+3 topAction+日夜 Tab 行+LazyColumn item 卡片[封面 BookCoverImage/源 chip/计数/状态/任务消息/动作 chip 行]+空态+常驻批量按钮行）+Activity 重写（composeHost 桥接/mutableStateMapOf 任务态定向 diff 写等效 PAYLOAD 局部刷新/8 动作枚举分发/确认弹框与锁定门禁全保留/VM 零改动）+删 CacheManageAdapter/item_cache_manage_book.xml+XML 纯化单 ComposeView | 踩坑记录：LegadoTheme 包路径 ui.theme、AppManagementPalette.settings.row/rowPressed 为 Int 需 Color() 包装、LegadoMiuixActionButton 需 LegadoMiuixPalette（管理页色板无转换改用 Chip）、MaterialTheme.typography.bodySecondary 需扩展 import、onBack lambda 内禁读 Composable 状态、FrameLayout 无 setViewCompositionStrategy
   - 验证标准：缓存数据零丢失，操作等价 (L3)
-- [ ] 4.2 CoverCollectionDetailActivity：同模板重写（浏览/收藏管理）
+- [x] 4.2 CoverCollectionDetailActivity：同模板重写（浏览/收藏管理）
+  - 留痕 (L1 编译过)：新建 CoverCollectionDetailScreen（Scaffold+导入 topAction+LazyVerticalGrid 3 列图片墙[AndroidView 包装 Glide ImageView]+长按删除 combinedClickable+空态）+Activity 重写（composeHost 桥接/collectionName+images 快照状态/删除确认链原样）+XML 纯化单 ComposeView+删 item_cover_collection_image.xml | 新增 cover_collection_empty 空态字符串 | ⚠️ 第 4 次并行 Edit 竞态（空态 Box 修正被覆盖），串行重修——铁律再次验证
   - 验证标准：收藏浏览功能等价 (L3)
-- [ ] 4.3 W4 波提交
+- [x] 4.3 W4 波提交
+  - 留痕：4.1=aa840faad、4.2+4.3=本波尾提交；L2 结构验证随模拟器环境恢复统一补验（GPU 故障期视觉挂起）
 
 ## 5. W5 管理列表/编辑型穷举（红队 R1-P0 缺口补入）
 - [ ] 5.1 BookSourceActivity/RssSourceActivity/TxtTocRuleActivity/ReplaceRuleActivity/DictRuleActivity/HighlightRuleActivity：管理列表型统一（含 ReplaceRule View 手术残留收尾：titleBar GONE+removeView 清理）
