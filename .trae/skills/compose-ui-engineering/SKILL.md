@@ -25,7 +25,8 @@ Compose 是函数式 UI 描述：`@Composable` 函数会被运行时重复执行
 | 文档 | 内容 | 何时读 |
 |------|------|--------|
 | `docs/project-rules/frontend-ui-standards.md` | **archive 迁移后强制基线**：设计 Token(AppShapes/UiCorner)+页面骨架分型+组件六族选用+View/Compose 混用红线+改造检查清单+已知坑 | 任何 Compose 页改造前（一级规范） |
-| `docs/project-flow/ui-standards/` | archive 迁移源核验参考：components/color/间距/骨架/dialog/迁移登记 | 组件归属/迁移状态核实时 |
+| `docs/project-flow/ui-standards/` | archive 迁移源核验参考：components/color/间距/骨架/dialog/迁移登记。**§三.1 顶栏族=3→1 归一终态权威源**（GlassTopAppBar 子页单源，2026-09-08 收官） | 组件归属/迁移状态核实时 |
+| `references/migration-workflow.md`（本项目） | **View→Compose 迁移实战工作流**：顶栏选型/ComposeView 容器替换陷阱（removeView no-op+addView 越界）/内容色作用域/MenuAction tint 决策/万级列表性能/交付纪律 | **任何 XML→Compose 页面迁移动手前必读** |
 | `docs/specs/ui-redesign-m3/ui-standards.md` | 历史 Compose 化工程详规：设计基石/骨架六类/组件精确真值表/检查清单/KPI（自研增量阶段产物，**归档为历史参考**，仅作组件规格真值溯源） | 组件精确规格（真值表/槽位）溯源时 |
 | `docs/specs/ui-redesign-m3/pages-inventory.md` | 84 页功能点清单 | 定位要改造的页面时 |
 | `docs/specs/ui-redesign-m3/tasks.md` | 任务进度 + 实施回执 | 改造完成后填回执 |
@@ -149,6 +150,11 @@ Composable 体内只描述 UI。改变外部世界的工作放进生命周期匹
 | 凭直觉加 stability wrapper 压重组数 | 先测量，确认输入没变却重组 |
 | 页面私有复制公共组件能力 | 复用 ui-standards §3 组件目录 |
 | 硬编码颜色/中文文案 | LegadoTheme 色板 + strings.xml |
+| 自绘顶栏分支不包 `LocalContentColor provides contentColor` | 必须包裹，否则图标回落黑色不随日夜主题（bugfix-0908f 实锤） |
+| 菜单/顶栏图标显式 tint 钉主题色（onSurfaceVariant 等） | `MenuActionIcon` 默认继承 `LocalContentColor.current`，仅 `action.tint` 显式覆盖 |
+| 容器替换 `addView(cv, index)` 用 removeView 前算的索引 | `index.coerceAtMost(container.childCount)`（摘录模板页闪退实锤） |
+| 对 binding.titleBar 等"错误 parent" removeView 后不验证 | 静默 no-op 残留旧顶栏——removeView 后断言可见性或改 GONE |
+| 万级列表用 joinToString 指纹串/比较器内查 Map | 整数版本信号 + 扁平 RowModel + IO 线程预计算（见 migration-workflow §2.7） |
 
 ## 详细参考（按需读，勿一次全载入）
 
