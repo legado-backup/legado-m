@@ -659,9 +659,112 @@ def t5(d, seed: int = 0, do_cleanup: bool = False) -> bool:
     return ok
 
 
+# ---------------- t6 摘录分享模板页启动（0908-followup T3 回归） ----------------
+def t6(d) -> bool:
+    print("== t6 摘录分享模板页：启动存活（IndexOutOfBounds 回归） ==")
+    force_stop()
+    shell(["logcat", "-c"])
+    out = start_activity("io.legado.app.ui.config.ShareNoteTemplateManageActivity", wait=5.0)
+    if "does not exist" in out:
+        print("  [FAIL] ShareNoteTemplateManageActivity 启动失败")
+        return False
+    time.sleep(2.0)
+    resumed = resumed_activity()
+    xml = dump(None)
+    # 页面锚点：顶栏标题/添加入口（Compose Screen 渲染成功标志）
+    anchors = [t for t in texts(xml) if ("摘录" in t or "模板" in t or "添加" in t or "新建" in t or "导入" in t)]
+    print(f"  resumed={resumed} 页面锚点数: {len(anchors)}（脱敏计数）")
+    ok = resumed.endswith("ShareNoteTemplateManageActivity") and len(anchors) >= 1
+    print(f"  判定: {'✅ 通过（启动无崩溃+内容可达）' if ok else '❌ 失败'}")
+    shell(["input", "keyevent", "4"], timeout=90)
+    time.sleep(1.0)
+    ok = fatal_check("t6") and ok
+    return ok
+
+
+# ---------------- t7 经典发现头部（0908-followup T1 回归） ----------------
+def t7(d) -> bool:
+    print("== t7 经典发现：头部存活+形态切换（颜色视觉留真机） ==")
+    force_stop()
+    shell(["logcat", "-c"])
+    start_activity("io.legado.app.ui.welcome.WelcomeActivity", wait=6.0)
+    # 发现与订阅设置页 → "发现页模式"项（注意区分"发现页布局/发现页管理"相邻项）→ 切经典发现
+    if not _goto_rss_discovery_sub():
+        return False
+    xml = dump(None)
+    title = "发现页模式" if "发现页模式" in texts(xml) else next(
+        (t for t in texts(xml) if "发现页模式" in t), None)
+    if not title:
+        print("  [WARN] 未找到发现形态设置项")
+        return False
+    tap_text(None, title)
+    xml = dump(None)
+    # 发现形态可能为对话框/下拉两种形态：选项不做位置过滤，取首个"经典发现"
+    best = None
+    for m in re.finditer(r'text="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
+        if m.group(1) == "经典发现":
+            x1, y1, x2, y2 = map(int, m.groups()[1:])
+            best = ((x1 + x2) // 2, (y1 + y2) // 2)
+            break
+    if not best:
+        print("  [WARN] 未定位'经典发现'选项")
+        return False
+    shell(["input", "tap", str(best[0]), str(best[1])])
+    time.sleep(2.0)
+    if not _back_to_main_and_open_discovery():
+        print("  [FAIL] 未能进入发现 tab")
+        return False
+    time.sleep(3.0)
+    # 经典发现头部 = TitleBar（title_bar 节点存在且可见）
+    flag_title = view_flag("title_bar")
+    print(f"  经典发现 title_bar 标志: {flag_title or '未找到'}")
+    ok = flag_title == "V"
+    print(f"  判定: {'✅ 通过（经典发现头部在位，颜色/壁纸视觉留真机）' if ok else '❌ 失败'}")
+    ok = fatal_check("t7") and ok
+    return ok
+
+
+def _back_to_main_and_open_discovery():
+    """返回键退出设置链到 MainActivity → 点发现 tab"""
+    for _ in range(4):
+        shell(["input", "keyevent", "4"], timeout=90)
+        time.sleep(1.5)
+        if resumed_activity().endswith("MainActivity"):
+            break
+    xml = dump(None)
+    m = re.search(r'resource-id="[^"]*menu_discovery[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+    if m:
+        cx = (int(m.group(1)) + int(m.group(3))) // 2
+        cy = (int(m.group(2)) + int(m.group(4))) // 2
+        shell(["input", "tap", str(cx), str(cy)], timeout=90)
+        time.sleep(2.5)
+        return True
+    return tap_text(None, "发现")
+
+
+# ---------------- t8 管理族自绘顶栏存活（0908-followup T2 回归） ----------------
+def t8(d) -> bool:
+    print("== t8 管理族自绘分支顶栏：页面存活（图标颜色视觉留真机） ==")
+    force_stop()
+    shell(["logcat", "-c"])
+    out = start_activity("io.legado.app.ui.book.source.manage.BookSourceActivity", wait=5.0)
+    if "does not exist" in out:
+        print("  [FAIL] BookSourceActivity 启动失败")
+        return False
+    time.sleep(2.0)
+    resumed = resumed_activity()
+    print(f"  resumed={resumed}")
+    ok = resumed.endswith("BookSourceActivity")
+    print(f"  判定: {'✅ 通过（自绘分支顶栏路径零崩溃）' if ok else '❌ 失败'}")
+    shell(["input", "keyevent", "4"], timeout=90)
+    time.sleep(1.0)
+    ok = fatal_check("t8") and ok
+    return ok
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario", default="all", help="all|t1|t2|t3|t4|t5")
+    ap.add_argument("--scenario", default="all", help="all|t1|t2|t3|t4|t5|t6|t7|t8")
     ap.add_argument("--seed", type=int, default=0, help="t5 造数条数")
     ap.add_argument("--cleanup", action="store_true", help="t5 清理合成源")
     ap.add_argument("--keep-alpha", action="store_true", help="t4 不恢复 dialogAlpha")
@@ -681,6 +784,12 @@ def main():
         results["t4"] = t4(None, keep_alpha=args.keep_alpha)
     if sc in ("t5", "all"):
         results["t5"] = t5(None, seed=args.seed, do_cleanup=args.cleanup)
+    if sc == "t6":
+        results["t6"] = t6(None)
+    if sc == "t7":
+        results["t7"] = t7(None)
+    if sc == "t8":
+        results["t8"] = t8(None)
 
     print("== 汇总 ==")
     for k, v in results.items():
