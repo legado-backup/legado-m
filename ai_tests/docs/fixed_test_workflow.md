@@ -53,6 +53,7 @@
 | 16q. Compose S6 弹窗族 L2 | `l2_verify_compose_s6_dialog_tiers.py` | L1 Confirm/L2 Form/L3 Management 三宽度档断言+弹框独立窗口不变量（S6-1~4；dp=px/density cap 容差 8dp） | `python ai_tests/scripts/l2_verify_compose_s6_dialog_tiers.py [--scenario all]` |
 | 16r. Compose 缓存清理页 L2 | `l2_verify_compose_cache.py` | CacheScreen 可达（CacheActivity 类名）/Compose 渲染锚点/无崩溃退出（registry 7.11be 销项） | `python ai_tests/scripts/l2_verify_compose_cache.py [--scenario all]` |
 | 16s. 批量 UI 修复 0905 L2 | `l2_verify_ui_batch_fix_0905.py` | T1 崩溃弹框回归/T2 订阅头部收口/T3 三点菜单 6 项/T4 发现页分组反馈（像素差）/T5 死菜单清理/T6 无卷视频书沉浸式集数/T7 有卷回归/T8 布局切换+选集切换帧差判定（ui-batch-fix-0905 新增）；辅助 `diag_video_books.py` 查视频书库存 | `python ai_tests/scripts/l2_verify_ui_batch_fix_0905.py [--scenario all\|t1..t8]` |
+| 16t. 真机反馈五项修复 0908 L2 | `l2_verify_bugfix_0908.py` | t1 替换净化单搜索框/t2 订阅文件夹视图切换无残留（全 UI 复刻用户路径）/t3 我的页书架媒体入口移除/t4 弹框 dim 补偿（alpha=60 标志级断言）/t5 万级书源域名分组稳定性（`--seed N` 造数 `--cleanup` 清理）；含 MEmu 陷阱沉淀：su 单字符串通道、u2.connect 破坏 su、prefs 直写被外观套件快照覆盖、screencap 黑屏 GPU 故障（real-device-bugfix-0908 新增） | `python ai_tests/scripts/l2_verify_bugfix_0908.py [--scenario all\|t1..t5] [--seed N] [--cleanup]` |
 
 ### ⚠️ uiautomator 环境陷阱（2026-08-30 实锤，read-menu 任务沉淀）
 
