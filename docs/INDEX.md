@@ -15,7 +15,7 @@
 - [UI 主题纳管与弹框交互优化](./specs/ui-theme-governance-polish/README.md) - 7 项 UI 问题修复：订阅布局弹框开关主题化+登录弹框按钮收纳+主题编辑器保存感知+字号滑条偏左+沉浸顶栏开关修复+管理页透明度设置+本地密码弹框托管（八轮红队+N1-N3 已闭环）🔄 开发中（真机反馈转入 followup）
 - [管理页样式统一与交互回归修复](./specs/ui-theme-governance-followup/README.md) - 真机反馈 5 类问题：发现页视频上滑误报（队列注入被 revert 移除）+书架手势三修+发现页标签闪烁+透明度 v2 预混模型全域生效+管理族子页面顶栏列表统一（24 页分型矩阵）🔄 设计中
 - [子页面顶栏取色统一](./specs/subpage-topbar-unify/README.md) - 顶栏取色统一+沉浸透明语义（全局壁纸下顶栏透明透壁纸）：三级决策链单源 resolvePageBarColorWithAlpha，ConfigTopBar 消灭（4→3），二期组件归一 Delta 已追加（共享内核+管理族委托 3→2+MainTopBarView 消亡路线）✅ 已验收通过
-- [我的全域Compose化](./specs/my-compose-full/README.md) - "我的"入口 45 页 Compose 化盘点（C-full 36/C-mixed 8/C-none 2）+ 四波迁移（W1 应用主题族先行→W2 收尾→W3 并存页→W4 纯 View 重写），与顶栏二期协同 🔄 设计中
+- [我的全域Compose化](./specs/my-compose-full/README.md) - "我的"入口 45 页 Compose 化盘点（C-full 36/C-mixed 8/C-none 2）+ 六波迁移（W0 闸门→W1 基线→W2 地基→W3 并存页→W4 纯 View 重写→W5/W6 穷举清扫→W7 顶栏 3→1 归一收官） ✅ 实施完成（L2/L3 真机回归待补验）
 - [本地打包提速](./specs/local-build-speedup/README.md) - daemon 复用+debug 降堆+configuration cache+版本号 ValueSource 化，增量打包 7m33s→≤4min，内存峰值 93.5%→≤91%（基线实测支撑，红队 2 轮闭环）🔄 实施完成，R1 计时补测待并行会话合并
 - [批量 UI 修复 0905](./specs/ui-batch-fix-0905/README.md) - 4 项用户反馈：崩溃弹框误弹回归+视频书源沉浸式左下角线路/集数+发现页分组弹窗 Bug 与全前端死菜单清理+经典订阅头部收口（搜索留外/六项收三点/删分组信息列举）✅ 开发完成（T1-T8 L2 真机验证，待用户验收）
 - [真机回归修复 0906](./specs/video-regression-fix-0906/README.md) - 4 项真机反馈：嗅探播放下滑（ExoPlayer 4003 解码竞态重建重试+DoH 死节点熔断+token 竞态观测）+书源切布局死窗（短路重采集）+书源上滑失效（队列兜底注入+集内降级，AD-01 边界增补）+分类列表页三点死按钮接线（45 文件日志脱敏分析+3 路源码探索）✅ 开发完成（S1-S3+T1-T8 L2 真机回归，待用户验收）
