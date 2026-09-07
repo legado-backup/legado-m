@@ -317,6 +317,73 @@ flowchart LR
 - **Tradeoff**: 支干样板页需投入一次"高质量打磨"时间（S2→BookSourceActivity、S3→BookSourceEditActivity 等），一旦冻结后续页不可另起炉灶。
 - **Status**: Accepted
 
+## 前端 UI 入口与功能操作完整性设计（2026-09-07 红队反省补齐）
+
+> 触发：用户质询"设计文档是否对前端 UI 入口及功能操作全面考虑与设计？设计前是否了解前端规范？"经两路子代理审计实锤 4 项系统性缺口（见 AD-25 Context），本章与 AD-25 为结构性补齐，对 D4/B3/B4/B5 全部批次生效。
+
+### 缺口反省结论（审计实锤）
+
+| # | 缺口 | 铁证 |
+|---|------|------|
+| G1 | 设计前未读工作区前端规范：本文档/spec.md 全文 0 处引用 `docs/project-flow/ui-standards/architecture.md`（四组件族+取色唯一基线+9 条开发门禁），引用的是 spec 内部已归档历史 ui-standards.md，且 §1.2 colorScheme 34 槽位优先与其"禁 colorScheme 页面级取色"新禁令存在口径差 | 两文件 Grep "四组件族" 0 命中 |
+| G2 | pages-inventory 84 页无"入口清单"字段，入口信息零散嵌于功能点文本；S3 书源编辑页遗漏模式未防呆，已二次重演（C2 BookSourceEditActivity 在 inventory 已登记但 master-track 批次清单无其实施 task） | pages-inventory 无 inbound/outbound 字段 |
+| G3 | 功能操作有枚举但无"迁移后保留/降级"逐项映射，D4 v2 行以"全量功能保留（红线合规）"整句概括；2026-09-06 视频详情页队列注入覆盖列表页完整队列（上一部/下一部丢失）即此缺口模式的运行时实锤 | inventory 无操作映射列 |
+| G4 | B3-D4 批 3 的 12 场景 L2 仅覆盖 2 条进入路径（S1/S7），搜索提交跳转、收藏列表进入、openRssLegacy 兼容等 inbound 未纳入验证 | flagship 分册 §7① 有 3 入口枚举但 §8 场景未覆盖 |
+
+### AD-25: 页面入口清单 + 功能操作保留/降级映射双字段强制门禁
+- **Context**: G1-G4 四缺口；页面登记≠入口盘点、操作枚举≠迁移承诺，"登记页遗漏于批次清单""整句概括功能保留"两类回归已实际发生。
+- **Concern**: 不补字段级设计，Compose 迁移将持续产出"功能静默丢失"型缺陷，且验收时无逐项对照物。
+- **Decision**:
+  1. **入口清单字段（inbound/outbound）**：pages-inventory 每页条目增补两必填字段——`inbound`（该页全部进入入口枚举，含兼容入口）与 `outbound`（该页可达的下一跳全集）。入口类型全集（2026-09-07 红队 R1 补全，防枚举不全）：①Activity/Fragment 跳转 ②菜单/长按菜单 ③深链/Manifest intent-filter（含 SEND/PROCESS_TEXT 等 action）④**动态 App Shortcuts**（ShortCuts.kt 注册制）⑤**前台服务通知 PendingIntent**（CacheBook/AudioPlay/VideoPlay/WebDav/AiTaskKeepAlive/Web/BaseReadAloud/CheckRssSource 等 8 服务）⑥**快捷设置磁贴**（QS Tile，WebTileService）⑦**S Pen RemoteAction/画中画/悬浮窗**（spen_remote_actions.xml、PiP、SYSTEM_ALERT_WINDOW）⑧**AppWidget**（含死入口审计：ReadRank/ReadGoal WidgetProvider Manifest 零注册，须判定活/死并标注）⑨**WebView JS 桥跳转**（RssJsExtensions 类 addJavascriptInterface 触发 startActivity）。存量 84 页由各批次开工前"批次盘点动作"补齐（禁止事后凭记忆）。
+  2. **功能操作保留/降级映射表**：每页实施前必须产出三列对照——`操作项｜迁移后保留方式（组件/回调锚点）｜降级方式（若降级）`；禁止"全量功能保留"整句概括；**删除与降级同等待遇**：降级不是免检通道，必须逐项列"降级后语义对照+用户可感知差异"并经检查点裁决，禁止实施者自批（2026-09-06"上一部/下一部降级为集内切换被用户批评不彻底"为判定权缺失实锤）；删除操作项必须给理由并经检查点确认。
+  3. **批次防呆 diff 校验**：每批次开工首个动作 = `pages-inventory 登记页集 vs 批次实施任务集` diff，差集非空即阻断开工（S3/C2 模式防复发）；C2 实施任务补登列入 master-track tasks 补登项。**追溯条款（红队 R3-A 补）**：AD-25 生效前已完成的批次（D4 批1/批2 已迁页）须追溯补录操作保留/降级映射表，已发生的删除/降级操作（如批2"ViewPager 家族退役"）补充删除理由并补检查点裁决，随下一批次开工前置完成，禁以"已完工"豁免。
+  4. **验证场景入口维度**：L2 场景必须覆盖该页 inbound 全集（每入口至少 1 条进入路径断言），批 3 场景增补 S13（搜索入口进入→列表渲染）、S14（收藏/详情返回→滚动位置保持）、S15（openRssLegacy 兼容入口→双模式分派正确）。
+  5. **验证场景出口维度**（红队 R1-C 补）：每页 outbound 全集"每跳至少 1 条 L2 到达断言"（断言目标页可达+关键参数非空），防断链（launchMode 冲突/Intent extra 键变更/通知 PendingIntent 指向被换壳 Activity 均为真实断链模式；G3 实锤事故本质即 outbound 跨页数据流缺陷）。
+- **Goal**: 任何页面的任何入口、任何操作在迁移后有据可查、逐项验收、丢失可拦截于设计期而非真机期。
+- **Tradeoff**: 每页增加 2 字段登记与 1 张映射表的成本；换取功能完整性验收物与防呆闭环。
+- **Status**: Accepted（用户质询裁决后即生效）
+
+### 规范基线声明（G1 补正）
+
+自本章节起，本 spec 全部 Compose 迁移页面实施**统一以 `docs/project-flow/ui-standards/architecture.md` 为最高门禁基线**：四组件族（顶栏 3 基线/ModernActionPopup/弹框族/卡片列表根背景族）+ 取色唯一基线（页面根背景唯一取 `palette.settings.page`，禁 colorScheme 页面级取色）+ §四 9 条开发门禁逐条核验；本文档历史 ui-standards.md 中 §1.2 colorScheme 34 槽位优先级条款**废止**（历史参考保留，冲突处以 architecture.md 为准）。顶栏图标语义保留按 architecture.md 门禁第 0 条执行（migration-registry.md"原 showAsAction 处置"必填列）。
+
+## 产品易用性、架构可靠性与盲区预防设计（2026-09-07 R4-R6 红队补齐）
+
+> 触发：用户裁决"审查目标=设计期预防，不是反复打补丁；易用性/架构可靠性/盲区三维度要设计进文档"。本章将 R4（产品易用性）、R5（架构可靠性）、R6（双向盲区）产出收敛为四条 AD + 一张盲区登记表，对 B4/B5 批次生效，D4 批3 修复其中已实锤的活缺陷。
+
+### AD-26: 全局信息架构地图 + 入口放置裁决
+- **Context**: 84 页矩阵无导航层级列，IA 资产仅 AD-16 单页布局；AD-25 只防"入口丢失"，不裁决"入口放得对不对"；逐页迁移后整体导航结构漂移无人拦截。
+- **Decision**: ①建立 `docs/specs/ui-redesign-m3/ia-map.md`：登记 84 页导航层级（L0 底栏/L1 一级页/L2 二级页/L3 弹层）与入口归属；pages-inventory 条目增补 `iaLevel` 必填字段，随各批次盘点动作补齐。②任何批次改变页面层级或入口归属（提升/降级/搬家）须先在 ia-map 变更记录登记并经检查点裁决；验收=ia-map 与实际路由 diff 为空。③新功能入口选位四级判据：日活≥1 次→底栏/一级页直入口；周活→所属功能域一级页分组；月活以下→低频列表；**禁止默认收拢进溢出菜单**（architecture.md 门禁第 0 条反向约束）；裁决记录"放哪/为何/谁裁决"三字段。
+- **Status**: Accepted
+
+### AD-27: 全站交互模式矩阵 + 易用性量化门禁
+- **Context**: 交互统一条款目前是 S2 骨架局部（手势/长按/批量条），S4-S6 无继承声明；删除双通道并存无仲裁；旅程 1-5 步数目标未进 KPI；无大字号/无障碍适配条款（用户 8~16 字号关注点未沉淀）。
+- **Decision**: ①"操作类型×触发方式×确认方式×反馈方式"矩阵升级为全站生效：破坏性列表操作=左滑或长按二选一（由骨架决定，同骨架禁双通道并存）；不可逆删除必须 ConfirmDialog 二次确认（destructive 钮 error 色）；可恢复操作用 Snackbar 撤销替代确认框；S4/S5/S6 显式继承并仅声明差异化项。②易用性量化门禁：旅程 1-5 纳入真机验收（步数断言）；"步"口径=1 次点击/1 次页面切换，长按+菜单选项按 2 步计，滑动按 1 步计；高频操作硬指标：续读（冷启→正文）≤2 步、书架刷新 ≤2 步。③无障碍增补：新页面必须通过 `fontScale=1.3` 布局不截断冒烟；正文设置（8~16 字号档）迁移后逐档真机验证，入 §7 checklist。
+- **Status**: Accepted
+
+### AD-28: 状态范式四死角补全 + 双栈共存统一条款
+- **Context**: R5 代码实证两处活缺陷（MASONRY/GRID 形态下 ScrollRestoreEffect/scrollToTopRequest 写死 lazyListState 全部失效；一次性事件用 LiveData 承载 View 重建即 Toast 重放）+ 两处条款真空（分页方案未决策、双栈共存四项零条款）。
+- **Decision**: ①分页统一=VM 自研分页（Room Flow+page 游标+debounce≥200ms 于 VM 层 flowOn(IO)），引入 Paging3 须先修 AD。②滚动定位/回顶必须按当前形态分发到对应 LazyState，禁写死单一 lazyListState（批3 修复实锤缺陷）。③一次性事件（Toast/导航/单发结果）一律 `Channel(BUFFERED).receiveAsFlow()` 于 VM，禁止 LiveData/StateFlow 持久字段承载。④Bridge 禁 collect 后回写第二状态（Flow 直接入 State holder）；`SideEffect` 内禁订阅类副作用（一次性注册须 DisposableEffect）；snapshotFlow 块内禁写状态。⑤双栈过渡期统一：主题切换=配置变更 RECREATE+LegadoTheme 以 ThemeStore 为唯一源；fontScale 由 Compose 自动继承禁手动乘 density；返回键 BackHandler 显式声明与 View 页一致；跨页回传统一 Activity Result API。
+- **Status**: Accepted
+
+### AD-29: 返修红线清单（命中即返修，不进回执）
+- **Context**: 禁令零散（AD-21/22/§6.1），图片桥（Glide CustomTarget/BookCover.load）回收时机零条款，是泄漏高发返修区。
+- **Decision**: 统一红线：Composable 持 Activity/Context 引用；GlobalScope 或 composition 内 IO；snapshotFlow 块内写状态；SideEffect 内做订阅/注册副作用；图片桥未实现 onForgotten 清引用+onReleased 取消请求；列表项 CustomTarget 跨组合缓存；组件参数逃出 §3 真值表。红线写入 §7 checklist 门禁与实施回执核验项。
+- **Status**: Accepted
+
+### 双向盲区登记表（R6，按返修成本降序，预防条款落点）
+
+| # | 盲区 | 成本 | 预防条款 |
+|---|------|------|---------|
+| H | release/R8 差异零覆盖（minifyEnabled true，L1-L3 全用 debug 包） | 高 | L3 每里程碑（W2/W4/W5）收束前加正式包冒烟：冷启动+核心 3 页可达+R8 后 Compose 页无 ClassNotFound，失败阻断波次收束（落 master-track design §6.1 L3） |
+| E | 迁移页无运行时回退开关（批2 无 feature flag，线上 P0 只能整包 revert） | 高 | migration-registry 增"回退开关"必填列：旗舰页（B3-D4/B4 核心）导航分派处保留 View 旧分支至下一里程碑验收，长尾枝叶页豁免（revert 兜底） |
+| F | 多 AI 会话写法漂移（回执是事后登记） | 高 | §7 checklist 增第 0 项：开工前必读同骨架最近回执+§3 组件目录，产出复用对照行，未读禁止开工（并入 AD-25 批次盘点动作） |
+| A | UI 状态 key 兼容（旧 View onSaveInstanceState/PreferKey vs rememberSaveable 语义未约定） | 中 | 批次盘点动作增"状态 key 复用或弃用映射登记"+覆盖安装走查场景 |
+| C | 无障碍/硬件键断供（TalkBack 语义、蓝牙翻页器 18 处 onKeyDown 分派回归） | 中 | §7 第 7 项扩为 TalkBack 焦点序+contentDescription 迁移对照+硬件翻页键回归 |
+| B | 服务运行态回归缺失（S12 仅 am kill 单态） | 中 | L2 模板增"TTS/下载/视频前台运行态切回已迁页"场景组 |
+| D | 性能预算无量化（NFR 定性"不掉帧"） | 中 | L2 增首帧 ms/丢帧率 2 条量化断言，低端机一台纳入真机窗口 |
+| G | inventory 文档漂移无收官巡检 | 低 | W5 收官 L3 增"inventory vs 代码 diff 巡检" |
+
 ## Data Flow
 
 1. 用户选主题 → `ThemeStore.setBackground`/`setPrimary`/... → `AppConfig.isNightTheme` + `ThemeConfig.applyDayNight` → 全局重建 → View 页同步 XML color，Compose 由 LegadoTheme react。

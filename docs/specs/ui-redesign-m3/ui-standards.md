@@ -19,7 +19,8 @@
 > **例外登记（2026-08-11 实施者复盘，2026-08-12 增补）**：①「封面视觉定色」允许 `Color(0x...)`——`BookshelfItems.kt:98-105` GeneratedCover 8 色渐变（BlueGrey800/BlueGrey700/Brown800/Brown700/Grey800/BlueGrey600/Brown900/Grey700）与书架 MoRealm 封面风格绑定，属内容呈现非 token 语义色，登记豁免后计入 KPI「非内核页硬编码色=0」的已知例外清单；② 阅读器内核（TextChapterLayout 等 N 不迁移页）沿用原色，豁免同款登记；③ **书源封面定色**（2026-08-12 v2.11 BookSource 复审 R2 登记）——`BookSourceItems.kt:312-321` `sourceCoverColorPalette` 8 色（BlueGrey800/BlueGrey700/Brown800/Brown700/Grey800/BlueGrey600/Brown900/Grey700）为书源封面视觉定色，同称 GeneratedCover 封面范式，豁免登记；④ **书源类型徽章语义色**（2026-08-12 R2 登记）——`BookSourceItems.kt:381-387` `SourceTypeBadge` 按类型（text/audio=#4CAF50/image=#2196F3/file=#FF9800/video=#E53935）固定语义色，属类型分类标识色，豁免登记（后续可按需收敛为 `ThemeSpec` 语义槽位）。
 
 ### 1.2 主题色使用优先级
-1. `MaterialTheme.colorScheme.primary / onPrimary / surface / surfaceVariant / outline` 等 34 槽位
+> 🔴 **废止标注（2026-09-07 AD-25 规范基线声明，红队 R2-C 实锤）**：本节第 1 条"页面级取 MaterialTheme.colorScheme 34 槽位"已**废止**——工作区最高基线 `docs/project-flow/ui-standards/architecture.md` 禁止 colorScheme 页面级/卡片级取色（M3 派生色是 lerp 偏移色），页面根背景唯一取 `palette.settings.page`。本条仅保留 34 槽位作为 LegadoTheme 内部实现机制描述，**不得作为页面取色依据**。冲突处一律以 architecture.md 为准。
+1. ~~`MaterialTheme.colorScheme.primary / onPrimary / surface / surfaceVariant / outline` 等 34 槽位~~（**已废止，勿用于页面取色**；页面取色唯一入口=`palette.settings.page`/`palette.settings.row` 等 palette 槽位）
 2. `ThemeSpec` 派生工具（contrastOn 等）
 3. 语义色：error 用 M3 标准红（夜 `#FF897D`）
 4. ⚠️ 阅读器内（ReadBookConfig 独立配色）不套用全局，走 `ReadBookConfig` 每书配色（红线）
@@ -205,9 +206,10 @@
 ### 页面回执：<页面名>（骨架 S? · 阶段 P?）
 - 负责人/日期：AI / YYYY-MM-DD
 - 【本次复用】公共组件清单：GlassTopAppBar, SettingsClickRow×N, BadgeDot, ...
-- 【本次复用】骨架/样式：S2 列表骨架、卡 18dp、间距 16dp、colorScheme.primary
+- 【本次复用】骨架/样式：S2 列表骨架、卡 18dp、间距 16dp、palette.settings.page（示范勿写 colorScheme——页面级取色已废止，见 §1.2 废止标注）
 - 【本次沉淀】新增可复用资产：<新组件/新 Modifier/新模式> → 已登记 components 目录 + 本表（若无可写"无"）
 - 【一致性】页面私有组件：<0 或列表>；硬编码色：<0>；三态齐全：<是/否>
+- 【入口/操作完整性】（2026-09-07 AD-25 增必填）：inbound/outbound 已盘点 <是，条数>；操作保留/降级映射表已产出 <位置>；降级/删除项经检查点裁决 <是/无降级删除>
 - 【对后续页复用贡献】本页哪些部分后续页面可直接照抄复用（例：搜索过滤模式可复用到 RssSource）
 - 【真机覆盖】功能点用例：① ② ③ ... 全部通过 ✅（测试时间/环境）
 - 【遗留】未完成项/待理事项：
@@ -338,7 +340,7 @@
 - **新文案一律进 `strings.xml`（values/ 英文 + values-zh/ 中文，双语必填）**，Compose 用 `stringResource(R.string.xxx)`，View 用 `getString(R.string.xxx)`。
 - ❌ 禁止在代码/布局中硬编码中文文案。存量硬编码清零（实测残留：RegexTestScreen「匹配详情」、TimestampConvertScreen「日期格式」、SettingsSearchBar「搜索设置」、OpenUrlConfirmDialog「正在请求跳转链接/应用」、VideoPlayerActivity/VideoFragment「播放地址/暂无播放地址/线路」、SpeakEngineDialog「系统默认」等，随页面改造逐项迁移）。
 - 🔴 **公共组件库硬编码中文 4 处（2026-08-11 v2.8 复审实测，接线页全部继承，优先级最高）**：`PillNavigationBar`（Tab label「书架/发现/历史/我的」）、`SettingsSearchBar`（「搜索设置」）、`BookTocBookmarkSheet`（Tab「目录/书签」）、`SummaryCard`（占位「书」）——公共组件 i18n 必须最先清，否则每个接线页都带中文。**【2026-08-12 已修复 1 处】**：`BookTocBookmarkSheet` Tab「目录/书签」→ `stringResource(R.string.source_tab_toc/bookmark)`（复用存量双语 key），剩 PillNavigationBar/SettingsSearchBar/SummaryCard 3 处待清。
-- 🔴 **debug 工具族硬编码（2026-08-11 v2.8 复审实测，Compose 工具页 7 个）**：硬编码中文 60 处（EncodeTools 19/HttpDebug 16/TimestampConvert 8/CurlTest 6/PingTest 6/RegexTest 4/DebugTools 1）；硬编码色 11 处（CurlTest 2/PingTest 5/RegexTest 4）——均走 §7 检查清单（第 8 步国际化/第 13 步硬编码色），随页面改造迁移 strings.xml 与 colorScheme token。
+- 🔴 **debug 工具族硬编码（2026-08-11 v2.8 复审实测，Compose 工具页 7 个）**：硬编码中文 60 处（EncodeTools 19/HttpDebug 16/TimestampConvert 8/CurlTest 6/PingTest 6/RegexTest 4/DebugTools 1）；硬编码色 11 处（CurlTest 2/PingTest 5/RegexTest 4）——均走 §7 检查清单（第 8 步国际化/第 13 步硬编码色），随页面改造迁移 strings.xml 与 palette 语义槽位（🔴 原"迁移到 colorScheme token"表述已废止——页面级取色以 architecture.md palette 入口为唯一基线，见 §1.2 废止标注；存量已迁移页 20+ 处 colorScheme 页面级取色列入整改清单，随各页下次改造顺带收敛，不设专项批次）。
 - 带占位符文案用 `%1$s` 位置参数（如 `getString(R.string.xxx, url)`），禁止字符串拼接翻译。
 - 文案一致性：同一概念全站同一 key（如"添加""删除""确定/取消""重试"已存在 key 优先复用，禁止同义多 key）。
 
@@ -353,13 +355,14 @@
 
 ## 7. 页面改造检查清单（每个页面改造必过）
 
-1. **功能核对**：对照 pages-inventory.md 该页功能点清单逐项核对——Compose 化后每个功能点有落点（Sheet/菜单/行/控件），**核心功能一个不漏**。
+0. **实施前对齐（2026-09-07 R6-F 增，多 AI 会话漂移拦截）**：开工前必读同骨架（S1-S6）最近一份实施回执 + §3 组件目录清单，产出"本页复用/新增组件对照行"写入实施 spec；未读取回执=禁止开工；同时声明红线自检（Composable 禁持 Activity/Context、禁 GlobalScope/composition 内 IO、禁 snapshotFlow 块内写状态、禁 SideEffect 内订阅、图片桥必须 onForgotten/onReleased 释放）。
+1. **功能核对**：对照 pages-inventory.md 该页功能点清单逐项核对——Compose 化后每个功能点有落点（Sheet/菜单/行/控件），**核心功能一个不漏**；**操作保留/降级映射表已产出且降级/删除项经检查点裁决**（2026-09-07 AD-25 增，禁整句概括、禁实施者自批降级）。
 2. **骨架归类**：该页属于 S1-S6 哪一类？骨架结构是否与同类型页一致？
 3. **组件复用**：grep 公共组件是否可覆盖（Settings* / BadgeDot / Skeleton / Sheet）？页面私有组件是否重复了公共能力？
 4. **主题接入**：`LegadoTheme {}` 包裹？无硬编码色值？字号/圆角/间距用 token？
 5. **状态管理**：ViewModel + Flow？受控组件？无 Fragment 散落重复订阅？
 6. **三态 + 弹窗 + 菜单**：加载/空/错误三态齐全且用规范组件；页面内 Dialog 全部归入 S6 三层体系（L1 Sheet / L2 Dialog 族 / L3 透明窗壳），**无页面私有弹窗布局**；页面内长按/更多菜单全部归入菜单族（`AppMenuSheet`/`AppDropdownMenu`/`SelectActionBar`），**无页面私有 PopupMenu**。
-7. **无障碍/暗色**：48dp、对比度、暗色分支？
+7. **无障碍/暗色/硬件键**：48dp、对比度、暗色分支？（2026-09-07 R6-C 扩：TalkBack 焦点序与 contentDescription 迁移对照；蓝牙翻页器/实体翻页键等 onKeyDown 分派回归；`fontScale=1.3` 布局不截断冒烟）
 8. **国际化**：新文案全部 `strings.xml` 双语（en/zh），页面无硬编码中文？（§6.1）
 9. **方向与自适应**：新页面不写 requestedOrientation（跟随系统）；仅阅读器/WebView 内容/沉浸全屏三类既有场景保留方向控制；网格列数随宽度自适应。
 10. **动画与转场**：Hero 转场默认关；浮层零打断；无常驻全量平滑换肤动画？（§6.2）

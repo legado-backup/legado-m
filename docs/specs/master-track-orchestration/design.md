@@ -130,7 +130,7 @@ flowchart TD
 ### AD-04: ui-standards 作为三轨 UI 改造唯一规范基线
 - **Context**: C3/P3/P5 均涉及 Compose UI 新增/重写，轨 A 已有四组件族+取色基线门禁
 - **Concern**: 各轨私设组件族或硬编码取色造成双体系扩散（miuix 教训）
-- **Decision**: 三轨 UI 改造统一对齐 ui-standards（四组件族+取色唯一基线+取色+材质双检查），写入各实施 spec 门禁；MaterialSurface"语义单源、实现双栈"登记豁免条款
+- **Decision**: 三轨 UI 改造统一对齐 ui-standards（四组件族+取色唯一基线+取色+材质双检查），写入各实施 spec 门禁；MaterialSurface"语义单源、实现双栈"登记豁免条款。**唯一基线文件=`docs/project-flow/ui-standards/architecture.md`（2026-09-07 AD-08 补注，防与 ui-redesign-m3 spec 内部历史 ui-standards.md 同名混淆；后者 colorScheme 页面级取色条款已废止）**
 - **Goal**: 全项目 UI 体系单一来源
 - **Tradeoff**: legadoC/NG 原生样式迁移时需做设计转换
 - **Status**: Proposed
@@ -159,6 +159,14 @@ flowchart TD
 - **Tradeoff**: 总线需维护 v-track-registry.md 并在每波次收束向并行会话拉取一次进度快照
 - **Status**: Proposed
 
+### AD-08: 页面级入口/功能操作完整性门禁（2026-09-07 用户质询后总线级补登）
+- **Context**: 用户质询设计文档未对前端 UI 入口及功能操作全面设计、设计前未读工作区前端规范。审计实锤：轨 A 各批次（B3-D4/B4/B5）任务清单无入口维度验证场景；pages-inventory 84 页无入口清单字段；S3 书源编辑页遗漏批次清单的缺口模式已二次重演（C2 已登记但批次清单无实施 task）；轨 A spec 未引用工作区 `docs/project-flow/ui-standards/architecture.md` 门禁基线。
+- **Concern**: 功能静默丢失类缺陷在真机期才暴露，设计期无拦截物。双运行时实锤：①2026-09-06 视频详情页队列注入覆盖列表页完整队列（上一部/下一部丢失）；②2026-09-06 崩溃日志（VideoPlayerActivity IndexOutOfBoundsException：loadMoreArticles 先替换列表再发事件+itemCount 误作 positionStart 越界插入→RecyclerView 计数膨胀→GapWorker 预取越界，已修 b5f223bd3）——同族跨页数据流缺陷，批2 退役的 RssSortActivity ViewPager 家族不含视频域 ViewPager2 风险面（v-track-registry 只读案例引用，不新开活动项）。
+- **Decision**: ①采纳 ui-redesign-m3 design.md AD-25 为轨 A 全批次硬门禁：入口清单（inbound/outbound）+ 功能操作保留/降级映射表 + 批次开工前 diff 防呆校验 + L2 场景覆盖 inbound 全集（D4 批 3 增补 S13/S14/S15）；②C2 实施任务补登列入本 spec tasks 补登项（随 4.2 批次清单核销时登记）；③规范基线统一为 architecture.md（四组件族+取色唯一基线+9 条门禁），轨 C P3/P5 条款同步对齐（**解锁前置**：P2/P3/P5 任一经 9.1/9.4 解锁实施时，第一步=按 AD-25 产出入口清单与操作映射表并对齐 architecture.md 基线，作为实施 spec 审查核对项）。
+- **Goal**: 设计期拦截功能丢失，批次清单与页面登记零差集。
+- **Tradeoff**: 各批次增加盘点与映射表前置投入。
+- **Status**: Accepted
+
 ## Data Flow
 
 ```mermaid
@@ -183,7 +191,7 @@ flowchart LR
 |------|------|---------|---------|
 | L1 分期级 | 各分期实施 spec 内 | **沿用各轨原分册验证设计，总线门禁=验证强度不得低于原分册声明**（R10）：轨 A 每批固定验证链（编译门禁→5.5 E2E→L2 场景脚本→registry 回执→daemon 清场→检查点）；轨 B C0 红测试先行+4 类单测+L3 书源基线回归、C1 红队三高险缓解、C2 四 Phase 各自门禁；轨 C ng P0 22 单测+观察式开关+灰度回退、ng P1/P2 红队收编门禁、ng P3 真机断言 | 每分期实施中 |
 | L2 波次级 | 每波次收束（总线新增，防跨轨回归污染） | ①整包编译（build-legado.bat 测试包）②`./gradlew test` 全量单测 ③E2E 冒烟（`run_e2e.py` 核心用例集）④**热点文件 git diff 审计**：对照 14 对热点表逐文件核对变更仅来自本窗口预期分期 ⑤波次验收单核销（进入条件逐项+验证结果记录+registry/v-track 同步） | 每波次收束（tasks §8.1；W5 的 Z 收尾动作比照执行） |
-| L3 里程碑级 | W2/W4/W5 三个收束点（依据：W1 真机验证已被 B0 合并窗口吸收；W3 后 D4 真机顺延至 W4 期 C2 独占窗一并执行；W2/W4/W5 为三轨均有实质合入的收束点） | W2 后：样板+AI 地基+朗读引擎三合入基线包真机回归；W4 后：视频域/朗读域/Rss 域三大热点域跨域集中走查（同包覆盖）；W5 后：`run_e2e.py --tc all` 全量 + kpi-final.md | 三个里程碑（tasks §8.2） |
+| L3 里程碑级 | W2/W4/W5 三个收束点（依据：W1 真机验证已被 B0 合并窗口吸收；W3 后 D4 真机顺延至 W4 期 C2 独占窗一并执行；W2/W4/W5 为三轨均有实质合入的收束点） | W2 后：样板+AI 地基+朗读引擎三合入基线包真机回归；W4 后：视频域/朗读域/Rss 域三大热点域跨域集中走查（同包覆盖）；W5 后：`run_e2e.py --tc all` 全量 + kpi-final.md；**2026-09-07 R6-H/B/D 补（每里程碑）**：正式包（release，minify 开启）冒烟——冷启动+书架/阅读器/书源管理三核心页可达+R8 后 Compose 页无 ClassNotFound，失败阻断波次收束；L2 场景组增"TTS/下载/视频前台运行态切回已迁页"；首帧 ms/丢帧率 2 条量化断言（低端机一台纳入真机窗口）；W5 加"inventory vs 代码 diff 巡检" | 三个里程碑（tasks §8.2） |
 | L4 交付级 | 发布 | publish.bat 五阶段（构建→校验→gh release→tag），--dry-run 预览先行；真机包选择按 package-naming（代码开发=测试包 debug，Skill 书源测试=正式包 release） | 用户触发（tasks §7.5） |
 
 #### 6.2 回退预案（万无一失防线）
