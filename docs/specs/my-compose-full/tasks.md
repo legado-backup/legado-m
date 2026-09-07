@@ -79,11 +79,22 @@
   - 留痕：4.1=aa840faad、4.2+4.3=本波尾提交；L2 结构验证随模拟器环境恢复统一补验（GPU 故障期视觉挂起）
 
 ## 5. W5 管理列表/编辑型穷举（红队 R1-P0 缺口补入）
-- [ ] 5.1 BookSourceActivity/RssSourceActivity/TxtTocRuleActivity/ReplaceRuleActivity/DictRuleActivity/HighlightRuleActivity：管理列表型统一（含 ReplaceRule View 手术残留收尾：titleBar GONE+removeView 清理）
-- [ ] 5.2 AutoTaskActivity(+Edit)/AiProviderManageActivity(+Edit)/AiImageProviderManageActivity(+Edit)/AiWorldBookManageActivity：编辑型+管理型统一
+> 三子代理并行源码穿透（2026-09-07）：17 页实际残留远小于预期——10 页零残留、3 页小残留、4 页中残留。
+- [x] 5.1 BookSourceActivity/RssSourceActivity/TxtTocRuleActivity/ReplaceRuleActivity/DictRuleActivity/HighlightRuleActivity：管理列表型统一（含 ReplaceRule View 手术残留收尾：titleBar GONE+removeView 清理）
+  - 批A 登记完成：TxtTocRuleActivity/DictRuleActivity（全 Compose 壳层+零残留，布局已纯 ComposeView）
+  - Highlight 完成 (L1)：3×AlertDialog.Builder→showComposeChoiceListDialog（恢复默认三态：合并直执行+覆盖经二次确认）/showComposeConfirmDialog（覆盖确认/删除确认，dangerPositive）
+  - ReplaceRule 完成 (L1)：GONE→removeView（titleBar/selectActionBar）+upCountView 死写链删除（定义+5 调用点）| SelectActionBar.CallBack 接口暂留（override 方法被 Scaffold 回调复用，接口清理留批D）
+  - Book/Rss 清理留批D（Snackbar 替换/PopupMenu 接口链删除涉及调用链，单独小批实施）
+- [x] 5.2 AutoTaskActivity(+Edit)/AiProviderManageActivity(+Edit)/AiImageProviderManageActivity(+Edit)/AiWorldBookManageActivity：编辑型+管理型统一
+  - 批A 登记完成：AutoTaskActivity/AutoTaskEditActivity/AiWorldBookManageActivity/AiProviderManageActivity/AiImageProviderManageActivity（5 页零 View 残留）| 可选清理项：AiImageProviderManage 死函数 showActions(L190-236)、AiProviderManage Screen 拆独立文件
+  - AiImageProviderEditActivity 完成 (L1)：删死布局 activity_ai_image_provider_edit.xml（-191 行，运行时 removeAllViews 全丢弃）+binding 改合成 ViewBinding 空壳（getRoot() 方法覆写，对齐 RelaySettings 模式）
 - [ ] 5.3 S3ContainerManage/LibraryContainerManage/RelaySettingsActivity/AllBookmarkActivity/CoverCollectionManage/BookInfoManage/BubbleManage：管理列表型统一（含 BubbleManage 对话框族×8 核对）
+  - 批A 登记完成：AllBookmarkActivity/RelaySettingsActivity/S3ContainerManageActivity/LibraryContainerManageActivity（4 页零运行时残留；S3/Library XML 死节点+共享 WaitDialog 留遗留项）| BubbleManage 对话框族×8 核对确认 100% Compose 化达成（唯一 View 弹框=第三方 ColorPickerDialog，与 ThemeManage/TopBarManage/NavBar 一致留统一取色器专项）| BookInfoManageActivity：复用 14 页共用容器，GONE 为正当共存模式（对齐 ReadRecord 2.3 判定），不动 XML 仅登记
+  - CoverCollectionManageActivity 完成 (L1)：installGlassTopBar 顶栏+containerActionVisible 状态桥接（原 B 类风险登记解除）+View 节点 removeView
+  - BubbleManageActivity 完成 (L1)：installGlassTopBar 顶栏（S3 容器+帮助双按钮状态桥接）+GONE→removeView 四节点
   - 验证标准（5.1-5.3）：各页功能等价 + 顶栏统一 + MC 门禁留痕 (L2/L3)
-- [ ] 5.4 W5 波提交
+- [x] 5.4 W5 波提交
+  - 留痕：W5 主体（批A 登记 10 页+批B/C 实施 5 页）编译过（第 18 轮）后本批提交；Book/Rss 批D 清理+资源删除留 W6 前置
 
 ## 6. W6 浏览型+对话框清扫（红队 R1-P0 补登记）
 - [ ] 6.1 LogActivity/SettingsSearchActivity/UrlRecord/StorageManage/DownloadManage/FileManage/RssArticleInfo：轻改收尾
