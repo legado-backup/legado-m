@@ -113,17 +113,17 @@ val defaultColor = if (wallpaper != null && isRegular) {
 - **Superseded-by**: 无
 - **ChangeLog**: 2026-09-07 初版
 
-### AD-02: 基色（含壁纸态）统一决策链，废弃黑白兜底语义（v1.1 修订：检查点 2 用户真机否决后）
-- **Version**: v1.1
+### AD-02: 基色统一决策链且保持不透明，wallpaperAlpha 只作用于壁纸图（v1.2 修订：检查点 2 二次否决后）
+- **Version**: v1.2
 - **UpdateTime**: 2026-09-07
-- **Context**: v1.0 曾决策"壁纸态保持 withOpacity(resolve) 原语义"以保护顶栏包契约；用户真机验收否决——激活壁纸顶栏包时顶栏仍黑/白（resolve 兜底黑白污染壁纸态），与"全站跟随主题设置体系"诉求冲突
-- **Concern**: resolveBackgroundColor 黑白兜底只要在任何路径存活，用户就会继续看到"纯黑/纯白"顶栏
-- **Decision**: 全部基色（壁纸态与非壁纸态）统一 `resolvePageBarColor` 三级决策链；壁纸叠加保留 `withOpacity(基色, wallpaperAlpha)`；顶栏包契约重定义——显式背景色优先（第一分支），未显式设置则跟随主题主色（不再黑白）
-- **Goal**: 任何顶栏包/开关/主题组合下顶栏不出现硬编码黑白
-- **Tradeoff**: 未设显式背景色的壁纸包视觉从黑白变主色（预期内，即用户诉求）；主 Tab regular 无壁纸态从黑白基线变主色（更协调）
+- **Context**: v1.1 修复黑白兜底时保留 `withOpacity(基色, wallpaperAlpha)` 叠加——用户真机二次否决：低 wallpaperAlpha（如 25%）把主色调成半透明，日间透白底"大白框"、夜间透黑底"大黑头"（书架媒体实锤）
+- **Concern**: wallpaperAlpha 语义是"壁纸图不透明度"，混入基色后基色透明度不受任何开关控制，随页面底色漂移出白框/黑框
+- **Decision**: 基色（含壁纸态）一律 `resolvePageBarColor` 不透明直出；wallpaperAlpha 只作用于壁纸图（Image/ComposeThemeImage alpha）；三组件（GlassTopAppBar/MainTopBarView/AppManagementTopBar）同步修正
+- **Goal**: 顶栏基色永远实色且随主题；壁纸作为半透明装饰层叠加
+- **Tradeoff**: 顶栏包作者若依赖"低 alpha 基色透底"效果将失效（该效果本身是黑白兜底时代的衍生产物，废弃）
 - **Status**: Accepted
 - **Superseded-by**: 无
-- **ChangeLog**: 2026-09-07 v1.1 检查点 2 用户真机否决后修订（原"壁纸态保持 resolve 原语义"废弃）
+- **ChangeLog**: 2026-09-07 v1.2（v1.0"壁纸态保持 resolve"、v1.1"withOpacity 基色叠加"均废弃）
 
 ### AD-03: 本轮只统一颜色，不统一高度/字号/裁切
 - **Version**: v1.1
