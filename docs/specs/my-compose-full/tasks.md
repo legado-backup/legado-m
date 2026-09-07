@@ -98,8 +98,12 @@
   - 批D 完成 (L1 第 19 轮)：BookSourceActivity——Snackbar→CheckProgressBanner（Compose 横幅+cancelSourceCheck，CHECK_SOURCE/CHECK_SOURCE_DONE 事件状态化）+SelectActionBar.CallBack 接口摘除（selectAll/revertSelection/onClickSelectBarMainAction 去 override 留函数）+upCountView 死写链删除（定义+6 调用点）+selectActionBar GONE→removeView | RssSourceActivity——initSelectActionBar 死函数+onMenuItemClick+PopupMenu.OnMenuItemClickListener 接口+SelectActionBar.CallBack 摘除（onClickSelectBarMainAction 死函数删除）+upCountView 死写链（定义+5 调用点）+GONE→removeView | BookSourceScreen 增 checkBannerText/onCancelCheck 参数+CheckProgressBanner 组件 | 布局 XML 死节点删除留 W6 资源清扫
 
 ## 6. W6 浏览型+对话框清扫（红队 R1-P0 补登记）
-- [ ] 6.1 LogActivity/SettingsSearchActivity/UrlRecord/StorageManage/DownloadManage/FileManage/RssArticleInfo：轻改收尾
-- [ ] 6.2 **AiImageGalleryActivity/DebugToolsActivity 明确迁移**；QrCodeActivity/WebViewActivity/VerificationCodeActivity/OpenUrlConfirmActivity 补登记后定迁移或豁免（红队 R1-P2 补树）
+- [x] 6.1 LogActivity/SettingsSearchActivity/UrlRecord/StorageManage/DownloadManage/FileManage/RssArticleInfo：轻改收尾
+  - 双子代理源码穿透（2026-09-08）：SettingsSearch/StorageManage/DownloadManage 零残留（AppManagementScaffold+GlassTopAppBar 已达标）；Log/UrlRecord 仅 binding 壳/状态桥接可选优化（登记不实施，避免过度工程）；FileManage 删除无确认弹窗为交互缺口非 View 残留（登记留功能专项）
+  - RssArticleInfoActivity 完成 (L1 第 20 轮)：主体全量重写 RssArticleInfoScreen（Glide sourceOrigin 封面 fitCenter+失败隐藏/信息行/简介/多源列表/底部操作栏）+合成 ViewBinding 空壳+applyThemeColors 手动取色链删除+RssArticleInfoSourceAdapter/activity_rss_article_info.xml/item_rss_article_info_source.xml 删除（-3 文件）
+- [x] 6.2 **AiImageGalleryActivity/DebugToolsActivity 明确迁移**；QrCodeActivity/WebViewActivity/VerificationCodeActivity/OpenUrlConfirmActivity 补登记后定迁移或豁免（红队 R1-P2 补树）
+  - AiImageGalleryActivity 完成 (L1 第 20 轮)：AppManagementScaffold 迁移（顶栏/搜索/批量底栏）+AiImageGalleryScreen（FlowRow chips+2 列网格+Glide AndroidView）+MainTopBarView Mode.SUB 消亡+RecyclerAdapter/activity_ai_image_gallery.xml 删除（item_ai_generated_image.xml 保留：BookCharacterEdit 仍在用）
+  - 豁免登记（双子代理穿透裁决）：DebugTools（纯 Compose 已达标，Screen 内私有卡片组件豁免先例）；QrCode（相机预览页，顶栏已 GlassTopAppBar）；WebView（WebView 主体不可 Compose 化，顶栏/菜单/对话框已全达标，迁移高风险零收益）；VerificationCode/OpenUrlConfirm（透明壳+ComposeDialogFragment，无可迁移面）
 - [ ] 6.3 对话框 40 类按形态分组（全屏/输入/多选/排序/预览）→ComposeDialogFragment 基线清扫（红队 R2：分组验收矩阵）
 - [ ] 6.4 W6 波提交
 
