@@ -69,7 +69,8 @@
   - 留痕：3.1/3.3/3.4=624e773c2、3.2=002236a3f、3.5+收尾=本波尾提交；L2 结构验证（模拟器 GPU 故障期）：安装 0907 新包→底栏管理页 dump 全挂载（GlassTopAppBar 标题+同步任务图标+日夜 Tab+列表项）→NavigationBarItemsDialog 打开验证（栏项列表+确认按钮渲染，零 FATAL）；视觉验收继续挂起待模拟器环境修复
 
 ## 4. W4 纯 View 重写（大）
-- [ ] 4.1 CacheManageActivity：composeHost + AppManagementScaffold 重写（**ViewModel 复用；ItemTouchHelper→LazyColumn 拖拽重实现**；多选/排序/清理确认全保留）
+- [x] 4.1 CacheManageActivity：composeHost + AppManagementScaffold 重写（**ViewModel 复用；ItemTouchHelper→LazyColumn 拖拽重实现**；多选/排序/清理确认全保留）
+  - 留痕 (L1 编译过，7 轮收敛)：**AOAdapt 前提修正**——子代理源码穿透实测本页无 ItemTouchHelper/无多选/无拖拽（排序为对话框比较器），"拖拽重实现"描述不成立，按保真原则未新增拖拽；交付=新建 CacheManageScreen（Scaffold+3 topAction+日夜 Tab 行+LazyColumn item 卡片[封面 BookCoverImage/源 chip/计数/状态/任务消息/动作 chip 行]+空态+常驻批量按钮行）+Activity 重写（composeHost 桥接/mutableStateMapOf 任务态定向 diff 写等效 PAYLOAD 局部刷新/8 动作枚举分发/确认弹框与锁定门禁全保留/VM 零改动）+删 CacheManageAdapter/item_cache_manage_book.xml+XML 纯化单 ComposeView | 踩坑记录：LegadoTheme 包路径 ui.theme、AppManagementPalette.settings.row/rowPressed 为 Int 需 Color() 包装、LegadoMiuixActionButton 需 LegadoMiuixPalette（管理页色板无转换改用 Chip）、MaterialTheme.typography.bodySecondary 需扩展 import、onBack lambda 内禁读 Composable 状态、FrameLayout 无 setViewCompositionStrategy
   - 验证标准：缓存数据零丢失，操作等价 (L3)
 - [ ] 4.2 CoverCollectionDetailActivity：同模板重写（浏览/收藏管理）
   - 验证标准：收藏浏览功能等价 (L3)
