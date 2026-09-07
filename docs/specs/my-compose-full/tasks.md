@@ -112,6 +112,9 @@
 
 ## 7. 收尾
 - [ ] 7.1 全域回归：我的 Tab 全入口 L3 点击 + 深浅主题 + 全局壁纸开关 + 顶栏包切换 + manageBgAlpha 两态
-- [ ] 7.2 MainTopBarView Mode.SUB 引用全域清零确认（Grep）+ **Mode.SUB 枚举删除（Delta 2026-09-07 终态：子页面唯一顶栏 GlassTopAppBar，3→1 达成）**；MainTopBarView 仅剩主 Tab 消费；AppManagementTopBar 定义删除确认
+- [x] 7.2 MainTopBarView Mode.SUB 引用全域清零确认（Grep）+ **Mode.SUB 枚举删除（Delta 2026-09-07 终态：子页面唯一顶栏 GlassTopAppBar，3→1 达成）**；MainTopBarView 仅剩主 Tab 消费；AppManagementTopBar 定义删除确认
+  - 10 页 Mode.SUB 收官迁移（L1 第 23 轮）：ParagraphRuleManage/ReadMenuButtonManage/ReadAloudBgmManage/AiReadAloudUsageRecord/ReadMenuCustomButtonEdit/DiscoverySuiteManage（共用容器 6 页走 installGlassTopBar，DiscoverySuite 动态标题/actionsBar 改 Compose 状态桥接）| ParagraphRuleEdit/BookSourceEdit（LinearLayout 自有布局走 installGlassTopBar；ParagraphRuleEdit updateActionButtonStates 改 topActionsEnabled 状态驱动；BookSourceEdit 3 一级+12 溢出菜单迁 TopBarActionRow/AppDropdownMenu，onCompatOptionsItemSelected→handleSourceEditMenuAction）| BookSourceDebug/ExploreShow（ConstraintLayout 页走布局内 compose_top_bar 直挂，约束链顺延）
+  - 基础设施：MenuAction 增 iconRes 双源（MenuActionIcon 渲染器）+enabled 启用态（对齐 AppManagementAction 模型）；installGlassTopBar LayoutParams 通用化（兼容 ConstraintLayout 外的根布局）
+  - 清零确认：Mode.SUB rg 全域仅注释命中；枚举已删（BOOKSHELF/DISCOVERY/RSS/READ_RECORD/MY）；arrangeTitleSelect 死函数删除；AppManagementTopBar 定义删除（Scaffold 直接委托 GlassTopAppBar，6.6 收官）
 - [ ] 7.3 updateLog + INDEX.md + ui-standards/migration-registry 登记（MC-13）+ 提交推送
 - [ ] 7.4 SubBarDebug 清理确认（W0 未清部分兜底）
