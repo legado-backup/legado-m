@@ -51,7 +51,7 @@
 | `GlassTopAppBar`（`ui/widget/components/GlassTopAppBar.kt`） | Compose | 功能页/子页（~40 页）+ **设置族（subpage-topbar-unify AD-04 后，ConfigTopBar 已消灭）** | **非壁纸基色统一 `TopBarConfig.resolvePageBarColor` 三级决策链（subpage-topbar-unify AD-01/AD-05：顶栏包自定义背景色 → 沉浸开关页面底色（背景图场景透明回退主色）→ 主题主色）**；壁纸态保持 withOpacity(resolve) 原语义 |
 | `AppManagementTopBar`（`AppManagementScaffold.kt` 内私有） | Compose | 列表管理页（书源/订阅源/替换/规则等 5 页，48dp） | **`TopBarConfig.resolvePageBarColor` 单源（subpage-topbar-unify AD-01 去重）**+ `manageBgAlphaFraction` 半透明特性 |
 
-**顶栏语义色单源（subpage-topbar-unify AD-05，2026-09-07）**：所有顶栏"非壁纸基色"一律由 `TopBarConfig.resolvePageBarColor(context, config)` 产出（对标 NG topBarContainer 单源模式），前景色一律 `contrastOn(基色)`；禁止组件各自兜底取色。`ConfigTopBar` 已消灭（ConfigActivity 改用 GlassTopAppBar + `ConfigMenuActions` MenuAction 适配）；`MainTopBarView` 为 View 过渡态（Mode.MAIN 长期保留，Mode.SUB 随 master-track B 波次页面迁移消亡）。
+**顶栏语义色单源（subpage-topbar-unify AD-05，2026-09-07）**：所有顶栏"非壁纸基色"一律由 `TopBarConfig.resolvePageBarColor(context, config)` 产出（对标 NG topBarContainer 单源模式），前景色一律 `contrastOn(基色)`；禁止组件各自兜底取色。**最终色（含透明度）一律经 `resolvePageBarColorWithAlpha`：透明度 manageBgAlpha 顶栏族全局生效**（my-compose-full MC-12，六验用户裁决"全站半透明一致"）；基色自带透明（沉浸+全局壁纸）时保持原 alpha 透出壁纸。`ConfigTopBar` 已消灭（ConfigActivity 改用 GlassTopAppBar + `ConfigMenuActions` MenuAction 适配）；`MainTopBarView` 为 View 过渡态（Mode.MAIN 长期保留，Mode.SUB 随 master-track B 波次页面迁移消亡）。
 
 **已查明的待治理形态**（不得新增）：
 - 自绘私有 Row 顶栏（AiChat/S3/Library/AiProvider/AiWorldBook/Relay/Toc 等 ~8 处碎片，互不共享）→ 并 AppManagementScaffold 或对齐视觉参数（H3/H4）
