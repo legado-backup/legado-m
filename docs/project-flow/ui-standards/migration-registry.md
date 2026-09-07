@@ -211,3 +211,20 @@
 | 7.11bn | `ui/video/VideoPlayerActivity.kt`+`VideoFragment.kt`（F6 同族） | [ ] 待冻结回执（顶栏+设置面板 Compose；手势四件套复用 R3 4.2） | S5 模式 | 真机 L2 | design D9/F6 |
 
 > 回执完成判定：对应 S 样板 §2 检查点全过 + L2 脚本落盘（ai_tests/scripts/l2_verify_compose_{page}.py）+ 截图/logcat 证据归档 + 本表 [ ]→[x]。完成后同步刷新 pages-inventory §0 快照。
+## MC-13 my-compose-full 全域登记（2026-09-08，W0~W7 收官）
+
+> 规格：docs/specs/my-compose-full/（spec/tasks/page-tree）。编译 L1 23 轮全过；真机 L2 回归见 7.1（GPU 故障遗留，待补验）。
+
+| 登记项 | 范围 | 现状 | 备注 |
+|-------|------|------|------|
+| W0 公共闸门 | SubBarDebug 定稿/manageBgAlpha 裁决/Tier×波次 | [x] | 22ac62dd4 |
+| W1 安全与基线 | 三页顶栏归一+installGlassTopBar 迁移模式 | [x] | 97daa7a23；共用布局 14 页 XML 保留 |
+| W2 地基与样板 | RssSearch/About/MyFragment+顶栏 3→1 Delta | [x] | 406beb1c0 |
+| W3 并存页收编 | TopBarManage/ShareNoteTemplate/AdvancedTitle/NavigationBarManage+孤儿治理 | [x] | 624e773c2→8446de161 |
+| W4 纯 View 重写 | CacheManage+CoverCollectionDetail（composeHost+Screen） | [x] | aa840faad/20e9d0a6f |
+| W5 管理列表/编辑型穷举 | 17 页（10 零残留登记+7 实施）+批D Book/Rss 清理 | [x] | d01e7d9f8/4bf20fcea |
+| W6 浏览型+对话框 | RssArticleInfo 重写+AiImageGallery 迁移+PackageSyncTaskDialog+5 页豁免 | [x] | 41fe61a9d/8a06ef855 |
+| W6.5/6.6 顶栏归一收官 | GlassTopAppBar 插槽扩展（barHeight/secondRow/titleFontFamily）+AppManagementTopBar 定义删除 | [x] | 6011f0654 |
+| W7.2 Mode.SUB 消亡 | 10 页收官迁移+枚举删除+MainTopBarView 仅剩主 Tab | [x] | 846d9e399 |
+| 豁免登记 | WebView/QrCode（相机/WebView 主体不可迁移，顶栏已达标）；VerificationCode/OpenUrlConfirm（透明壳）；DebugTools（纯 Compose）；WaitDialog（全 App 共用加载框） | [x] | 豁免理由见 tasks.md 6.2/6.3 |
+| 待真机补验 | 全域 L3 回归+视觉验收（W2/W3 两波一并） | [ ] | 7.1；MEmu GPU 故障待修复 |
