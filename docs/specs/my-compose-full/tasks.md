@@ -45,13 +45,22 @@
 - [x] 2.4 MyFragment 本体：View 壳+View 顶栏 → Compose 壳（MySettingsData 路由零改动）
   - 验证标准：我的 Tab 全入口（21+）+ **SettingsSearchActivity 全路由回归**（复用 handleSettingsRowClick 连带，红队 R2）(L3)
   - 留痕：fragment_my_config.xml 纯化为单 ComposeView（compose_host）；顶栏 GlassTopAppBar（搜索/帮助一级图标语义保留）+statusBarsPadding 外层 Box（GlassTopAppBar 无 modifier 槽）；MainTopBarView Mode.MY 引用删除；路由 onRowClick→handleSettingsRowClick 零改动
-- [ ] 2.5 W2 波提交 + MC 门禁核对留痕
+- [x] 2.5 W2 波提交 + MC 门禁核对留痕
+  - 留痕：commit 406beb1c0；MC 门禁核对：MC-3（历史区复用 SearchInputHelpScreen 基线/空状态组件化）✓ MC-5（GlassTopAppBar 单源取色）✓ MC-10（About 评分/分享、我的搜索/帮助图标 onClick 真实挂载）✓ MC-12（顶栏透壁纸语义随 GlassTopAppBar）✓；调试日志 Grep 0 残留 ✓
+  - **L2 验证状态（用户裁决 2026-09-07 17:4x"接受现状进W3"）**：结构级 L2 全过（我的 Tab 全设置行挂载+顶栏搜索/帮助图标[588,30]/[660,30]+书源管理路由跳转 BookSourceActivity+RssSearch 顶栏搜索栏挂载+全程无 FATAL）；视觉 L2 挂起——模拟器 GPU 合成故障（对照实验：W1 验收通过的 090716 旧包同黑屏，定性环境问题非代码缺陷），视觉验收随 W3 波/真机回归补验
 
 ## 3. W3 并存页统一收尾
-- [ ] 3.1 TopBarManageActivity：RecyclerView 与 ComposeView 并存收编（AppPackageManageScreen 样板，功能等价）
+> 红队 R2 补充（子代理源码穿透 2026-09-07）：四页布局全部为 activity_theme_manage.xml（14 页共用容器），顶栏统一走 installGlassTopBar 运行时替换（W1 模式，XML 不动）。四页内容区均已大量 Compose 化，残留点各异，实施序=从小到大（3.4→3.3→3.1→3.2）。
+- [x] 3.1 TopBarManageActivity：RecyclerView 与 ComposeView 并存收编（AppPackageManageScreen 样板，功能等价）
+  - 留痕 (L1 编译过)：installGlassTopBar 顶栏（S3 容器/同步任务保留一级图标）；containerActionVisible mutableStateOf 驱动 S3 按钮显隐（替代 AppCompatImageButton.isVisible）；ModernActionPopup→showComposeActionListDialog；ColorPickerDialog 保留（W5 专项）；功能 15 项零删改
+  - 改造点：①顶栏 View→installGlassTopBar（titleBar L192-205 删）②容器切换 ModernActionPopup(L251)→showComposeActionListDialog（对齐 ThemeManage W1 模式）③ColorPickerDialog(L390-395) View 弹框暂保留（W5 专项统一取色器）④私有 TopBarManageScreen(L841-882) 已用样板，抽取独立文件可选。功能 15 项全保留（新增/导入/应用/编辑全项/条目菜单7项/S3切换/同步/WebDav/zip/壁纸裁剪/默认包只读）
 - [ ] 3.2 NavigationBarManageActivity：同模式 + **alert{}×2（L337/L464）→showCompose 系（MC-7）**
-- [ ] 3.3 ShareNoteTemplateManageActivity：同模式（样板页核对基准）
-- [ ] 3.4 **AdvancedTitleManageActivity 纳入**（红队 R1：入口阅读页 TipConfigDialog，顶栏统一+组件收编）
+  - 改造点：①L337 alert（customView 塞 ComposeView BottomNavItemsManageContent+okButton）→ComposeDialogFragment 容器（参照 TopBarEditDialog 模式）②L464 alert（editDialogScrollContainer=buildEditView L495-619 动态 LinearLayout）→专用 ComposeDialogFragment（全部配置项 Compose 重写：布局模式/材质/搜索开关/壁纸/透明度/边框色/侧栏背景/逐项图标）③NumberPickerDialog(L679)→showComposeNumberPickerDialog ④PackageManageUi View 助手弃用评估 ⑤顶栏→installGlassTopBar
+- [x] 3.3 ShareNoteTemplateManageActivity：同模式（样板页核对基准）
+  - 留痕 (L1 编译过)：installGlassTopBar 顶栏（标题字符串资源化）；GONE→removeView 四节点；硬编码中文 9 处→stringResource（新增 share_note_ 族 10 条，对齐该族中文默认资源现状）；ComposeActionListDialog/ComposeConfirmDialog 已合规保留
+  - 改造点：①顶栏→installGlassTopBar ②硬编码中文（L109 标题+L231-246/L254-259/L341 菜单标签）→stringResource（§6.1）③tabBar/tvSummary/btnAdd GONE→removeView 对齐 ④ComposeActionListDialog.create 可选统一为 showComposeActionListDialog
+- [x] 3.4 **AdvancedTitleManageActivity 纳入**（红队 R1：入口阅读页 TipConfigDialog，顶栏统一+组件收编）
+  - 留痕 (L1 编译过)：实施评估=AppManagementScaffold 为管理族三基线之一已合规（Screen 内自供顶栏+返回键），无需 installGlassTopBar；改造收敛为 GONE 残留清理——hideTopBar/initComposeContent 统一 removeView 五节点（titleBar/recyclerView/tabBar/tvSummary/btnAdd），删 View import。**未换样板**（Lottie 预览列表为功能特性，与红队 R1 结论一致）
 - [ ] 3.5 孤儿治理：ThemeEditorDialogFragment/DiscoveryConfigFragment/SubscriptionConfigFragment 死代码删除（**同步删 ConfigActivity.kt:126-127 分发分支+ConfigTag 常量；删前运行时入口审计：searchTarget 深链核查**）；fileManage 死分支路由删除
   - 验证标准（3.1-3.5）：管理功能等价 + 顶栏统一 + 死代码清零 (L2)
 - [ ] 3.6 W3 波提交
