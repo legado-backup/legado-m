@@ -95,6 +95,7 @@
   - 验证标准（5.1-5.3）：各页功能等价 + 顶栏统一 + MC 门禁留痕 (L2/L3)
 - [x] 5.4 W5 波提交
   - 留痕：W5 主体（批A 登记 10 页+批B/C 实施 5 页）编译过（第 18 轮）后本批提交；Book/Rss 批D 清理+资源删除留 W6 前置
+  - 批D 完成 (L1 第 19 轮)：BookSourceActivity——Snackbar→CheckProgressBanner（Compose 横幅+cancelSourceCheck，CHECK_SOURCE/CHECK_SOURCE_DONE 事件状态化）+SelectActionBar.CallBack 接口摘除（selectAll/revertSelection/onClickSelectBarMainAction 去 override 留函数）+upCountView 死写链删除（定义+6 调用点）+selectActionBar GONE→removeView | RssSourceActivity——initSelectActionBar 死函数+onMenuItemClick+PopupMenu.OnMenuItemClickListener 接口+SelectActionBar.CallBack 摘除（onClickSelectBarMainAction 死函数删除）+upCountView 死写链（定义+5 调用点）+GONE→removeView | BookSourceScreen 增 checkBannerText/onCancelCheck 参数+CheckProgressBanner 组件 | 布局 XML 死节点删除留 W6 资源清扫
 
 ## 6. W6 浏览型+对话框清扫（红队 R1-P0 补登记）
 - [ ] 6.1 LogActivity/SettingsSearchActivity/UrlRecord/StorageManage/DownloadManage/FileManage/RssArticleInfo：轻改收尾
