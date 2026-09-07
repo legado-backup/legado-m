@@ -52,7 +52,10 @@
   - 验证标准：0 残留 ✓（SubBarDebug 临时日志+临时 import 已删，第7次编译前 Grep 确认 "log clean"）
 
 ## 5. 文档收尾
-- [ ] 5.1 issues-found.md 记录真机问题（如有）
-- [ ] 5.2 文档同步检查：①ui-standards/architecture.md 顶栏章节补充"顶栏语义色单源"说明（如存在对应章节）②master-track 设计文档 tasks 登记：Mode.SUB 22 页迁移清单挂接 B 波次（AD-04/AD-05 承诺）③INDEX.md 状态流转
-- [ ] 5.3 清理临时文件与调试代码
-- [ ] 5.4 代码提交并推送 feat 分支
+- [x] 5.1 issues-found.md 记录真机问题（如有）
+  - 结论：真机发现 1 项——沉浸开关+全局背景图顶栏透黑（SubBarDebug 铁证 bg=0），已按 spec 预案修复（分支2 收窄），无未解决项
+- [x] 5.2 文档同步检查：①ui-standards/architecture.md 顶栏章节补充"顶栏语义色单源"说明 ✓（顶栏族表 3 组件取色列+单源声明段+ConfigTopBar 消灭记录）②master-track 设计文档 tasks 2.14.3 挂接 ✓（B 波次迁移收益+Mode.SUB 消亡路线）③INDEX.md 状态流转 ✓（2 处更新为"开发完成待验收"）
+- [x] 5.3 清理临时文件与调试代码
+  - ✓ SubBarDebug 日志+临时 import 已删（第7次编译前 Grep "log clean"）；output/l2-topbar/ 截图+分析脚本为 L2 证据产物保留；commit_msg 临时文件已删
+- [x] 5.4 代码提交并推送
+  - ✓ commit ae7689003 已推 origin/master（15 文件）；updateLog 第二批/INDEX/master-track tasks 混并行会话条目未随本次提交（c47ffc993 先例，等并行统一）
