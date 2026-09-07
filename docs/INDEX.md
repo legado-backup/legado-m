@@ -6,12 +6,16 @@
 
 ## 🔴 进行中的工作 → 设计中
 
+- [TTS朗读引擎统一优化](./specs/optimize-tts-engine/README.md) - 朗读引擎切换不生效修复（UI写SpeechRoute/服务层读SelectItem分裂）+引擎路由单源化+脚本引擎协议（Rhino沙箱）+MultiTTS/CloneTTS深度适配+在线TTS内置模板库（默认停用） 🔄 设计中
+
 - [UI 设置体验修复包](./specs/archive/2026-09-06-ui-settings-fix-pack/README.md) - 三项 UI 体验修复：主界面底栏搜索框显隐入口补齐（设置页快捷开关+两层配置防回滚）+ fontScale 放大组件文字截断逐点修复（12 处 height→heightIn(min)）+ 恢复被误删调用链的优化版取色器 ColorPickerSheet（扩展跟随默认）✅ 已完成并归档（2026-09-06 验收通过，commit 13574ae41）
 - [主界面头部透明对齐Archive](./specs/main-topbar-transparent-align/README.md) - 四Tab头部透明失效根因修复：恢复 MaterialValueHelper backgroundColor 透明原语（背景图→TRANSPARENT 分支被删）+BaseActivity decorView 着色策略对齐（P0/P1 diff 实证，overlay/blur 排除）🔄 设计中
 - [书源视频对标订阅源](./specs/video-booksource-align-rss/README.md) - 书源视频单页化+列表驱动上滑+公共采集链组件（根治直链地址不正确/播放信息不匹配/上滑卡死三类反复问题）✅ 已实施（2026-09-03，S1-S4 真机验证通过）
 - [视频播放器双布局模式](./specs/video-player-dual-layout/README.md) - 内置抖音沉浸式(默认)+传统(上播放器下信息区)双布局可配置，设置中心化到「我的→视频播放器设置」，播放页仅保留即时生效项，嗅探/采集链零改动（五轮红队闭环，/goal 实施中）🔄 开发中
 - [UI 主题纳管与弹框交互优化](./specs/ui-theme-governance-polish/README.md) - 7 项 UI 问题修复：订阅布局弹框开关主题化+登录弹框按钮收纳+主题编辑器保存感知+字号滑条偏左+沉浸顶栏开关修复+管理页透明度设置+本地密码弹框托管（八轮红队+N1-N3 已闭环）🔄 开发中（真机反馈转入 followup）
 - [管理页样式统一与交互回归修复](./specs/ui-theme-governance-followup/README.md) - 真机反馈 5 类问题：发现页视频上滑误报（队列注入被 revert 移除）+书架手势三修+发现页标签闪烁+透明度 v2 预混模型全域生效+管理族子页面顶栏列表统一（24 页分型矩阵）🔄 设计中
+- [子页面顶栏取色统一](./specs/subpage-topbar-unify/README.md) - 顶栏取色统一+沉浸透明语义（全局壁纸下顶栏透明透壁纸）：三级决策链单源 resolvePageBarColorWithAlpha，ConfigTopBar 消灭（4→3），二期组件归一 Delta 已追加（共享内核+管理族委托 3→2+MainTopBarView 消亡路线）✅ 已验收通过
+- [我的全域Compose化](./specs/my-compose-full/README.md) - "我的"入口 45 页 Compose 化盘点（C-full 36/C-mixed 8/C-none 2）+ 四波迁移（W1 应用主题族先行→W2 收尾→W3 并存页→W4 纯 View 重写），与顶栏二期协同 🔄 设计中
 - [本地打包提速](./specs/local-build-speedup/README.md) - daemon 复用+debug 降堆+configuration cache+版本号 ValueSource 化，增量打包 7m33s→≤4min，内存峰值 93.5%→≤91%（基线实测支撑，红队 2 轮闭环）🔄 实施完成，R1 计时补测待并行会话合并
 - [批量 UI 修复 0905](./specs/ui-batch-fix-0905/README.md) - 4 项用户反馈：崩溃弹框误弹回归+视频书源沉浸式左下角线路/集数+发现页分组弹窗 Bug 与全前端死菜单清理+经典订阅头部收口（搜索留外/六项收三点/删分组信息列举）✅ 开发完成（T1-T8 L2 真机验证，待用户验收）
 - [真机回归修复 0906](./specs/video-regression-fix-0906/README.md) - 4 项真机反馈：嗅探播放下滑（ExoPlayer 4003 解码竞态重建重试+DoH 死节点熔断+token 竞态观测）+书源切布局死窗（短路重采集）+书源上滑失效（队列兜底注入+集内降级，AD-01 边界增补）+分类列表页三点死按钮接线（45 文件日志脱敏分析+3 路源码探索）✅ 开发完成（S1-S3+T1-T8 L2 真机回归，待用户验收）
@@ -244,7 +248,7 @@
 | [sniff-regression-rss-image-crash](./specs/sniff-regression-rss-image-crash/README.md) | ✅ | 嗅探回归与图片订阅源崩溃取证修复（① WebView 池全局互斥修复嗅探回归 ② 图片订阅源崩溃根因模拟器复现实锤：appendItems 后台线程更新 vs 主线程 notify 竞态 → RecyclerView Inconsistency FATAL，修复后 3 轮全绿；Phase B 定向防御 H4/H6/H1/H3；真实崩溃栈回灌闭环） |
 | [source-arch-mutual-borrow](./specs/source-arch-mutual-borrow/README.md) | 🔄 | 书源/订阅源架构差异分析与机制层互补优化（6 个共享机制组件，V2） |
 | [source-layout-redesign](./specs/source-layout-redesign/README.md) | ✅ | 书源/订阅源布局设置重做（视图模式/排序/类型筛选/统一配置对话框） |
-| [subpage-topbar-unify](./specs/subpage-topbar-unify/README.md) | 🔄 | 子页面头部统一（全 App TitleBar 子页批量迁移 MainTopBarView） |
+| [subpage-topbar-unify](./specs/subpage-topbar-unify/README.md) | 🔄 | 子页面顶栏取色统一（TopBarConfig 三级决策链单源+组件缩减 4→3：ConfigTopBar 消灭/MainTopBarView SUB 过渡态，40+ 页跟随主题）✅ 开发完成待验收 |
 | [tag-mode-unify](./specs/tag-mode-unify/README.md) | 🔄 | 书架订阅标签样式统一（对齐 Archive MainTopBarView 顶栏标签体系） |
 | [theme-rss-header-layout-sync](./specs/theme-rss-header-layout-sync/README.md) | ✅ | 主题设置与订阅/发现页头部布局联动修复（即时刷新+废弃 key 清理） |
 | [ai-test-system-refinement](./specs/ai-test-system-refinement/README.md) | 🔄 | ai_test 体系沉淀反思优化（五批次：SOP 文档沉淀+经验回流 / 编排层 feedback+五件套接入 / 用例解析修复 30 条 seg 残留 / scripts 52 个删除候选治理 / pytest 全量验证） |

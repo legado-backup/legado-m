@@ -131,3 +131,51 @@ ConfigTopBar 消灭，ConfigActivity 全部宿主页顶栏改用 GlassTopAppBar�
 - L1：编译通过，无残留调试日志
 - L2：真机/模拟器逐页验证（日间+夜间 × 默认顶栏包 × 沉浸开关两态）：设置族 10 页 + Mode.SUB 抽查 5 页 + Glass 族抽查 8 页 + 管理族 6 页不回归 + 豁免页 4 页不回归
 - L3：切换颜色主题后顶栏实时跟随；顶栏包自定义背景/壁纸优先级正确
+
+---
+
+## Delta Spec（2026-09-07 二期：组件归一路线 C，验收通过后追加）
+
+> 前序（一期：取色单源+ConfigTopBar 消灭+透明语义）已验收通过。本期响应用户"组件 3→1 继续统一"裁决。
+
+### ADDED Requirements
+
+#### Requirement: 共享内核层（TopBarBackgroundLayer）
+壁纸/取色/圆角/内容色背景渲染抽为公共 Composable（crop 矩形+动图+fallback 统一版，取自 MainTopBarView ComposeThemeImageLayer），三组件背景层全部替换消费，消除三份重复实现。
+
+#### Scenario: 三组件背景层同源
+- **WHEN** 任意页面顶栏渲染（含壁纸包/透明/实色组合）
+- **THEN** 背景由同一 `TopBarBackgroundLayer` 产出，三组件背景行为像素级一致
+
+#### Requirement: 管理族顶栏委托归一（3→2）
+AppManagementTopBar 内部委托扩展版 GlassTopAppBar，扩展插槽清单（红队 R3 补全）：①**高度槽**（48dp 紧凑档 vs M3 默认，参数化）②**双行布局**（标题行+搜索框第二行，管理族形态）③真实搜索框内嵌槽（BasicTextField+hint+清空）④管理族 Action 模型适配（text/iconRes/icon 双源/danger-tint/primary/**menuActions 延迟求值 provider**）⑤statusBars 内嵌（对齐 AppManagementScaffold :180-188）。管理族页面顶栏渲染路径与 Glass 族同源。
+
+#### Scenario: 管理族搜索框内嵌
+- **WHEN** 书源管理页顶栏渲染
+- **THEN** 搜索框内嵌形态与改前一致（BasicTextField+hint+清空），SelectionBottomBar 联动/AnimatedVisibility 行为不变
+
+#### Requirement: 共享内核层表述修正
+背景共享层基于独立文件 `ui/widget/compose/ComposeThemeImageLayer.kt`（非 MainTopBarView 内部），共享化需对齐 stableWidthScale/动图/wallpaperAlpha 参数全集；Glass 族壁纸观感将因统一动图/crop 能力而变化（红队 R2：入 Drawbacks——现 Glass 静态解码→统一后支持 crop/动图，视觉增强）。
+
+#### Scenario: 三组件壁纸行为统一
+- **WHEN** 同一壁纸顶栏包在 Glass/管理族/MainTopBarView 页渲染
+- **THEN** crop/动图/透明度行为一致（观感增强属预期变化）
+
+#### Requirement: MainTopBarView 消亡路线冻结
+MainTopBarView 仅保留主 Tab（BOOKSHELF/DISCOVERY/RSS/MY/READ_RECORD）消费；Mode.SUB 22 页按 Tier 分档随 master-track 波次迁移，全部消亡后 View 体系顶栏删除，终态全站唯一顶栏组件。
+
+#### Scenario: SUB 页迁移后零 View 顶栏
+- **WHEN** 某 SUB 页完成 Compose 化迁移
+- **THEN** 该页顶栏由统一组件渲染，MainTopBarView 对其引用删除
+
+### MODIFIED Requirements
+（无——一期 Requirements 全部保留生效）
+
+### REMOVED Requirements
+（无）
+
+### 分期任务索引
+- 二期 1：共享内核 TopBarBackgroundLayer + rememberPageBarColors（三组件换壳）
+- 二期 2：GlassTopAppBar 插槽扩展（搜索槽/Action 模型/danger-tint）+ AppManagementTopBar 委托（3→2）
+- 二期 3：MainTopBarView Mode.SUB 22 页随波次消亡（Tier1 10 页先行 → Tier2 8 页 → Tier3 4 页），配合 my-compose-full spec 执行
+- 详细页面分档与成本：见 my-compose-full spec 附录 page-tree.md + tasks.md 0.3 Tier×波次映射表（红队 R4 悬空引用修复）
