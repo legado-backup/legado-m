@@ -74,12 +74,12 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 
 | 族 | 组件 | 选用要点 |
 |----|------|---------|
-| 顶部栏 | `MainTopBarView` / `TitleBar` | 主界面现代页（书架/发现现代/订阅/阅读记录）用 `MainTopBarView` 读顶栏配置；子页面/经典头用 `TitleBar`；主界面经典头需读配色按 §1.4 `topBarColorManaged`。`TitleBar` 承载动态度量（内联搜索/动态菜单）时不要盲目换成 `MainTopBarView`（会破坏功能，ADR-01） |
+| 顶部栏 | `GlassTopAppBar`（**子页单源**）/ `MainTopBarView`（仅主 Tab）/ `TitleBar`（仅"我的/发现经典"managed 遗留） | **2026-09-08 顶栏 3→1 归一收官（my-compose-full W6.5/6.6/W7.2）**：子页/设置族/管理族全部 `GlassTopAppBar` 单源（`AppManagementTopBar` 定义已删除，管理族经 AppManagementScaffold 委托）；`MainTopBarView` 仅主界面 Tab；`TitleBar` managed 分支取色已收编 `resolvePageBarColorWithAlpha`（bugfix-0908f），新页面禁止使用。**自绘顶栏分支必须包 `CompositionLocalProvider(LocalContentColor provides contentColor)`，图标默认 tint 继承 `LocalContentColor.current` 禁止钉主题色，同栏图标统一 20dp**（bugfix-0908f 铁律，违者图标黑色不随日夜主题）。详见 `docs/project-flow/ui-standards/architecture.md` §三.1 |
 | 搜索框 | `SettingsSearchBar` / `TopBarSearchStyle` | **统一 18dp 圆角 + palette 槽位取色**（§1.4，禁止 surfaceVariant）。Compose 用 `SettingsSearchBar`（40dp + `ThemeUiPalette.searchFieldBackgroundColor` + alpha/描边 + `AppShapes.Search`）；View 搜索框背景对齐 `TopBarSearchStyle`/`bg_searchview`(18dp)，不要再出现 35dp 全胶囊等发散圆角 |
 | 卡片 | `LegadoMiuixCard` / `SettingsCard` | 卡片化条目/面板统一 18dp 圆角 |
 | 列表项 | 列表/单列/双列/三列/瀑布 | 封面图**四角圆弧统一 `FilletImageView`(12dp)**；瀑布流用 `CardView` + `android:clipToOutline="true"`（引用 `compose-ui-engineering` 相关段落） |
 | 菜单 | `ModernActionPopup` | 右上角三点等弹出菜单 |
-| 弹窗 | `ComposeDialog` 家族（`AppDialogFrame`/`ConfirmDialog`/`AppEditDialog`/`SingleChoiceDialog`/`ComposeChoiceListDialog`/`GroupManageComposeDialog` 等） | 帮助/日志/编辑/单选/确认等一律 Compose 化 |
+| 弹窗 | `ComposeDialog` 家族（`AppDialogFrame`/`ConfirmDialog`/`AppEditDialog`/`SingleChoiceDialog`/`ComposeChoiceListDialog`/`GroupManageComposeDialog` 等） | 帮助/日志/编辑/单选/确认等一律 Compose 化。**已收官（2026-09-08）**：BaseDialogFragment 残留=0、alert{} DSL 已收敛；弹框根节点必须显式背景（`rememberAppDialogStyle().surface`），dialogAlpha<100 时 `ComposeDialogFragment` 自动 dim 补偿（bugfix-0908 T4） |
 
 ### 3.1 主 Tab 头部搜索入口形态（topbar-search-entry-align，2026-08-28 新增）
 
@@ -128,3 +128,6 @@ View 世界的圆角统一走 `io.legado.app.lib.theme.UiCorner`（`panelRadius`
 - 顶栏"全面迁移 MainTopBarView"会破坏 `view_search` 内联过滤 / `menu_group` 动态菜单（ADR-01 结论），遇主界面经典头优先"局部读配色"。
 - Compose 搜索框默认高可能 72dp（M3 TextField+padding），缩至 40dp 输入区（对齐 `SettingsSearchBar`）。
 - **强跳过吞重组陷阱**（2026-08-30 沉淀）：Kotlin 2.0.20+ Compose 编译器强跳过模式默认开启——含 unstable 参数（var 字段类）的 Composable 变为可跳过，unstable 参数按**引用相等**比较。表现为：原地修改数据对象后列表"看起来没反应"，退出重进才更新（重新 load 出新实例）。修复一律用 `copy()`，禁止 key/contentType 层 workaround。铁证案例：`HighlightRuleActivity` 复选框切换不刷新。
+- **removeView 静默 no-op**（2026-09-08 bugfix-0908 T1 实锤）：Compose 化替换旧 View 时，`binding.titleBar` 等视图与内容区可能**不同父容器**（根 LinearLayout vs 中间 FrameLayout），对错误 parent 调 removeView 不报错但无效 → 旧搜索框/顶栏残留（替换净化页双搜索框）。处理：removeView 后必须 `isVisible` 断言或直接 GONE。
+- **ComposeView 容器替换 addView 越界**（2026-09-08 bugfix-0908f T3 实锤：摘录分享模板启动闪退 index=3 count=1）：批量 removeView 后原 `indexOfChild` 索引失效，`addView(view, index)` 必须写 `index.coerceAtMost(container.childCount)`。同批复制模板时逐页核对（W3.3 曾漏改 1/7 页）。
+- **自绘顶栏分支内容色**（2026-09-08 bugfix-0908f T2 实锤：书源管理返回/编辑书源图标黑）：自绘 Column/Row 顶栏漏包 `CompositionLocalProvider(LocalContentColor provides contentColor)` 时图标回落主题 onSurface（黑），且不随日夜主题。M3 TopAppBar 自带三键 contentColor，自绘分支必须手动等价提供。

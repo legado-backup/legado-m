@@ -43,24 +43,31 @@
 
 > 双栈并存是既定事实（View 存量 + Compose 演进方向），但**取色来源必须统一**；同类页面必须用同类组件。
 
-### 1. 顶栏族（8 形态 → 3 基线）
+### 1. 顶栏族（8 形态 → 3 基线 → **1 单源 + 主 Tab 例外**，2026-09-08 收官）
+
+> my-compose-full W6.5/W6.6/W7.2 收官终态（2026-09-08 核定）：**子页/设置族/管理族顶栏全部单源 GlassTopAppBar**；`AppManagementTopBar` 定义已删除（AppManagementScaffold 委托 Glass 族）；`MainTopBarView` 仅剩主界面 Tab 消费（Mode.SUB 枚举已删除）。
 
 | 基线组件 | 技术栈 | 适用 | 取色 |
 |---------|--------|------|------|
-| `MainTopBarView`（`ui/widget/MainTopBarView.kt`） | View | 主界面 5 Tab + 高阶子页（SUB 模式 56dp） | 完整消费 `TopBarConfig`（壁纸/圆角/背景色）+ ThemeStore；**SUB 非壁纸态基色走 `TopBarConfig.resolvePageBarColor` 单源（subpage-topbar-unify AD-01）** |
-| `GlassTopAppBar`（`ui/widget/components/GlassTopAppBar.kt`） | Compose | 功能页/子页（~40 页）+ **设置族（subpage-topbar-unify AD-04 后，ConfigTopBar 已消灭）** | **非壁纸基色统一 `TopBarConfig.resolvePageBarColor` 三级决策链（subpage-topbar-unify AD-01/AD-05：顶栏包自定义背景色 → 沉浸开关页面底色（背景图场景透明回退主色）→ 主题主色）**；壁纸态保持 withOpacity(resolve) 原语义 |
-| `AppManagementTopBar`（`AppManagementScaffold.kt` 内私有） | Compose | 列表管理页（书源/订阅源/替换/规则等 5 页，48dp） | **`TopBarConfig.resolvePageBarColor` 单源（subpage-topbar-unify AD-01 去重）**+ `manageBgAlphaFraction` 半透明特性 |
+| `GlassTopAppBar`（`ui/widget/components/GlassTopAppBar.kt`） | Compose | **子页/设置族/管理族全量单源**（功能页 ~40 页 + ConfigActivity + 管理族 48dp 自绘分支 + 共用布局页 installGlassTopBar 运行时替换） | 非壁纸基色统一 `TopBarConfig.resolvePageBarColor` 三级决策链（AD-01/AD-05）；最终色（含透明度）一律 `resolvePageBarColorWithAlpha`；前景色一律 `contrastOn(barColor)` |
+| `MainTopBarView`（`ui/widget/MainTopBarView.kt`） | View | **仅主界面 Tab**（书架/发现/订阅/我的；Mode.SUB 已删除） | 完整消费 `TopBarConfig`（壁纸/圆角/背景色）；`resolvePageBarColorWithAlpha` 同源 |
+| `TitleBar`（managed=true 分支） | View | **仅主界面"我的/发现经典"遗留头部** | `resolvePageBarColorWithAlpha` 单源（bugfix-0908f T1 收编：半透明清阴影）；新页面禁止使用 |
 
-**顶栏语义色单源（subpage-topbar-unify AD-05，2026-09-07）**：所有顶栏"非壁纸基色"一律由 `TopBarConfig.resolvePageBarColor(context, config)` 产出（对标 NG topBarContainer 单源模式），前景色一律 `contrastOn(基色)`；禁止组件各自兜底取色。**最终色（含透明度）一律经 `resolvePageBarColorWithAlpha`：透明度 manageBgAlpha 顶栏族全局生效**（my-compose-full MC-12，六验用户裁决"全站半透明一致"）；基色自带透明（沉浸+全局壁纸）时保持原 alpha 透出壁纸。`ConfigTopBar` 已消灭（ConfigActivity 改用 GlassTopAppBar + `ConfigMenuActions` MenuAction 适配）；`MainTopBarView` 为 View 过渡态（Mode.MAIN 长期保留，Mode.SUB 随 master-track B 波次页面迁移消亡）。
+**顶栏语义色单源（AD-05 + bugfix-0908f 补强，2026-09-08）**：
+1. 基色/前景色单源不变（`resolvePageBarColorWithAlpha` + `contrastOn`），禁止组件各自兜底取色。
+2. **内容色作用域铁律（bugfix-0908f T2 实锤条款）**：任何自绘顶栏分支必须 `CompositionLocalProvider(LocalContentColor provides contentColor)` 包裹整个顶栏内容——M3 TopAppBar 有 `actionIconContentColor` 三键等价物，自绘分支漏包时 nav/action 图标回落主题 onSurface（黑色），日夜主题不跟随（真机实锤：书源管理返回/编辑书源图标黑）。
+3. **MenuActionIcon tint 继承决策（R5 恢复）**：`tint = action.tint ?: LocalContentColor.current`——禁止显式钉 `MaterialTheme.colorScheme.onSurfaceVariant` 等主题色（W7.2 回归实锤）；显式 `action.tint` 仍最优先。
+4. **同栏图标尺寸统一 20dp 档**：nav 图标、TopBarActionRow 一级图标、溢出 MoreVert 均为 `Modifier.size(20.dp)`；新增一级图标必须对齐。
+5. 半透明底（alpha < 0xFF）不画阴影/elevation（W0 定稿，GlassTopAppBar 与 TitleBar managed 分支已同步）。
 
-**已查明的待治理形态**（不得新增）：
-- 自绘私有 Row 顶栏（AiChat/S3/Library/AiProvider/AiWorldBook/Relay/Toc 等 ~8 处碎片，互不共享）→ 并 AppManagementScaffold 或对齐视觉参数（H3/H4）
-- M3 原生 `TopAppBar`（Debug 8 页 secondary 色 + MyFeatureBooks）→ GlassTopAppBar primaryColor（H12）
-- 原生 Toolbar 溢出（OpenUrlConfirm/VerificationCode）→ 项目头部（H5）
-- 旧 `TitleBar` 残留（S3Container/LibraryContainer）→ 双基线（H4）
-- **`ConfigTopBar` 已消灭（subpage-topbar-unify AD-04，2026-09-07：ConfigActivity 换 GlassTopAppBar + MenuAction 适配）**
-- ReadRecordActivity 壳层自绘脱离体系（登记 Phase2 收敛）
+**待治理形态收尾状态（2026-09-08 核定）**：
+- ~~自绘私有 Row 顶栏（H3/H4）~~ ✅ 已收敛（管理族委托 Glass 单源）
+- ~~M3 原生 TopAppBar（H12）~~ ✅ 已收敛
+- ~~原生 Toolbar 溢出（OpenUrlConfirm/VerificationCode，H5）~~ ✅ 已登记豁免（透明壳）
+- ~~ConfigTopBar~~ ✅ 已消灭
+- ReadRecordActivity 壳层自绘（登记 Phase2 收敛，唯一未清项）
 - 播放器/漫画沉浸页（ReadBook/ReadManga/Video/Audio）：**播放器手势红线，不改造**
+- 旧 TitleBar 残留：主界面"发现经典/我的" managed 分支保留（bugfix-0908f 已收编取色）；**经典发现头部迁移 MainTopBarView 彻底方案**登记后续迭代（与 D4 批3 同批评估）
 
 **主 Tab 头部搜索入口形态（topbar-search-entry-align，2026-08-28）**：四主 Tab（书架/发现/订阅/我的）统一"标题区（titleSelect）+ 搜索按钮 → 新搜索页"，宿主一律 `setSearchEntryVisible(false)` 关闭 searchEntry 胶囊（regular 风格下胶囊与 titleSelect 互斥，关胶囊后源选择入口自动回归）；搜索框底色统一 `ThemeUiPalette.searchFieldBackgroundColor` + alpha 对齐 View 侧（详见 `project-rules/frontend-ui-standards.md` §3.1）。
 
@@ -80,12 +87,13 @@
 | 家族 | 数量 | 状态 | 处置 |
 |------|------|------|------|
 | A 新 Compose（`ComposeDialogFragment` + `AppDialogFrame`/`AppDialogStyle`，含 9 工厂 40 子类） | 49 文件 | ✅ 全纳管 | **基线** |
-| B 旧 View（`base/BaseDialogFragment` 子类，仅 `setBackgroundColor(ThemeStore)` 联动背景） | **36**（+pref 2） | ⚠️ 仅背景色 | **D1 全部入迁移队列**（撤销 G6 存量判定） |
-| C 系统弹框（`alert{}` DSL 71 文件 162 处 + 内联 9 处） | 71 文件 | ❌ 不随主题 | D2 收敛 `ComposeConfirmDialog` 族 |
-| D M3 @Composable（`AppConfirmDialog`/`AppEditDialog`/`AppTextDialog`/`SingleChoiceDialog`/`ConfirmDialog`） | 5 | ✅ material3 默认 | D3 对齐 `AppDialogStyle`（补面板背景/圆角/透明度） |
-| E 散点（raw Dialog/BottomSheet/ComponentDialog/AlertDialog+ViewBinding） | 13 | ⚠️ 部分 | D4 迁移或登记 |
+| B 旧 View（`base/BaseDialogFragment` 子类） | **~1** | ✅ **D1 已收官（my-compose-full W6.3，2026-09-08：grep 残留=0，PackageSyncTaskDialog 重写为最后一个）** | 基线 |
+| C 系统弹框（`alert{}` DSL） | 残留少量 | ✅ **D2 已收敛（约 90 处转 Compose 族，W5/W6 批次）** | 基线 |
+| D M3 @Composable（`AppConfirmDialog`/`AppEditDialog`/`AppTextDialog`/`SingleChoiceDialog`/`ConfirmDialog`） | 5 | ✅ 已对齐 `AppDialogStyle` | 基线 |
+| E 散点（raw Dialog/BottomSheet/ComponentDialog/AlertDialog+ViewBinding） | 登记 | ⚠️ 豁免/Phase2 | F3/F4 WebView 承载登记豁免 |
 
 **禁止**：新建 `BaseDialogFragment` 子类；新建 `alert{}` DSL；弹框系统原生样式。
+**弹框透明度语义（bugfix-0908 T4）**：主题"弹框不透明度"(dialogAlpha)<100 时，`ComposeDialogFragment.onStart` 按比例单调上浮窗口 dimAmount 补偿可读性（alpha=100 零改动，E-Ink 分支不受影响）；弹框根节点必须显式背景（`rememberAppDialogStyle().surface`），禁止依赖窗口默认。
 
 ### 4. 卡片 / 列表 / 根背景族（3 套 → 直色基线）
 
@@ -103,7 +111,9 @@
 > 新增/修改 UI 完成后逐项自检，全部通过才算完成；**具体写法/真签名/样板页见 `how-to.md`（写码前先翻它，禁止凭记忆猜 API）**：
 
 - [ ] 0. 顶栏图标行为语义（topbar-icon-semantics-fix 置顶条款，2026-08-28）：**图标功能有效性**——每个顶栏/菜单图标必须挂真实 onClick，禁止死按钮/空实现/占位图标；**图标语义保留**——迁移/重构 TopBar 时原一级功能图标（原版 menu XML `showAsAction="always"`）禁止静默收拢进溢出菜单，必须映射为一级图标（ConfigTopBar 系用 `MenuAction.alwaysShow=true`；GlassTopAppBar 系 actions 槽直写；MainTopBarView 系走 `addActionButton`）；新增一级图标按组件系接入取色权威源（updateIconColors / actionIconContentColor / contrastOn(bgColor) / titleTextColor），**禁止硬编码图标 tint**；迁移登记见 migration-registry.md"原 showAsAction 处置"必填列
-- [ ] 1. 顶栏：从三基线选一（MainTopBarView / GlassTopAppBar / AppManagementTopBar），未自绘 Row、未用 M3 TopAppBar、未用原生 Toolbar 溢出
+- [ ] 1. 顶栏：**GlassTopAppBar 单源**（主界面 Tab 用 MainTopBarView；"我的/发现经典"遗留 TitleBar managed 例外且禁止新增），未自绘 Row、未用 M3 TopAppBar、未用原生 Toolbar 溢出；**自绘分支必须包 `CompositionLocalProvider(LocalContentColor provides contentColor)`（bugfix-0908f 铁律，漏包=图标黑色不随主题）**
+- [ ] 1a. 顶栏/菜单图标：MenuActionIcon 默认 tint 继承 `LocalContentColor.current`（禁止显式钉主题色）；同栏图标统一 20dp 档；`action.tint` 显式指定仍最优先
+- [ ] 1b. ComposeView 容器替换模式（installGlassTopBar/页面 Compose 化）：**批量 removeView 后 addView 索引必须 `coerceAtMost(container.childCount)`**（bugfix-0908f T3 实锤：摘录模板页裸 index=3 越界闪退）；removeView 静默 no-op 陷阱——titleBar 等视图与内容区不同父容器时 removeView 无效，改 GONE（bugfix-0908 T1）
 - [ ] 2. 菜单：ModernActionPopup 视觉（AppDropdownMenu 渲染层）/ 行内 action 图标，非系统菜单
 - [ ] 3. 弹框：`ComposeDialogFragment` + `AppDialogFrame`/`AppDialogStyle`（AppComposeDialogs 工厂），非 BaseDialogFragment / alert{} DSL / M3 组件
 - [ ] 4. 根背景：`palette.settings.page`（ThemeStore 直读），非 `colorScheme.surface`
