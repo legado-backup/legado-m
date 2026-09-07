@@ -17,6 +17,7 @@
 - [子页面顶栏取色统一](./specs/subpage-topbar-unify/README.md) - 顶栏取色统一+沉浸透明语义（全局壁纸下顶栏透明透壁纸）：三级决策链单源 resolvePageBarColorWithAlpha，ConfigTopBar 消灭（4→3），二期组件归一 Delta 已追加（共享内核+管理族委托 3→2+MainTopBarView 消亡路线）✅ 已验收通过
 - [我的全域Compose化](./specs/my-compose-full/README.md) - "我的"入口 45 页 Compose 化盘点（C-full 36/C-mixed 8/C-none 2）+ 六波迁移（W0 闸门→W1 基线→W2 地基→W3 并存页→W4 纯 View 重写→W5/W6 穷举清扫→W7 顶栏 3→1 归一收官） ✅ 实施完成（L2/L3 真机回归待补验）
 - [真机反馈五项修复 0908](./specs/real-device-bugfix-0908/spec.md) - 书源管理万级域名分组卡死（host 表 IO 线程化+dataVersion 重组信号+扁平 RowModel）+替换净化双搜索框（removeView 静默 no-op 改 GONE）+弹框透明（SourcePicker 背景补齐+ComposeDialogFragment dim 补偿）+书架媒体入口删除+订阅栏目文件夹残留（applyModernRssMode 补隐藏） ✅ 已实施（L2 五场景自测通过，2026-09-08）
+- [真机反馈三项修复 0908-followup](./specs/real-device-bugfix-0908-followup/spec.md) - 经典发现头部纯黑（TitleBar managed 接入 resolvePageBarColorWithAlpha 唯一取色+半透明清阴影）+顶栏图标颜色/尺寸混乱（GlassTopAppBar 自绘分支补 LocalContentColor+MenuActionIcon 恢复 R5 继承决策+一级图标 20dp 统一）+摘录分享模板启动崩溃（addView 索引 coerceAtMost） ✅ 已实施（L2 t6/t7/t8 自测通过，2026-09-08）
 - [Compose化进度盘点 0908](./specs/compose-progress-audit-0908/README.md) - 汇报类：我的域 Compose 化收官确认+全项目 14 个真 View 页清单+死布局 5 个/孤儿字符串 554 个核查+规范文档 4 处滞后修订建议（architecture.md 3 基线口径滞后/frontend-ui-standards 缺弹框与归一条款）🔄 下次迭代输入
 - [本地打包提速](./specs/local-build-speedup/README.md) - daemon 复用+debug 降堆+configuration cache+版本号 ValueSource 化，增量打包 7m33s→≤4min，内存峰值 93.5%→≤91%（基线实测支撑，红队 2 轮闭环）🔄 实施完成，R1 计时补测待并行会话合并
 - [批量 UI 修复 0905](./specs/ui-batch-fix-0905/README.md) - 4 项用户反馈：崩溃弹框误弹回归+视频书源沉浸式左下角线路/集数+发现页分组弹窗 Bug 与全前端死菜单清理+经典订阅头部收口（搜索留外/六项收三点/删分组信息列举）✅ 开发完成（T1-T8 L2 真机验证，待用户验收）
