@@ -47,16 +47,18 @@
 
 | 基线组件 | 技术栈 | 适用 | 取色 |
 |---------|--------|------|------|
-| `MainTopBarView`（`ui/widget/MainTopBarView.kt`） | View | 主界面 5 Tab + 高阶子页（SUB 模式 56dp） | 完整消费 `TopBarConfig`（壁纸/圆角/背景色）+ ThemeStore |
-| `GlassTopAppBar`（`ui/widget/components/GlassTopAppBar.kt`） | Compose | 功能页/子页（~40 页） | `containerColor ?: Color(context.primaryColor)` + barElevation；**H13 已实施（2026-08-27）：STYLE_REGULAR 顶栏包启用时消费 TopBarConfig 壁纸/圆角/背景色（对齐 MainTopBarView）** |
-| `AppManagementTopBar`（`AppManagementScaffold.kt` 内私有） | Compose | 列表管理页（书源/订阅源/替换/规则等 5 页，48dp） | `AppSettingPalette` + themeUiPalette + UiCorner |
+| `MainTopBarView`（`ui/widget/MainTopBarView.kt`） | View | 主界面 5 Tab + 高阶子页（SUB 模式 56dp） | 完整消费 `TopBarConfig`（壁纸/圆角/背景色）+ ThemeStore；**SUB 非壁纸态基色走 `TopBarConfig.resolvePageBarColor` 单源（subpage-topbar-unify AD-01）** |
+| `GlassTopAppBar`（`ui/widget/components/GlassTopAppBar.kt`） | Compose | 功能页/子页（~40 页）+ **设置族（subpage-topbar-unify AD-04 后，ConfigTopBar 已消灭）** | **非壁纸基色统一 `TopBarConfig.resolvePageBarColor` 三级决策链（subpage-topbar-unify AD-01/AD-05：顶栏包自定义背景色 → 沉浸开关页面底色（背景图场景透明回退主色）→ 主题主色）**；壁纸态保持 withOpacity(resolve) 原语义 |
+| `AppManagementTopBar`（`AppManagementScaffold.kt` 内私有） | Compose | 列表管理页（书源/订阅源/替换/规则等 5 页，48dp） | **`TopBarConfig.resolvePageBarColor` 单源（subpage-topbar-unify AD-01 去重）**+ `manageBgAlphaFraction` 半透明特性 |
+
+**顶栏语义色单源（subpage-topbar-unify AD-05，2026-09-07）**：所有顶栏"非壁纸基色"一律由 `TopBarConfig.resolvePageBarColor(context, config)` 产出（对标 NG topBarContainer 单源模式），前景色一律 `contrastOn(基色)`；禁止组件各自兜底取色。`ConfigTopBar` 已消灭（ConfigActivity 改用 GlassTopAppBar + `ConfigMenuActions` MenuAction 适配）；`MainTopBarView` 为 View 过渡态（Mode.MAIN 长期保留，Mode.SUB 随 master-track B 波次页面迁移消亡）。
 
 **已查明的待治理形态**（不得新增）：
 - 自绘私有 Row 顶栏（AiChat/S3/Library/AiProvider/AiWorldBook/Relay/Toc 等 ~8 处碎片，互不共享）→ 并 AppManagementScaffold 或对齐视觉参数（H3/H4）
 - M3 原生 `TopAppBar`（Debug 8 页 secondary 色 + MyFeatureBooks）→ GlassTopAppBar primaryColor（H12）
 - 原生 Toolbar 溢出（OpenUrlConfirm/VerificationCode）→ 项目头部（H5）
-- 旧 `TitleBar` 残留（ReadRecord/S3Container/LibraryContainer/AiImageProviderEdit）→ 双基线（H4）
-- `ConfigTopBar`（ConfigActivity 私有）缺背景 → 补背景随顶栏管理（H6）——**H6 已完成（2026-08-27）：ConfigTopBar 已带背景（TopBarConfig/壁纸/透明度），菜单已改 AppDropdownMenu（渲染层对齐基线）**
+- 旧 `TitleBar` 残留（S3Container/LibraryContainer）→ 双基线（H4）
+- **`ConfigTopBar` 已消灭（subpage-topbar-unify AD-04，2026-09-07：ConfigActivity 换 GlassTopAppBar + MenuAction 适配）**
 - ReadRecordActivity 壳层自绘脱离体系（登记 Phase2 收敛）
 - 播放器/漫画沉浸页（ReadBook/ReadManga/Video/Audio）：**播放器手势红线，不改造**
 
