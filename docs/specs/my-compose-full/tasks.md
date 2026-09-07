@@ -62,9 +62,11 @@
   - 改造点：①顶栏→installGlassTopBar ②硬编码中文（L109 标题+L231-246/L254-259/L341 菜单标签）→stringResource（§6.1）③tabBar/tvSummary/btnAdd GONE→removeView 对齐 ④ComposeActionListDialog.create 可选统一为 showComposeActionListDialog
 - [x] 3.4 **AdvancedTitleManageActivity 纳入**（红队 R1：入口阅读页 TipConfigDialog，顶栏统一+组件收编）
   - 留痕 (L1 编译过)：实施评估=AppManagementScaffold 为管理族三基线之一已合规（Screen 内自供顶栏+返回键），无需 installGlassTopBar；改造收敛为 GONE 残留清理——hideTopBar/initComposeContent 统一 removeView 五节点（titleBar/recyclerView/tabBar/tvSummary/btnAdd），删 View import。**未换样板**（Lottie 预览列表为功能特性，与红队 R1 结论一致）
-- [ ] 3.5 孤儿治理：ThemeEditorDialogFragment/DiscoveryConfigFragment/SubscriptionConfigFragment 死代码删除（**同步删 ConfigActivity.kt:126-127 分发分支+ConfigTag 常量；删前运行时入口审计：searchTarget 深链核查**）；fileManage 死分支路由删除
+- [x] 3.5 孤儿治理：ThemeEditorDialogFragment/DiscoveryConfigFragment/SubscriptionConfigFragment 死代码删除（**同步删 ConfigActivity.kt:126-127 分发分支+ConfigTag 常量；删前运行时入口审计：searchTarget 深链核查**）；fileManage 死分支路由删除
+  - 留痕 (L1 编译过)：深链审计确认——DISCOVERY_CONFIG/SUBSCRIPTION_CONFIG 常量零 putExtra 来源（活链路为 DISCOVERY_SUBSCRIPTION_CONFIG）；ThemeEditor 三件套（DialogFragment/Screen/ViewModel）互引闭环零外部入口；fileManage 路由分支无入口行（FileManageActivity 活入口在精准管理/AiConfigFragment，页面保留 W6.1）| 删除 5 文件+ConfigActivity 分支 2 行+ConfigTag 常量 2 条+MySettingsData 死分支+import | rg 复核清零 |
   - 验证标准（3.1-3.5）：管理功能等价 + 顶栏统一 + 死代码清零 (L2)
-- [ ] 3.6 W3 波提交
+- [x] 3.6 W3 波提交
+  - 留痕：3.1/3.3/3.4=624e773c2、3.2=002236a3f、3.5+收尾=本波尾提交；L2 结构验证（模拟器 GPU 故障期）：安装 0907 新包→底栏管理页 dump 全挂载（GlassTopAppBar 标题+同步任务图标+日夜 Tab+列表项）→NavigationBarItemsDialog 打开验证（栏项列表+确认按钮渲染，零 FATAL）；视觉验收继续挂起待模拟器环境修复
 
 ## 4. W4 纯 View 重写（大）
 - [ ] 4.1 CacheManageActivity：composeHost + AppManagementScaffold 重写（**ViewModel 复用；ItemTouchHelper→LazyColumn 拖拽重实现**；多选/排序/清理确认全保留）
