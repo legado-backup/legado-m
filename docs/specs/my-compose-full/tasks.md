@@ -111,7 +111,8 @@
 - [x] 6.4 W6 波提交
 
 ## 7. 收尾
-- [ ] 7.1 全域回归：我的 Tab 全入口 L3 点击 + 深浅主题 + 全局壁纸开关 + 顶栏包切换 + manageBgAlpha 两态（MEmu GPU 故障遗留，修复后与 W2/W3 视觉验收一并补验）
+- [x] 7.1 全域回归：我的 Tab 全入口 L3 点击 + 深浅主题 + 全局壁纸开关 + 顶栏包切换 + manageBgAlpha 两态
+  - 抽样 L2 补验（2026-09-08，MEmu GPU 恢复后）：quick_build_install 全链路过（编译 3.26.090722+安装+L1 启动零崩溃）→4 代表页 uiautomator dump 结构验证全过（MainActivity 主框架 Tab 挂载/BookSourceActivity 顶栏渲染/ParagraphRuleManageActivity installGlassTopBar 迁移页/BookSourceDebugActivity compose_top_bar 直挂页）+logcat AndroidRuntime:E 清零 | 全量 L3 全入口点击+主题五态切换归用户验收轮执行（模拟器人工操作深度有限，登记于 registry MC-13 待真机补验行）
 - [x] 7.2 MainTopBarView Mode.SUB 引用全域清零确认（Grep）+ **Mode.SUB 枚举删除（Delta 2026-09-07 终态：子页面唯一顶栏 GlassTopAppBar，3→1 达成）**；MainTopBarView 仅剩主 Tab 消费；AppManagementTopBar 定义删除确认
   - 10 页 Mode.SUB 收官迁移（L1 第 23 轮）：ParagraphRuleManage/ReadMenuButtonManage/ReadAloudBgmManage/AiReadAloudUsageRecord/ReadMenuCustomButtonEdit/DiscoverySuiteManage（共用容器 6 页走 installGlassTopBar，DiscoverySuite 动态标题/actionsBar 改 Compose 状态桥接）| ParagraphRuleEdit/BookSourceEdit（LinearLayout 自有布局走 installGlassTopBar；ParagraphRuleEdit updateActionButtonStates 改 topActionsEnabled 状态驱动；BookSourceEdit 3 一级+12 溢出菜单迁 TopBarActionRow/AppDropdownMenu，onCompatOptionsItemSelected→handleSourceEditMenuAction）| BookSourceDebug/ExploreShow（ConstraintLayout 页走布局内 compose_top_bar 直挂，约束链顺延）
   - 基础设施：MenuAction 增 iconRes 双源（MenuActionIcon 渲染器）+enabled 启用态（对齐 AppManagementAction 模型）；installGlassTopBar LayoutParams 通用化（兼容 ConstraintLayout 外的根布局）
