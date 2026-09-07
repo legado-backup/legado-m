@@ -104,7 +104,10 @@
 - [x] 6.2 **AiImageGalleryActivity/DebugToolsActivity 明确迁移**；QrCodeActivity/WebViewActivity/VerificationCodeActivity/OpenUrlConfirmActivity 补登记后定迁移或豁免（红队 R1-P2 补树）
   - AiImageGalleryActivity 完成 (L1 第 20 轮)：AppManagementScaffold 迁移（顶栏/搜索/批量底栏）+AiImageGalleryScreen（FlowRow chips+2 列网格+Glide AndroidView）+MainTopBarView Mode.SUB 消亡+RecyclerAdapter/activity_ai_image_gallery.xml 删除（item_ai_generated_image.xml 保留：BookCharacterEdit 仍在用）
   - 豁免登记（双子代理穿透裁决）：DebugTools（纯 Compose 已达标，Screen 内私有卡片组件豁免先例）；QrCode（相机预览页，顶栏已 GlassTopAppBar）；WebView（WebView 主体不可 Compose 化，顶栏/菜单/对话框已全达标，迁移高风险零收益）；VerificationCode/OpenUrlConfirm（透明壳+ComposeDialogFragment，无可迁移面）
-- [ ] 6.3 对话框 40 类按形态分组（全屏/输入/多选/排序/预览）→ComposeDialogFragment 基线清扫（红队 R2：分组验收矩阵）
+- [x] 6.3 对话框 40 类按形态分组（全屏/输入/多选/排序/预览）→ComposeDialogFragment 基线清扫（红队 R2：分组验收矩阵）
+  - 双子代理分类穿透（2026-09-08，31 类核对）：30 类类型 A 已达 ComposeDialogFragment 基线（含 GroupManageDialog×4 薄壳共享 GroupManageComposeDialog、FontSelectDialog/TopBarEditDialog/BookmarkDialog/CacheChapterDialog/UpdateDialog/CoverRuleConfigDialog/ImportAutoTaskDialog/AutoTaskLogDialog/AiImagePreviewDialog/ChangeBookSourceDialog/ChangeRssArticleSourceDialog/CheckSourceConfig/TextDialog/AppLogDialog/VariableDialog/SourceLoginDialog/Import 系×5/DictRuleEditDialog/Highlight 系×3/TxtTocRuleEditDialog+ComposeDialog 双版均 A）| ThemeEditorDialogFragment 类型 D 已删除
+  - PackageSyncTaskDialog 完成 (L1 第 21 轮)：唯一类型 C（AndroidAlertBuilder+编程式 View 列表）重写 ComposeDialogFragment+AppDialogFrame+LazyColumn+states.collectAsState 定向刷新，扩展函数签名不变 4 调用点零改动
+  - 豁免登记：WaitDialog（全 App 共用 21 处加载指示器，非"我的"域专属，留全局统一专项）| AndroidView 包 TextView/PhotoView（MD 渲染/图片手势）为合理互操作非残留
 - [ ] 6.4 W6 波提交
 
 ## 7. 收尾
