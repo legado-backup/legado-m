@@ -24,12 +24,15 @@
     - 合计 3+1+4+2+3+1+1+5+2=22 ✓
 
 ## 1. W1 先行（ThemeManage 自造组件清零拆至 W5，红队 R5 拆波）
-- [ ] 1.1 AppearanceKitActivity：去 View 顶栏（MainTopBarView Mode.SUB）→ 统一顶栏组件；自造 AppearanceKitCard→AppManagementCard（MC-8）
+- [x] 1.1 AppearanceKitActivity：去 View 顶栏（MainTopBarView Mode.SUB）→ 统一顶栏组件；自造 AppearanceKitCard→AppManagementCard（MC-8）
   - 验证标准：编译通过；顶栏统一组件+透壁纸语义；主题 Kit 功能等价 (L2)
-- [ ] 1.2 AppearanceKitEditActivity：同 1.1 模式；自造 SettingPanel/自绘按钮/M3 OutlinedTextField→统一组件（MC-3/8/11）
+  - 回填勾选（2026-09-08 源码核验）：97daa7a23 已实施 installGlassTopBar（L166 topBarTitle/topBarActions 状态桥接），Checkbox 漏勾
+- [x] 1.2 AppearanceKitEditActivity：同 1.1 模式；自造 SettingPanel/自绘按钮/M3 OutlinedTextField→统一组件（MC-3/8/11）
   - 验证标准：同上 (L2)
-- [ ] 1.3 ThemeManageActivity（2495 行）：本轮限顶栏+布局统一；自造组件清零（tabs/开关行/编辑大弹框/alert{}:1201/ColorPicker×3）拆至 W5 专项
+  - 回填勾选（2026-09-08 源码核验）：97daa7a23 已实施 installGlassTopBar（L100）
+- [x] 1.3 ThemeManageActivity（2495 行）：本轮限顶栏+布局统一；自造组件清零（tabs/开关行/编辑大弹框/alert{}:1201/ColorPicker×3）拆至 W5 专项
   - 验证标准：顶栏统一+透壁纸；主题切换/应用/同步功能等价 (L2)
+  - W5 专项收官（2026-09-08，编译第 25 轮）：新增/编辑主题包大弹框重写 ThemePackageEditDialog（ComposeDialogFragment+AppDialogFrame+4 分组 Tab[颜色/图片/界面/字体]+~26 配置行全 Compose）| ThemeManageActivity 22 个 pending* 状态 mutableStateOf 化+4 必选色/名称状态化（saveThemeFromDialog）| AndroidAlertBuilder×2/alert{}:1201(模糊弹框→showComposeNumberPickerDialog)/setupXxx View 助手链 ~700 行删除 | ColorPickerDialog(第三方)×3+FontSelectDialog+图片裁剪回调链零改动（openColorPicker/openFontPicker 桥接）| 删 dialog_theme_package_edit.xml/item_theme_package_option.xml/dialog_image_blurring.xml
 - [x] 1.4 W1 波提交 + 三页 Mode.SUB 引用删除确认（Grep MainTopBarView 零残留于三页）+ MC 门禁核对留痕
   - 留痕：commit 97daa7a23
 
@@ -88,7 +91,7 @@
 - [x] 5.2 AutoTaskActivity(+Edit)/AiProviderManageActivity(+Edit)/AiImageProviderManageActivity(+Edit)/AiWorldBookManageActivity：编辑型+管理型统一
   - 批A 登记完成：AutoTaskActivity/AutoTaskEditActivity/AiWorldBookManageActivity/AiProviderManageActivity/AiImageProviderManageActivity（5 页零 View 残留）| 可选清理项：AiImageProviderManage 死函数 showActions(L190-236)、AiProviderManage Screen 拆独立文件
   - AiImageProviderEditActivity 完成 (L1)：删死布局 activity_ai_image_provider_edit.xml（-191 行，运行时 removeAllViews 全丢弃）+binding 改合成 ViewBinding 空壳（getRoot() 方法覆写，对齐 RelaySettings 模式）
-- [ ] 5.3 S3ContainerManage/LibraryContainerManage/RelaySettingsActivity/AllBookmarkActivity/CoverCollectionManage/BookInfoManage/BubbleManage：管理列表型统一（含 BubbleManage 对话框族×8 核对）
+- [x] 5.3 S3ContainerManage/LibraryContainerManage/RelaySettingsActivity/AllBookmarkActivity/CoverCollectionManage/BookInfoManage/BubbleManage：管理列表型统一（含 BubbleManage 对话框族×8 核对）
   - 批A 登记完成：AllBookmarkActivity/RelaySettingsActivity/S3ContainerManageActivity/LibraryContainerManageActivity（4 页零运行时残留；S3/Library XML 死节点+共享 WaitDialog 留遗留项）| BubbleManage 对话框族×8 核对确认 100% Compose 化达成（唯一 View 弹框=第三方 ColorPickerDialog，与 ThemeManage/TopBarManage/NavBar 一致留统一取色器专项）| BookInfoManageActivity：复用 14 页共用容器，GONE 为正当共存模式（对齐 ReadRecord 2.3 判定），不动 XML 仅登记
   - CoverCollectionManageActivity 完成 (L1)：installGlassTopBar 顶栏+containerActionVisible 状态桥接（原 B 类风险登记解除）+View 节点 removeView
   - BubbleManageActivity 完成 (L1)：installGlassTopBar 顶栏（S3 容器+帮助双按钮状态桥接）+GONE→removeView 四节点
