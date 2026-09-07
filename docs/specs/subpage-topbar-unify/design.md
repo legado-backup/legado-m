@@ -113,17 +113,17 @@ val defaultColor = if (wallpaper != null && isRegular) {
 - **Superseded-by**: 无
 - **ChangeLog**: 2026-09-07 初版
 
-### AD-02: 壁纸态（regular 顶栏包 + 壁纸）保持 resolve 原语义，不并入统一函数
-- **Version**: v1.0
+### AD-02: 基色（含壁纸态）统一决策链，废弃黑白兜底语义（v1.1 修订：检查点 2 用户真机否决后）
+- **Version**: v1.1
 - **UpdateTime**: 2026-09-07
-- **Context**: 顶栏包壁纸态使用 `withOpacity(resolveBackgroundColor(config), wallpaperAlpha)`，其中 resolve 兜底黑白是"顶栏包默认包底色"语义（TopBarConfig.kt:312-319 hasCustomBackground 值比较依赖 defaultBackgroundColor 不变）
-- **Concern**: 若统一函数替换壁纸态基色，用户自定义顶栏包（未显式设背景色）壁纸叠加色将从黑白变主色，顶栏包视觉契约被破坏
-- **Decision**: 统一函数只接管"非壁纸基色"；壁纸态保持 `withOpacity(resolve)` 原逻辑不动
-- **Goal**: 顶栏包作者所见即所得，零回归
-- **Tradeoff**: regular 顶栏包无壁纸时若未显式设背景色，基色从"黑白兜底"变"主色"（hasCustom=false 走决策链）——此为统一目标内的预期变化
+- **Context**: v1.0 曾决策"壁纸态保持 withOpacity(resolve) 原语义"以保护顶栏包契约；用户真机验收否决——激活壁纸顶栏包时顶栏仍黑/白（resolve 兜底黑白污染壁纸态），与"全站跟随主题设置体系"诉求冲突
+- **Concern**: resolveBackgroundColor 黑白兜底只要在任何路径存活，用户就会继续看到"纯黑/纯白"顶栏
+- **Decision**: 全部基色（壁纸态与非壁纸态）统一 `resolvePageBarColor` 三级决策链；壁纸叠加保留 `withOpacity(基色, wallpaperAlpha)`；顶栏包契约重定义——显式背景色优先（第一分支），未显式设置则跟随主题主色（不再黑白）
+- **Goal**: 任何顶栏包/开关/主题组合下顶栏不出现硬编码黑白
+- **Tradeoff**: 未设显式背景色的壁纸包视觉从黑白变主色（预期内，即用户诉求）；主 Tab regular 无壁纸态从黑白基线变主色（更协调）
 - **Status**: Accepted
 - **Superseded-by**: 无
-- **ChangeLog**: 2026-09-07 初版
+- **ChangeLog**: 2026-09-07 v1.1 检查点 2 用户真机否决后修订（原"壁纸态保持 resolve 原语义"废弃）
 
 ### AD-03: 本轮只统一颜色，不统一高度/字号/裁切
 - **Version**: v1.1
