@@ -102,16 +102,16 @@ val defaultColor = if (wallpaper != null && isRegular) {
 ## Architecture Decisions
 
 ### AD-01: 取色决策单点收敛到 TopBarConfig，而非组件级各自修复
-- **Version**: v1.4
+- **Version**: v1.3
 - **UpdateTime**: 2026-09-07
-- **Context**: 4 套顶栏组件（AppManagementTopBar/GlassTopAppBar/ConfigTopBar/MainTopBarView）各自实现取色，`defaultBackgroundColor` 硬编码黑白被 2 套组件无条件消费，30+ 页面顶栏不随主题；真机四轮实锤追加自由度失控：wallpaperAlpha 混入基色（大白框/大黑头）、半透明顶栏跨页观感漂移（delta 52）
+- **Context**: 4 套顶栏组件（AppManagementTopBar/GlassTopAppBar/ConfigTopBar/MainTopBarView）各自实现取色，`defaultBackgroundColor` 硬编码黑白被 2 套组件无条件消费，30+ 页面顶栏不随主题；真机三轮实锤追加两个自由度失控：wallpaperAlpha 混入基色（大白框/大黑头）、Glass 族实色与管理族半透明色系不一致
 - **Concern**: 逐组件修复则逻辑重复 4 份，且基色的"色相"与"透明度"两个自由度分散在各组件，任何一处失控即视觉分裂
-- **Decision**: `resolvePageBarColor` 统一产出**色相**，且**顶栏一律实色直出（alpha=1）**——半透明顶栏观感取决于各页底下透出层级结构，页面不同观感必然不同（真机实锤：manageBgAlpha=40 时书源管理 (46,51,46) vs 备份恢复 (98,128,111)，delta 52），实色是唯一可达成全站一致的方案；wallpaperAlpha 只作用于壁纸图。manageBgAlpha 设置仅保留于各页**内容背景层**（管理族 root 半透明背景特性不变），不再作用于顶栏
-- **Goal**: 任一组合（顶栏包×主题×开关×透明度设置）下全组件顶栏视觉**像素级一致**且跟随主题
-- **Tradeoff**: 书源管理等管理族顶栏从"半透明暗绿"变"实色亮绿"（为全站绝对一致的必要代价，用户裁决点）；v1.3 透明度对齐方案废弃（物理上不可行）
+- **Decision**: `resolvePageBarColor` 统一产出**色相**；**透明度**统一 = `manageBgAlphaFraction`（>0 时同 alpha 半透明对齐管理族，=0 回退实色 1f 防顶栏消失）；wallpaperAlpha 只作用于壁纸图。三自由度（色相/透明度/壁纸）全组件单一语义
+- **Goal**: 任一组合（顶栏包×主题×开关×透明度设置）下全组件顶栏视觉一致且跟随主题
+- **Tradeoff**: Mode.SUB 家族 22 页视觉从黑白变主色系（用户诉求）；主 Tab regular 无壁纸从黑白基线变半透明主色
 - **Status**: Accepted
 - **Superseded-by**: 无
-- **ChangeLog**: 2026-09-07 v1.4 真机四轮反馈后定稿：v1.3 半透明对齐被自测实锤否决（跨页 delta 52），改全站实色
+- **ChangeLog**: 2026-09-07 v1.3 真机三轮反馈后定稿（色相+透明度双自由度单源化）
 
 ### AD-02: 基色统一决策链且保持不透明，wallpaperAlpha 只作用于壁纸图（v1.2 修订：检查点 2 二次否决后）
 - **Version**: v1.2
