@@ -1,110 +1,133 @@
-# spec.md — 子页面头部统一：全 App TitleBar 子页迁移 MainTopBarView
+# spec.md — 子页面顶栏样式统一
 
 ## Intent
+用户反馈：书源管理、订阅源管理、TXT目录规则、替换净化、字典规则、高亮规则管理、应用主题等页面顶栏是"标准的"，但主题设置、备份与恢复、公网Web访问、AI设置、自动任务管理、视频设置、订阅源全局搜索、书架媒体、书签、阅读记录、其他设置、精准管理、URL访问记录、日志管理、编辑订阅源等页面顶栏"五花八门，要么纯黑要么纯色"，不跟随主题设置体系。要求全面排查所有子页面并统一顶栏样式到标准决策链。
 
-四主页面（书架/订阅/发现/我的）头部已统一为 `MainTopBarView`，受主题 / 顶栏设置全量管理。但全 App 约 18 个子页面 Activity 仍在布局中使用传统 `TitleBar`（[TitleBar.kt](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/ui/widget/TitleBar.kt)），其 `topBarColorManaged` 默认 `false`，仅在显式开启时跟随顶栏 **背景色**，无法被圆角 / 壁纸 / 胶囊 / 字号 / 搜索入口等顶栏全套样式管理；且另有一部分页面头部用 `MaterialToolbar` 或 Compose 自绘，形成**多套不同样式**并存。
+**定位升级（检查点 R2 用户锚定）**：本任务是对标 legado_NG、服务"不影响主题设置体系前提下除阅读器外全面 Compose 化"终极目标的**取色铺路子任务**——顶栏语义色单源化后，master-track B 波次的页面迁移可零成本继承顶栏颜色。
 
-用户明确要求：**全 App 所有 `TitleBar` 子页面头部统一，并迁移到 `MainTopBarView`**，使子页面头部同样受主题设置 / 顶栏设置 / 样式管理统一管控，消除多套样式。
+根因（探索已锁定）：4 套顶栏组件存在 3 条取色管线，`TopBarConfig.defaultBackgroundColor` 硬编码夜间 `Color.BLACK`/日间 `Color.WHITE`，被 ConfigTopBar 与 MainTopBarView(Mode.SUB) 无条件消费。
 
 ## Scope
+### 包含
+- `TopBarConfig` 新增统一子页顶栏取色决策函数（三级链）
+- 4 套顶栏组件收敛：ConfigTopBar **消灭**（并入 GlassTopAppBar）；AppManagementTopBar、GlassTopAppBar、MainTopBarView(Mode.SUB) 接入统一函数
+- XML 残留死代码顶栏清理（4 处）
+- 真机 L2 全量页面顶栏验证（含设置页溢出菜单专项回归）
 
-### In-Scope（本次实现）
-
-1. **组件扩展**：`MainTopBarView` 新增通用子页面形态（新增 `Mode.SUB` 或等效机制），补齐子页面头部所需能力：
-   - 返回导航（左上返回箭头，代替原 `TitleBar` 的 `navigationIcon` + `onSupportNavigateUp`）。
-   - 菜单（原 `about:blank` 等 Activity 用 `setSupportActionBar` 挂的 overflow 菜单，改由 `MainTopBarView` 承载）。
-   - 副标题（`TitleBar.subtitle` 场景）。
-   - 自定义内容插槽（原 `TitleBar.contentLayout`）。
-2. **布局迁移**：将使用 `io.legado.app.ui.widget.TitleBar` 的子页面布局 XML 的头部替换为 `MainTopBarView`。
-3. **代码接线**：对应 Activity / Fragment 移除 `setSupportActionBar(binding.titleBar.toolbar)`，改为 `MainTopBarView` 接线（返回、菜单、标题、副标题、内容）。
-4. **样式一致**：子页面头部观感与主页面一致，颜色 / 圆角 / 胶囊 / 壁纸 / 字号全部读取 `TopBarConfig` + 主题 token，被顶栏设置 / 主题设置 / 样式管理全量管理。
-
-### Out-of-Scope（本次不实现）
-
-- **`MaterialToolbar` 弹窗**（`dialog_*.xml`，约 18 处）：弹窗头部语义与页面顶栏不同，不迁移。
-- **非 `TitleBar` 布局**：Compose 自绘页面头部、`fragment_explore`（发现经典主 Tab 变体）等不属「子页面 TitleBar」范畴，单独评估。
-- **`TitleBar.kt` 组件删除**：迁移完成并验证后再评估废弃；过渡期保留以防回退。
-- 不引入新依赖、不改数据库 schema。
+### 不包含
+- 主页 Mode.MAIN 顶栏（主界面设计，含标签栏/搜索，不动）
+- 沉浸豁免页：ImageCrop（深色裁剪）、ImageGallery/ImageDetail（黑底看图）、VideoPlayerActivity 播放器内顶栏、SearchActivity 自绘搜索头
+- 顶栏包壁纸态 crop 裁切像素级对齐（GlassTopAppBar 已有近似实现，随 ConfigTopBar 消灭差异面缩小）
+- Mode.SUB 22 页 View 宿主的 Compose 迁移（列入 master-track 波次随页面逐页消亡）
+- 管理族顶栏高度（48dp）与字号调整（用户认可的标准，不变）
+- 主题设置体系本身（ThemeStore/颜色主题功能）
 
 ## Approach
 
-### Selected Approach：扩展 `MainTopBarView` 增加通用子页形态，按页面批量迁移
+### Selected Approach
+两层收敛：**取色单点化 + 组件缩减（4→3）**。
 
-复用已验证的 `MainTopBarView` 体系，新增一个「子页」形态（`Mode.SUB`），为其补齐返回 / 菜单 / 副标题 / 自定义内容能力，再按**页面优先级分批**将 TitleBar 子页面迁移过去：
+**第一层：取色单点化。** 在 `TopBarConfig` 中新增统一决策函数（暂名 `resolvePageBarColor(context, config)`），实现与 `AppManagementScaffold` 完全一致的三级决策链：
 
-1. **组件**：`MainTopBarView` 新增 `Mode.SUB`：
-   - `titleSelect`（标题 + 向下箭头）在子页态改为「标题 + 返回箭头」，点击返回（复用宿主 `onBackPressed`）。
-   - 暴露 `setMenu` / `setSubtitle` / `setContentLayout` API，替代 `TitleBar` 对应能力。
-   - `setMode(Mode.SUB)` 中按钮可见性按子页语义配置（默认更多按钮隐藏，由页面按需 `setActionsVisible`）。
-2. **迁移批次**（每批 = 一类相似页面，迁移后立即编译 + 真机回归）：
-   - **批次 A（列表/管理页）**：`activity_book_source`、`activity_rss_source`、`activity_cache_manage`、`activity_read_record`、`activity_theme_manage`。
-   - **批次 B（编辑页）**：`activity_book_source_edit`、`activity_paragraph_rule_edit`、`activity_replace_rule`、`activity_rule_sub`、`activity_ai_image_provider_edit`。
-   - **批次 C（详情/杂项）**：`activity_about`、`activity_explore_show`、`activity_cover_collection_detail`、`activity_cover_collection_manage`、`activity_s3_container_manage`、`activity_source_debug`、`activity_ai_image_gallery`。
-3. **接线规范**：统一从 `Activity` 移除 `setSupportActionBar`，改用 `topBar.setMode(Mode.SUB)` + `topBar.setNavigationOnClick` / 菜单 API；返回键与 `onBackPressedDispatcher` 对接。
-4. **刷新链路**：复用 `MainTopBarView.refreshStyle()` / `TOP_BAR_CHANGED` 事件，子页面头部随主题变更自动刷新。
+1. `TopBarConfig.hasCustomBackground(config)` → 显式自定义背景色
+2. `AppConfig.immersiveManageBar` 开启 → `context.backgroundColor`（页面底色沉浸）
+3. 兜底 → `context.primaryColor`（主题主色）
 
-理由：同一组件后，子页面与主页面观感天然一致、全量受主题管理；`Mode.SUB` 使子页差异收敛在组件内；分批迁移降低单次回归面。
+所有顶栏组件的"非壁纸基色"全部改为消费该函数；壁纸态（顶栏包 regular + wallpaper）保持 `withOpacity(resolveBackgroundColor, alpha)` 原语义。
+
+**第二层：组件缩减（4→3，用户裁决 R1 检查点）。** 顶栏组件现状 4 套并存是架构债，收敛如下：
+
+| 组件 | 终态定位 | 动作 |
+|------|---------|------|
+| `GlassTopAppBar` | **Compose 页唯一通用顶栏** | 保留，接入统一函数 |
+| `ConfigTopBar`（ConfigActivity 私有） | **消灭** | 仅 1 个调用点（ConfigActivity:135），改用 GlassTopAppBar + MenuAction 适配（一级图标直出 + 溢出下拉菜单），删除 ConfigTopBar 定义与 decodeTopBarBitmap |
+| `AppManagementTopBar`（AppManagementScaffold 内私有） | **脚手架内置顶栏**（管理族标准本体，非独立组件） | 保留，取色逻辑改调统一函数去重 |
+| `MainTopBarView`（View 体系） | **View 宿主过渡态**：Mode.MAIN（主界面 4 Tab）长期保留；Mode.SUB 22 页列入 master-track 迁移清单，随页面 Compose 化逐页消亡 | 本轮 Mode.SUB 取色接统一函数 |
+
+收敛后修顶栏 bug 只需考虑三层且边界清晰：Compose 通用页（GlassTopAppBar）/ 管理族（Scaffold 内置）/ View 残留（MainTopBarView，有明确消亡计划）。
+
+落地理由：决策链已在管理族落地并被用户认可为标准；TopBarConfig 是各组件的共同依赖点，单点收敛改动最小；ConfigTopBar 与 GlassTopAppBar 功能重合度极高（壁纸/圆角/溢出菜单），且 H13 crop 遗留差异（ConfigTopBar 忽略 crop）随消灭自然消除。
 
 ### Alternatives Considered
-
-| 方案 | 说明 | 否决理由 |
-|------|------|---------|
-| 增强 `TitleBar` 完整接入主题 | 给 `TitleBar` 注入 `MainTopBarView` 全套视觉属性（圆角/壁纸/胶囊/字号/搜索入口） | `TitleBar` 是 AppBarLayout 体系，难支持 backgroundLayer 壁纸/胶囊图层；为单一组件注入全套属性污染所有 `TitleBar`；与主页面仍有观感差异 |
-| 仅让子页面 `TitleBar` 跟随顶栏背景色 | 扩展 `topBarColorManaged` 默认开启 | 只能跟背景色，无法跟圆角/壁纸/胶囊/字号/搜索入口，观感仍不一致（bugfix③早已存在，用户明确不满意） |
-| 新建独立 Compose 子页头部组件 | 抽一套 Compose 头部覆盖子页 | 与主页面 `MainTopBarView` 双实现，观感难保证一致；重构面积大 |
+| 备选方案 | 否决理由 |
+|---------|---------|
+| A1：仅改 `TopBarConfig.defaultBackgroundColor` 黑白兜底为 primaryColor | 治标：resolve 兜底被壁纸态/hasCustom 判定共用，直接改默认值会破坏 `hasCustomBackground` 值比较逻辑（恒真陷阱注释 TopBarConfig.kt:312-319），且无法接入沉浸开关分支 |
+| A2：22 页 View 宿主一次性全部迁 Compose GlassTopAppBar（4→2） | 单轮回归面过大（22 页含书源编辑/缓存管理等重交互页），且与 master-track 波次计划冲突（页面迁移应随波次逐页进行）；本轮先统一取色 + 声明消亡路线 |
+| A3：每页面逐个指定 containerColor | 反模式：30+ 页各自硬编码，下次主题体系变更又要全量返工 |
+| A4：AppManagementTopBar 也并入 GlassTopAppBar（4→2） | 管理族顶栏带搜索框内嵌/选择态联动，与 Scaffold 深度耦合；且管理族视觉（48dp 紧凑）是用户认可的标准，不应变 |
 
 ### Drawbacks
-
-- **迁移面大**：约 18 个 Activity + 布局 + 接线，需分批进行、逐批编译与真机回归，工期长、回归风险高。
-- **`setSupportActionBar` 移除**：依赖系统 ActionBar / `onSupportNavigateUp` 的页面需改写返回与菜单接线，个别页面（菜单项多、需层级返回）改造工作量大。
-- **`MainTopBarView` 增高**：子页头部（标题行 + 标签行）可能比原 `TitleBar` 略高，压缩正文可视区，需真机确认。
-- **过渡期双组件并存**：`TitleBar.kt` 保留（部分弹窗/页面仍用），维护成本短期上升。
-
-接受上述缺点，换取「子页面与主页面观感完全一致 + 全量受主题管理」，且复用已验证组件、无新增依赖。
-
-### Prior Art
-
-- 主页面（书架/订阅/发现）实现：`BaseBookshelfFragment.initComposeTopBar()`（[BaseBookshelfFragment.kt L100-L117](file:///f:/myself/github/WeAgentChat/temp/legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt#L100-L117)）、`RssFragment`、`ExploreFragment` 均用 `MainTopBarView`。
-- 「我的」页主入口迁移：`docs/specs/my-topbar-unify/`（`Mode.MY`，已验证主 Tab 页迁移可行）。
-- 标签体系统一：`docs/specs/tag-mode-unify/`。
+- **已知缺陷**：MainTopBarView(Mode.SUB) 家族 22 页（含书源编辑、缓存管理等）将从黑白兜底变为主题主色，视觉与用户当前印象的"应用主题页"有变化
+- **已知缺陷**：ConfigActivity 各页顶栏高度 56dp→M3 TopAppBar 高度（64dp），设置页顶栏视觉微变；溢出菜单交互保留但实现从私有 AppDropdownMenu 迁移到适配层
+- **风险点**：`context.backgroundColor` 在设置全局背景图时返回 TRANSPARENT（MaterialValueHelper.kt），沉浸分支下顶栏可能透出窗口底色
+- **风险点**：ConfigTopBar 消灭涉及溢出菜单行为迁移，三点菜单回归需专项验证
+- **接受理由**：主色兜底正是管理族标准形态，用户诉求即"跟随主题设置体系"；透明风险与管理族现状一致（同链同险）；组件缩减正是消除"改一处须顾四套"的架构债
+- **兜底预案**：真机验证时若沉浸分支出现透明异常，将分支 2 收窄为 `AppConfig.immersiveManageBar && context.backgroundColor != Color.TRANSPARENT`；不可接受时 Mode.SUB 可单点回退（改动隔离在 renderBackgroundLayer 一处）；ConfigTopBar 收敛若溢出菜单回归受阻，备份 bak 可快速还原（实施前备份）
 
 ## Requirements
 
-### 功能需求（FR）
+### Requirement: 统一取色决策链
+所有子页面顶栏背景色必须经 `TopBarConfig` 统一决策函数产出，禁止组件各自兜底。
 
-- **FR-1** `MainTopBarView` 新增通用子页形态（`Mode.SUB` 或等效），支持返回 / 菜单 / 副标题 / 自定义内容。
-- **FR-2** 全 App 所有 `TitleBar` 子页面头部迁移到 `MainTopBarView`，观感与主页面一致。
-- **FR-3** 子页面头部样式受顶栏设置 / 主题设置 / 样式管理全量管理（改圆角/胶囊/壁纸/字号/搜索入口后跟随刷新），无硬编码颜色。
-- **FR-4** 子页面的返回导航、菜单、副标题、自定义内容行为不丢（功能等价迁移）。
-- **FR-5** 迁移过程分批交付，每批编译通过且目标页面真机回归通过。
+#### Scenario: 未配置顶栏包且沉浸开关关闭
+- **WHEN** 任一子页面顶栏渲染，无自定义背景色、`immersiveManageBar=false`
+- **THEN** 顶栏背景 = `context.primaryColor`（主题主色），前景 = `contrastOn(主色)`
 
-### 非功能需求（NFR）
+#### Scenario: 沉浸开关开启
+- **WHEN** `AppConfig.immersiveManageBar=true` 且无自定义背景色
+- **THEN** 顶栏背景 = `context.backgroundColor`（页面底色）
 
-- **N1** 不引入新依赖、不改数据库 schema。
-- **N2** 无残留调试日志；`TitleBar.kt` 在全部迁移后评估废弃（不在本次强制删除）。
-- **N3** updateLog 同步更新（编译前）。
-- **N4** 迁移不改变子页面原有业务逻辑（仅头部壳层替换）。
+#### Scenario: 顶栏包自定义背景色
+- **WHEN** 当前顶栏包配置了非默认背景色（`hasCustomBackground=true`）
+- **THEN** 顶栏背景 = 自定义背景色，优先级最高
 
-## Scenarios
+### Requirement: 设置族顶栏跟随主题
+ConfigActivity 全部宿主 Fragment（主题设置/备份恢复/其他设置/AI设置/视频设置/精准管理/封面/欢迎页/发现/订阅源配置）顶栏不再出现夜间纯黑/日间纯白硬编码。
 
-### 正常场景
+#### Scenario: 夜间模式进入设置页
+- **WHEN** 夜间主题下进入"备份与恢复"
+- **THEN** 顶栏背景 = 主题主色（非 Color.BLACK），标题/图标为对比色
 
-1. 用户进入「书源管理」：头部为 `MainTopBarView`（返回箭头 + 标题 + 菜单），与主页面观感一致。
-2. 用户改顶栏设置（圆角/壁纸/胶囊）→ 所有子页面头部同步刷新（含已迁移页面）。
-3. 用户点返回箭头 → 回到上一级页面（`onBackPressedDispatcher`）。
-4. 用户点菜单 → 弹出 `TitleBar` 迁移前的等价菜单项。
+### Requirement: Mode.SUB 顶栏跟随主题
+MainTopBarView Mode.SUB 家族 22 页顶栏背景经统一决策函数；Mode.MAIN 保持现状不受影响。
 
-### 边界/异常场景
+#### Scenario: 主页与子页互不影响
+- **WHEN** 从主页 Tab 切换到书源编辑页（Mode.SUB）再返回
+- **THEN** 书源编辑页顶栏走统一决策链，主页顶栏渲染逻辑与改前一致
 
-1. 首页/末页返回：子页面返回箭头行为与系统返回一致（无残留 Activity 栈问题）。
-2. 夜间/日间主题切换：子页面头部颜色、字号自动刷新。
-3. 旧包覆盖安装：已迁移页面无 `setSupportActionBar` 残留导致的空白/崩溃。
-4. 编辑类页面（`activity_book_source_edit`）头部含自绘扩展区：`Mode.SUB` 自定义内容插槽承载，观感与未迁移前等价。
+### Requirement: 组件收敛（4→3）
+ConfigTopBar 消灭，ConfigActivity 全部宿主页顶栏改用 GlassTopAppBar；顶栏组件不再存在"同功能双实现"。
 
-## X2 互斥门禁：与 compose 整页迁移名单交叉核查（2026-09-01）
+#### Scenario: 设置页三点菜单
+- **WHEN** 在"备份与恢复"页点击顶栏溢出（三点）菜单
+- **THEN** 菜单项与改前一致（MenuAction 分级：alwaysShow 一级直出，其余进溢出），点击行为不变
 
-总线 master-track-orchestration tasks 2.14 交叉核查：本 spec 批次 A/B/C 页名单（17 项）与 compose-migration-status-audit B4 待迁页 7 项（B5 AllBookmark / B14 ExploreShow / B15 StorageManage / D2 RssSourceEdit / D3 RssSourceDebug / D5 RssSearch+ArticleInfo / D7 RssFavorites）求交集，**唯一命中 `activity_explore_show`（ExploreShowActivity，批次 C 4.2）**。
+#### Scenario: ConfigTopBar 定义删除
+- **WHEN** 全局搜索 ConfigTopBar
+- **THEN** 零定义零调用（Grep 验证）
 
-**门禁声明（ExploreShowActivity）**：该页列入 compose 整页迁移名单（compose B4-c），禁止对其实施独立的 View 顶栏改动（避免双改冲突），顶栏改造随整页 Compose 迁移一并落地。实况注记：本 spec 4.2 的 MainTopBarView(Mode.SUB) 替换已先期完成（编译通过，真机回归待设备），compose 侧整页迁移实施时须以该现状为输入，将顶栏一次性收敛为 Compose 头部；4.2 真机回归结论应同步抄送 compose spec registry 作为迁移输入基线。
+### Requirement: 壁纸态语义保持
+顶栏包配置壁纸时，壁纸显示 + withOpacity(resolveBackgroundColor) 叠加语义不变。
 
-其余 6 项经核查不在本 spec 页名单（D3 RssSourceDebugActivity 布局为 `activity_rss_source_debug`，与 4.6 `activity_source_debug` = BookSourceDebugActivity 非同页），无互斥约束。
+#### Scenario: regular 顶栏包带壁纸
+- **WHEN** 顶栏包为 regular 样式且配置了壁纸
+- **THEN** 4 套组件均显示壁纸，背景叠加 `withOpacity(自定义/兜底色, wallpaperAlpha)`，与改前一致
+
+### Requirement: 沉浸豁免页不回归
+豁免页（ImageCrop/ImageGallery/ImageDetail/VideoPlayer 播放器内/SearchActivity）顶栏视觉保持现状。
+
+#### Scenario: 看图页黑色背景
+- **WHEN** 进入 ImageDetailActivity
+- **THEN** 黑底沉浸视觉不变（不受统一函数影响）
+
+### Requirement: XML 残留清理
+4 处残留死代码顶栏移除（activity_read_record.xml 双顶栏、activity_rule_sub.xml TitleBar、activity_ai_image_provider_edit.xml TitleBar、fragment_explore.xml TitleBar），不得产生运行时回归。
+
+#### Scenario: 阅读记录页单顶栏
+- **WHEN** 打开阅读记录页
+- **THEN** 仅显示 Compose GlassTopAppBar，XML 残留节点已清除且无视觉变化
+
+## Scenarios（验证总纲）
+- L1：编译通过，无残留调试日志
+- L2：真机/模拟器逐页验证（日间+夜间 × 默认顶栏包 × 沉浸开关两态）：设置族 10 页 + Mode.SUB 抽查 5 页 + Glass 族抽查 8 页 + 管理族 6 页不回归 + 豁免页 4 页不回归
+- L3：切换颜色主题后顶栏实时跟随；顶栏包自定义背景/壁纸优先级正确
