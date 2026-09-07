@@ -148,3 +148,41 @@ View 壳（fragment_my_config）+ View 顶栏 → Compose 壳；MySettingsData �
 | 字体缩放 | fontScale/fontScaleN（**分日夜双键**） | ThemeRuntimeKeys.fontScale | 放大后文字不截断 |
 
 **日夜分键约束**：带昼夜切换 Tab 的迁移页（TopBar/NavigationBar/ThemeManage），顶栏配置必须按 isNight 维度取 `currentConfig(context, isNight)`，禁止只取单模式缓存。
+
+---
+
+## Delta 2026-09-07: 顶栏 3→1 组件归一（W1 验收通过后追加，用户裁决"通过（推荐）"）
+
+> 背景：W1 三页验证了 `installGlassTopBar` 运行时替换模式可行；一期"保留三基线"为过渡态结论（回归面+管理族耦合+GlassTopAppBar 缺双行插槽三卡点），本 Delta 声明终态与消亡路线，卡点随波次逐一拆除。与 subpage-topbar-unify 二期 L177-179 的 3→1 分期路线衔接并收编入本 spec 波次。
+
+### MODIFIED Requirements
+
+### Requirement: MC-4 顶栏基线终态（替换原"三基线"表述）
+过渡期维持三基线；W6 收官后全站子页面唯一顶栏组件 = GlassTopAppBar。MainTopBarView 仅剩主界面 4 Tab 消费（Mode.MAIN，筛选栏 chip 承载，**不在本 spec 范围**）；AppManagementTopBar 消灭（委托 GlassTopAppBar）。
+
+#### Scenario: W6 收官后顶栏清点
+- **WHEN** 全域迁移完成，Grep MainTopBarView / AppManagementTopBar
+- **THEN** MainTopBarView 仅剩 Mode.MAIN 主 Tab 消费（Mode.SUB 枚举与 22 页引用清零）；AppManagementTopBar 定义删除（脚手架内部委托 GlassTopAppBar）
+
+### ADDED Requirements
+
+### Requirement: GlassTopAppBar 插槽扩展（归一技术前置，W6 执行）
+为承接管理族形态，GlassTopAppBar 新增：①`bottomSlot: (@Composable () -> Unit)?` 双行第二行承载（搜索框内嵌/筛选条）②高度档参数化（compact 48dp / 默认 M3 64dp）③选择态联动参数（selectionActive: Boolean 等价语义）。不改变既有 66 处消费点默认行为（新参数全部带默认值）。
+
+#### Scenario: 插槽扩展零回归
+- **WHEN** 插槽扩展合入且未改任何调用点
+- **THEN** 既有 66 文件 167 处消费点视觉与行为不变（编译 + 抽样 L2）
+
+### Requirement: AppManagementTopBar 委托收官（3→2→1）
+AppManagementScaffold 内置顶栏改为组合 GlassTopAppBar（消费 compact 档+bottomSlot+选择态参数），保留管理族视觉等价（48dp 紧凑/搜索框内嵌/选择态联动/Action danger-tint 语义）；完成后删除 AppManagementTopBar 独立定义。
+
+#### Scenario: 管理族视觉等价
+- **WHEN** 书源管理页（AppManagementScaffold 消费页）委托后打开
+- **THEN** 顶栏 48dp+搜索框+选择态视觉与委托前等价，多选/搜索/菜单功能等价（L2）
+
+### Requirement: MainTopBarView Mode.SUB 22 页随波次消亡（3→1 主路径）
+维持既有 Mode.SUB 消亡联动 Requirement，按两个口径绑定波次：**口径 A（共用容器 22 页，tasks 0.3 映射表）**：W1 3 页（已完成）/W2 About/W3 4 页/W5 2 页（BookInfoManage/BubbleManage）/W6 3 页/跨域 10 页随 master-track B2/B3/B4-c；**口径 B（W5 穷举批 17 页，tasks 5.1-5.3）**：规则族 6+Ai 族 5+容器管理族 6 等非共用容器页，迁移时各自删除本页 View 顶栏。每页迁移即删该页 SUB 引用；tasks 7.2 全域清零确认为本 Delta 的终态验收点。
+
+#### Scenario: 波次页顶栏消亡
+- **WHEN** 任一 View 宿主页完成迁移
+- **THEN** 该页 MainTopBarView Mode.SUB 引用删除，顶栏由 GlassTopAppBar（installGlassTopBar 运行时替换或 composeHost 内嵌）承载，透壁纸语义不变
