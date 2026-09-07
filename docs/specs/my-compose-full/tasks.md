@@ -10,6 +10,15 @@
   - 验证标准：architecture.md 与本 spec G12/MC-12 表述一致
 - [ ] 0.3 Tier×波次映射表落盘（subpage-topbar-unify 二期三期衔接）：22 页分档逐页标注所属波次；非我的域 10 页归属声明
   - 验证标准：22 页每页有唯一波次归属
+  - Tier×波次映射表（红队 R4 落盘）：
+    - **W1**：AppearanceKit、AppearanceKitEdit、ThemeManage（3 页，本波顶栏+布局统一）
+    - **W2**：About（去壳）
+    - **W3**：TopBarManage、NavigationBarManage、ShareNoteTemplateManage、AdvancedTitleManage（4 页）
+    - **W5**：BookInfoManage、BubbleManage（2 页，随管理列表批）
+    - **W6**：AiReadAloudUsageRecord、AiImageGallery、ExploreShow（3 页，浏览型；ExploreShow 同时是 master-track B4-c 登记页——以本表为准）
+    - **master-track B2**：BookSourceEdit（1 页）；**B3**：BookSourceDebug（1 页）；**B4-c**：ParagraphRuleManage、ParagraphRuleEdit、ReadAloudBgmManage、ReadMenuButtonManage、ReadMenuCustomButtonEdit（5 页，阅读域随波次）
+    - 非我的域 10 页归属声明：ReadMenuButtonManage/ReadMenuCustomButtonEdit/ParagraphRule×2/ReadAloudBgm/AiReadAloudUsageRecord（阅读域 5 页）+ ExploreShow/DiscoverySuiteManage（发现域 2 页）+ BookSourceEdit/Debug（书源域 2 页）+ CacheManage（ui/book/cache，精准管理域已入 W4）——各域归属如上，不重复排期
+    - 合计 3+1+4+2+3+1+1+5+2=22 ✓
 
 ## 1. W1 先行（ThemeManage 自造组件清零拆至 W5，红队 R5 拆波）
 - [ ] 1.1 AppearanceKitActivity：去 View 顶栏（MainTopBarView Mode.SUB）→ 统一顶栏组件；自造 AppearanceKitCard→AppManagementCard（MC-8）
