@@ -39,3 +39,17 @@
 - [x] T12 主 Tab 固定按钮补 fontScale 联动：MainTopBarView applyDefaultStyle/applyRegularStyle 两处 forEach 容器/margin/padding ×fs（applyTopBarStyle signature 已含 fontScale，字号变更自动重样式）
 - [x] T13 编译验证：BUILD SUCCESSFUL（compileAppDebugKotlin）
 - 决策记录：GlassTopAppBar navIcon 参数内容本就被忽略（两分支固定渲染 ic_back），40+ 页传 Icons.ArrowBack 仅语义误导、无视觉差异，本次不逐页改传参（视觉零收益）；ReadMenuComposeComponents ic_arrow_back 属阅读菜单自有体系，不动
+
+## 管理族新增图标纠错追加（用户三次验收反馈：TXT 目录规则页双三点、要求全面排查引错图标，2026-09-08）
+根因（代码实锤）：MenuAction→AppManagementAction 转换漏传 iconRes——TxtTocRuleScreen.kt:106 与 DictRuleScreen.kt:105（复制粘贴同源）只传 `icon = action.icon`；两页"新增"动作均为 iconRes-only（ic_add），转换后 icon/iconRes 双空 → Scaffold `?: ic_more_vert` 兜底渲染成竖三点（与溢出菜单三点并列 = 用户看到的"两个竖三点"）
+子代理全面排查（Explore，63 处 AppManagementAction 调用点 15 文件）：
+- BUG-fallback（顶栏双空直配）：0 处（37 处无图标调用全在 bottomActions 纯文本路径，不经兜底）
+- BUG-漏传iconRes：2 处（TxtTocRuleScreen/DictRuleScreen）
+- 风格错配：HighlightRuleScreen.kt:132 新增引 Material 粗线 Icons.Default.Add（应全站细线 ic_add）
+- `icon = <var>.icon` 模式全局仅 3 处命中（2 处转换 + 渲染逻辑本身），无第三处同类漏传
+子任务：
+- [x] T14 TxtTocRuleScreen 转换补 iconRes 透传（+注释锚定真机实锤）
+- [x] T15 DictRuleScreen 转换补 iconRes 透传（同源修复）
+- [x] T16 HighlightRuleScreen 新增图标 Icons.Default.Add → iconRes ic_add（细线资产统一）
+- [x] T17 编译过（BUILD SUCCESSFUL）+ 打包安装 + updateLog 第十三批
+- 防复发锚点：iconRes-only 动作经任何中间转换层时必须同步透传 iconRes，否则静默退化成三点图标
