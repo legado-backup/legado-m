@@ -26,3 +26,16 @@
 - [x] T7 标题字体跟随主题：无 titleFontFamily 槽时回落 AppConfig.systemTypefaces 三态映射（对齐 MainTopBarView.applyUiTitleTypeface 的 baseSystemTypeface 口径）；titleFontFamily 槽（主题包字体）仍最优先，不破坏主题设置体系
 - [x] T8 返回/溢出图标细线化：GlassTopAppBar 两分支 nav 渲染固定 ic_back（细线），TopBarActionRow/ConfigActivity 溢出图标改 ic_more_vert（主 Tab 同款资产）
 - [x] T9 回归：编译过 + L1 过 + t6/t8 零 FATAL；已知限制=自定义标题字体文件（titleFontPath）在 Compose 侧以 systemTypefaces 三态近似（android.graphics.Typeface→Compose FontFamily 无法直桥），登记升级路径（AndroidView 桥接或 Font 文件加载）
+
+## 尺寸单源+资产纠错追加（用户二次验收反馈：图标偏小/引错图标/没改全，2026-09-08）
+根因盘点（代码实锤）：
+1. **图标偏小**：主 Tab regular 顶栏包下按钮容器 36dp（top_bar_regular_action_size）/图标视觉 20dp，而子页 Compose 写死 34/18 → 子页比主 Tab 小 10%（34/18 只是 default 样式口径，误当全域基准）
+2. **引错图标**：TocComposeScreen 返回键引 Material 粗线 ic_arrow_back（全站统一应为项目细线 ic_back）
+3. **没改全**：MainTopBarView default/regular 两分支固定按钮（more/search 等）容器/内边距未乘 fontScale，字号调大后主 Tab 按钮不变（actionsBar 动态按钮已跟随，固定按钮漏网）
+4. 历史遗留编译错：GlassTopAppBar 引用 iconScale 未声明、ConfigActivity 缺 LocalContext import、TopBarTitleText 缺 TextView/TextUtils import（上轮半提交态）
+子任务：
+- [x] T10 尺寸单源：TopBarConfig 新增 actionContainerSize/actionIconSize（regular 36/20、default 34/18，×fontScale），GlassTopAppBar 两分支/AppMenuSheet/ConfigActivity/ImportBookScreen/AppManagementScaffold（Vector/Icon/Search）/AppSettingComponents（IconAction/MoreActionButton）全部改走单源，禁止任何组件写死第二套基准
+- [x] T11 资产纠错：TocComposeScreen ic_arrow_back→ic_back
+- [x] T12 主 Tab 固定按钮补 fontScale 联动：MainTopBarView applyDefaultStyle/applyRegularStyle 两处 forEach 容器/margin/padding ×fs（applyTopBarStyle signature 已含 fontScale，字号变更自动重样式）
+- [x] T13 编译验证：BUILD SUCCESSFUL（compileAppDebugKotlin）
+- 决策记录：GlassTopAppBar navIcon 参数内容本就被忽略（两分支固定渲染 ic_back），40+ 页传 Icons.ArrowBack 仅语义误导、无视觉差异，本次不逐页改传参（视觉零收益）；ReadMenuComposeComponents ic_arrow_back 属阅读菜单自有体系，不动
