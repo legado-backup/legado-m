@@ -1,0 +1,24 @@
+[
+  {
+    "bookSourceUrl": "http://127.0.0.1:18093",
+    "bookSourceName": "PageReproTest",
+    "bookSourceGroup": "AI测试",
+    "bookSourceType": 0,
+    "enabled": true,
+    "enabledExplore": true,
+    "searchUrl": "http://127.0.0.1:18093/search?kw={{key}}&pg={{page}}",
+    "exploreUrl": "分类A::http://127.0.0.1:18093/explore?pg={{page}}",
+    "ruleSearch": {
+      "bookList": "class.book",
+      "name": "class.name@text",
+      "author": "class.author@text",
+      "bookUrl": "class.link@text"
+    },
+    "ruleExplore": {
+      "bookList": "class.book",
+      "name": "class.name@text",
+      "author": "class.author@text",
+      "bookUrl": "class.link@text"
+    }
+  }
+]
