@@ -289,6 +289,8 @@ def ensure_cronet_ready():
 4. **toybox sed 经 su 多层 shell 传参**：表达式必须内层双引号包裹，否则被空格截断报 bad pattern
 5. **模拟器 screencap 陈旧帧**：截图前 sleep 或双帧对比；截图审查拦截时改用像素亮度分析（`l2_verify_header_brightness.py`）或 VL 判定（`l2_vl_header_analysis.py`）
 6. **包名带构建类型后缀**：debug 包=io.legado.miss.app.debug，am start/pm 命令须用实际安装包名（config.PACKAGE 动态拼接）
+7. **screencap 恒定黑帧（2026-09-08 实锤+已修复）**：MEmu `graphics_render_mode=0`（DirectX）下 GPU readback 通路故障——UI 显示正常但 screencap 输出恒定 3669B 黑 PNG（特征值：非黑帧最小 >17KB），`stop;start` 重启 framework、重启实例、微 swipe 唤醒、冷启动首帧均无效。**修复**：改 VM 配置 `MemuHyperv VMs\MEmu\MEmu.memu` 的 `graphics_render_mode` 0→1（OpenGL）+ `memuc stop/start -i 0`，一次性修复。排查口诀：3669B=黑帧特征值；宿主 CopyFromScreen/PrintWindow 均不可靠（PrintWindow 对动态重绘区返回底色，勿据其判定"图标消失"类问题）
+8. **adb shell 多参数拼接（2026-09-08 实锤）**：`subprocess` 传 `["shell","sh","-c",cmd]` 会被设备端按空格拼接成 `sh -c cat ...`（cat 读 stdin 输出空）→ `> file` 重定向把目标文件截断为 0 字节（prefs 写回实测铁证）。整条命令必须**单参数**传递：`["shell", "cat a > b && cat b"]`
 
 ## 像素亮度差判定方法论（2026-08-30 沉淀）
 
