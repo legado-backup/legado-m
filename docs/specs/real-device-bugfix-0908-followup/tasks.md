@@ -20,3 +20,9 @@
 - [x] R1 正确性/回归面：自绘分支补 LocalContentColor 仅影响该分支（M3 分支已有 contentColor 三键）；MenuActionIcon 默认 tint 改继承后，AppMenuSheet 菜单行图标色从 onSurfaceVariant→onSurface（与同行文字一致，视觉合理）；AppDropdownMenu 不经 MenuActionIcon（走 LegadoMiuixChoiceRow tint=null 默认），零影响；AppManagementScaffold 内部图标均显式 tint，零影响；TitleBar 半透明清阴影仅 managed+alpha<0xFF 分支
 - [x] R2 边界/性能：CompositionLocalProvider 无重组开销；TitleBar setBackgroundColor/alpha 判算轻量；coerceAtMost 纯算术
 - [x] R3 盲区/兼容性：MenuActionIcon 全部消费点（AppMenuSheet/ConfigActivity/ImportBookScreen）均在 M3 内容色提供者作用域内，无裸 fallback=黑风险；LocalContentColor 显式 action.tint 优先级保留；TitleBar managed=true 仅主界面"我的/发现经典"两处使用（bugfix ③ 注释锚定），不污染子页面；E-Ink 分支保持 bg_eink_border_bottom 不受影响
+
+## 视觉统一追加（用户验收反馈：新批次标题偏大偏粗/图标偏粗）
+- [x] T6 标题字重对齐：GlassTopAppBar titleStyle fontWeight Medium→Normal（主 Tab 主题字体默认 Regular，用户实锤"文字粗一点"）
+- [x] T7 标题字体跟随主题：无 titleFontFamily 槽时回落 AppConfig.systemTypefaces 三态映射（对齐 MainTopBarView.applyUiTitleTypeface 的 baseSystemTypeface 口径）；titleFontFamily 槽（主题包字体）仍最优先，不破坏主题设置体系
+- [x] T8 返回/溢出图标细线化：GlassTopAppBar 两分支 nav 渲染固定 ic_back（细线），TopBarActionRow/ConfigActivity 溢出图标改 ic_more_vert（主 Tab 同款资产）
+- [x] T9 回归：编译过 + L1 过 + t6/t8 零 FATAL；已知限制=自定义标题字体文件（titleFontPath）在 Compose 侧以 systemTypefaces 三态近似（android.graphics.Typeface→Compose FontFamily 无法直桥），登记升级路径（AndroidView 桥接或 Font 文件加载）
