@@ -399,3 +399,42 @@ urlStr.replace(new RegExp("'", "g"), "\\'")  // ✅
 // 如果只是转义单引号，可以用split+join替代
 urlStr.split("'").join("\\'")  // ✅
 ```
+
+## 4.13 TVBox/CatVod 配置 ≠ 影视接口（⚠️ 类型误判陷阱）
+
+**现象**：用户丢一个"影视接口"链接要求做 Legado 视频订阅源，实际拿到的是 TVBox/CatVod 系配置文件。
+
+**识别特征**（同时满足即为 TVBox 配置，不是 Legado 可消费的接口）：
+- 响应体 = `随机前缀` + `**` + Base64，解码后是 JSON
+- JSON 顶层含 `spider` / `sites` / `parses` / `lives` / `doh` / `flags` / `wallpaper`
+- `sites[]` 全部 `type=3` 且 `api` 形如 `csp_XXX`
+- `spider` 指向外部 jar（常带 `;md5;` 校验串）
+
+**根因（不可转换）**：
+| 能力 | TVBox/CatVod | Legado RssSource |
+|---|---|---|
+| 站点解析 | 加载外部 **jar/dex 爬虫**（任意 Java 逻辑、可加密、可联网） | CSS / JSONPath / XPath / 正则 / JS(Rhino ES5) |
+| 配置粒度 | 一份配置带 N 个站点（实测某配置 124 个） | 一个源 = 一个站点 |
+
+`type=3` 意味着域名、加密参数、播放地址解析**全在 jar 里**，配置只留 `key`/`name`/`api`/`ext` 空壳。Legado 无加载外部 jar 的通道 → 直接判定不可转换，不要再逐个站点试规则。
+
+**决策树**（拿到疑似影视链接时）：
+1. 先 curl 看 `Content-Type` 与响应形态 → 命中上述识别特征 → 直接告知用户"这是 TVBox 配置"，给出路径选择（换真正在线播放的站点 / 给 TVBox 系 App 用 / 反编译 jar 复刻单站 / 嗅探兜底）
+2. 未命中 → 正常走 Phase 1 分析
+
+> 若用户选"反编译 jar 复刻单站" → 走 [special-scenarios/tvbox-spider-reverse-engineering.md](../special-scenarios/tvbox-spider-reverse-engineering.md) 的完整流程（含 `Str.u()` 字符串解密算法与站点筛选优先级）。实测可行：124 站中筛出 1 个官方公开 API 站点并成功落地为 Legado 视频源。
+
+**附带经验：这类配置底下站点的普遍现状**（实测 4 个抽样站点全部失败）：
+- 采集类 MacCMS 站点 `/api.php/provide/vod/` 大量返回 `closed`（后台关闭采集接口，只给合作爬虫用）→ 见下方 4.14
+- `[4K]` 命名组多为网盘/磁力站，详情页只有 `magnet:` 与网盘链接，**无在线播放地址**，天生不适合做视频源
+- 播放页常见两种死路：① `iframe` 指向第三方播放器且 `?url=` 为密文 ② `player_aaaa.url` 为 `co_xxx` 之类的编码串，需播放器 JS 二次解析
+
+## 4.14 MacCMS 采集接口返回 `closed`
+
+**现象**：`{site}/api.php/provide/vod/?ac=list&pg=1` 返回 HTTP 200，正文仅 6 字节 `closed`。
+
+**判定**：站点后台关闭了采集 API。**不要再试 `ac=videolist` / `ac=detail` / `/provide/vod/`**，全部同样返回 `closed`。
+
+**应对**：降级到 HTML 解析（P2/P3）；若 HTML 播放页仍为加密 iframe 或编码串，则该站不可做源。
+
+> 经验来源标注：`[经验来源:TVBox配置识别与类型误判范式]`

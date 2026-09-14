@@ -16,3 +16,8 @@
 ## IF-4 检查更新自身无 L2 脚本（已补齐）
 - **现象**：更新链路（Gitee/GitHub 双源+资产解析）此前无固化验证脚本，回归只能靠发版后用户反馈。
 - **修复**：新增 `ai_tests/scripts/l2_verify_update_check.py`（SOP 16v），T1 静默判定/T2 低版本弹框对号，本批 T1/T2 真机 PASS（证据 `ai_tests/reports/update_check_20260912_161932|162046/`）。
+
+## IF-5 会话沙箱发布死结（环境级，2026-09-12）
+- **现象**：后台沙箱运行 publish_release.py 时，正式包 kotlin 编译随机 AccessDenied（class 文件/F:\gh daemon registry 锁被拒）；沙箱留下的两个 gradle daemon（PID 43192/61040）宿主侧 taskkill/Stop-Process 均"拒绝访问"杀不掉，长期存活且拖慢后续构建（冷构建 17min 恶化为 50min+，期间 kapt/KSP 阶段反复停滞）。
+- **本次结局**：4 次发布尝试（沙箱 1 次 + 提权 3 次），测试包 49 分钟构建成功但正式包阶段反复受阻，最终人工中止。
+- **教训**：**发布这类需要完整文件系统/网络/进程控制的重流程，应在用户原生终端跑 `publish.bat`**，不进会话沙箱；沙箱内跑过一次重型 gradle 后，同会话后续构建都受僵尸 daemon 拖累。

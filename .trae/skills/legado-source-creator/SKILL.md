@@ -257,6 +257,12 @@ adb shell "am start -n io.legado.miss.app.release/io.legado.app.ui.welcome.Welco
 
 ## 真机测试脚本
 
+### 工具脚本（`tools/`）
+
+| 脚本 | 用途 |
+|------|------|
+| `tools/tvbox_spider_deobf.py` | TVBox/CatVod spider jar 反混淆：`--scan` 全量批量还原接口明文；`--class X --deobf` 单类反混淆源码；`--class X --strings` 单类明文清单。配合 `references/special-scenarios/tvbox-spider-reverse-engineering.md` 使用 |
+
 ### 通用脚本
 
 | 脚本 | 用途 |
