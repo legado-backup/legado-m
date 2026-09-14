@@ -120,6 +120,8 @@
 
 | 日期 | 经验类型 | 标题 | 沉淀位置 | 经验来源标记 |
 |------|---------|------|---------|-------------|
+| 2026-09-12 | 方案类（爬虫jar反编译） | TVBox/CatVod spider 反编译还原：下载jar并校验MD5 → jadx 反编译 → **破解 `Str.u()` 字符串混淆**（`b = ((c-19968)&0xFF) ^ [0xA5,0x3C,0x7E,0x19][i%4]`，批量脱壳527类） → 站点筛选优先级（官方公开API ⭐⭐⭐ ／ 签名可复刻 ⭐⭐ ／ 设备注册token ❌ ／ 网盘磁力 ❌） → **实网验证三件事**（逐跳curl、裸链可播、参数占位形态）。含避坑：Java Random LCG 签名在 Rhino 难复刻；同接口多 id 形态传错只报 params error 易误判 | special-scenarios/tvbox-spider-reverse-engineering.md（新建） | `[经验来源:TVBox爬虫jar反编译还原范式]` |
+| 2026-09-12 | 陷阱类（源类型误判） | TVBox/CatVod 配置 ≠ 影视接口：识别特征（`前缀+**+Base64`、`spider`/`sites`/`parses` 顶层字段、`sites[]` 全 `type=3` + `csp_*`、`spider` 指向外部 jar）；Legado 无加载外部 jar 通道 → 直接判定不可转换；配套决策树 + 实测附带经验（MacCMS `/api.php/provide/vod/` 返回 `closed` 4.14、[4K] 组多为网盘磁力无在线地址、播放页加密 iframe / `co_xxx` 编码串两条死路） | troubleshooting/source-type-traps.md（4.13 / 4.14） | `[经验来源:TVBox配置识别与类型误判范式]` |
 | 2026-08-02 | 方案类（RSS视频源） | TikTok风格滑动+网格双模式视频订阅源：sourceUrl用?view=grid；ruleArticles@js双分支grid优先（首页grid页DOM含隐藏.swiper-slide防误判）；分类页强制swiper；grid标题从URL slug用split-join提取；ruleNextPage正则+追加view=grid且必须IIFE；sortUrl首行「最新」 | special-scenarios/rss-advanced.md（7.13节） | `[经验来源:滑动+网格双模式视频订阅源范式]` |
 | 2026-08-02 | 陷阱类（Rhino） | @js规则顶层return触发 msg.bad.return「返回的值无效」（ruleNextPage编译失败→翻页失效），必须IIFE `(function(){...})()` 包裹；jsoup Java String.replace(正则,字符串)触发「选择不明确」，用 split().join() 或先 String() 转换 | troubleshooting/rhino-js-traps.md（陷阱70/71） | `[经验来源:Rhino String.replace歧义范式]` |
 | 2026-08-02 | 方案类（加密图片） | 封面图字节 AES 密文解密（站点JT实例）：图片密钥与 API 响应密钥不同，藏于打包 bundle `crypto-worker.js` 的 `media_key`/`media_iv`（下划线十进制 ASCII）；**改解密规则后 Glide 磁盘缓存残留旧密文致白屏**，须 `am force-stop` 后删 `image_manager_disk_cache` | special-scenarios/encrypted-images.md（§4.6 实例块） | `[经验来源:封面解密范式]` |

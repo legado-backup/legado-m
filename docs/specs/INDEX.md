@@ -70,6 +70,7 @@
 | [video-download-manager](./video-download-manager/README.md) | ✅ | 视频下载与下载管理整合（自研 IDM 式分片引擎+m3u8 重封装） |
 | [video-extractor-enhancement](./video-extractor-enhancement/README.md) | 🔄 | 内置视频抓取能力增强（自动抓取视频链接补齐规则短板） |
 | [video-player-image-enhance](./video-player-image-enhance/README.md) | ✅ | 视频播放器画质增强三级档位（色彩参数/CAS 锐化降噪/Anime4K 超分） |
+| [video-player-multiline-reset](./video-player-multiline-reset/README.md) | 🔄 | 播放器多线路多集状态残留修复（新会话 initSource 统一重置线路/集数，防左下角残留旧视频数据） |
 | [video-player-theme-unify](./video-player-theme-unify/README.md) | ✅ | 视频播放器主题统一（控制条/弹框动态设色+硬编码色清理） |
 | [video-player-ux-fixes](./video-player-ux-fixes/README.md) | ✅ | 视频播放器体验五项修复（下载按钮/快进灵敏度/弹框透明/标题/图标） |
 | [video-sniff-403-and-rss-classic-fix](./video-sniff-403-and-rss-classic-fix/README.md) | ✅ | 视频嗅探引擎架构级重构（SniffEngine 统一播放/下载+删 WebView 播放器+拦截面扩展+经典布局修复+线程数 256，Phase 0-4 全闭环） |
