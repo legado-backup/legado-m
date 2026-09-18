@@ -56,4 +56,19 @@ class DownloadNameResolveTest {
         // DIRECT 误下 m3u8 由 F1 2.2 下载完成 Content-Type 纠正兜底改名
         assertEquals("v.m3u8", name)
     }
+
+    @Test
+    fun `apk更新包保留后缀不被改写为mp4`() {
+        // app-update-github-channel AD-05：更新包必须保持 .apk 后缀，否则系统无法识别为安装包
+        assertEquals(
+            "legado_miss_app_3.26.091720.apk",
+            resolveVideoFileName("legado_miss_app_3.26.091720.apk", "u", exts)
+        )
+        assertEquals(
+            "legado_miss_app_debug_3.26.091720.apk",
+            resolveVideoFileName("legado_miss_app_debug_3.26.091720.apk", "u", exts)
+        )
+        // 大小写不敏感
+        assertEquals("app.APK", resolveVideoFileName("app.APK", "u", exts))
+    }
 }
