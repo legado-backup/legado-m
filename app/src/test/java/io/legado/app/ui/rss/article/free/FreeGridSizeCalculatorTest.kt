@@ -328,10 +328,75 @@ class FreeGridSizeCalculatorTest {
         }
     }
 
+    // ------------------------------------------------ v1.3 行组成定型（AD-10）
+
+    /**
+     * 冻结语义：首次 `build` 定型后，比例流式回填（`recalcFrom`）**不得**改变每行张数。
+     *
+     * 这是「自由布局列表一直闪烁」的确定性根因回归：源均值随样本漂移，若每批预取回填
+     * 都重算张数，整表图片分组会反复变化。
+     */
+    @Test
+    fun itemsPerRow_frozenAfterFirstBuild_recalcCannotChangeIt() {
+        val g = geometry()
+        val calc = FreeGridSizeCalculator()
+        // 首屏按横图定型（理想 2 张/行）
+        calc.build(g, FloatArray(12) { 1.78f })
+        val frozen = rowsOf(calc).first().size
+        assertEquals("横图源应定型 2 张/行", 2, frozen)
+        assertTrue("首次构建后必须处于已定型状态", calc.isItemsPerRowFrozen)
+
+        // 比例真值到达后整表变成窄竖图（按新均值应变成 4 张/行），行组成仍不得变化
+        calc.recalcFrom(0, FloatArray(12) { 0.67f })
+        assertTrue("回填后仍应保持已定型状态", calc.isItemsPerRowFrozen)
+        rowsOf(calc).dropLast(1).forEach { row ->
+            assertEquals("比例回填不得改变每行张数，实际 ${row.size}", frozen, row.size)
+        }
+    }
+
+    /** 解锁语义：`unlockItemsPerRow()` 之后的下一次构建按新比例表重新定型 */
+    @Test
+    fun unlockItemsPerRow_recomputesOnNextBuild() {
+        val g = geometry()
+        val calc = FreeGridSizeCalculator()
+        calc.build(g, FloatArray(12) { 1.78f })
+        assertEquals("横图源定型 2 张/行", 2, rowsOf(calc).first().size)
+
+        calc.unlockItemsPerRow()
+        calc.build(g, FloatArray(12) { 0.67f })
+        assertEquals("解锁后应按竖图均值重新定型为 4 张/行", 4, rowsOf(calc).first().size)
+    }
+
+    /** 分页追加：结构变化走全量构建，但**既有行组成与矩形必须保持不变** */
+    @Test
+    fun appendingData_keepsExistingRowComposition() {
+        val g = geometry()
+        val calc = FreeGridSizeCalculator()
+        val firstPage = FloatArray(9) { 0.75f }
+        calc.build(g, firstPage)
+        assertEquals("竖图源应定型 3 张/行", 3, rowsOf(calc).first().size)
+        // 只比对前 6 项（前两个完整行）：首屏恰好 3 行时，第 3 行是「末行」，
+        // 按既有算法会被收敛到目标行高（151）且不做末位补偿；追加后它变成完整行（156+撑满），
+        // 矩形变化属**既有末行语义**，与本轮行组成定型无关，故不纳入逐字节比较
+        val before = dumpOf(calc, 6)
+
+        // 第二页比例更宽：若允许重算，整表会变成 2 张/行（既有内容被重组）
+        val appended = FloatArray(18) { if (it < 9) 0.75f else 1.78f }
+        calc.build(g, appended)
+        assertTrue("追加后仍应处于已定型状态", calc.isItemsPerRowFrozen)
+        rowsOf(calc).dropLast(1).take(3).forEach { row ->
+            assertEquals("追加不得改变既有行组成，实际 ${row.size}", 3, row.size)
+        }
+        assertEquals("既有完整行的矩形表必须逐字节不变", before, dumpOf(calc, 6))
+    }
+
     /** 把整张矩形表序列化为字符串，用于「增量 == 全量」的逐字节比较 */
-    private fun dumpOf(calc: FreeGridSizeCalculator): String {
+    private fun dumpOf(calc: FreeGridSizeCalculator): String = dumpOf(calc, calc.itemCount)
+
+    /** 把前 [count] 项矩形序列化（用于比较追加前后的既有内容） */
+    private fun dumpOf(calc: FreeGridSizeCalculator, count: Int): String {
         val sb = StringBuilder()
-        for (i in 0 until calc.itemCount) {
+        for (i in 0 until count) {
             sb.append(calc.getLeft(i)).append(',')
                 .append(calc.getTop(i)).append(',')
                 .append(calc.getRight(i)).append(',')
