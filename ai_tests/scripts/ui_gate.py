@@ -85,6 +85,64 @@ def _ssl_violations(lines: list[str]) -> list[tuple[int, str]]:
     return hits
 
 
+# ---- Deprecation 门禁（A2.2.3）----
+# 项目无 allWarningsAsErrors / detekt / ktlint、.git/hooks 仅 .sample
+# ⇒ `@Deprecated` 不会自动阻止新用法，由本门禁本地兜底。
+RE_DEPRECATED_DECL = re.compile(r"@Deprecated\s*\(")
+# Kotlin/IDE 为「覆写已弃用 Java 成员」自动生成的标记，非项目级弃用声明 → 排除（防误报）
+_JAVA_DEPRECATED_MARK = '"Deprecated in Java"'
+RE_DECL_NAME = re.compile(
+    r"^\s*(?:@\w+(?:\([^)]*\))?\s*)*"
+    r"(?:public\s+|internal\s+|private\s+|protected\s+)?"
+    r"(?:suspend\s+|inline\s+|open\s+|override\s+|operator\s+)*"
+    r"(?:fun|val|var|class|object|interface|typealias)\s+([A-Za-z_]\w*)"
+)
+
+
+def _deprecated_symbols() -> dict[str, str]:
+    """扫描全量源码，返回 {被弃用符号名: 其声明文件相对路径}。"""
+    out: dict[str, str] = {}
+    base = ROOT / SCAN_DIR
+    for kt in sorted(base.rglob("*.kt")):
+        rel = kt.relative_to(ROOT).as_posix()
+        try:
+            lines = kt.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        for idx, line in enumerate(lines):
+            if not RE_DEPRECATED_DECL.search(line):
+                continue
+            # 注解与声明可能跨行（注解行 → 声明行），向后探 4 行
+            for probe in lines[idx: idx + 4]:
+                if _JAVA_DEPRECATED_MARK in probe:
+                    break
+                m = RE_DECL_NAME.match(probe)
+                if m:
+                    out[m.group(1)] = rel
+                    break
+    return out
+
+
+def _deprecated_hits(
+    lines: list[str], symbols: dict[str, str], self_rel: str
+) -> list[tuple[int, str]]:
+    """返回 (行号, 行内容) —— 引用了被弃用符号（排除其声明文件自身）。"""
+    if not symbols:
+        return []
+    hits: list[tuple[int, str]] = []
+    for idx, line in enumerate(lines, 1):
+        stripped = line.lstrip()
+        if stripped.startswith(("*", "//")):
+            continue
+        for name, decl_rel in symbols.items():
+            if decl_rel == self_rel:
+                continue
+            if re.search(rf"(?<![\w.]){re.escape(name)}(?![\w])", line):
+                hits.append((idx, line))
+                break
+    return hits
+
+
 def _line_hits(lines: list[str]) -> list[tuple[int, str, str]]:
     """返回 (行号, 门禁名, 行内容)。"""
     out: list[tuple[int, str, str]] = []
@@ -110,6 +168,7 @@ def _is_exempt(rel: str, category: str) -> bool:
 def scan_all() -> list[str]:
     findings: list[str] = []
     base = ROOT / SCAN_DIR
+    deprecated = _deprecated_symbols()
     for kt in sorted(base.rglob("*.kt")):
         rel = kt.relative_to(ROOT).as_posix()
         try:
@@ -123,6 +182,9 @@ def scan_all() -> list[str]:
         if not _is_exempt(rel, "SNAPSHOT_WRITE"):
             for idx, line in _ssl_violations(lines):
                 findings.append(f"{rel}:{idx}: SNAPSHOT_WRITE | {line.strip()[:110]}")
+        if not _is_exempt(rel, "DEPRECATED_USAGE"):
+            for idx, line in _deprecated_hits(lines, deprecated, rel):
+                findings.append(f"{rel}:{idx}: DEPRECATED_USAGE | {line.strip()[:110]}")
     return findings
 
 
@@ -146,6 +208,7 @@ def scan_diff() -> list[str]:
             cur_line += 1
 
     findings: list[str] = []
+    deprecated = _deprecated_symbols()
     for rel, items in added.items():
         lines = [t for _, t in items]
         ln_of = {idx: ln for idx, (ln, _) in enumerate(items, 1)}
@@ -156,6 +219,9 @@ def scan_diff() -> list[str]:
         if not _is_exempt(rel, "SNAPSHOT_WRITE"):
             for i, line in _ssl_violations(lines):
                 findings.append(f"{rel}:{ln_of[i - 1]}: SNAPSHOT_WRITE | {line.strip()[:110]}")
+        if not _is_exempt(rel, "DEPRECATED_USAGE"):
+            for i, line in _deprecated_hits(lines, deprecated, rel):
+                findings.append(f"{rel}:{ln_of[i - 1]}: DEPRECATED_USAGE | {line.strip()[:110]}")
     return findings
 
 
@@ -191,12 +257,36 @@ def selftest() -> int:
         print(f"  ✓ {idx}: SNAPSHOT_WRITE | {line.strip()[:90]}")
     missed = [i for i, want in enumerate(expect, 1) if want and i not in caught]
     false_pos = [i for i, want in enumerate(expect, 1) if not want and i in caught]
-    if missed or false_pos:
+
+    # ---- Deprecation 门禁自检（合成注册表：OldApi 声明于 decl/Old.kt，被测文件为 use/New.kt）----
+    dep_lines = [
+        "val a = OldApi.doIt()",           # 引用被弃用符号 → 应命中
+        "OldApi(",                         # 同上
+        "val b = NewApi.doIt()",           # 未弃用 → 不应命中
+        '@Deprecated("use NewApi")',       # 声明行本身不是「使用」→ 不应命中
+    ]
+    dep_expect = [True, True, False, False]
+    dep_hits = _deprecated_hits(dep_lines, {"OldApi": "decl/Old.kt"}, "use/New.kt")
+    dep_caught = {idx for idx, _ in dep_hits}
+    for idx, line in sorted(dep_hits):
+        print(f"  ✓ D{idx}: DEPRECATED_USAGE | {line.strip()[:90]}")
+    dep_missed = [i for i, w in enumerate(dep_expect, 1) if w and i not in dep_caught]
+    dep_false = [i for i, w in enumerate(dep_expect, 1) if not w and i in dep_caught]
+    for i in dep_missed:
+        print(f"  ✗ 漏报 D{i}: {dep_lines[i - 1]}")
+    for i in dep_false:
+        print(f"  ✗ 误报 D{i}: {dep_lines[i - 1]}")
+    # 声明文件自身引用自己的符号不应命中
+    if _deprecated_hits(["OldApi("], {"OldApi": "decl/Old.kt"}, "decl/Old.kt"):
+        print("  ✗ 误报 D5: 声明文件自身被判定为使用")
+        dep_false.append(5)
+
+    if missed or false_pos or dep_missed or dep_false:
         for i in missed:
             print(f"  ✗ 漏报 {i}: {lines[i - 1]}")
         for i in false_pos:
             print(f"  ✗ 误报 {i}: {lines[i - 1]}")
-        print(f"[FAIL] 漏报 {len(missed)} / 误报 {len(false_pos)}")
+        print(f"[FAIL] 漏报 {len(missed) + len(dep_missed)} / 误报 {len(false_pos) + len(dep_false)}")
         return 1
     print("[PASS] 违规样例全部被拦下，无漏报无误报")
     return 0
@@ -229,6 +319,7 @@ def main() -> int:
         print("  2. RAW_DIALOG       → 走 ComposeDialogFragment + AppDialogFrame/AppDialogStyle")
         print("  3. HARDCODE_COLOR   → 取色唯一基线 palette.settings.* / rememberAppSettingPalette()")
         print("  4. SNAPSHOT_WRITE   → 改 SnapshotListUpdates.replaceAt/replaceByIndex（写回不落地铁律）")
+        print("  5. DEPRECATED_USAGE → 避免使用 @Deprecated 符号；确需用先改造或豁免")
         return 1
     print("[PASS] fail=0，新增代码未触碰门禁项")
     return 0
