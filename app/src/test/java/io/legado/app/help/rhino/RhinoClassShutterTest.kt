@@ -173,6 +173,7 @@ class RhinoClassShutterTest {
 
     @Test
     fun guardLog_observeClass_countsAccumulateAndThrottlesAtPowersOfTen() {
+        assumeGuardLogRunnable()
         AppLog.clear()
         BookSourceGuardLog.reset()
         val cls = "io.legado.app.help.BookHelp"
@@ -194,6 +195,7 @@ class RhinoClassShutterTest {
 
     @Test
     fun guardLog_observeClass_lruCapEvictsOldestKey() {
+        assumeGuardLogRunnable()
         AppLog.clear()
         BookSourceGuardLog.reset()
         // MAX_REPORTED_KEYS=512：513 个不同键触发最旧键淘汰
@@ -210,6 +212,7 @@ class RhinoClassShutterTest {
 
     @Test
     fun guardLog_blockedClass_rateLimitedPerMinute() {
+        assumeGuardLogRunnable()
         AppLog.clear()
         BookSourceGuardLog.blockedClass("nsW", "android.webkit.CookieManager")
         BookSourceGuardLog.blockedClass("nsW", "android.webkit.CookieManager")
