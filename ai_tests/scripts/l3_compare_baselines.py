@@ -48,16 +48,18 @@ def compare(a: Path, b: Path) -> tuple[float, float] | None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="output/ui-baseline")
+    ap.add_argument("--pre", default="baseline-pre-a3", help="基准目录名（相对 --root）")
+    ap.add_argument("--after", default="after-a3", help="对比目录名（相对 --root）")
     args = ap.parse_args()
     root = Path(args.root)
-    pre, after = root / "baseline-pre-a3", root / "after-a3"
+    pre, after = root / args.pre, root / args.after
     if not pre.is_dir() or not after.is_dir():
         print(f"[FAIL] 基线目录缺失: pre={pre.exists()} after={after.exists()}")
         return 1
 
     pre_rel = sorted(p.relative_to(pre).as_posix() for p in pre.rglob("*.png"))
     after_rel = sorted(p.relative_to(after).as_posix() for p in after.rglob("*.png"))
-    print(f"pre-a3 帧数 = {len(pre_rel)}   after-a3 帧数 = {len(after_rel)}")
+    print(f"[{args.pre}] 帧数 = {len(pre_rel)}   [{args.after}] 帧数 = {len(after_rel)}")
     print("=" * 78)
     print(f"{'cell':44s} {'平均像素差':>10s} {'显著变化占比':>12s}")
     print("-" * 78)
@@ -75,11 +77,11 @@ def main() -> int:
     missing = [c for c in pre_rel if c not in after_rel]
     print("=" * 78)
     if missing:
-        print(f"after 缺失 {len(missing)} 帧（重采样被模拟器渲染故障阻断，AD-25 待设备恢复重跑）：")
+        print(f"[{args.after}] 缺失 {len(missing)} 帧（重采样被模拟器渲染故障阻断，AD-25 待设备恢复重跑）：")
         for m in missing:
             print(f"  - {m}")
     else:
-        print("after 帧覆盖完整，无缺失")
+        print(f"[{args.after}] 帧覆盖完整，无缺失")
     return 0
 
 
