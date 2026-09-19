@@ -26,6 +26,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCAN_DIR = "app/src/main/java/io/legado/app/ui"
 
+# 登记豁免（architecture.md 铁律 1 自带豁免类 + 语义色单源）：
+# 键 = 相对仓库根的路径，值 = 允许命中的门禁类别集合（"*" = 全部）
+# 说明：取色/语义色的**单源定义点**必须能写具体色值，否则门禁与铁律自相矛盾；
+#       任何新增豁免都必须在此登记并在提交信息中说明理由。
+EXEMPT: dict[str, set[str]] = {
+    # 语义色单源（AD-14 danger / 后续 A3.3 token 门面）：本文件是色值的唯一落地点
+    "app/src/main/java/io/legado/app/ui/widget/compose/AppUiTokens.kt": {"HARDCODE_COLOR"},
+}
+
 # 词边界：避免命中 `showAlertDialog` / `AppAlertDialog` / `MyAlertDialog(` 等自定义符号
 RE_VIEW_LAYOUT = re.compile(r"(?<![\w.])R\.layout\.\w+")
 RE_RAW_DIALOG = re.compile(
@@ -92,6 +101,12 @@ def _line_hits(lines: list[str]) -> list[tuple[int, str, str]]:
     return out
 
 
+def _is_exempt(rel: str, category: str) -> bool:
+    """该文件该类门禁是否已登记豁免。"""
+    cats = EXEMPT.get(rel)
+    return bool(cats) and ("*" in cats or category in cats)
+
+
 def scan_all() -> list[str]:
     findings: list[str] = []
     base = ROOT / SCAN_DIR
@@ -102,9 +117,12 @@ def scan_all() -> list[str]:
         except OSError:
             continue
         for idx, name, line in _line_hits(lines):
+            if _is_exempt(rel, name):
+                continue
             findings.append(f"{rel}:{idx}: {name} | {line.strip()[:110]}")
-        for idx, line in _ssl_violations(lines):
-            findings.append(f"{rel}:{idx}: SNAPSHOT_WRITE | {line.strip()[:110]}")
+        if not _is_exempt(rel, "SNAPSHOT_WRITE"):
+            for idx, line in _ssl_violations(lines):
+                findings.append(f"{rel}:{idx}: SNAPSHOT_WRITE | {line.strip()[:110]}")
     return findings
 
 
@@ -130,11 +148,14 @@ def scan_diff() -> list[str]:
     findings: list[str] = []
     for rel, items in added.items():
         lines = [t for _, t in items]
-        ln_of = {i: ln for i, (ln, _) in enumerate(lines)}
+        ln_of = {idx: ln for idx, (ln, _) in enumerate(items, 1)}
         for i, name, line in _line_hits(lines):
+            if _is_exempt(rel, name):
+                continue
             findings.append(f"{rel}:{ln_of[i - 1]}: {name} | {line.strip()[:110]}")
-        for i, line in _ssl_violations(lines):
-            findings.append(f"{rel}:{ln_of[i - 1]}: SNAPSHOT_WRITE | {line.strip()[:110]}")
+        if not _is_exempt(rel, "SNAPSHOT_WRITE"):
+            for i, line in _ssl_violations(lines):
+                findings.append(f"{rel}:{ln_of[i - 1]}: SNAPSHOT_WRITE | {line.strip()[:110]}")
     return findings
 
 
