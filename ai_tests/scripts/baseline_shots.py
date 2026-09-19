@@ -303,28 +303,54 @@ def device():
     return _DEV
 
 
-def shoot(path: Path, seen: set[bytes] | None = None, retries: int = 4) -> bool:
-    """截图：走 u2 通道（复用 `lib/ui_executor.py` 同源能力），连拍取稳定帧。
+def _grab_u2() -> bytes | None:
+    """u2（atx-agent）通道取帧。"""
+    try:
+        img = device().screenshot()
+    except Exception as e:  # noqa: BLE001
+        print(f"  !! 截图异常：{e}")
+        return None
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
 
-    MEmu 上 `adb exec-out screencap -p` 存在返回陈旧帧的问题（实测两主题得到同一 731441 字节），
-    故改走 u2（atx-agent）通道；并要求 ①连续两帧字节一致（画面已稳定）②**不与本次运行任何已落盘
-    截图重复**（防截到桌面/上一页的陈旧帧，这是「假基线」的主要来源）。
+
+def _grab_screencap() -> bytes | None:
+    """`adb exec-out screencap -p` 兜底通道（A5.8 新增）。
+
+    二进制安全：必须经 subprocess 管道读 stdout；**禁用 PowerShell `>` 重定向**
+    （会按文本编码写坏 PNG → 「Unknown image format」）。
+    存在意义：u2 通道在 MEmu 上偶发持续黑帧/陈旧帧（AD-25 渲染管线故障）时提供第二通道。
+    """
+    try:
+        out = subprocess.run(
+            [ADB_PATH, "-s", MEMU_ADB_HOST, "exec-out", "screencap", "-p"],
+            capture_output=True, timeout=30
+        ).stdout
+        return out or None
+    except Exception as e:  # noqa: BLE001
+        print(f"  !! screencap 异常：{e}")
+        return None
+
+
+def shoot(path: Path, seen: set[bytes] | None = None, retries: int = 6) -> bool:
+    """截图：u2 主通道 + `screencap` 兜底，连拍取稳定帧。
+
+    MEmu 上两通道各有失效场景：u2 偶发持续黑帧/陈旧帧（AD-25），
+    `adb exec-out screencap` 亦曾被记录返回陈旧帧（实测两主题同 731441 字节）。
+    故双通道轮换 + 三重校验：①字节 ≥20000（黑帧特征值，SOP u2 陷阱 7）
+    ②**不与本次运行任何已落盘截图重复**（防截到桌面/上一页的陈旧帧，假基线主因）
+    ③连续两帧字节一致（画面已稳定）。
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    d = device()
     prev: bytes | None = None
-    for _ in range(retries):
-        try:
-            img = d.screenshot()
-        except Exception as e:  # noqa: BLE001
-            print(f"  !! 截图异常：{e}")
+    for attempt in range(retries):
+        data = _grab_u2() if attempt % 2 == 0 else _grab_screencap()
+        if data is None:
             time.sleep(1.0)
             continue
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        data = buf.getvalue()
         if len(data) < 20000:  # 黑帧特征值（SOP u2 陷阱 7）
-            print(f"  !! 疑似黑帧（{len(data)} 字节），重试")
+            print(f"  !! 疑似黑帧（{len(data)} 字节，通道={'u2' if attempt % 2 == 0 else 'screencap'}），重试")
             time.sleep(1.2)
             continue
         if seen is not None and data in seen:
