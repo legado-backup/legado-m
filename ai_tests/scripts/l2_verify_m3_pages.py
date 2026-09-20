@@ -2,7 +2,26 @@
 """l2_verify_m3_pages.py — M3 批（设置与阅读器配置页 14 页）真机 L2 验证，按落地顺序增量登记
 
 已覆盖：
-  【log/log · LogActivity】F190 命中计数条 + 关键词高亮 + 一键清除筛选；F191 详情逐条翻阅；F192 跨年时间补年份
+  【rss/articles · RssSortActivity/RssArticlesFragment】**s8 PASS（2026-09-20）**：F142 页脚错误可恢复态（LoadMoreView 错误分支重做）
+    + F143 分类 Tab 未读徽标（A 有未读 / B 全已读不显 / C 超量 999+ 封顶）
+    + 顺带修复 3 个既有缺陷（见下）
+    s8 通道：DB 播种「合成源（3 分类，URL 指向本机计数监听器）+ 已入库文章」——A 3 条未读 / B 2 条全已读
+       / C 1200 条未读；adb reverse 把设备 127.0.0.1:18543 打到主机计数监听器（接受即关闭 ⇒ 加载必失败）
+       → 落地即「库内内容在场 + 网络加载失败落错误页脚」：摘要前缀 + 「点击查看详情」+ danger 圆点像素
+       → 徽标以像素为准（compound drawable 不进无障碍树）：A/C 有 danger 胶囊、B 无、C 比 A 宽（999+ 封顶）
+       → 点页脚 ⇒ 详情弹窗（错误 + 重试）⇒ 点重试 ⇒ 监听器命中 2→3（客观证明真的重新发起请求）
+         且源仍不可达 ⇒ 回到错误页脚；再次点页脚仍能开弹窗（恢复通道可重复）
+       → 库快照回滚 + 源码断言 12/12
+    🔴 本轮顺带修复的既有缺陷（3 条，均以真机证据定性）：①**页脚重试两道闸全断**——`RssArticlesViewModel`
+       三条非成功出口漏复位 `isLoading`（`scrollToBottom` 首行守卫恒真）+ 首页失败时 `nextPageUrl` 为 null
+       （`loadMore` 直接判无下一页）⇒ 首页失败后「重试」与触底翻页**永久失效**；②**错误详情弹窗把「重试」
+       挤出屏幕**（40+ 行堆栈撑破弹窗，操作行不可见亦不可点）⇒ `messageInContent = true` 走限高滚动正文区；
+       ③`LoadMoreView` 硬编码中文提示抽为字符串资源（`error_view_detail`/`load_failed`）并按有无详情分流
+    ⚠️ 播种踩坑（已写进 `_art_seed` 注释）：分类清单分隔符必须用**无空格 `&&`** —— `sortUrls()` 走
+       `split("(&&&|&&|\n)+")` 且**不 trim**，写成 `" && "` 会让第 2 条起的分类名带前导空格（Tab 上看不出，
+       但与库内 `sort` 值不一致 ⇒ 未读徽标查不到计数，首轮因此误判为「徽标不显示」）
+
+【log/log · LogActivity】F190 命中计数条 + 关键词高亮 + 一键清除筛选；F191 详情逐条翻阅；F192 跨年时间补年份
     s1 搜索命中计数与清除筛选（文本口径）→ 同一行「搜索前/后」前景色像素对比证明高亮渲染
        → 点行开详情弹窗（位置指示 N/M）→ › 翻阅后指示递增 → 关窗
        → 时间列同口径回归（`MM-dd HH:mm:ss`）；F192 跨年分支以源码断言兜底（见脚本末尾口径说明）
@@ -85,6 +104,7 @@
 """
 import argparse
 import re
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -2471,6 +2491,359 @@ def guarded(fn):
     return inner
 
 
+# ===================== s8：rss/articles（订阅文章列表）=====================
+# F142 页脚错误可恢复态（LoadMoreView 错误分支）+ F143 分类 Tab 未读徽标
+#   + 顺带修复：首页加载失败时页脚「重试」并未真正重拉（nextPageUrl 为 null ⇒ 退化成「我是有底线的」）
+
+ACT_RSS_ART = "io.legado.app.ui.rss.article.RssSortActivity"
+SEED_ART_SOURCE = "l2seed://articles-badge"
+SEED_ART_NAME = "L2文章列表校验源"
+ART_PORT = 18543
+# 分类清单（我自造的合成标签，非用户业务数据）：A 3 条未读 / B 2 条全已读 / C 1200 条未读（测 999+ 封顶）
+SEED_ART_SORTS = (("L2分类A", "a", 3), ("L2分类B", "b", 2), ("L2分类C", "c", 1200))
+SEED_ART_ITEM_PREFIX = "L2条目"
+
+S_ERR_SUMMARY_PREFIX = "加载失败"     # error_load_msg 前缀
+S_ERR_DETAIL = "点击查看详情"          # error_view_detail
+S_RETRY = "重试"                      # retry
+S_ERROR_TITLE = "错误"                # error
+
+SRC_RSS_ART_FRAG = "app/src/main/java/io/legado/app/ui/rss/article/RssArticlesFragment.kt"
+SRC_RSS_ART_VM = "app/src/main/java/io/legado/app/ui/rss/article/RssArticlesViewModel.kt"
+SRC_LOAD_MORE = "app/src/main/java/io/legado/app/ui/widget/recycler/LoadMoreView.kt"
+SRC_LOAD_MORE_XML = "app/src/main/res/layout/view_load_more.xml"
+SRC_BADGE = "app/src/main/java/io/legado/app/ui/widget/text/CountBadgeDrawable.kt"
+SRC_RSS_DAO = "app/src/main/java/io/legado/app/data/dao/RssArticleDao.kt"
+SRC_MANGA = "app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt"
+
+# danger 真值（AppSemanticColors.Danger = #D44848）：徽标胶囊按此判定，容差防抗锯齿/主题底色混色
+DANGER_RGB = (212, 72, 72)
+DANGER_TOL = 26
+
+
+class _HitServer(threading.Thread):
+    """计数监听器：接受连接后立即关闭（不返回 HTTP 响应）。
+
+    用途有二——① 让订阅文章加载必然失败（构造页脚错误态）；② 用命中次数给出「重试是否真的
+    重新发起请求」的客观证据（不依赖 UI 文案自证）。
+    """
+
+    def __init__(self, port: int):
+        super().__init__(daemon=True)
+        self.hits = 0
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._sock.bind(("127.0.0.1", port))
+        self._sock.listen(16)
+
+    def run(self):
+        while True:
+            try:
+                conn, _ = self._sock.accept()
+            except OSError:
+                return
+            self.hits += 1
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+    def stop(self):
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+
+
+def _art_seed(workdir: Path) -> bool:
+    """播种合成源 + 文章：整行复制既有源后改写（源名/URL/分类清单/规则），零真实源污染。
+
+    仅列出「必须给值的列」（显式覆盖项 + NOT NULL 且无默认值者），其余交给库内默认值，
+    避免向 NOT NULL DEFAULT 列显式写 NULL（会触发 NOT NULL 约束失败）。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(rssSources)")]
+        row = con.execute("select * from rssSources where enabled = 1 limit 1").fetchone()
+        if not row:
+            return False
+        data = dict(zip(cols, row))
+        data["sourceUrl"] = SEED_ART_SOURCE
+        data["sourceName"] = SEED_ART_NAME
+        # 分类 URL 指向本机计数监听器（adb reverse）：列表分类只依赖 sortUrl，纯本地解析。
+        # ⚠️ 分隔符必须用**无空格的 `&&`**：`sortUrls()` 走 `split("(&&&|&&|\n)+")` 且**不 trim**，
+        #    写成 " && " 会让第 2 条起的分类名带**前导空格**（Tab 上看不出、但与库内 sort 值不一致
+        #    ⇒ 未读徽标查不到计数，实测踩坑 2026-09-20）。
+        data["sortUrl"] = "&&".join(
+            f"{name}::http://127.0.0.1:{ART_PORT}/{slug}"
+            for name, slug, _ in SEED_ART_SORTS
+        )
+        data["ruleArticles"] = None      # 去掉列表规则 ⇒ 加载失败只来自网络通道
+        data["ruleNextPage"] = None      # 非分页源：重试应走「按当前页重拉」分支
+        data["loginUrl"] = None          # 避免继承既有源的登录分支干扰
+        data["loginCheckJs"] = None
+        data["preload"] = 0              # 关预加载：只有当前 Tab 发一次请求，命中数可控
+        data["articleStyle"] = 0         # 普通单列列表：Tab 行结构确定，便于像素取样
+        data["enabled"] = 1
+        con.execute(
+            f"insert or replace into rssSources ({','.join(cols)})"
+            f" values ({','.join('?' * len(cols))})",
+            [data[c] for c in cols]
+        )
+        con.execute("delete from rssArticles where origin = ?", (SEED_ART_SOURCE,))
+        art_meta = [(r[1], (r[2] or "").upper(), r[3], r[4])
+                    for r in con.execute("pragma table_info(rssArticles)")]
+        rec_meta = [(r[1], (r[2] or "").upper(), r[3], r[4])
+                    for r in con.execute("pragma table_info(rssReadRecords)")]
+
+        def ins(table: str, meta: list, overrides: dict):
+            names, vals = [], []
+            for name, ctype, notnull, dflt in meta:
+                if name in overrides:
+                    names.append(name)
+                    vals.append(overrides[name])
+                elif notnull and dflt is None:
+                    names.append(name)
+                    vals.append(0 if ("INT" in ctype or "REAL" in ctype) else "")
+            sql = (f"insert or replace into {table} "
+                   f"({','.join('`' + n + '`' for n in names)}) "
+                   f"values ({','.join('?' * len(names))})")
+            con.execute(sql, vals)
+
+        now = int(time.time() * 1000)
+        order = now
+        for name, slug, count in SEED_ART_SORTS:
+            read_all = (slug == "b")     # B 分类整类已读 ⇒ 不应出现徽标（对照组）
+            for i in range(count):
+                link = f"l2art://{slug}/{i}"
+                order -= 1
+                title = f"{SEED_ART_ITEM_PREFIX}{slug.upper()}{i + 1}"
+                ins("rssArticles", art_meta, {
+                    "origin": SEED_ART_SOURCE, "sort": name, "link": link,
+                    "title": title, "order": order, "read": 1 if read_all else 0,
+                    "type": 0, "pubDate": "",
+                })
+                if read_all:
+                    ins("rssReadRecords", rec_meta, {
+                        "record": link, "origin": SEED_ART_SOURCE, "sort": name,
+                        "title": title, "read": 1, "readTime": now,
+                        "type": 0, "durPos": 0, "pubDate": "",
+                    })
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _device_density() -> float:
+    """屏幕密度（px/dp）：取 `wm density` 输出最后一个数字段（覆盖值优先）"""
+    r = sh("wm", "density", timeout=20)
+    vals = re.findall(r"(\d+)", (r.stdout or b"").decode("utf-8", errors="ignore"))
+    return (int(vals[-1]) / 160.0) if vals else 2.0
+
+
+def _danger_run(img, b, ratio: float = 0.5):
+    """胶囊**右半区**内 danger 像素的水平跨度：返回 (命中列数, 跨度px)。
+
+    徽标是 TextView 的 compound drawable（不进无障碍树 ⇒ 无法用节点定位），
+    故以像素为准：右半区内存在与 danger 真值同色（容差 [DANGER_TOL]）的像素，
+    即证明徽标已渲染；跨度用于区分「3」与「999+」（后者更宽）。
+    """
+    x0 = int(b["left"] + (b["right"] - b["left"]) * ratio)
+    x1 = min(img.width, b["right"])
+    y0, y1 = max(0, b["top"] + 2), min(img.height, b["bottom"] - 2)
+    hits = []
+    for x in range(x0, x1):
+        for y in range(y0, y1):
+            p = img.getpixel((x, y))
+            if all(abs(p[i] - DANGER_RGB[i]) <= DANGER_TOL for i in range(3)):
+                hits.append(x)
+                break
+    if not hits:
+        return 0, 0
+    return len(hits), max(hits) - min(hits) + 1
+
+
+def s8_rss_articles_page(d) -> bool:
+    """订阅文章列表：F142 页脚错误可恢复 + F143 分类未读徽标（含 999+ 封顶与已读不显）"""
+    print("  [s8] ===== 订阅文章列表错误页脚与分类未读徽标 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m3art_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s8] 数据库快照失败（前置）")
+        return False
+    server = None
+    ok = False
+    try:
+        server = _HitServer(ART_PORT)
+        server.start()
+        if not _reverse_on(ART_PORT):
+            print("  [s8] adb reverse 未建立（设备侧不可达监听器）")
+            return False
+        # 推库前先停应用：运行中的 SQLite 连接持旧 inode，页内数据变化必须走「停 → 推 → 重开」
+        reset_app()
+        if not _art_seed(workdir):
+            print("  [s8] 合成源/文章播种失败")
+            return False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_RSS_ART}", "--es", "sourceUrl", SEED_ART_SOURCE)
+        time.sleep(7.0)   # 列表先出库内文章，随后网络加载失败落到页脚
+        landed = ACT_RSS_ART.split(".")[-1] in current_activity()
+        xml1 = dump_xml(d)
+        ca.shot(d, "m3art_s8_landed")
+        print(f"  [s8] 落地={landed} / 首次加载命中={server.hits}")
+
+        from PIL import Image
+        shot_dir = Path(tempfile.mkdtemp(prefix="m3artshot_"))
+
+        # ---------- F143：分类 Tab 未读徽标（A=3 有 / B=全已读 无 / C=1200 封顶）----------
+        tabs = tab_nodes(xml1)
+        badge_ok = False
+        run_a = run_b = run_c = 0
+        if len(tabs) == len(SEED_ART_SORTS):
+            p1 = str(shot_dir / "tabs_badge.png")
+            d.screenshot(p1)
+            img1 = Image.open(p1).convert("RGB")
+            run_a = _danger_run(img1, tabs[0]["bounds"])
+            run_b = _danger_run(img1, tabs[1]["bounds"])
+            run_c = _danger_run(img1, tabs[2]["bounds"])
+            # 判据：未读分类有 danger 徽标；全已读分类无；超量分类徽标更宽（999+ 封顶后仍为宽胶囊）
+            badge_ok = (run_a[0] > 0 and run_b[0] == 0 and run_c[0] > 0
+                        and run_c[1] > run_a[1])
+            print(f"  [s8] F143 徽标像素跨度（列数/宽度）：A(3条未读)={run_a} "
+                  f"B(全已读)={run_b} C(1200条)={run_c} ⇒ {badge_ok}")
+        else:
+            print(f"  [s8] F143 分类 Tab 数={len(tabs)}（播种 {len(SEED_ART_SORTS)}）⇒ 无法比对")
+
+        # ---------- 列表内容保留（错误页脚与既有内容并存）----------
+        keep_ok = sum(1 for t, _, _, _, _ in text_nodes(xml1)
+                      if t.startswith(SEED_ART_ITEM_PREFIX)) > 0
+        print(f"  [s8] 页脚错误态下列表内容仍在场={keep_ok}")
+
+        # ---------- F142：错误页脚三层结构 ----------
+        hint_b = node_bounds(xml1, S_ERR_DETAIL)
+        summary_hit = any(t.startswith(S_ERR_SUMMARY_PREFIX) for t, _, _, _, _ in text_nodes(xml1))
+        dot_ok = False
+        if hint_b:
+            p2 = str(shot_dir / "footer_error.png")
+            d.screenshot(p2)
+            img2 = Image.open(p2).convert("RGB")
+            # 圆点在错误行左侧：容器左内边距 12dp(margin) + 12dp(padding) + 半径 4dp ⇒ 取 [18dp,38dp] 带
+            density = _device_density()
+            xs = [int(v * density) for v in (18, 38)]
+            y0, y1 = hint_b["cy"] - int(8 * density), hint_b["cy"] + int(8 * density)
+            dot_ok = any(
+                all(abs(img2.getpixel((x, y))[i] - DANGER_RGB[i]) <= DANGER_TOL for i in range(3))
+                for x in range(xs[0], xs[1] + 1)
+                for y in range(max(0, y0), y1 + 1)
+            )
+        footer_ok = bool(hint_b) and summary_hit
+        print(f"  [s8] F142 页脚错误三层：摘要前缀在场={summary_hit} / 详情提示在场={bool(hint_b)} "
+              f"/ danger 圆点={dot_ok}（提示文案={S_ERR_DETAIL}）")
+
+        # ---------- 重试闭环：详情弹窗内重试 ⇒ 服务端命中 +1（真正的重新拉取）----------
+        retry_ok = False
+        dialog_ok = False
+        repeat_ok = False
+        hits_before = server.hits
+        if hint_b:
+            click_xy(d, hint_b["cx"], hint_b["cy"])
+            time.sleep(2.0)
+            xml_d = dump_xml(d)
+            dialog_ok = (S_RETRY in xml_d) and (S_ERROR_TITLE in xml_d)
+            ca.shot(d, "m3art_s8_error_dialog")
+            print(f"  [s8] F142 详情弹窗：含「{S_ERROR_TITLE}」与「{S_RETRY}」={dialog_ok}")
+            if dialog_ok:
+                tap_text(d, S_RETRY)
+                time.sleep(4.0)
+                xml_r = dump_xml(d)
+                retry_ok = (server.hits > hits_before)
+                back_to_err = any(t.startswith(S_ERR_SUMMARY_PREFIX)
+                                  for t, _, _, _, _ in text_nodes(xml_r))
+                print(f"  [s8] F142 重试闭环：命中 {hits_before} → {server.hits}"
+                      f"（重新发起请求={retry_ok}）/ 源仍不可达 ⇒ 回到错误页脚={back_to_err}")
+            # 可重复恢复：再次点击页脚仍能打开详情弹窗（重试后先轮询等错误页脚回归）
+            b2 = None
+            for _ in range(6):
+                b2 = node_bounds(dump_xml(d), S_ERR_DETAIL)
+                if b2:
+                    break
+                time.sleep(1.0)
+            repeat_ok = False
+            if b2:
+                click_xy(d, b2["cx"], b2["cy"])
+                time.sleep(1.8)
+                repeat_ok = S_RETRY in dump_xml(d)
+                print(f"  [s8] F142 恢复通道可重复={repeat_ok}")
+                d.press("back")
+                time.sleep(1.2)
+            else:
+                print("  [s8] F142 二次定位页脚失败（可重复性未取证）")
+
+        # ---------- 源码断言（像素取不到时的兜底口径 + 共享组件调用点一致性）----------
+        src_frag = _src_text(SRC_RSS_ART_FRAG)
+        src_lm = _src_text(SRC_LOAD_MORE)
+        src_xml = _src_text(SRC_LOAD_MORE_XML)
+        src_badge = _src_text(SRC_BADGE)
+        src_dao = _src_text(SRC_RSS_DAO)
+        src_manga = _src_text(SRC_MANGA)
+        src_checks = {
+            "错误页脚三层结构落定": all(k in src_xml for k in
+                                 ("error_container", "error_dot", "tv_error_summary", "tv_error_hint")),
+            "危险色取自语义单源": ("AppSemanticColors.Danger" in src_lm and "initErrorView" in src_lm),
+            "提示文案按真实行为分流": ("R.string.error_view_detail" in src_lm
+                              and "R.string.dynamic_click_retry" in src_lm),
+            "摘要取错误首行": "errorSummaryLine" in src_lm,
+            "详情正文限高可滚动": "messageInContent = true" in src_lm,
+            "旧硬编码文案已删": "点击查看详情\"" not in src_lm,
+            "首页失败重试重拉当前页": ("forceLoad && viewModel.nextPageUrl.isNullOrEmpty()" in src_frag
+                              and "loadArticles(it, viewModel.page)" in src_frag),
+            "失败复位在途标记": _src_text(SRC_RSS_ART_VM).count("isLoading = false") >= 4,
+            "徽标 999+ 封顶": ("MAX_DISPLAY = 999" in src_badge and "\"$MAX_DISPLAY+\"" in src_badge),
+            "徽标挂 compound drawable": "setCompoundDrawablesRelativeWithIntrinsicBounds" in _src_text(
+                "app/src/main/java/io/legado/app/ui/rss/article/RssSortActivity.kt"),
+            "未读聚合走 flow": ("flowUnreadCountBySort" in src_dao and "group by t1.sort" in src_dao),
+            "共享消费点口径同步": "error(null, getString(R.string.load_failed))" in src_manga,
+        }
+        src_ok = all(src_checks.values())
+        print(f"  [s8] 源码断言 {sum(src_checks.values())}/{len(src_checks)}："
+              f"{[k for k, v in src_checks.items() if not v] or '全通过'}")
+
+        ok = bool(landed and keep_ok and footer_ok and dot_ok and badge_ok
+                  and dialog_ok and retry_ok and repeat_ok and src_ok)
+    except Exception as e:
+        print(f"  [s8] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        release_reverse(ART_PORT)
+        if server:
+            server.stop()
+        reset_app()
+        try:
+            rolled = m2._db_push(db_snap)
+            print(f"  [s8] 数据库快照已回滚={rolled}")
+        except Exception as e:
+            print(f"  [s8] 兜底回滚异常: {type(e).__name__}")
+        reset_app()
+    return ok
+
+
+def guarded(fn):
+    def inner(d):
+        try:
+            return fn(d)
+        except Exception as e:
+            print(f"  [EXC] {type(e).__name__}: {e}")
+            return False
+
+    inner.__name__ = getattr(fn, "__name__", "step")
+    return inner
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -2479,6 +2852,7 @@ STEPS = {
     "s5": guarded(s5_image_crop_page),
     "s6": guarded(s6_login_page),
     "s7": guarded(s7_favorites_page),
+    "s8": guarded(s8_rss_articles_page),
 }
 
 
@@ -2489,7 +2863,8 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"]
+               if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
         ok = ca.run_steps({sid: STEPS[sid]}, scenario=sid, tag_keywords=[], since_ts=since, ctx=d) and ok
