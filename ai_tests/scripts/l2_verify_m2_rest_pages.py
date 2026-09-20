@@ -10,6 +10,12 @@
     s4 预览条渲染 + 布局切换（悬浮/常规/侧栏）即时重绘（像素指纹三态判定，取消即零污染）
   【main/discovery-suite-manage】F21 行内高频前置 + F20 倍率即时预览 + 蓝图声称已修项
     s5 常驻「设为当前」+ ⋮ 收敛 + 副标题类型摘要 + 倍率行样例（播种合成套件，测后还原 prefs 快照）
+  【main/rss】F29 两级标签视觉分层 + F28 源卡未读标记
+    s6 经典订阅+标签样式+常规顶栏（prefs 播种）→ 一级胶囊零回归 / 二级描边弱底分层（同栏像素对比）
+       + 「全部 · N 源」源数胶囊 + 未读圆点（沙箱库播种 3 行未读，测后按前缀删除并复核归零）
+  【about/read-record】F161 达成态 + F162 摘要行/续读直达 + 分隔符修复
+    s7 目标分钟播种 10 →「已达成」徽标 + 达成文案；9999 → 徽标消失回退默认文案
+       + 热力图摘要行按设备日聚合真值逐字核对 + 最近在读「续读 ›」+ 旧分隔符零残留
 
 执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m2_rest_pages.py [--scenario s1|s2|s3|s4|s5|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装（build-legado.bat / quick_build_install.py 产物）
@@ -27,6 +33,7 @@ import json
 import re
 import socket
 import socketserver
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -334,6 +341,28 @@ def prefs_patch(xml: str, values: dict) -> str:
         pat = re.compile(r'<string name="' + re.escape(k) + r'">[^<]*</string>')
         item = f'<string name="{k}">{v}</string>'
         xml = pat.sub(item, xml) if pat.search(xml) else xml.replace("</map>", item + "</map>")
+    return xml
+
+
+def prefs_patch_typed(xml: str, values: dict) -> str:
+    """插入/覆盖若干 prefs 键，**按真实元素类型**写入。
+
+    铁律：prefs 的 `<string>` / `<int>` / `<boolean>` 元素类型必须与读取方
+    （`getPrefString/Int/Boolean` → SharedPreferences 同名 getter）一致，否则抛
+    ClassCastException（实测：把 int 写成 `<string>` 会让 AppConfig 读崩）。
+    values 值形如 {"key": ("bool"|"int"|"str", "value")}。
+    """
+    for key, (kind, value) in values.items():
+        xml = re.sub(
+            rf'<(?:string|int|boolean|long|float) name="{re.escape(key)}"[^>]*(?:/>|>[^<]*</\w+>)',
+            "", xml)
+        if kind == "bool":
+            item = f'<boolean name="{key}" value="{value}" />'
+        elif kind == "int":
+            item = f'<int name="{key}" value="{value}" />'
+        else:
+            item = f'<string name="{key}">{value}</string>'
+        xml = xml.replace("</map>", item + "</map>")
     return xml
 
 
@@ -962,6 +991,456 @@ def s5_discovery_suite_row_and_opacity(d) -> bool:
             and purge_ok and not residue)
 
 
+# ============================ main/rss（F29 两级标签分层 + F28 源卡未读标记） ============================
+
+ACT_MAIN = "io.legado.app.ui.main.MainActivity"
+S_TAB_RSS = "订阅"                    # R.string.rss（底栏导航标签）
+S_FILTER = "筛选"                     # R.string.screen（顶栏筛选箭头 contentDescription）
+S_UNREAD_DOT = "有未读文章"           # rss_source_unread（未读圆点 contentDescription）
+S_GROUP_ALL = "全部"                  # R.string.all_groups（一级胶囊）
+S_GROUP_WEB = "网页"                  # R.string.type_web（一级同栏底衬参照）
+S_RSS_COUNT_PREFIX = "全部 · "        # rss_tag_all_count（F29 二级「全部」胶囊的源数前缀）
+DB_REL = "databases/legado.db"
+UNREAD_SEED_PREFIX = "l2seed/"
+
+
+def _remote_md5(path: str) -> str:
+    r = sh(f"run-as {PKG} md5sum {path}", timeout=60)
+    m = re.search(rb"([0-9a-f]{32})", r.stdout or b"")
+    return m.group(1).decode() if m else ""
+
+
+def _local_md5(path: Path) -> str:
+    import hashlib
+    h = hashlib.md5()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _db_pull(workdir: Path) -> Path:
+    """拉取测试包数据库（含 -wal/-shm 以保持一致性），本地 checkpoint 合并后返回主库路径
+
+    `exec-out` 通道（二进制安全）+ 主库 md5 比对：截断/串包一律可被识别。
+    """
+    reset_app()
+    main = workdir / "legado.db"
+    for suffix in ("", "-wal", "-shm"):
+        dst = workdir / f"legado.db{suffix}"
+        with open(dst, "wb") as fh:
+            r = subprocess.run(
+                [ADB, "-s", HOST, "exec-out", f"run-as {PKG} cat {DB_REL}{suffix}"],
+                stdout=fh, stderr=subprocess.DEVNULL, timeout=120)
+        if r.returncode != 0 or dst.stat().st_size == 0:
+            dst.unlink(missing_ok=True)
+    if not main.exists() or main.stat().st_size < 4096:
+        return None
+    remote = _remote_md5(DB_REL)
+    if remote and remote != _local_md5(main):
+        print("  [db] ⚠️ 拉取主库 md5 不一致（-wal 未合并的合法差异或截断），按本地副本继续")
+    con = sqlite3.connect(str(main))
+    try:
+        con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        con.commit()
+    finally:
+        con.close()
+    return main
+
+
+def _db_push(local_path: Path) -> bool:
+    """整份写回数据库：`adb push` → /data/local/tmp → `run-as cp`（**app uid 属主 + 目录默认
+    SELinux 标签**），写后删设备侧 WAL/SHM 并做 **md5 双向校验**。
+
+    🔴 铁律：**不可用 `adb shell` + stdin 灌入**写二进制 —— 实测 300000B 仅落地 246B
+    （2026-09-20 沙箱库被重建为空库的真因）；`exec-out`/`push` 才是二进制安全通道。
+    """
+    reset_app()
+    tmp = "/data/local/tmp/l2_db_push.db"
+    r = subprocess.run([ADB, "-s", HOST, "push", str(local_path), tmp],
+                       capture_output=True, timeout=180)
+    if r.returncode != 0:
+        print("  [db] push 到 /data/local/tmp 失败")
+        return False
+    sh(f"run-as {PKG} cp {tmp} {DB_REL}", timeout=90)
+    sh(f"run-as {PKG} rm -f {DB_REL}-wal", timeout=30)
+    sh(f"run-as {PKG} rm -f {DB_REL}-shm", timeout=30)
+    sh(f"rm -f {tmp}", timeout=30)
+    remote_md5 = _remote_md5(DB_REL)
+    local_md5 = _local_md5(local_path)
+    ok = bool(remote_md5) and remote_md5 == local_md5
+    print(f"  [db] 写回校验 md5_match={ok}（size={local_path.stat().st_size}）")
+    return ok
+
+
+def _snapshot_db(workdir: Path, dest: Path) -> bool:
+    """写库前的整份快照（收尾必须回滚，见 s6 finally）"""
+    import shutil
+    db = _db_pull(workdir)
+    if db is None:
+        return False
+    shutil.copy2(db, dest)
+    return True
+
+
+def _db_seed_unread(workdir: Path, rows: int = 3) -> bool:
+    """播种未读文章（挑第一个启用源），返回是否成功；日志只打印源指纹，不落源名称/URL"""
+    db = _db_pull(workdir)
+    if db is None:
+        print("  [s6] 数据库拉取失败（播种中止）")
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cur = con.cursor()
+        row = cur.execute(
+            "select sourceUrl from rssSources where enabled = 1 order by customOrder limit 1"
+        ).fetchone()
+        if not row:
+            print("  [s6] 无启用源，无法播种")
+            return False
+        origin = row[0]
+        cur.executemany(
+            "insert or replace into rssArticles"
+            "(origin, sort, title, `order`, link, pubDate, description, content, image,"
+            " `group`, read, variable, type, durPos)"
+            " values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [(origin, "l2sort", "L2校验文章", 10 ** 13 - i, f"{UNREAD_SEED_PREFIX}{i}",
+              "", "", "", "", "默认分组", 0, "", 0, 0) for i in range(rows)])
+        con.commit()
+    finally:
+        con.close()
+    ok = _db_push(db)
+    print(f"  [s6] 未读播种 rows={rows} / 写回={ok} / 源指纹={hash(origin) % 10000}")
+    return ok
+
+
+def _db_purge_seeded(workdir: Path) -> int:
+    """清理播种行（按 link 前缀），返回删除行数（-1=通道失败）；不触碰既有数据"""
+    db = _db_pull(workdir)
+    if db is None:
+        return -1
+    con = sqlite3.connect(str(db))
+    try:
+        cur = con.cursor()
+        cur.execute("delete from rssArticles where link like ?", (f"{UNREAD_SEED_PREFIX}%",))
+        removed = cur.rowcount
+        con.commit()
+    finally:
+        con.close()
+    _db_push(db)
+    return removed
+
+
+def _open_rss_tab(d, tries=3) -> bool:
+    """底栏切到订阅 tab：`menu_rss` 节点坐标点击为主通道，文案/描述兜底；
+    **判据唯一**=底栏选中态落在 `menu_rss`（不依赖任何业务文案）。"""
+    for _ in range(tries):
+        if _selected_tab(dump_xml(d)) == "menu_rss":
+            time.sleep(2.0)
+            return True
+        if not ca.click_by_dump(d, 'resource-id="[^"]*menu_rss[^"]*"', timeout=4):
+            if not _tap_desc(d, S_TAB_RSS, timeout=3):
+                tap_text(d, S_TAB_RSS, timeout=3)
+        time.sleep(2.5)
+    return _selected_tab(dump_xml(d)) == "menu_rss"
+
+
+def _selected_tab(xml: str) -> str:
+    """底栏当前选中 tab 的菜单 id 后缀（只读 id/selected 属性，不涉及任何业务文案）"""
+    for tag in re.findall(r"<node[^>]*>", xml):
+        if 'selected="true"' in tag:
+            m = re.search(r'resource-id="[^"]*/(menu_\w+)"', tag)
+            if m:
+                return m.group(1)
+    return ""
+
+
+def _desc_count(d, desc: str) -> int:
+    try:
+        return d(description=desc).count
+    except Exception:
+        return 0
+
+
+def _two_level_probe(d, workdir: Path) -> dict:
+    """两级同栏像素对比：chip 中心色 vs 同栏未选中 chip 中心色（后者=透明底 → 顶栏底色参照）"""
+    from PIL import Image
+    xml = dump_xml(d)
+    nodes = text_nodes(xml)
+    w, _h = d.window_size()
+    shot = str(workdir / "probe.png")
+    d.screenshot(shot)
+    img = Image.open(shot).convert("RGB")
+
+    def pick(label, prefix=False):
+        if prefix:
+            return next((n for n in nodes if n[0].startswith(label)), None)
+        return next((n for n in nodes if n[0] == label), None)
+
+    def ref_of(sel):
+        _, _, left, cx, cy = sel
+        # 排除：自身、左侧节点、同栏右侧动作区（筛选按钮自带底色，不能当底衬参照）
+        cands = [n for n in nodes
+                 if abs(n[4] - cy) <= 24 and n[2] > left + 8
+                 and abs(n[3] - cx) >= 8 and n[3] < w - 48]
+        return min(cands, key=lambda n: n[2]) if cands else None
+
+    out = {}
+    for key, sel in (("primary", pick(S_GROUP_ALL)),
+                     ("secondary", pick(S_RSS_COUNT_PREFIX, True))):
+        ref = ref_of(sel) if sel else None
+        if ref is None:
+            out[key] = None
+            print(f"    [probe] {key}: 未定位到选中/参照 chip")
+            continue
+        sel_rgb = _mean_rgb(img, sel[3], sel[4])
+        ref_rgb = _mean_rgb(img, ref[3], ref[4])
+        out[key] = _dist(sel_rgb, ref_rgb)
+        print(f"    [probe] {key}: sel={sel_rgb} ref={ref_rgb} delta={_dist(sel_rgb, ref_rgb)}")
+    return out
+
+
+def s6_rss_tag_hierarchy_and_unread(d) -> bool:
+    """订阅页（main/rss）：F29 两级标签视觉分层 + F28 源卡未读标记
+
+    构造通道：prefs 播种「经典订阅 + 标签样式 + 常规顶栏」——仅常规顶栏下一级分组胶囊与
+  二级源标签同屏，才存在「两级」判定对象；F28 用测试包沙箱数据库播种 3 条未读文章
+  （link 唯一前缀，测后删除并复核归零）。零污染：prefs 快照还原 **+ 数据库整份快照回滚**。
+
+  🔴 沙箱库写回铁律（2026-09-20 踩坑，代价=整库被重建为空库）：**禁止用 `adb shell` + stdin
+  灌二进制**（实测 300000B 只落地 246B）；必须 `adb push` → `/data/local/tmp` → `run-as cp`，
+  并在写后做 **md5 双向校验**；写库前必须先快照、收尾整份回滚。
+  """
+    workdir = Path(tempfile.mkdtemp(prefix="m2rss_"))
+    snap = workdir / "prefs.xml"
+    db_snap = workdir / "legado_snapshot.db"
+    if not prefs_snapshot(str(snap)):
+        print("  [s6] prefs 快照失败（前置）")
+        return False
+    if not _snapshot_db(workdir, db_snap):
+        print("  [s6] 数据库快照失败（前置）")
+        return False
+    ok = False
+    try:
+        xml = prefs_patch_typed(snap.read_text(encoding="utf-8"), {
+            "modernRssPage": ("bool", "false"),
+            "sourceGroupStyle": ("int", "1"),
+            "sourceGroupMode": ("int", "0"),
+            "defaultTopBarStyle": ("str", "regular"),
+        })
+        if not prefs_write(xml):
+            print("  [s6] prefs 写入失败")
+            return False
+        if not _db_seed_unread(workdir):
+            print("  [s6] 未读播种失败")
+            return False
+
+        reset_app()
+        start_act(ACT_MAIN)
+        time.sleep(3.0)
+        if not _open_rss_tab(d):
+            print(f"  [s6] 未进入订阅 tab（栈顶={current_activity()}）")
+            return False
+        landed = False
+        for _ in range(6):
+            xml_now = dump_xml(d)
+            if _selected_tab(xml_now) == "menu_rss" and S_GROUP_ALL in xml_now:
+                landed = True
+                break
+            time.sleep(2.0)
+        print(f"  [s6] 订阅页经典标签样式落地={landed} / 选中tab={_selected_tab(dump_xml(d))} "
+              f"/ 类型胶囊(按类型样式才有)={S_GROUP_WEB in dump_xml(d)}")
+        ca.shot(d, "m2rest_s6_classic_grid")
+        if not landed:
+            return False
+
+        # F28：未读圆点（唯一播种源 ⇒ 恰好 1 个；零基线校验见收尾）
+        dots = _desc_count(d, S_UNREAD_DOT)
+        print(f"  [s6] 未读圆点数量={dots}（期望 1）")
+        ca.shot(d, "m2rest_s6_unread_dot")
+
+        # F29①：展开二级源标签，核对「全部 · N 源」源数前缀
+        expanded = _tap_desc(d, S_FILTER)
+        time.sleep(1.5)
+        count_chip = next((n for n in text_nodes(dump_xml(d))
+                           if n[0].startswith(S_RSS_COUNT_PREFIX)), None)
+        print(f"  [s6] 筛选展开={expanded} / 二级源数胶囊={bool(count_chip)}")
+        ca.shot(d, "m2rest_s6_two_level_tags")
+
+        # F29②：两级选中态同栏像素对比（弱底 vs 实心；同栏未选中 chip 作底衬参照，规避主题差异）
+        probe = _two_level_probe(d, workdir) if count_chip else {}
+        prim = probe.get("primary")
+        sec = probe.get("secondary")
+        # 判定口径：①一级仍为实心选中底（零回归） ②两级选中填充强度可区分（一眼分层）
+        hierarchy_ok = (prim is not None and sec is not None
+                        and prim >= 4 and min(prim, sec) >= 2 and abs(prim - sec) >= 4)
+        print(f"  [s6] 两级填充差判定={hierarchy_ok}（primary={prim} secondary={sec}）")
+
+        # F28 收尾：清理播种 → 复核未读圆点归零（同一进程内 DB 失效触达）
+        removed = _db_purge_seeded(workdir)
+        reset_app()
+        start_act(ACT_MAIN)
+        time.sleep(3.0)
+        reopened = _open_rss_tab(d)
+        time.sleep(2.0)
+        dots_after = _desc_count(d, S_UNREAD_DOT)
+        print(f"  [s6] 播种行已删={removed} / 清理后未读圆点={dots_after}（期望 0）/ 重开页={reopened}")
+
+        ok = bool(landed and dots == 1 and count_chip and hierarchy_ok
+                  and removed >= 3 and dots_after == 0)
+    finally:
+        try:
+            # 最强零污染口径：整份回滚到写库前快照（播种期间任何异常都不外溢）
+            rolled = _db_push(db_snap)
+            print(f"  [s6] 数据库快照已回滚={rolled}")
+        except Exception as e:
+            print(f"  [s6] 兜底回滚异常: {type(e).__name__}")
+        ok_restore = prefs_write(snap.read_text(encoding="utf-8"))
+        print(f"  [s6] prefs 已还原={ok_restore}")
+        reset_app()
+    return ok
+
+
+# ============================ about/read-record（F161 达成态 + F162 摘要行/续读直达 + 分隔符修复） ============================
+
+ACT_READ_RECORD_STATS = "io.legado.app.ui.about.ReadRecordStatsActivity"
+S_RR_CONTINUE = "续读 ›"              # read_record_continue_reading
+S_RR_ACHIEVED = "已达成"              # read_record_goal_achieved
+S_RR_ACHIEVED_HINT = "今日目标已达成"  # read_record_goal_achieved_hint
+S_RR_GOAL_PROGRESS = "今日目标"       # read_record_goal_target_progress（未达成态文案）
+S_RR_STREAK = "最长连续"
+S_RR_MAXDAY = "单日最高"
+RR_OLD_SEPARATOR = "路"               # 修复前误用字符（页面不得再出现）
+GOAL_ACHIEVED_MINUTES = 10            # < 今日已读（约 16 分钟）⇒ 达成态
+GOAL_UNACHIEVED_MINUTES = 9999        # 远超今日已读 ⇒ 未达成态
+
+
+def _patch_goal_minutes(xml: str, minutes: int) -> str:
+    """改写 readRecordGoalConfig 的 dailyGoalMinutes（prefs 内 JSON 以 &quot; 转义）"""
+    rx = re.compile(r'(dailyGoalMinutes(?:&quot;|")\s*:\s*)(\d+)')
+    if rx.search(xml):
+        return rx.sub(lambda m: m.group(1) + str(minutes), xml, count=1)
+    item = f'<string name="readRecordGoalConfig">{{&quot;dailyGoalMinutes&quot;:{minutes}}}</string>'
+    return xml.replace("</map>", item + "</map>")
+
+
+def _daily_truth(workdir: Path):
+    """从设备库读日聚合真值 → (最长连续天数, 单日最高毫秒)；失败返回 (None, None)"""
+    db = _db_pull(workdir)
+    if db is None:
+        return (None, None)
+    con = sqlite3.connect(str(db))
+    try:
+        rows = list(con.execute("select date, readTime from readRecordDaily"))
+    finally:
+        con.close()
+    import datetime as _dt
+    act = sorted({_dt.date.fromisoformat(d) for d, t in rows if t and t > 0})
+    best = run = 0
+    for i, day in enumerate(act):
+        run = run + 1 if i > 0 and (day - act[i - 1]).days == 1 else 1
+        best = max(best, run)
+    mx = max([t for _, t in rows], default=0)
+    return (best, mx)
+
+
+def _format_during_py(ms: int) -> str:
+    """复刻 formatDuring 口径（values-zh：%d天/%d小时/%d分钟/%d秒；秒仅在同一日内展示）"""
+    days = ms // 86400000
+    hours = (ms % 86400000) // 3600000
+    minutes = (ms % 3600000) // 60000
+    seconds = (ms % 60000) // 1000
+    out = ""
+    if days > 0:
+        out += f"{days}天"
+    if hours > 0:
+        out += f"{hours}小时"
+    if minutes > 0:
+        out += f"{minutes}分钟"
+    if seconds > 0 and days == 0 and hours == 0:
+        out += f"{seconds}秒"
+    return out or "0秒"
+
+
+def _collect_scroll_texts(d, max_scroll=5) -> set:
+    """收集纵向滚动过程中的全部可见文本（NestedScrollView 只 dump 可见区）"""
+    seen = set()
+    w, h = d.window_size()
+    for i in range(max_scroll):
+        for label, *_ in text_nodes(dump_xml(d)):
+            seen.add(label)
+        d.swipe(w * 0.5, h * 0.75, w * 0.5, h * 0.35)
+        time.sleep(1.0)
+    for label, *_ in text_nodes(dump_xml(d)):
+        seen.add(label)
+    return seen
+
+
+def s7_read_record_optimizations(d) -> bool:
+    """阅读记录页（about/read-record）：F161 达成态徽标 + F162 热力图摘要/续读直达 + 分隔符修复
+
+    构造通道：prefs 播种目标分钟（10 → 达成；9999 → 未达成），判定后整份还原。
+    零污染：不改数据库，仅读日聚合真值作为摘要行期望值。
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="m2rr_"))
+    snap = workdir / "prefs.xml"
+    if not prefs_snapshot(str(snap)):
+        print("  [s7] prefs 快照失败（前置）")
+        return False
+    base = snap.read_text(encoding="utf-8")
+    ok = False
+    try:
+        streak, max_ms = _daily_truth(workdir)
+        expected_summary = None
+        if streak is not None:
+            expected_summary = f"{S_RR_STREAK} {streak} 天 · {S_RR_MAXDAY} {_format_during_py(max_ms)}"
+        print(f"  [s7] 日聚合真值：最长连续={streak} 天 / 单日最高={_format_during_py(max_ms or 0)}"
+              f" / 期望摘要={bool(expected_summary)}")
+
+        # ① 达成态
+        if not prefs_write(_patch_goal_minutes(base, GOAL_ACHIEVED_MINUTES)):
+            print("  [s7] 达成态 prefs 写入失败")
+            return False
+        reset_app()
+        start_act(ACT_READ_RECORD_STATS)
+        time.sleep(4.0)
+        texts = _collect_scroll_texts(d)
+        ca.shot(d, "m2rest_s7_achieved")
+        achieved_badge = S_RR_ACHIEVED in texts
+        achieved_hint = any(S_RR_ACHIEVED_HINT in t for t in texts)
+        summary_ok = expected_summary is not None and expected_summary in texts
+        continue_ok = S_RR_CONTINUE in texts
+        # 修复断言：旧错误分隔符只在「空格包围」形态下成立（书籍名自身含该字不误伤）
+        meta_rows = [t for t in texts if "上次打开" in t]
+        joined_rows = [t for t in meta_rows if " · " in t]
+        mojibake_free = not any(f" {RR_OLD_SEPARATOR} " in t for t in texts)
+        print(f"  [s7] 达成徽标={achieved_badge} / 达成文案={achieved_hint} / "
+              f"热力图摘要命中={summary_ok} / 续读直达={continue_ok}")
+        print(f"  [s7] 最近在读 meta 行={len(meta_rows)}（含「 · 」分隔={len(joined_rows)}）"
+              f" / 旧分隔符残留={not mojibake_free}")
+
+        # ② 未达成态（同一页面换目标，断言达成态消失且回退默认文案）
+        if not prefs_write(_patch_goal_minutes(base, GOAL_UNACHIEVED_MINUTES)):
+            print("  [s7] 未达成态 prefs 写入失败")
+            return False
+        reset_app()
+        start_act(ACT_READ_RECORD_STATS)
+        time.sleep(4.0)
+        texts2 = _collect_scroll_texts(d)
+        ca.shot(d, "m2rest_s7_unachieved")
+        badge_gone = S_RR_ACHIEVED not in texts2
+        progress_back = any(S_RR_GOAL_PROGRESS in t for t in texts2)
+        print(f"  [s7] 未达成态：徽标消失={badge_gone} / 默认进度文案回归={progress_back}")
+
+        ok = (achieved_badge and achieved_hint and summary_ok and continue_ok
+              and mojibake_free and badge_gone and progress_back)
+    finally:
+        ok_restore = prefs_write(base)
+        print(f"  [s7] prefs 已还原={ok_restore}")
+        reset_app()
+    return ok
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -980,6 +1459,8 @@ STEPS = {
     "s3": guarded(s3_remote_download_busy),
     "s4": guarded(s4_navbar_edit_preview),
     "s5": guarded(s5_discovery_suite_row_and_opacity),
+    "s6": guarded(s6_rss_tag_hierarchy_and_unread),
+    "s7": guarded(s7_read_record_optimizations),
 }
 
 
@@ -1006,7 +1487,7 @@ def main():
             return 0 if ok_purge else 1
 
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3", "s4", "s5"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
 
     ok = True
     for sid in targets:
