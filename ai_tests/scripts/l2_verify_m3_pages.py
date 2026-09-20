@@ -2499,6 +2499,256 @@ def s7_favorites_page(d) -> bool:
         reset_app()
 
 
+# ===================== s10：video/video + video/video-player =====================
+# F180 沉浸式首次手势引导卡（一次性） / F181 位置指示（源码断言兜底） / F182 布局模式逐项说明
+# 通道：设备侧既有本地视频（file:// 直启 VideoPlayerActivity，无需网络）；prefs 直改保证沉浸式 + 未看过引导
+
+ACT_VIDEO_PLAYER = "io.legado.app.ui.video.VideoPlayerActivity"
+VIDEO_SRC = "/sdcard/Movies/l2ux_test_300s.mp4"
+VIDEO_PREFS = f"/data/data/{PKG}/shared_prefs/video_config.xml"
+DEFAULT_PREFS = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+
+S_GUIDE_TITLE = "手势操作"                 # video_gesture_guide_title
+S_GUIDE_ITEM_TAP = "双击屏幕 · 暂停 / 继续"  # video_gesture_guide_double_tap
+S_GUIDE_ITEM_PINCH = "双指外扩 · 全屏"      # video_gesture_guide_pinch
+S_GUIDE_CONFIRM = "知道了"                 # video_gesture_guide_confirm
+S_GUIDE_FOOTNOTE = "设置中可切换 布局模式"   # video_gesture_guide_footnote
+S_LAYOUT_SUMMARY_IMMERSIVE = "沉浸式为全屏竖滑切换"      # video_layout_mode_summary
+S_LAYOUT_SUMMARY_TRADITIONAL = "上部播放器 + 下部视频信息"  # video_layout_mode_traditional_summary
+S_SETTINGS_TITLE = "视频设置"              # video_settings（面板标题）
+S_LAYOUT_MODE_ROW = "布局模式"             # video_layout_mode
+S_CANCEL = "取消"
+
+SRC_VIDEO_FRAG = "app/src/main/java/io/legado/app/ui/video/VideoFragment.kt"
+SRC_VIDEO_LAYOUT = "app/src/main/res/layout/fragment_video.xml"
+SRC_SINGLE_CHOICE = "app/src/main/java/io/legado/app/ui/widget/components/SingleChoiceDialog.kt"
+SRC_VIDEO_SETTINGS = "app/src/main/java/io/legado/app/ui/video/VideoSettingsPanelContent.kt"
+SRC_VIDEO_STRINGS = "app/src/main/res/values/strings_video_dual_layout.xml"
+
+GUIDE_KEY = "videoGestureGuideShown"
+
+
+def _prefs_edit(remote: str, workdir: Path, mutate) -> bool:
+    """拉取远端 prefs → 就地改 XML → 推回（应用需已停）。零 UI 依赖的确定性通道"""
+    local = workdir / Path(remote).name
+    r = sh_su(f"cat {remote}")
+    raw = r.stdout or b""
+    if not raw.strip():
+        # 文件可能不存在：构造最小 XML 供写入
+        raw = b'<?xml version="1.0" encoding="utf-8" standalone="yes" ?>\n<map>\n</map>'
+    text = mutate(raw.decode("utf-8", errors="ignore"))
+    local.write_text(text, encoding="utf-8")
+    sh_su(f"cp {remote} {remote}.bak_l2s10")
+    subprocess.run([ADB, "-s", HOST, "shell", f"su -c 'cat > {remote}'"],
+                   input=text.encode("utf-8"), capture_output=True, timeout=40)
+    time.sleep(0.5)
+    verify = sh_su(f"cat {remote}")
+    return text.strip()[:60] in (verify.stdout or b"").decode("utf-8", errors="ignore")
+
+
+def _force_immersive_and_reset_guide(workdir: Path) -> bool:
+    """① video_config.xml: layoutMode=0（沉浸式）② 默认 prefs: 移除引导一次性键（还原为「未看过」）"""
+    def mut_video(text: str) -> str:
+        if 'name="layoutMode"' in text:
+            return re.sub(r'(<int name="layoutMode" value=")\d+(")', r"\g<1>0\g<2>", text)
+        return text.replace("</map>", '<int name="layoutMode" value="0" />\n</map>')
+
+    ok1 = _prefs_edit(VIDEO_PREFS, workdir, mut_video)
+    ok2 = _prefs_edit(DEFAULT_PREFS, workdir,
+                      lambda t: re.sub(r'\s*<boolean name="%s"[^/]*/>' % GUIDE_KEY, "", t))
+    return ok1 and ok2
+
+
+def _guide_shown_flag() -> bool:
+    """回读默认 prefs 中引导一次性键（真机取证「点了知道了会写偏好」）"""
+    r = sh_su(f"cat {DEFAULT_PREFS}")
+    return f'name="{GUIDE_KEY}" value="true"' in (r.stdout or b"").decode("utf-8", errors="ignore")
+
+
+def _start_local_video() -> bool:
+    """本地 file:// 直启播放器（与 DownloadManageActivity 同款 extras；每次换文件名规避进度恢复）"""
+    ts = int(time.time() * 10)
+    dst = f"/data/data/{PKG}/files/l2m3_{ts}.mp4"
+    sh_su(f"cp {VIDEO_SRC} {dst} && chown $(stat -c %u /data/data/{PKG}) {dst} && chmod 600 {dst}")
+    reset_app()
+    sh("am", "start", "-n", f"{PKG}/{ACT_VIDEO_PLAYER}", "--ez", "isNew", "true",
+       "--es", "videoUrl", f"file://{dst}", "--es", "videoTitle", "L2M3")
+    for _ in range(12):
+        time.sleep(2)
+        if "VideoPlayerActivity" in current_activity():
+            time.sleep(5.0)
+            return True
+    return False
+
+
+def _node_by_id(xml: str, res_suffix: str):
+    """按 resource-id 后缀取可见节点 bounds（播放器悬浮控件是 View 系，靠 id 定位最稳）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        t = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', t)
+        if not rid or not rid.group(1).endswith(res_suffix):
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', t)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 > x1 and y2 > y1:
+            return {"left": x1, "top": y1, "right": x2, "bottom": y2,
+                    "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2}
+    return None
+
+
+def _clickable_bounds(xml: str, label: str):
+    """按文本取可点节点 bounds。
+
+    必要性（实测）：Compose 设置面板里**卡片标题与可点行文案同名**（如都叫「布局模式」），
+    直接取首个匹配会点在不可点的卡片标题上 ⇒ 弹窗打不开、断言假 FAIL。
+    策略：优先 `clickable="true"` 的匹配；若全无（Compose 行常把 clickable 挂在外层语义节点上，
+    文本子节点自身不带该属性）则取 **cy 最大**者（行总在卡片标题下方）。
+    """
+    hits = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        t = m.group(0)
+        tx = re.search(r'\btext="([^"]*)"', t)
+        if not tx or tx.group(1) != label:
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', t)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 <= x1 or y2 <= y1:
+            continue
+        hits.append({
+            "left": x1, "top": y1, "right": x2, "bottom": y2,
+            "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2,
+            "clickable": 'clickable="true"' in t,
+        })
+    if not hits:
+        return None
+    clickable_hits = [h for h in hits if h["clickable"]]
+    return max(clickable_hits or hits, key=lambda h: h["cy"])
+
+
+def s10_video_pages(d) -> bool:
+    """video/video（F180 引导卡 + F181 位置指示）+ video/video-player（F182 布局模式说明）"""
+    print("  [s10] ===== 沉浸式手势引导卡 + 布局模式说明 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m3vid_"))
+    src_frag = _src_text(SRC_VIDEO_FRAG)
+    src_xml = _src_text(SRC_VIDEO_LAYOUT)
+    src_sc = _src_text(SRC_SINGLE_CHOICE)
+    src_set = _src_text(SRC_VIDEO_SETTINGS)
+    src_str = _src_text(SRC_VIDEO_STRINGS)
+    ok = False
+    try:
+        # ---------- 阶段 A：首次进入 ⇒ 引导卡在场 + 四条手势 + 点「知道了」收 ----------
+        reset_app()
+        prefs_ok = _force_immersive_and_reset_guide(workdir)
+        print(f"  [s10] prefs 预置（沉浸式 + 未看过引导）={prefs_ok}")
+        landed = _start_local_video()
+        xml = dump_xml(d)
+        ca.shot(d, "m3video_s10_guide_first")
+        title_ok = S_GUIDE_TITLE in xml
+        items_ok = (S_GUIDE_ITEM_TAP in xml) and (S_GUIDE_ITEM_PINCH in xml)
+        confirm_b = node_bounds(xml, S_GUIDE_CONFIRM)
+        footnote_ok = S_GUIDE_FOOTNOTE in xml
+        print(f"  [s10] F180 首次：落地={landed} / 标题={title_ok} / 四条手势(取样2)={items_ok} / "
+              f"「{S_GUIDE_CONFIRM}」={bool(confirm_b)} / 脚注={footnote_ok}")
+
+        dismissed = flag_written = False
+        if confirm_b:
+            click_xy(d, confirm_b["cx"], confirm_b["cy"])
+            time.sleep(1.5)
+            dismissed = S_GUIDE_TITLE not in dump_xml(d)
+            flag_written = _guide_shown_flag()
+            ca.shot(d, "m3video_s10_guide_dismissed")
+            print(f"  [s10] F180 点「{S_GUIDE_CONFIRM}」：卡片消失={dismissed} / 偏好已写={flag_written}")
+
+        # ---------- 阶段 B：再次进入 ⇒ 引导卡不再出现（一次性） ----------
+        reset_app()
+        _start_local_video()
+        xml_b = dump_xml(d)
+        ca.shot(d, "m3video_s10_guide_second")
+        once_ok = S_GUIDE_TITLE not in xml_b
+        print(f"  [s10] F180 二次进入不显示（一次性）={once_ok}")
+
+        # ---------- 阶段 C：设置面板 → 布局模式 ⇒ 逐项说明（F182） ----------
+        summary_ok = False
+        # 悬浮控件 3 秒自动隐藏 ⇒ 先单击上半屏呼出，再按 resource-id 定位设置按钮
+        sb = _node_by_id(xml_b, "btn_settings")
+        if not sb:
+            w, h = d.window_size()
+            for _ in range(3):
+                d.click(w // 2, h // 4)
+                time.sleep(1.5)
+                sb = _node_by_id(dump_xml(d), "btn_settings")
+                if sb:
+                    break
+        if sb:
+            click_xy(d, sb["cx"], sb["cy"])
+            # 面板为 Compose BottomSheet：轮询等「布局模式」行出现（首帧可能未组合完）
+            row_b = None
+            for _ in range(8):
+                time.sleep(1.0)
+                row_b = _clickable_bounds(dump_xml(d), S_LAYOUT_MODE_ROW)
+                if row_b:
+                    break
+            if row_b:
+                click_xy(d, row_b["cx"], row_b["cy"])
+                has_i = has_t = False
+                for _ in range(8):
+                    time.sleep(1.0)
+                    xml_c = dump_xml(d)
+                    has_i = S_LAYOUT_SUMMARY_IMMERSIVE in xml_c
+                    has_t = S_LAYOUT_SUMMARY_TRADITIONAL in xml_c
+                    if has_i and has_t:
+                        break
+                ca.shot(d, "m3video_s10_layout_summary")
+                summary_ok = has_i and has_t
+                print(f"  [s10] F182 布局模式逐项说明：沉浸式项={has_i} / 传统项={has_t}")
+                if S_CANCEL in xml_c:
+                    d.press("back")
+                    time.sleep(1.0)
+            else:
+                print(f"  [s10] F182 未定位可点击的「{S_LAYOUT_MODE_ROW}」行")
+        else:
+            print("  [s10] F182 未定位设置按钮（btn_settings，控件呼出失败）")
+
+        src_checks = {
+            "F180 引导卡四要素落布局": all(k in src_xml for k in
+                                ("gesture_guide_card", "tv_guide_items", "btn_guide_confirm",
+                                 "tv_guide_footnote")),
+            "F180 一次性偏好": ("PreferKey.videoGestureGuideShown" in src_frag
+                          and "putPrefBoolean(PreferKey.videoGestureGuideShown, true)" in src_frag),
+            "F180 长按倍速动态取值": "video_gesture_guide_long_press" in src_frag,
+            "F181 位置指示同源字符串": ("tv_position_indicator" in src_xml
+                              and "video_playlist_position_episode" in src_frag
+                              and "video_playlist_position_article" in src_frag),
+            "F181 单集不显示（避免噪声）": "articles.size > 1" in src_frag and "episodes.size > 1" in src_frag,
+            "F181 与标题同源刷新": "updatePositionIndicator()" in src_frag.split("private fun setTitle")[1][:400],
+            "F182 说明为可选参数（零改动）": ("optionSummaries: List<String>? = null" in src_sc
+                                and "optionSummaries = summaries" in src_set),
+            "F182 复用既有 summary 资源": ("video_layout_mode_summary" in src_str
+                                and "video_layout_mode_traditional_summary" in src_str),
+        }
+        src_ok = all(src_checks.values())
+        print(f"  [s10] 源码断言 {sum(src_checks.values())}/{len(src_checks)}："
+              f"{[k for k, v in src_checks.items() if not v] or '全通过'}")
+
+        ok = bool(landed and title_ok and items_ok and footnote_ok and dismissed and flag_written
+                  and once_ok and summary_ok and src_ok)
+    except Exception as e:
+        print(f"  [s10] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        # 还原 prefs：移除引导一次性键（保持环境可复跑）+ 清掉 prefs 备份与临时视频
+        _prefs_edit(DEFAULT_PREFS, workdir, lambda t: re.sub(
+            r'\s*<boolean name="%s"[^/]*/>' % GUIDE_KEY, "", t))
+        sh_su(f"rm -f {DEFAULT_PREFS}.bak_l2s10 {VIDEO_PREFS}.bak_l2s10 "
+              f"/data/data/{PKG}/files/l2m3_*.mp4")
+        reset_app()
+    return ok
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -3261,6 +3511,7 @@ STEPS = {
     "s7": guarded(s7_favorites_page),
     "s8": guarded(s8_rss_articles_page),
     "s9": guarded(s9_usage_and_para_rule_page),
+    "s10": guarded(s10_video_pages),
 }
 
 
@@ -3271,7 +3522,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
