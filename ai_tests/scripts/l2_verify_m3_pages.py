@@ -2,7 +2,27 @@
 """l2_verify_m3_pages.py — M3 批（设置与阅读器配置页 14 页）真机 L2 验证，按落地顺序增量登记
 
 已覆盖：
-  【rss/articles · RssSortActivity/RssArticlesFragment】**s8 PASS（2026-09-20）**：F142 页脚错误可恢复态（LoadMoreView 错误分支重做）
+  【book/ai-read-aloud-usage + book/paragraph-rule-manage】**s9 PASS（2026-09-21）**：F30 摘要拆行+主指标强调
+    / F31 选中态批量栏（删除选中/导出）/ F51 拖拽手柄可见化 / F50 空态操作化 / F52 导入进度闭环
+    s9 通道：DB 播种 2 条消耗记录（A 模型大额 + B 模型小额，校验千分位与按模型汇总）+
+       2 条段落规则（另一轮清空构造空态）；导入进度用**慢响应服务器**（延迟 5s 后 500）拉长窗口
+       → F30：摘要首行不含统计段（回归哨兵）+ 多行含「输入/总/按模型」+ 总 Token 段像素有色度（accent 强调）
+       → F31：长按首条 ⇒ 批量栏「删除选中 1」+「导出」⇒ 删除二次确认（取消，零污染）⇒ 导出跳 HandleFileActivity ⇒ 取消选中后栏收起
+       → F51：卡右侧手柄 content-desc「拖动排序手柄」≥2 + 摘要含手柄提示 → F50：空态提示+引导+「添加」主操作在场
+       → F52：顶栏导入 → 网络导入 → 输 URL ⇒ 「正在导入规则…」在 5s 窗口内可见 → 库快照回滚 + 源码断言 8 项
+    🔴 本轮顺带修复的既有缺陷（2 条，真机取证）：①**顶栏图标用 selector 资产导致整页崩溃**——
+       `iconRes = R.drawable.ic_bottom_books`（StateListDrawable）经 `painterResource` 渲染抛
+       IllegalArgumentException「Only VectorDrawables and rasterized asset types…」⇒ 打开页面即崩（改同族矢量 `_e`）；
+       全仓回归探针：40 处 `iconRes` × 65 个非矢量 drawable 求交，**仅此 1 处命中**
+      ②**共用容器下动态插入视图的高度测量异常**——宿主 `activity_theme_manage.xml` 的 recyclerView 为
+       `height=0dp + weight=1`，实测插入的同级视图被测量成整屏高（bounds=(27,183)-(693,1280)）把列表与
+       「全选」挤出可视区 ⇒ F30 摘要改为**零新增视图**（`tvSummary` 内 Spannable 多行 + accent 强调），
+       F31 批量栏改为**条件挂载**（addView/removeView）
+    ⚠️ 文案真值踩坑：`import_on_line` 渲染为「网络导入」（非「在线导入」）、对话框确认键为「确定」
+    ⚠️ 通道踩坑：`AiReadAloudUsageRecordActivity` 在 Manifest 显式 `exported=false`，`am start` 直起不稳
+       （实测 4.8s 后回落桌面）⇒ 统一走 `start_robust`（shell + su 兜底）
+
+【rss/articles · RssSortActivity/RssArticlesFragment】**s8 PASS（2026-09-20）**：F142 页脚错误可恢复态（LoadMoreView 错误分支重做）
     + F143 分类 Tab 未读徽标（A 有未读 / B 全已读不显 / C 超量 999+ 封顶）
     + 顺带修复 3 个既有缺陷（见下）
     s8 通道：DB 播种「合成源（3 分类，URL 指向本机计数监听器）+ 已入库文章」——A 3 条未读 / B 2 条全已读
@@ -2491,6 +2511,393 @@ def guarded(fn):
     return inner
 
 
+# ===================== s9：book/ai-read-aloud-usage + book/paragraph-rule-manage =====================
+# F30 摘要拆两行 + Chip + 明细折叠 / F31 选中态批量栏（删除+导出）
+# F51 拖拽手柄可见化 / F50 空态操作化（引导）/ F52 导入进度闭环
+
+ACT_AI_USAGE = "io.legado.app.ui.book.read.config.AiReadAloudUsageRecordActivity"
+ACT_PARA_RULE = "io.legado.app.ui.book.read.config.ParagraphRuleManageActivity"
+ACT_HANDLE_FILE = "HandleFileActivity"
+
+S_AI_SUMMARY_BOOK = "全部书籍"
+S_AI_TOTAL_CHIP = "总 1,252,500"    # 千分位 + 两行拆分后的「总 Token」主指标（摘要内强调段）
+S_AI_MODEL_A_LINE = "L2模型A 1,250,000"   # 第 3 行「按模型拆分」中的 A 模型汇总
+S_AI_INPUT_LINE = "输入 1,002,000"
+S_AI_EXPORT = "导出"                # ai_usage_export_selected
+S_AI_DELETE_PREFIX = "删除选中 "     # ai_usage_delete_selected
+S_AI_DELETE_TITLE = "删除记录"
+
+S_PARA_HANDLE_DESC = "拖动排序手柄"   # paragraph_rule_drag_handle（content-desc，可被 a11y 树取到）
+S_PARA_DRAG_HINT = "拖动右侧手柄"     # paragraph_rule_manage_summary 片段
+S_PARA_EMPTY_GUIDE = "点下方「添加」创建第一条规则"  # paragraph_rule_empty_guide
+S_PARA_EMPTY = "暂无段落规则"         # paragraph_rule_empty
+S_PARA_IMPORTING = "正在导入规则…"    # paragraph_rule_importing
+S_PARA_IMPORT_ONLINE = "网络导入"     # import_on_line（真值「网络导入」，非「在线导入」——实测踩坑）
+S_OK = "确定"                        # ok 在**对话框按钮**上的渲染真值（实测；取消键=「取消」）
+S_CANCEL = "取消"                    # cancel
+
+SRC_AI_USAGE = "app/src/main/java/io/legado/app/ui/book/read/config/AiReadAloudUsageRecordActivity.kt"
+SRC_PARA_RULE = "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleManageActivity.kt"
+
+SEED_USAGE_A_MODEL = "L2模型A"
+SEED_USAGE_B_MODEL = "L2模型B"
+SEED_PARA_NAMES = ("L2规则甲", "L2规则乙")
+PARA_BOOK_URL = "l2book://para-context"
+IMPORT_PORT = 18544
+IMPORT_URL = f"http://127.0.0.1:{IMPORT_PORT}/rules.json"
+
+
+def _usage_seed(workdir: Path) -> bool:
+    """播种 2 条消耗记录（A 模型 1 条大额 + B 模型 1 条小额），用于摘要/Chip/明细/批量栏断言"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from ai_read_aloud_usage_records")
+        meta = [(r[1], (r[2] or "").upper(), r[3], r[4])
+                for r in con.execute("pragma table_info(ai_read_aloud_usage_records)")]
+
+        def ins(overrides: dict):
+            names, vals = [], []
+            for name, ctype, notnull, dflt in meta:
+                if name in overrides:
+                    names.append(name)
+                    vals.append(overrides[name])
+                elif notnull and dflt is None:
+                    names.append(name)
+                    vals.append(0 if ("INT" in ctype or "REAL" in ctype) else "")
+            con.execute(f"insert into ai_read_aloud_usage_records ({','.join('`' + n + '`' for n in names)})"
+                        f" values ({','.join('?' * len(names))})", vals)
+
+        now = int(time.time() * 1000)
+        ins({"id": 9001, "type": "role", "status": "success", "bookName": "L2校验书",
+             "chapterTitle": "第1章", "modelId": SEED_USAGE_A_MODEL,
+             "inputTokens": 1000000, "cachedInputTokens": 200000, "outputTokens": 50000,
+             "totalTokens": 1250000, "createdAt": now})
+        ins({"id": 9002, "type": "bgm", "status": "success", "bookName": "L2校验书",
+             "chapterTitle": "第2章", "modelId": SEED_USAGE_B_MODEL,
+             "inputTokens": 2000, "cachedInputTokens": 0, "outputTokens": 500,
+             "totalTokens": 2500, "createdAt": now - 60000})
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _para_seed(workdir: Path, rows: int) -> bool:
+    """播种段落规则（rows=0 ⇒ 清空，用于构造「无规则」空态）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from paragraph_rules")
+        meta = [(r[1], (r[2] or "").upper(), r[3], r[4])
+                for r in con.execute("pragma table_info(paragraph_rules)")]
+        for index in range(rows):
+            overrides = {"id": 9100 + index, "name": SEED_PARA_NAMES[index], "script": "return text"}
+            names, vals = [], []
+            for name, ctype, notnull, dflt in meta:
+                if name in overrides:
+                    names.append(name)
+                    vals.append(overrides[name])
+                elif notnull and dflt is None:
+                    names.append(name)
+                    vals.append(0 if ("INT" in ctype or "REAL" in ctype) else "")
+            con.execute(f"insert into paragraph_rules ({','.join('`' + n + '`' for n in names)})"
+                        f" values ({','.join('?' * len(names))})", vals)
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+class _DelayedServer(threading.Thread):
+    """慢响应服务器（延迟 N 秒后 500）：用于观察「导入进行中」状态不会被一闪而过"""
+
+    def __init__(self, port: int, delay_s: float = 5.0):
+        super().__init__(daemon=True)
+        self.delay_s = delay_s
+        self.hits = 0
+        self._srv = HTTPServer(("127.0.0.1", port), self._make_handler())
+
+    def _make_handler(self):
+        delay = self.delay_s
+        outer = self
+
+        class _Handler(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                outer.hits += 1
+                time.sleep(delay)
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"server error")
+
+            def log_message(self, *args):
+                return
+
+        return _Handler
+
+    def run(self):
+        self._srv.serve_forever()
+
+    def stop(self):
+        try:
+            self._srv.shutdown()
+            self._srv.server_close()
+        except Exception:
+            pass
+
+
+def _start_para(book_url: str) -> bool:
+    """直起段落规则管理页（传合成 bookUrl ⇒ 上下文非空，走「有当前书」分支；shell 不稳时 su 兜底）"""
+    simple = ACT_PARA_RULE.rsplit(".", 1)[-1]
+    reset_app()
+    for round_ in range(2):
+        if round_ == 0:
+            sh("am", "start", "-n", f"{PKG}/{ACT_PARA_RULE}", "--es", "bookUrl", book_url)
+        else:
+            sh_su(f"am start -n {PKG}/{ACT_PARA_RULE} --es bookUrl {book_url}")
+        for _ in range(6):
+            time.sleep(1.2)
+            if simple in current_activity():
+                time.sleep(2.0)
+                return True
+    return False
+
+
+def _handle_desc_count(xml: str) -> int:
+    """统计 content-desc 为拖拽手柄的节点数（手柄是插入的 ImageView，靠 a11y desc 定位）"""
+    return sum(1 for m in re.finditer(r"<node[^>]*>", xml)
+               if f'content-desc="{S_PARA_HANDLE_DESC}"' in m.group(0))
+
+
+def s9_usage_and_para_rule_page(d) -> bool:
+    """消耗记录（F30/F31）+ 段落规则管理（F50/F51/F52）"""
+    print("  [s9] ===== 消耗记录摘要/批量栏 + 段落规则手柄/空态/导入进度 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m3s9_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s9] 数据库快照失败（前置）")
+        return False
+    server = None
+    src_ai = _src_text(SRC_AI_USAGE)
+    src_para = _src_text(SRC_PARA_RULE)
+    ok = False
+    try:
+        from PIL import Image
+        shot_dir = Path(tempfile.mkdtemp(prefix="m3s9shot_"))
+
+        # ---------------- 阶段 A：消耗记录（F30 + F31）----------------
+        reset_app()
+        if not _usage_seed(workdir):
+            print("  [s9] 消耗记录播种失败")
+            return False
+        reset_app()
+        # 该活动在 Manifest 显式 `exported=false`：shell 直起不稳（实测被丢回桌面）⇒ 走 su 兜底通道
+        if not start_robust(ACT_AI_USAGE):
+            print("  [s9] 消耗记录页未能落地（非导出组件通道）")
+            return False
+        time.sleep(2.0)
+        xml = dump_xml(d)
+        ca.shot(d, "m3usage_s9_landed")
+
+        summary_nodes = [t for t, *_ in text_nodes(xml)
+                         if S_AI_SUMMARY_BOOK in t and "条" in t]
+        # F30：摘要首行只留范围/条数（旧实现把 8 段拼一行，此断言即回归哨兵）；
+        # 现为**单个 TextView 多行** ⇒ 判据取 `\n` 之前的第一行，且第二/三行必须带统计与按模型信息
+        summary_ok = False
+        summary_all = ""
+        for label, *_ in text_nodes(xml):
+            if S_AI_SUMMARY_BOOK in label and "条" in label:
+                summary_all = label.replace("&#10;", "\n")
+                first_line = summary_all.split("\n")[0]
+                summary_ok = "输入" not in first_line
+                break
+        chip_ok = (S_AI_TOTAL_CHIP in summary_all and S_AI_INPUT_LINE in summary_all
+                   and S_AI_MODEL_A_LINE in summary_all)
+        # F30 主指标强调：摘要节点内应存在**有色度**的像素段（accent 着色的「总 N」），
+        # 逐行扫描取最大色度（比定位精确坐标稳；其余文字为次级灰、色度≈0）
+        emphasize_ok = False
+        emph_b = node_bounds(xml, S_AI_TOTAL_CHIP, contains=True)
+        if emph_b:
+            p_emph = str(shot_dir / "summary_emph.png")
+            d.screenshot(p_emph)
+            img_e = Image.open(p_emph).convert("RGB")
+            max_chroma = 0
+            for yy in range(max(0, emph_b["top"]), min(img_e.height, emph_b["bottom"])):
+                for xx in range(max(0, emph_b["left"]), min(img_e.width, emph_b["right"])):
+                    px = img_e.getpixel((xx, yy))
+                    max_chroma = max(max_chroma, max(px) - min(px))
+            emphasize_ok = max_chroma >= 30
+            print(f"  [s9] F30 主指标强调：节点内最大色度={max_chroma}（≥30 即 accent 段在场）")
+        print(f"  [s9] F30 摘要首行不含统计段={summary_ok} / 多行含 输入+总+按模型={chip_ok}")
+
+        # F31：长按首条 ⇒ 批量栏浮现（删除选中 N / 导出）
+        rows = text_nodes(dump_xml(d))
+        item = next((n for n in rows if "多角色" in n[0]), None)
+        batch_ok = delete_dialog_ok = export_ok = clear_ok = False
+        if item:
+            d.long_click(item[3], item[4])
+            time.sleep(1.5)
+            xml_b = dump_xml(d)
+            has_delete = f"{S_AI_DELETE_PREFIX}1" in xml_b
+            has_export = S_AI_EXPORT in xml_b
+            ca.shot(d, "m3usage_s9_batch_bar")
+            print(f"  [s9] F31 批量栏：「{S_AI_DELETE_PREFIX}1」={has_delete} / 「{S_AI_EXPORT}」={has_export}")
+            batch_ok = has_delete and has_export
+            del_b = node_bounds(xml_b, f"{S_AI_DELETE_PREFIX}1")
+            if del_b:
+                click_xy(d, del_b["cx"], del_b["cy"])
+                time.sleep(1.6)
+                xml_c = dump_xml(d)
+                has_confirm = S_AI_DELETE_TITLE in xml_c and S_CANCEL in xml_c
+                delete_dialog_ok = has_confirm
+                print(f"  [s9] F31 删除二次确认（标题「{S_AI_DELETE_TITLE}」+「{S_CANCEL}」）={has_confirm}")
+                if has_confirm:
+                    # Compose 弹窗按钮用坐标点击更可靠（u2 的 text 匹配在 Dialog 上可能点到无效层），
+                    # 并**轮询确认弹窗真的关闭**——否则「批量栏文本仍在」会被误读为「取消后选中保留」
+                    cancel_b = node_bounds(xml_c, S_CANCEL)
+                    if cancel_b:
+                        click_xy(d, cancel_b["cx"], cancel_b["cy"])
+                    dialog_gone = False
+                    for _ in range(6):
+                        time.sleep(0.8)
+                        if S_AI_DELETE_TITLE not in dump_xml(d):
+                            dialog_gone = True
+                            break
+                    still = f"{S_AI_DELETE_PREFIX}1" in dump_xml(d)
+                    delete_dialog_ok = dialog_gone and still
+                    print(f"  [s9] F31 取消后：弹窗关闭={dialog_gone} / 选中保留（零数据污染）={still}")
+            # 取消选中 ⇒ 批量栏收起（弹窗关闭有动画，先轮询等列表节点回归）
+            # ⚠️ 匹配用 `in`（不是 startswith）：选中态行首带「✓ 」前缀（`UsageHolder.bind` 加的）
+            item2 = None
+            for _ in range(10):
+                item2 = next((n for n in text_nodes(dump_xml(d))
+                              if "多角色" in n[0]), None)
+                if item2:
+                    break
+                time.sleep(1.0)
+            if item2:
+                d.long_click(item2[3], item2[4])
+                time.sleep(1.5)
+                clear_ok = S_AI_DELETE_PREFIX not in dump_xml(d)
+                print(f"  [s9] F31 取消选中后批量栏收起={clear_ok}")
+            else:
+                print("  [s9] F31 未取到记录行（取消选中未取证）")
+            # 重新选中后验证导出通道（导出会离开本页，故放在最后一步）
+            item3 = next((n for n in text_nodes(dump_xml(d)) if "多角色" in n[0]), None)
+            if item3:
+                d.long_click(item3[3], item3[4])
+                time.sleep(1.5)
+            exp_b = node_bounds(dump_xml(d), S_AI_EXPORT)
+            if exp_b:
+                click_xy(d, exp_b["cx"], exp_b["cy"])
+                time.sleep(4.0)
+                export_ok = ACT_HANDLE_FILE in current_activity()
+                print(f"  [s9] F31 导出走「选择保存位置」通道（{ACT_HANDLE_FILE}）={export_ok}")
+
+        # ---------------- 阶段 B：段落规则（F51 + F50）----------------
+        reset_app()
+        if not _para_seed(workdir, 2):
+            print("  [s9] 段落规则播种失败")
+            return False
+        landed = _start_para(PARA_BOOK_URL)
+        xml_p = dump_xml(d)
+        ca.shot(d, "m3usage_s9_para_rules")
+        handle_count = _handle_desc_count(xml_p)
+        names_ok = all(name in xml_p for name in SEED_PARA_NAMES)
+        hint_ok = S_PARA_DRAG_HINT in xml_p
+        print(f"  [s9] F51 落地={landed} / 拖拽手柄数={handle_count}（期望 ≥2）/ "
+              f"规则名在场={names_ok} / 摘要手柄提示={hint_ok}")
+
+        # F50：无规则空态 ⇒ 引导文案 + 底部「添加」主操作仍在场
+        reset_app()
+        if not _para_seed(workdir, 0):
+            print("  [s9] 空态播种失败")
+            return False
+        _start_para(PARA_BOOK_URL)
+        xml_e = dump_xml(d)
+        ca.shot(d, "m3usage_s9_para_empty")
+        empty_ok = (S_PARA_EMPTY in xml_e and S_PARA_EMPTY_GUIDE in xml_e
+                    and "添加" in xml_e)
+        print(f"  [s9] F50 空态：提示+引导+主操作在场={empty_ok}"
+              f"（「{S_PARA_EMPTY}」/「{S_PARA_EMPTY_GUIDE}」）")
+
+        # ---------------- 阶段 C：导入进度闭环（F52）----------------
+        server = _DelayedServer(IMPORT_PORT, delay_s=5.0)
+        server.start()
+        _reverse_on(IMPORT_PORT)
+        importing_ok = False
+        import_menu = topbar_action_bounds(xml_e, 1)
+        print(f"  [s9] F52 顶栏导入入口={import_menu}")
+        if import_menu:
+            click_xy(d, import_menu["cx"], import_menu["cy"])
+            time.sleep(1.6)
+            opened_menu = S_PARA_IMPORT_ONLINE in dump_xml(d)
+            tapped = tap_text(d, S_PARA_IMPORT_ONLINE)
+            print(f"  [s9] F52 导入菜单出现={opened_menu} / 点「{S_PARA_IMPORT_ONLINE}」={tapped}")
+            time.sleep(1.6)
+            typed = type_search(d, IMPORT_URL)
+            print(f"  [s9] F52 URL 输入={typed}")
+            if typed:
+                tap_text(d, S_OK)
+                for _ in range(10):
+                    time.sleep(0.6)
+                    if S_PARA_IMPORTING in dump_xml(d):
+                        importing_ok = True
+                        break
+                ca.shot(d, "m3usage_s9_importing")
+            print(f"  [s9] F52 导入进行中态可见={importing_ok}（服务端命中={server.hits}）")
+        else:
+            print("  [s9] F52 未定位顶栏导入入口")
+
+        src_checks = {
+            "F30 摘要多行+强调": ("emphasizeTotal" in src_ai and "MAX_MODEL_LINES" in src_ai
+                          and "SpannableString" in src_ai),
+            "F30 主指标千分位": "formatTokens" in src_ai,
+            "F30 摘要零新增视图": ("chipRow" not in src_ai and "detailPanel" not in src_ai),
+            "F31 批量栏条件挂载+导出": ("renderBatchBar" in src_ai and "HandleFileContract.EXPORT" in src_ai
+                              and "container.removeView(bar)" in src_ai),
+            "F51 手柄复用全站资产": ("ic_drag_handle" in src_para and "itemTouchHelper?.startDrag" in src_para),
+            "F50 空态引导": ("paragraph_rule_no_book_guide" in src_para
+                        and "paragraph_rule_empty_guide" in src_para),
+            "F52 导入进度+防重复": ("paragraph_rule_importing" in src_para
+                            and "btnAdd.isEnabled = false" in src_para),
+            "顶栏图标为矢量（非 selector）": "ic_bottom_books_e" in src_ai,
+        }
+        src_ok = all(src_checks.values())
+        print(f"  [s9] 源码断言 {sum(src_checks.values())}/{len(src_checks)}："
+              f"{[k for k, v in src_checks.items() if not v] or '全通过'}")
+
+        ok = bool(summary_ok and chip_ok and emphasize_ok and batch_ok and delete_dialog_ok
+                  and export_ok and clear_ok and landed and handle_count >= 2 and names_ok
+                  and hint_ok and empty_ok and importing_ok and src_ok)
+    except Exception as e:
+        print(f"  [s9] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        release_reverse(IMPORT_PORT)
+        if server:
+            server.stop()
+        reset_app()
+        try:
+            rolled = m2._db_push(db_snap)
+            print(f"  [s9] 数据库快照已回滚={rolled}")
+        except Exception as e:
+            print(f"  [s9] 兜底回滚异常: {type(e).__name__}")
+        # 导出动作会在应用私有目录落一个 JSON：测试后清掉（零残留）
+        try:
+            sh_su(f"rm -f /data/data/{PKG}/files/aiReadAloudUsageSelection.json")
+        except Exception:
+            pass
+        reset_app()
+    return ok
+
+
 # ===================== s8：rss/articles（订阅文章列表）=====================
 # F142 页脚错误可恢复态（LoadMoreView 错误分支）+ F143 分类 Tab 未读徽标
 #   + 顺带修复：首页加载失败时页脚「重试」并未真正重拉（nextPageUrl 为 null ⇒ 退化成「我是有底线的」）
@@ -2853,6 +3260,7 @@ STEPS = {
     "s6": guarded(s6_login_page),
     "s7": guarded(s7_favorites_page),
     "s8": guarded(s8_rss_articles_page),
+    "s9": guarded(s9_usage_and_para_rule_page),
 }
 
 
@@ -2863,7 +3271,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
