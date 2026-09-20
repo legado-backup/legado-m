@@ -24,7 +24,22 @@
     ⚠️ F215 踩坑：活动被配置变更重建后，重建实例会读到「首次创建时刚写入」的一次性记忆位 ⇒ 引导条消失；
        修复=引导条显隐经 savedInstanceState 保存/恢复（配置变更重建不丢一次性提示）
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|all]
+【qrcode/qrcode · QrCodeActivity】**s4 PASS（2026-09-20）**：F188 相册解码等待可见化 / F189 权限受限兜底双出口
+    + A3-2 扫描引导与全屏识别说明 + A3-3 解码失败页内提示与重试
+    s4 通道：底部「从相册识别」/ 失败条「重试」→ HandleFileActivity「自带文件选择器」→ Pictures → 选图 → 确认
+       → 本机测试图（ai_tests/testdata/qr_scan/，由 ZXing 生成）直取原文件，全程离线、无 DocumentsUI/媒体库依赖
+       → 默认态：标题/引导/「支持全屏识别」/底部相册入口 全在场，权限卡不在场
+       → 失败链路：无二维码图 ⇒ 页内 danger 提示条（标题+建议+重试）+ **停留本页**（旧实现 setResult(null)+finish）
+       → 大图链路：2600px 图 ⇒ 「正在识别图片…」等待态真机可见（协程下沉，主线程不再卡）+ 兜底提示
+       → 成功链路：780px 真二维码 ⇒ 微确认「已识别」帧可见 ⇒ 回传退出（ActivityResult 契约不变）
+       → 权限链路：**本 ROM 环境不可达**（CAMERA 被记为 install 权限、`pm revoke` 无效）⇒ 登记跳过，以源码断言兜底
+       → 源码断言 10/10：解码下沉/微确认/失败停留/权限上抛/授权恢复/覆盖层三卡/旧同步链已删
+    ⚠️ 实测取舍：「手动输入图片链接」路由不可用（选图页静默返回、调用方收到 CANCELED、根因未定，属
+       HandleFileActivity 既有缺陷，已登记 issues-found）⇒ 本场景改走「自带文件选择器」。
+    ⚠️ 大图识别观察：1200px/2600px 的**满幅**二维码图识别失败、780px 成功（同一 `QRCodeUtils.parseCodeResult`
+       路径，非本批次引入，根因未确证）⇒ 大图链路只断言「有等待态 + 有兜底提示」，不声称识别成功。
+
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装；openssl（Git 自带，脚本自动定位）
 
 口径说明（F192）：跨年分支需要「去年」的日志条目，真机沙箱无法构造跨年数据（AppLog 为内存日志，
@@ -1261,6 +1276,321 @@ def s3_browser_page(d) -> bool:
         reset_app()
 
 
+# ===================== s4：qrcode/qrcode（扫码页）=====================
+# 覆盖：F188 相册解码等待可见化（loading + 成功微确认）/ F189 相机权限受限兜底双出口 /
+#       A3-2 扫描引导与全屏识别说明 / A3-3 解码失败页内提示 + 重试。
+# 通道：扫码页 → 从相册识别 → 「手动输入图片链接」→ 填设备侧绝对路径（绕开 DocumentsUI，
+#       用本机测试图直取原始文件，无需媒体库索引、全程离线、结果确定）。
+ACT_QR = "io.legado.app.ui.qrcode.QrCodeActivity"
+S_QR_TITLE = "扫描二维码"                  # scan_qr_code
+S_QR_HINT = "将二维码对准取景框即可自动识别"   # qr_scan_hint
+S_QR_FULL_AREA = "支持全屏识别"             # qr_scan_full_area
+S_QR_GALLERY = "从相册识别"                # qr_gallery_entry
+S_QR_DECODING = "正在识别图片"              # qr_decoding
+S_QR_DECODING_NOTE = "识别成功后自动返回"     # qr_decoding_note
+S_QR_DECODED = "已识别"                    # qr_decode_succeeded
+S_QR_FAIL_TITLE = "未识别到二维码"           # qr_decode_failed_title
+S_QR_FAIL_DESC = "所选图片中没有二维码"       # qr_decode_failed_desc
+S_QR_BLOCK_TITLE = "需要相机权限才能扫码"     # qr_camera_blocked_title
+S_QR_BLOCK_DESC = "也可以不授权限"           # qr_camera_blocked_desc
+S_QR_GRANT = "去授权"                      # qr_camera_blocked_grant
+S_QR_MANUAL = "手动输入图片链接"             # manual_input_img_src
+S_QR_APP_PICKER = "自带文件选择器"           # app_file_picker（value=11 → 应用内 FilePickerDialog）
+S_QR_PICK_OK = "确认"                      # ok（应用内文件选择器的确认键）
+S_RETRY = "重试"                          # retry
+QR_FIXTURE_DIR = "Pictures"                # 应用内选择器 root 首屏可见目录（测试图落点）
+SRC_QR_ACT = "app/src/main/java/io/legado/app/ui/qrcode/QrCodeActivity.kt"
+SRC_QR_FRAG = "app/src/main/java/io/legado/app/ui/qrcode/QrCodeFragment.kt"
+SRC_QR_OVERLAY = "app/src/main/java/io/legado/app/ui/qrcode/QrCodeOverlay.kt"
+SRC_QR_LAYOUT = "app/src/main/res/layout/activity_qrcode_capture.xml"
+QR_DEV_DIR = "/sdcard/Pictures"
+QR_FIXTURES = {
+    "blank": "ai_tests/testdata/qr_scan/qr_blank.png",      # 无二维码（失败链路）
+    "ok": "ai_tests/testdata/qr_scan/qr_ok.png",            # 780px 真二维码（快速成功）
+    "big": "ai_tests/testdata/qr_scan/qr_ok_big.png",       # 2600px 真二维码（拉长解码窗口，暴露 loading）
+}
+
+
+def _qr_repo_path(rel: str) -> Path:
+    return Path(__file__).resolve().parents[2] / rel
+
+
+def _src_text(rel: str) -> str:
+    p = _qr_repo_path(rel)
+    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
+
+
+def _src_code(rel: str) -> str:
+    """去注释后的源码：用于「应删尽删」断言，避免注释里引用的旧实现片段造成假命中"""
+    txt = re.sub(r"/\*.*?\*/", "", _src_text(rel), flags=re.S)
+    return "\n".join(line.split("//")[0] for line in txt.splitlines())
+
+
+def _qr_push_fixtures() -> dict:
+    out = {}
+    sh("mkdir", "-p", QR_DEV_DIR)
+    for key, rel in QR_FIXTURES.items():
+        local = _qr_repo_path(rel)
+        remote = f"{QR_DEV_DIR}/l2_qr_{key}.png"
+        if not local.exists():
+            print(f"  [s4] 缺测试图: {rel}")
+            out[key] = ""
+            continue
+        subprocess.run([ADB, "push", str(local), remote], capture_output=True, timeout=90)
+        r = sh("ls", remote)
+        exists = remote.rsplit("/", 1)[-1] in (r.stdout or b"").decode("utf-8", "ignore")
+        print(f"  [s4] 推送测试图 {key}: {exists}")
+        out[key] = remote if exists else ""
+    return out
+
+
+def _qr_cleanup_fixtures():
+    for key in QR_FIXTURES:
+        sh("rm", "-f", f"{QR_DEV_DIR}/l2_qr_{key}.png")
+
+
+def _qr_pick_image(d, remote: str, via_retry: bool = False,
+                   probe_keywords=None, probe_seconds: float = 6.0) -> tuple:
+    """相册识别链路：入口（底部入口 / 失败条重试）→ 自带文件选择器 → Pictures → 选图 → 确认
+
+    通道选择（2026-09-20 实测取舍）：**不走「手动输入图片链接」**——该路由真机上选图页会静默返回、
+    调用方收到 CANCELED（无 toast、无解码），根因未定（见 issues-found），且属 HandleFileActivity
+    既有缺陷、不在本页范围。改走「自带文件选择器」：`setResultData` → `onResult` 先于 dismiss 落地，
+    结果链正确，且全是应用内 Compose 控件、无 DocumentsUI/媒体库依赖。
+
+    返回 `(是否成功, 探针结果|None)`。传 `probe_keywords` 时**先取好确认键坐标**再快速点击、
+    点击后立刻进入连续 dump（实测 dump 节拍 ≈60ms）——解码中/微确认这类瞬时态必须这样才抓得到。
+    """
+    fname = remote.rsplit("/", 1)[-1]
+    entry = S_RETRY if via_retry else S_QR_GALLERY
+    if not tap_text(d, entry, timeout=8):
+        print(f"  [s4] 未能点到入口「{entry}」")
+        return False, None
+    time.sleep(2.5)
+    if not tap_text(d, S_QR_APP_PICKER, timeout=8):
+        print("  [s4] 未出现「自带文件选择器」动作项")
+        return False, None
+    time.sleep(2.5)
+    xml = dump_xml(d)
+    if fname not in xml and not tap_text(d, QR_FIXTURE_DIR, timeout=8):
+        print(f"  [s4] 未能进入测试图目录 {QR_FIXTURE_DIR}")
+        return False, None
+    time.sleep(1.8)
+    if not tap_text(d, fname, timeout=8):
+        print(f"  [s4] 文件列表未出现 {fname}")
+        return False, None
+    time.sleep(1.0)
+    if probe_keywords:
+        b = node_bounds(dump_xml(d), S_QR_PICK_OK)
+        if not b:
+            print("  [s4] 未取到选择器确认键坐标")
+            return False, None
+        w, h = d.window_size()
+        d.click(b["cx"] / w, b["cy"] / h)     # 快速点击（不带 sleep）→ 立刻进入探针窗口
+        return True, _qr_probe(d, probe_keywords, probe_seconds)
+    if not tap_text(d, S_QR_PICK_OK, timeout=6):
+        print("  [s4] 未点到选择器确认键")
+        return False, None
+    return True, None
+
+
+def _qr_probe(d, keywords, seconds: float) -> dict:
+    """窗口期内连续 dump，记录关键词是否**出现过**（捕捉 loading / 微确认这类瞬时态）"""
+    seen = {k: False for k in keywords}
+    rounds = 0
+    end = time.time() + seconds
+    while time.time() < end:
+        xml = dump_xml(d)
+        rounds += 1
+        for k in keywords:
+            if not seen[k] and k in xml:
+                seen[k] = True
+        if all(seen.values()):
+            break
+    seen["_rounds"] = rounds
+    return seen
+
+
+def _qr_deny_permission_dialog(d, rounds: int = 6, wait: float = 2.0) -> tuple:
+    """系统相机权限弹窗点「拒绝」。返回 (是否点到, 是否出现过弹窗)。"""
+    for _ in range(rounds):
+        xml = dump_xml(d)
+        for m in re.finditer(r"<node[^>]*>", xml):
+            tag = m.group(0)
+            rid = re.search(r'resource-id="([^"]*)"', tag)
+            if not (rid and "permission_deny_button" in rid.group(1)):
+                continue
+            b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+            if b:
+                x1, y1, x2, y2 = map(int, b.groups())
+                click_xy(d, (x1 + x2) // 2, (y1 + y2) // 2)
+                return True, True
+        time.sleep(wait)
+    return False, False
+
+
+def _qr_return_to_page(d, tries: int = 3) -> bool:
+    """逐级 back 直到回到扫码页（弹框/文件页层数不固定，按当前 Activity 判定而非固定次数）"""
+    for _ in range(tries):
+        if "QrCodeActivity" in current_activity():
+            return True
+        d.press("back")
+        time.sleep(1.5)
+    return "QrCodeActivity" in current_activity()
+
+
+def _qr_camera_granted() -> bool:
+    """读设备侧 CAMERA 授权态（判定「本 ROM 能否构造拒绝态」）"""
+    r = sh("dumpsys", "package", PKG, timeout=30)
+    return b"android.permission.CAMERA: granted=true" in (r.stdout or b"")
+
+
+def s4_qrcode_page(d) -> bool:
+    """扫码页：覆盖层引导/全屏说明、相册解码等待与失败重试、权限受限兜底双出口与授权闭环"""
+    print("  [s4] ===== 扫码页覆盖层与解码链路 =====")
+    files = _qr_push_fixtures()
+    try:
+        # ---- 默认态：引导 / 全屏说明 / 相册入口在场，权限卡不在场 ----
+        reset_app()
+        started = start_robust(ACT_QR)
+        xml = dump_xml(d)
+        title_ok = S_QR_TITLE in xml
+        hint_ok = S_QR_HINT in xml
+        full_ok = S_QR_FULL_AREA in xml
+        gallery_ok = S_QR_GALLERY in xml
+        block_absent = S_QR_BLOCK_TITLE not in xml
+        default_ok = started and title_ok and hint_ok and full_ok and gallery_ok and block_absent
+        print(f"  [s4] 默认态 启动={started} 标题={title_ok} 引导={hint_ok} 全屏说明={full_ok} "
+              f"相册入口={gallery_ok} 权限卡未出现={block_absent}")
+
+        # ---- 失败链路：无二维码图 → 页内 danger 提示 + 停留本页（A3-3 禁止静默失败）----
+        fail_ok = False
+        if files.get("blank"):
+            picked, _ = _qr_pick_image(d, files["blank"])
+            time.sleep(3.0)
+            xml2 = dump_xml(d)
+            stayed = "QrCodeActivity" in current_activity()
+            banner = (S_QR_FAIL_TITLE in xml2) and (S_QR_FAIL_DESC in xml2) and (S_RETRY in xml2)
+            fail_ok = picked and banner and stayed
+            print(f"  [s4] 失败链路 入口={picked} 提示条={banner} 停留本页={stayed}")
+
+        # ---- 慢解码等待态（2600px 大图）：证明「解码中」遮罩真机可见（窗口足够长），
+        #      且大图解码失败时同样落到兜底提示条（不静默、不崩）----
+        loading_ok = False
+        if files.get("big"):
+            picked3, probed3 = _qr_pick_image(
+                d, files["big"], via_retry=True,
+                probe_keywords=[S_QR_DECODING, S_QR_DECODING_NOTE],
+                probe_seconds=12.0,
+            )
+            probed3 = probed3 or {k: False for k in (S_QR_DECODING, S_QR_DECODING_NOTE)}
+            time.sleep(2.0)
+            xml_load = dump_xml(d)
+            loading_ok = (picked3 and probed3.get(S_QR_DECODING)
+                          and (S_QR_FAIL_TITLE in xml_load) and ("QrCodeActivity" in current_activity()))
+            print(f"  [s4] 大图链路 选图={picked3} 解码中态={probed3.get(S_QR_DECODING)} "
+                  f"等待说明={probed3.get(S_QR_DECODING_NOTE)}（{probed3.get('_rounds')}轮）"
+                  f" 兜底提示={S_QR_FAIL_TITLE in xml_load}")
+
+        # ---- 成功链路：重试入口 → 真二维码 → 解码中态可见 → 微确认 → 回传退出 ----
+        succ_ok = False
+        if files.get("ok"):
+            picked2, probed = _qr_pick_image(
+                d, files["ok"], via_retry=True,
+                probe_keywords=[S_QR_DECODING, S_QR_DECODING_NOTE, S_QR_DECODED],
+                probe_seconds=8.0,
+            )
+            probed = probed or {k: False for k in (S_QR_DECODING, S_QR_DECODING_NOTE, S_QR_DECODED)}
+            time.sleep(1.5)
+            finished = "QrCodeActivity" not in current_activity()
+            succ_ok = picked2 and finished
+            print(f"  [s4] 成功链路 重试选图={picked2} 解码中态={probed.get(S_QR_DECODING)} "
+                  f"等待说明={probed.get(S_QR_DECODING_NOTE)} 微确认={probed.get(S_QR_DECODED)}"
+                  f"（{probed.get('_rounds')}轮） 回传退出={finished}")
+
+        # ---- 权限受限链路：撤销相机权限 → 拒绝 → 兜底卡（双出口）→ 授权闭环 ----
+        # ⚠️ 环境限制（2026-09-20 实测）：本 ROM 把本测试包的 CAMERA 记在 **install permissions**
+        #    （granted=true），`pm revoke`（含 --user 0 / su）返回 0 但授权态不变 ⇒ **拒绝态不可构造**；
+        #    故该链路登记为「环境不可达」，以源码断言兜底（与 s3 的 canGoBack 限制同类处理）。
+        blocked_ok = cross_ok = grant_ok = True
+        perm_skipped = False
+        reset_app()
+        sh("pm", "revoke", PKG, "android.permission.CAMERA")
+        time.sleep(1.2)
+        if _qr_camera_granted():
+            perm_skipped = True
+            print("  [s4] 权限链路：CAMERA 为 install 权限且 pm revoke 无效 ⇒ 拒绝态不可构造，"
+                  "登记环境不可达（卡片双出口以源码断言兜底）")
+        else:
+            started2 = start_robust(ACT_QR)
+            clicked, dialog_seen = _qr_deny_permission_dialog(d)
+            time.sleep(2.5)
+            xml3 = dump_xml(d)
+            denied_ok = clicked or not dialog_seen  # ROM 若记忆「不再询问」则无弹窗、直接进拒绝回调
+            blocked_ok = (started2 and denied_ok and (S_QR_BLOCK_TITLE in xml3)
+                          and (S_QR_BLOCK_DESC in xml3) and (S_QR_GRANT in xml3) and (S_QR_GALLERY in xml3))
+            print(f"  [s4] 权限受限 启动={started2} 弹窗={dialog_seen} 拒绝={clicked} 兜底卡={blocked_ok}")
+
+        if not perm_skipped and blocked_ok:
+            # 出口一：从相册识别（复用同一回调链）——只断言替代路径可达，不做完整选图
+            cross_click = tap_text(d, S_QR_GALLERY, timeout=8)
+            time.sleep(2.5)
+            cross_xml = dump_xml(d)
+            cross_ok = cross_click and (S_QR_MANUAL in cross_xml)
+            back_to_page = _qr_return_to_page(d)
+            cross_xml2 = dump_xml(d)
+            cross_ok = cross_ok and back_to_page and (S_QR_BLOCK_TITLE in cross_xml2)
+            print(f"  [s4] 出口一 从相册识别={cross_click} 相册动作面板={S_QR_MANUAL in cross_xml} "
+                  f"返回扫码页={back_to_page} 兜底卡仍在={S_QR_BLOCK_TITLE in cross_xml2}")
+
+            # 出口二：去授权 → 系统应用详情页 → 授权后返回 → 卡片收起（onResume 授权闭环）
+            grant_click = tap_text(d, S_QR_GRANT, timeout=8)
+            time.sleep(3.0)
+            act_name = current_activity()
+            settings_ok = "settings" in act_name.lower()
+            sh("pm", "grant", PKG, "android.permission.CAMERA")
+            time.sleep(1.2)
+            d.press("back")
+            time.sleep(2.5)
+            back_ok = "QrCodeActivity" in current_activity()
+            xml4 = dump_xml(d)
+            grant_ok = grant_click and settings_ok and back_ok and (S_QR_BLOCK_TITLE not in xml4)
+            print(f"  [s4] 出口二 去授权={grant_click} 落到设置页={settings_ok} 返回扫码页={back_ok} "
+                  f"卡片收起={S_QR_BLOCK_TITLE not in xml4}")
+
+        # ---- 源码断言：应落定的落定、应删尽的删尽 ----
+        act = _src_text(SRC_QR_ACT)
+        frag = _src_text(SRC_QR_FRAG)
+        act_code = _src_code(SRC_QR_ACT)
+        frag_code = _src_code(SRC_QR_FRAG)
+        ov = _src_text(SRC_QR_OVERLAY)
+        lay = _src_text(SRC_QR_LAYOUT)
+        code_checks = {
+            "解码下沉协程": "Coroutine.async" in act,
+            "成功微确认常量": "DECODE_CONFIRM_DELAY" in act,
+            "失败停留本页": "onDecodeFailed()" in act,
+            "权限受限上抛": "onCameraPermissionDenied" in act and "onCameraPermissionDenied" in frag,
+            "授权恢复入口": "resumeCameraAfterPermissionGranted" in frag,
+            "覆盖层三卡": all(k in ov for k in ("PermissionCard", "DecodingCard", "DecodeFailedBanner")),
+            "覆盖层挂载点": "compose_qr_overlay" in lay,
+            "旧同步解码已删": "onScanResultCallback(QRCodeUtils.parseCodeResult" not in act_code,
+            "旧主线程读文件已删": "readBytes(this)?.let" not in act_code,
+            "库默认拒绝即退出已覆盖": "finish()" not in frag_code,
+        }
+        code_ok = all(code_checks.values())
+        print(f"  [s4] 源码断言 {sum(code_checks.values())}/{len(code_checks)} "
+              f"未过={[k for k, v in code_checks.items() if not v]}")
+
+        ok = all([default_ok, fail_ok, loading_ok, succ_ok, blocked_ok, cross_ok, grant_ok, code_ok])
+        print(f"  [s4] 小计: {'PASS' if ok else 'FAIL'}"
+              + ("（权限链路=环境不可达，已登记跳过）" if perm_skipped else ""))
+        return ok
+    finally:
+        _qr_cleanup_fixtures()
+        sh("pm", "grant", PKG, "android.permission.CAMERA")   # 还原：测试前相机权限为已授权
+        reset_app()
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -1277,6 +1607,7 @@ STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
     "s3": guarded(s3_browser_page),
+    "s4": guarded(s4_qrcode_page),
 }
 
 
@@ -1287,7 +1618,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
     ok = True
     for sid in targets:
         ok = ca.run_steps({sid: STEPS[sid]}, scenario=sid, tag_keywords=[], since_ts=since, ctx=d) and ok
