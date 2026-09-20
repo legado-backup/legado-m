@@ -39,7 +39,20 @@
     ⚠️ 大图识别观察：1200px/2600px 的**满幅**二维码图识别失败、780px 成功（同一 `QRCodeUtils.parseCodeResult`
        路径，非本批次引入，根因未确证）⇒ 大图链路只断言「有等待态 + 有兜底提示」，不声称识别成功。
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|all]
+【image/image-crop · ImageCropActivity】**s5 PASS（2026-09-20）**：F179 前置（比例徽标 + 保存中回执）
+    + A3-3 可恢复失败页内错误条 + 重试（不可恢复仍 toast+finish）
+    s5 通道：`am start` + extras（uri/aspectWidth/aspectHeight）直起；「失败→重试→恢复」用**本机 HTTP 先停后起**制造
+       → 默认态：比例徽标按 extras 渲染「3:4」+ 操作提示在场 ✅
+       → 保存回执：点确认 ⇒「保存中，请稍候…」真机可见 + 无失败条 + 回传退出 ✅
+       → 失败链路：远端不可达 ⇒ 页内错误条「图片裁剪失败：图片解码失败」+ 重试键 + **停留本页** ✅
+       → 重试恢复：起服务后点重试 ⇒ 错误条消失且**不再出现**（`hideCropError` 只在 `loadImage` 开头调用 ⇒ 硬判据）
+         ⇒ 再点确认**真正裁剪并回传退出** ✅
+       → 不可恢复：未传 uri ⇒ 仍 toast + finish（原语义保留）✅
+       → 源码断言 6/6：保存中态/徽标/错误条落定 + 旧「失败 toast+finish」已删 ✅
+    ⚠️ 蓝图失实（已反哺 §1.5）：蓝图称「可拖取景框/角点缩放/90° 旋转入口已在前批完成」，实际源码 0 落点
+       （`ImageCropOverlayView` 无触摸处理、布局无旋转按钮）⇒ 本轮不补、登记为缺口
+
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装；openssl（Git 自带，脚本自动定位）
 
 口径说明（F192）：跨年分支需要「去年」的日志条目，真机沙箱无法构造跨年数据（AppLog 为内存日志，
@@ -52,7 +65,9 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -1591,6 +1606,234 @@ def s4_qrcode_page(d) -> bool:
         reset_app()
 
 
+# ===================== s5：image/image-crop（裁剪页）=====================
+# 覆盖：F179 前置（比例徽标 + 保存中回执）+ A3-2/A3-3（可恢复失败页内错误条 + 重试；不可恢复仍 toast+finish）。
+# 通道：`am start` 直起 + extras（uri/aspectWidth/aspectHeight）；「失败→重试→恢复」用本机 HTTP 先停后起制造，
+#       全程离线（adb reverse 回环 + 本地 http.server）。
+ACT_CROP = "io.legado.app.ui.image.ImageCropActivity"
+S_CROP_HINT = "拖动或双指缩放图片后确认裁剪"    # image_crop_hint
+S_CROP_SAVING = "保存中，请稍候…"              # image_crop_saving
+S_CROP_FAIL_PREFIX = "图片裁剪失败："           # image_crop_failed
+S_CROP_FAIL_DECODE = "图片解码失败"            # error_decode_bitmap
+ID_BADGE = f"{PKG}:id/tv_aspect_badge"
+ID_HINT = f"{PKG}:id/tv_hint"
+ID_CONFIRM = f"{PKG}:id/btn_confirm"
+ID_PROGRESS = f"{PKG}:id/progress_save"
+ID_ERROR_BAR = f"{PKG}:id/error_bar"
+ID_RETRY = f"{PKG}:id/btn_retry"
+CROP_DEV_SRC = "/sdcard/Pictures/l2_crop_src.png"
+CROP_PORT = 8567
+SRC_CROP_ACT = "app/src/main/java/io/legado/app/ui/image/ImageCropActivity.kt"
+SRC_CROP_LAYOUT = "app/src/main/res/layout/activity_image_crop.xml"
+
+
+def _node_by_res(xml: str, res_id: str):
+    """按 resource-id 取节点 bounds（不可见节点不在 dump 中 ⇒ 兼作可见性判据）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', tag)
+        if not rid or rid.group(1) != res_id:
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        return {"left": x1, "top": y1, "right": x2, "bottom": y2,
+                "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2}
+    return None
+
+
+def _node_text(xml: str, res_id: str) -> str:
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', tag)
+        if rid and rid.group(1) == res_id:
+            t = re.search(r'\btext="([^"]*)"', tag)
+            return t.group(1) if t else ""
+    return ""
+
+
+def _crop_push_source() -> str:
+    """裁剪源图（2600px，够大 ⇒ 裁剪/落盘耗时可观察）落到设备公共目录"""
+    local = _qr_repo_path(QR_FIXTURES["big"])
+    if not local.exists():
+        return ""
+    sh("mkdir", "-p", QR_DEV_DIR)
+    subprocess.run([ADB, "push", str(local), CROP_DEV_SRC], capture_output=True, timeout=90)
+    r = sh("ls", CROP_DEV_SRC)
+    return CROP_DEV_SRC if "l2_crop_src.png" in (r.stdout or b"").decode("utf-8", "ignore") else ""
+
+
+def _crop_start(uri: str, aspect_w: int = 3, aspect_h: int = 4) -> bool:
+    """按 extras 直起裁剪页（uri 为空串 ⇒ 不传 uri，用于「不可恢复」分支）"""
+    args = ["am", "start", "-n", f"{PKG}/{ACT_CROP}",
+            "--ei", "aspectWidth", str(aspect_w), "--ei", "aspectHeight", str(aspect_h)]
+    if uri:
+        args += ["-e", "uri", uri]
+    sh(*args)
+    time.sleep(3.5)
+    return "ImageCropActivity" in current_activity()
+
+
+class _CropHandler(BaseHTTPRequestHandler):
+    """极简静态图服务（s5 专用）：只有 /crop_src.png 返回 200，其余 404"""
+
+    png: bytes = b""
+
+    def do_GET(self):  # noqa: N802
+        if self.path.startswith("/crop_src.png") and _CropHandler.png:
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(_CropHandler.png)))
+            self.end_headers()
+            self.wfile.write(_CropHandler.png)
+        else:
+            self.send_error(404)
+
+    def log_message(self, *args):  # 静音
+        pass
+
+
+def _crop_serve() -> object:
+    srv = HTTPServer(("127.0.0.1", CROP_PORT), _CropHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def _crop_bar_probe(d, seconds: float) -> dict:
+    """错误条显隐轨迹：gone=曾消失（⇒loadImage 被调用）/ back=消失后又出现（⇒仍失败）/ final=结束时是否在场
+
+    「消失」只可能由 `hideCropError()`（只在 `loadImage()` 开头）触发 ⇒ 是「重试确实重跑了加载」的硬判据；
+    恢复成功 = gone 且 final 为 False；仍失败 = gone 且 back（条又回来）。
+    """
+    gone = back = False
+    final = None
+    rounds = 0
+    end = time.time() + seconds
+    while time.time() < end:
+        present = _node_by_res(dump_xml(d), ID_ERROR_BAR) is not None
+        rounds += 1
+        if not present:
+            gone = True
+        elif gone:
+            back = True
+        final = present
+        if back:
+            break
+    return {"gone": gone, "back": back, "final": final, "_rounds": rounds}
+
+
+def s5_image_crop_page(d) -> bool:
+    """裁剪页：比例徽标 / 保存中回执 / 失败错误条 + 重试恢复 / 不可恢复仍 toast+finish"""
+    print("  [s5] ===== 裁剪页比例、保存回执与失败重试 =====")
+    src = _crop_push_source()
+    _CropHandler.png = _qr_repo_path(QR_FIXTURES["big"]).read_bytes() \
+        if _qr_repo_path(QR_FIXTURES["big"]).exists() else b""
+    # 回环通道：设备 127.0.0.1:CROP_PORT → 主机（服务先不开，用于制造「连接失败」）
+    _reverse_on(CROP_PORT)
+    srv = None
+    try:
+        # ---- 1) 默认态：比例徽标（3:4）+ 操作提示 ----
+        reset_app()
+        started = _crop_start(f"file://{src}" if src else "", 3, 4)
+        xml = dump_xml(d)
+        badge = _node_text(xml, ID_BADGE)
+        default_ok = started and badge == "3:4" and (S_CROP_HINT in xml)
+        print(f"  [s5] 默认态 启动={started} 比例徽标={badge!r} 提示={S_CROP_HINT in xml}")
+
+        # ---- 2) 保存中回执 → 回传退出 ----
+        save_ok = False
+        b = _node_by_res(xml, ID_CONFIRM)
+        if b:
+            w, h = d.window_size()
+            d.click(b["cx"] / w, b["cy"] / h)
+            pr = _qr_probe(d, [S_CROP_SAVING, S_CROP_FAIL_PREFIX], 10.0)
+            time.sleep(1.5)
+            finished = "ImageCropActivity" not in current_activity()
+            save_ok = bool(pr.get(S_CROP_SAVING)) and not pr.get(S_CROP_FAIL_PREFIX) and finished
+            print(f"  [s5] 保存回执 保存中态={pr.get(S_CROP_SAVING)} 未出现失败条="
+                  f"{not pr.get(S_CROP_FAIL_PREFIX)} 回传退出={finished}（{pr.get('_rounds')}轮）")
+        else:
+            print("  [s5] 未取到确认键坐标")
+
+        # ---- 3) 可恢复失败：页内错误条 + 停留本页（服务未开 ⇒ 连接失败）----
+        reset_app()
+        fail_url = f"http://127.0.0.1:{CROP_PORT}/crop_src.png"
+        started2 = _crop_start(fail_url, 3, 4)
+        xml2 = dump_xml(d)
+        stayed = "ImageCropActivity" in current_activity()
+        bar = _node_by_res(xml2, ID_ERROR_BAR) is not None
+        text_ok = (S_CROP_FAIL_PREFIX in xml2) and (S_CROP_FAIL_DECODE in xml2)
+        retry_ok = _node_by_res(xml2, ID_RETRY) is not None
+        fail_ok = started2 and stayed and bar and text_ok and retry_ok
+        print(f"  [s5] 失败条 启动={started2} 停留本页={stayed} 错误条={bar} 文案={text_ok} 重试键={retry_ok}")
+
+        # ---- 4) 重试 → 服务恢复 → 图片加载成功 → 确认裁剪 → 回传退出 ----
+        retry_ok2 = recover_ok = False
+        rb = _node_by_res(dump_xml(d), ID_RETRY)
+        if fail_ok and rb:
+            srv = _crop_serve()
+            time.sleep(0.6)
+            w, h = d.window_size()
+            d.click(rb["cx"] / w, rb["cy"] / h)
+            traj = _crop_bar_probe(d, 12.0)
+            # 重试被执行的硬判据 = 错误条曾消失（hideCropError 只在 loadImage 开头调用）
+            retry_ok2 = bool(traj["gone"]) and not traj["back"] and not traj["final"]
+            print(f"  [s5] 重试 错误条消失={traj['gone']} 又出现={traj['back']} 最终在场={traj['final']}"
+                  f"（{traj['_rounds']}轮）")
+            # 图片加载成功才可能真正裁剪 ⇒ 用「确认后回传退出」做正向判据（大图加载需余量）
+            if retry_ok2:
+                time.sleep(3.0)
+                for attempt in range(2):
+                    cb = _node_by_res(dump_xml(d), ID_CONFIRM)
+                    if not cb:
+                        break
+                    d.click(cb["cx"] / w, cb["cy"] / h)
+                    pr3 = _qr_probe(d, [S_CROP_SAVING], 12.0 if attempt == 0 else 8.0)
+                    if "ImageCropActivity" not in current_activity():
+                        recover_ok = True
+                        break
+                    print(f"  [s5] 恢复后第{attempt + 1}次确认未回传（保存中态={pr3.get(S_CROP_SAVING)}）")
+                print(f"  [s5] 恢复后裁剪回传退出={recover_ok}")
+
+        # ---- 5) 不可恢复（未传 uri）：保留 toast + finish ----
+        reset_app()
+        _crop_start("", 3, 4)
+        time.sleep(2.0)
+        fatal_ok = "ImageCropActivity" not in current_activity()
+        print(f"  [s5] 不可恢复(无 uri) 直接关闭={fatal_ok}")
+
+        # ---- 6) 源码断言 ----
+        act_code = _src_code(SRC_CROP_ACT)
+        lay = _src_text(SRC_CROP_LAYOUT)
+        checks = {
+            "保存中态落定": "setSavingState(true)" in act_code and "image_crop_saving" in act_code,
+            "徽标落定": "updateAspectBadge" in act_code and "tv_aspect_badge" in lay,
+            "错误条落定": "showCropError" in act_code and "error_bar" in lay and "btn_retry" in lay,
+            "失败不再关页": "showCropError(getString(R.string.error_decode_bitmap))" in act_code,
+            "旧失败 toast+finish 已删":
+                "toastOnUi(getString(R.string.image_crop_failed, getString(R.string.error_decode_bitmap)))"
+                not in act_code,
+            "不可恢复保留 finish": "error_image_url_empty" in act_code,
+        }
+        code_ok = all(checks.values())
+        print(f"  [s5] 源码断言 {sum(checks.values())}/{len(checks)} "
+              f"未过={[k for k, v in checks.items() if not v]}")
+
+        ok = all([default_ok, save_ok, fail_ok, retry_ok2, recover_ok, fatal_ok, code_ok])
+        print(f"  [s5] 小计: {'PASS' if ok else 'FAIL'}")
+        return ok
+    finally:
+        if srv is not None:
+            try:
+                srv.shutdown()
+            except Exception:
+                pass
+        release_reverse(CROP_PORT)
+        sh("rm", "-f", CROP_DEV_SRC)
+        reset_app()
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -1608,6 +1851,7 @@ STEPS = {
     "s2": guarded(s2_rss_sort_page),
     "s3": guarded(s3_browser_page),
     "s4": guarded(s4_qrcode_page),
+    "s5": guarded(s5_image_crop_page),
 }
 
 
@@ -1618,7 +1862,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3", "s4"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4", "s5"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
     ok = True
     for sid in targets:
         ok = ca.run_steps({sid: STEPS[sid]}, scenario=sid, tag_keywords=[], since_ts=since, ctx=d) and ok
