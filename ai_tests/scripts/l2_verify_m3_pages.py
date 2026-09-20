@@ -115,7 +115,7 @@
        （首轮按分组层实现，真机抓不到帧）⇒ 空态改落 Activity 层（新手态），蓝图 §1.5 已反哺
     ⚠️ 运行中推库不可用（SQLite 连接持旧 inode）⇒ 需「页内数据变化」的场景一律走「应用已停 + 推库 + 重开」
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|s6|s7|all]
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|s6|s7|s8|s9|s10|s11|s12|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装；openssl（Git 自带，脚本自动定位）
 
 口径说明（F192）：跨年分支需要「去年」的日志条目，真机沙箱无法构造跨年数据（AppLog 为内存日志，
@@ -123,6 +123,7 @@
 并在 tasks.md 登记为「逻辑分支未构造真机数据」——不伪称真机已覆盖。
 """
 import argparse
+import base64
 import re
 import socket
 import sqlite3
@@ -3929,6 +3930,423 @@ def guarded(fn):
     return inner
 
 
+# ============================ s12：M4 批次（image/image-gallery + rss/source-edit） ============================
+
+ACT_RSS_ART_S12 = "io.legado.app.ui.rss.article.RssSortActivity"
+ACT_GALLERY = "io.legado.app.ui.image.ImageGalleryActivity"
+ACT_SOURCE_EDIT = "io.legado.app.ui.rss.source.edit.RssSourceEditActivity"
+
+GAL_PORT = 18561
+# 失效文章专用端口：**从不监听**。为什么不用「停掉 GAL_PORT 服务」制造失败——实测踩坑：
+# `Rss.getContentAwait` 的文章正文**会被缓存**，停服后再次刷新仍 `imageCount=3 costMs=0`
+# （logcat 铁证 2026-09-21），失败态根本构造不出来。指向一个从未监听过的端口 ⇒ 连接必被拒，
+# 且该 link 从未被抓取过 ⇒ 无缓存可命中，失败是确定性的。
+GAL_DEAD_PORT = 18562
+GAL_SOURCE = "l2seed://image-gallery"
+GAL_SOURCE_NAME = "L2图片浏览校验源"
+GAL_SORT = "L2图集"
+GAL_ART_TITLE = "L2图集条目"
+GAL_ART_TITLE_DEAD = "L2图集失效条目"
+SRC_SEED_URL = "l2seed://source-edit-required"
+
+# 文案取自 values-zh/strings.xml 真值
+S_GAL_RUNNING = "正在刷新图片…"        # image_refresh_running
+S_GAL_DONE = "已刷新"                  # image_refresh_done
+S_GAL_FAILED = "刷新失败"              # image_refresh_failed
+S_GAL_ERR_SET = ("网络连接失败", "图片解析失败", "订阅源配置异常")   # image_load_error_*
+S_GAL_BACK_TOP = "返回顶部"            # image_back_to_top
+S_GAL_REFRESH_DESC = "刷新"            # refresh（顶栏刷新图标 content-desc）
+S_SRC_GROUP_SET = ("账户与变量", "编辑辅助", "导入 · 导出", "工具")   # source_menu_group_*
+S_SRC_REQUIRED_ERR = "必填项，不能为空"  # source_required_hint
+S_SRC_SAVE_DESC = "保存"                # action_save
+S_SRC_TAB_LIST = "列表"                 # source_tab_list
+S_SRC_NAME_HINT_PREFIX = "* 源名称"      # 必填标记 + source_name
+
+SRC_GALLERY_ACT = "app/src/main/java/io/legado/app/ui/image/ImageGalleryActivity.kt"
+SRC_GALLERY_ADAPTER = "app/src/main/java/io/legado/app/ui/image/adapter/ImageCanvasAdapter.kt"
+SRC_SOURCE_EDIT_ACT = "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt"
+SRC_EDIT_ENTITY = "app/src/main/java/io/legado/app/ui/widget/text/EditEntity.kt"
+
+# 1x1 真实 PNG 字节：Glide downloadOnly → decodeBounds 需要**真能被解码**的图（F271 同型教训），
+# 用假路径/空文件会让「加载成功」断言必然失败 ⇒ 把功能正常误判成缺陷（假阴性）。
+_TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+class _GalleryServer(threading.Thread):
+    """本机图集服务：`/art1` 返回含 3 张 `<img>` 的 HTML，`/imgN.png` 返回真实 PNG 字节。
+
+    为什么是 3 张：`ImageUrlExtractor` 在 **L1 命中 < 3 张**时才进 L2（WebView 嗅探 6s）——
+    给 3 张可跳过 L2，加载既快又确定。为什么必须走**真实入口**（订阅列表 → 点条目）而不是
+    `am start` 直起：`ImageGalleryActivity` 的数据源是 `ImagePlay` 单例，只有
+    `ReadRss.readNoHtml` 会注入它；直起只剩「订阅源为空」的错误分支（已实测）。
+    """
+
+    def __init__(self, port: int):
+        super().__init__(daemon=True)
+        self.port = port
+        self.hits = 0
+        self._httpd = None
+
+    def run(self):
+        import http.server
+        png = _TINY_PNG
+        html = ("<html><head><title>L2GAL</title></head><body>"
+                + "".join(f'<img src="/img{i}.png">' for i in (1, 2, 3))
+                + "</body></html>").encode("utf-8")
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                is_png = urlparse(self.path).path.endswith(".png")
+                body = png if is_png else html
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 "image/png" if is_png else "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _text_by_id(xml: str, res_suffix: str) -> str:
+    """按 resource-id 后缀取节点 text（View 系控件靠 id 定位最稳）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', tag)
+        if not rid or not rid.group(1).endswith(res_suffix):
+            continue
+        t = re.search(r'\btext="([^"]*)"', tag)
+        return t.group(1) if t else ""
+    return ""
+
+
+def _s12_upsert(con, table: str, cols: list, data: dict):
+    con.execute(
+        f"insert or replace into {table} ({','.join(cols)})"
+        f" values ({','.join('?' * len(cols))})",
+        [data[c] for c in cols]
+    )
+
+
+def _s12_seed(workdir: Path) -> bool:
+    """播种两个合成源（整行复制既有源后改写，零真实源污染，测后整份回滚快照）。
+
+    ① 图片订阅源（type=1）：文章 link 指向本机图集服务 ⇒ 走「订阅列表 → 点条目」真实入口；
+    ② 编辑校验源：`sourceName` 置空 ⇒ 供 F155「保存必填校验 + 定位」构造失败态。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(rssSources)")]
+        row = con.execute("select * from rssSources where enabled = 1 limit 1").fetchone()
+        if not row:
+            return False
+        base = dict(zip(cols, row))
+
+        gal = dict(base)
+        gal.update({
+            "sourceUrl": GAL_SOURCE, "sourceName": GAL_SOURCE_NAME,
+            "type": 1, "articleStyle": 0, "enabled": 1,
+            "sortUrl": f"{GAL_SORT}::http://127.0.0.1:{GAL_PORT}/sort",
+            "ruleArticles": None, "ruleNextPage": None,
+            "ruleContent": None, "ruleImage": "img@src",
+            "header": None, "loginUrl": None, "loginCheckJs": None,
+            "enabledCookieJar": 0, "preload": 0,
+        })
+        _s12_upsert(con, "rssSources", cols, gal)
+
+        edit = dict(base)
+        edit.update({
+            "sourceUrl": SRC_SEED_URL, "sourceName": "", "enabled": 1,
+            "ruleArticles": None, "ruleNextPage": None,
+            "loginUrl": None, "loginCheckJs": None, "preload": 0,
+        })
+        _s12_upsert(con, "rssSources", cols, edit)
+
+        con.execute("delete from rssArticles where origin = ?", (GAL_SOURCE,))
+        art_meta = [(r[1], (r[2] or "").upper(), r[3], r[4])
+                    for r in con.execute("pragma table_info(rssArticles)")]
+        # 两篇：A 走本机图集服务（成功路径）；B 指向从不监听的端口（确定性失败路径）
+        now_ms = int(time.time() * 1000)
+        for idx, (link, title) in enumerate((
+            (f"http://127.0.0.1:{GAL_PORT}/art1", GAL_ART_TITLE),
+            (f"http://127.0.0.1:{GAL_DEAD_PORT}/art1", GAL_ART_TITLE_DEAD),
+        )):
+            overrides = {
+                "origin": GAL_SOURCE, "sort": GAL_SORT, "link": link,
+                "title": title, "order": now_ms - idx, "read": 0, "type": 1, "pubDate": "",
+            }
+            names, vals = [], []
+            for name, ctype, notnull, dflt in art_meta:
+                if name in overrides:
+                    names.append(name)
+                    vals.append(overrides[name])
+                elif notnull and dflt is None:
+                    names.append(name)
+                    vals.append(0 if ("INT" in ctype or "REAL" in ctype) else "")
+            con.execute(
+                f"insert or replace into rssArticles ({','.join('`' + n + '`' for n in names)})"
+                f" values ({','.join('?' * len(names))})", vals)
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def s12_gallery_and_source_edit(d) -> bool:
+    """M4 2-3/11：image/image-gallery（F179 失败分类 + 返回顶部 + 刷新任务条 + 修重复追加）
+    + rss/source-edit（优化 6 菜单四组 / 优化 7 必填显式化 + 保存失败定位）"""
+    print("  [s12] ===== 图片浏览刷新回执/失败自愈 + 订阅源编辑菜单与必填定位 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s12_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s12] 数据库快照失败（前置）")
+        return False
+    server = None
+    ok = False
+    try:
+        server = _GalleryServer(GAL_PORT)
+        server.start()
+        if not _reverse_on(GAL_PORT):
+            print("  [s12] adb reverse 未建立（设备侧不可达本机图集服务）")
+            return False
+        if not _device_reachable(f"http://127.0.0.1:{GAL_PORT}", retries=3):
+            # 非致命：探针依赖设备侧 curl，缺失/超时不应直接判负；真实可达性由后续加载断言给出
+            print("  [s12] 设备侧探针未通（继续，真实可达性看加载断言）")
+        reset_app()
+        if not _s12_seed(workdir):
+            print("  [s12] 合成源播种失败")
+            return False
+        reset_app()
+
+        # ---------- B1：真实入口（订阅列表 → 点条目）→ 图片浏览成功加载 3 张 ----------
+        sh("am", "start", "-n", f"{PKG}/{ACT_RSS_ART_S12}", "--es", "sourceUrl", GAL_SOURCE)
+        time.sleep(9.0)
+        list_xml = dump_xml(d)
+        ca.shot(d, "m4s12_art_list")
+        item_b = _clickable_bounds(list_xml, GAL_ART_TITLE) or node_bounds(list_xml, GAL_ART_TITLE)
+        print(f"  [s12] 订阅列表条目在场={bool(item_b)}")
+        if item_b:
+            click_xy(d, item_b["cx"], item_b["cy"])
+        time.sleep(12.0)
+        gal_xml = dump_xml(d)
+        ca.shot(d, "m4s12_gallery_loaded")
+        landed = "ImageGalleryActivity" in current_activity()
+        idx_before = _text_by_id(gal_xml, "tv_canvas_page_index")
+        # 3 张图 ⇒ 页码「1 / 3」；若刷新后重复追加则变「1 / 6」
+        loaded_ok = landed and idx_before.replace(" ", "") == "1/3"
+        print(f"  [s12] B1 落地={landed} 页码={idx_before!r} 服务命中={server.hits} ⇒ {loaded_ok}")
+
+        # ---------- B2：刷新回执（任务条 Done）+ 修「刷新后重复追加」 ----------
+        refresh_b = (_desc_bounds_all(gal_xml, S_GAL_REFRESH_DESC) or [None])[0]
+        done_seen = False
+        idx_after = ""
+        if refresh_b:
+            click_xy(d, refresh_b["cx"], refresh_b["cy"])
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                cur = dump_xml(d)
+                if S_GAL_DONE in cur:
+                    done_seen = True
+                    break
+                time.sleep(1.0)
+            time.sleep(3.0)   # 等任务条消退 + 数据稳定
+            after_xml = dump_xml(d)
+            ca.shot(d, "m4s12_gallery_refreshed")
+            idx_after = _text_by_id(after_xml, "tv_canvas_page_index")
+        no_dup_ok = idx_after.replace(" ", "") == "1/3"
+        print(f"  [s12] B2 刷新任务条「{S_GAL_DONE}」={done_seen} / 刷新后页码={idx_after!r} "
+              f"（未重复追加={no_dup_ok}）")
+
+        # ---------- B3：失败自愈（点「失效文章」⇒ 加载必失败）——分类文案 + 提示 + 返回顶部 + 失败回执 ----------
+        # ⚠️ 不能用「停掉 GAL_PORT 服务」构造失败：`Rss.getContentAwait` 的文章正文**会被缓存**
+        # （实测铁证 2026-09-21：停服后刷新仍 `imageCount=3 costMs=0`，失败态根本构造不出来）
+        # ⇒ 改点第二篇文章，其 link 指向**从不监听的端口**（从未被抓取 ⇒ 无缓存可命中）。
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_RSS_ART_S12}", "--es", "sourceUrl", GAL_SOURCE)
+        time.sleep(9.0)
+        dead_list = dump_xml(d)
+        dead_b = _clickable_bounds(dead_list, GAL_ART_TITLE_DEAD) \
+            or node_bounds(dead_list, GAL_ART_TITLE_DEAD)
+        print(f"  [s12] B3 失效条目在场={bool(dead_b)}")
+        err_text = hint_text = ""
+        back_top = False
+        raw_leak = False
+        run_seen = fail_seen = False
+        if dead_b:
+            click_xy(d, dead_b["cx"], dead_b["cy"])
+            deadline = time.time() + 60
+            while time.time() < deadline:
+                cur = dump_xml(d)
+                err_text = _text_by_id(cur, "tv_error")
+                hint_text = _text_by_id(cur, "tv_error_hint")
+                if err_text in S_GAL_ERR_SET and hint_text:
+                    break
+                time.sleep(1.5)
+            ca.shot(d, "m4s12_gallery_error")
+            err_xml = dump_xml(d)
+            back_top = bool(_desc_bounds_all(err_xml, S_GAL_BACK_TOP)) or \
+                bool(node_bounds(err_xml, S_GAL_BACK_TOP))
+            # F179 判据核心：呈现的是**分类文案**，不再把原始异常文本抛给用户
+            raw_leak = ("empty list" in err_xml) or ("Exception" in err_xml)
+            # 刷新回执（失败分支）：顶栏刷新入口按 desc 取，取不到按顶栏动作序兜底
+            refresh_b2 = (_desc_bounds_all(err_xml, S_GAL_REFRESH_DESC) or [None])[0] \
+                or topbar_action_bounds(err_xml, from_right=1)
+            if refresh_b2:
+                click_xy(d, refresh_b2["cx"], refresh_b2["cy"])
+                deadline = time.time() + 60
+                while time.time() < deadline:
+                    cur = dump_xml(d)
+                    if S_GAL_RUNNING in cur:
+                        run_seen = True
+                    if S_GAL_FAILED in cur:
+                        fail_seen = True
+                    if run_seen and fail_seen:
+                        break
+                    time.sleep(1.2)
+            else:
+                print("  [s12] B3 刷新入口未定位到")
+        err_ok = (err_text in S_GAL_ERR_SET) and bool(hint_text) and back_top \
+            and not raw_leak and run_seen and fail_seen
+        print(f"  [s12] B3 分类文案={err_text!r} 提示={bool(hint_text)} 返回顶部={back_top} "
+              f"原始异常外泄={raw_leak} / 刷新进行中={run_seen} 失败回执={fail_seen} ⇒ {err_ok}")
+
+        # ---------- A：rss/source-edit 菜单四组 + 必填显式化 + 保存失败定位 ----------
+        reset_app()
+        edit_landed = False
+        for _ in range(2):
+            sh("am", "start", "-n", f"{PKG}/{ACT_SOURCE_EDIT}", "--es", "sourceUrl", SRC_SEED_URL)
+            time.sleep(4.0)
+            if "RssSourceEditActivity" in current_activity():
+                edit_landed = True
+                break
+            sh_su(f"am start -n {PKG}/{ACT_SOURCE_EDIT} --es sourceUrl {SRC_SEED_URL}")
+            time.sleep(4.0)
+            if "RssSourceEditActivity" in current_activity():
+                edit_landed = True
+                break
+        edit_xml = dump_xml(d)
+        ca.shot(d, "m4s12_source_edit")
+        # 必填标记：hint 渲染为「* 源名称（sourceName）」
+        req_mark = any(t.startswith(S_SRC_NAME_HINT_PREFIX) for t, *_ in text_nodes(edit_xml))
+        print(f"  [s12] A0 落地={edit_landed} 必填标记「{S_SRC_NAME_HINT_PREFIX}…」={req_mark}")
+
+        # ---------- A1：保存失败定位（先切到「列表」Tab，再点保存）----------
+        # 顺序刻意排在菜单检查之前：菜单关闭若误触返回会结束本页，放最后可避免连带污染本项。
+        cur_xml = dump_xml(d)
+        tab_b = _clickable_bounds(cur_xml, S_SRC_TAB_LIST) or node_bounds(cur_xml, S_SRC_TAB_LIST)
+        if tab_b:
+            click_xy(d, tab_b["cx"], tab_b["cy"])
+            time.sleep(1.5)
+        save_b = (_desc_bounds_all(dump_xml(d), S_SRC_SAVE_DESC) or [None])[0]
+        err_located = False
+        alive = False
+        if save_b:
+            click_xy(d, save_b["cx"], save_b["cy"])
+            deadline = time.time() + 12
+            while time.time() < deadline:
+                cur = dump_xml(d)
+                if S_SRC_REQUIRED_ERR in cur:
+                    err_located = True
+                    break
+                time.sleep(1.0)
+            last = dump_xml(d)
+            ca.shot(d, "m4s12_source_required_error")
+            alive = "RssSourceEditActivity" in current_activity()
+            # 定位有效性：错误文案在场 + 必填字段（基本 Tab）重新可见
+            back_to_base = any(t.startswith(S_SRC_NAME_HINT_PREFIX) for t, *_ in text_nodes(last))
+            print(f"  [s12] A1 保存校验错误在场={err_located} 已回到基本Tab={back_to_base} "
+                  f"页面存活={alive}")
+            err_located = err_located and back_to_base and alive
+        else:
+            print("  [s12] A1 保存入口未定位到")
+
+        # ---------- A2：⋮ 菜单四组（⋮ 是顶栏最右可点图标）----------
+        more_b = topbar_action_bounds(dump_xml(d), from_right=0)
+        groups_ok = False
+        if more_b:
+            click_xy(d, more_b["cx"], more_b["cy"])
+            time.sleep(2.0)
+            menu_xml = dump_xml(d)
+            ca.shot(d, "m4s12_source_menu")
+            hit_groups = [g for g in S_SRC_GROUP_SET if g in menu_xml]
+            groups_ok = len(hit_groups) == len(S_SRC_GROUP_SET)
+            print(f"  [s12] A2 菜单分组命中={hit_groups} ⇒ {groups_ok}")
+            d.press("back")
+            time.sleep(1.5)
+        else:
+            print("  [s12] A2 ⋮ 入口未定位到")
+
+        # ---------- 源码断言（关键接线必须真实存在） ----------
+        src_gal = _src_text(SRC_GALLERY_ACT)
+        src_ad = _src_text(SRC_GALLERY_ADAPTER)
+        src_ed = _src_text(SRC_SOURCE_EDIT_ACT)
+        src_ee = _src_text(SRC_EDIT_ENTITY)
+        checks = [
+            ("gallery: 刷新前复位画布状态", "ImagePlay.clearImageCanvasState()" in src_gal
+             and "isInitialScrollDone = false" in src_gal),
+            ("gallery: 刷新回执由 loadState 驱动", "finishRefresh(" in src_gal
+             and "is ImageCanvasAdapter.LoadState.SUCCESS" in src_gal),
+            ("gallery: 任务条挂载", "InlineTaskBar(" in src_gal),
+            ("gallery: 失败分类器", "fun classifyError(" in src_ad),
+            ("gallery: 返回顶部逃生口", "onBackToTop" in src_ad and "btnBackToTop" in src_ad),
+            ("gallery: 原始异常不再直出", "state.error.message ?: " not in src_ad),
+            ("source-edit: 菜单四组标题", "header = true" in src_ed
+             and "source_menu_group_io" in src_ed),
+            ("source-edit: 必填校验 + 定位", "private fun saveSource(" in src_ed
+             and "private fun locateField(" in src_ed),
+            ("source-edit: 必填字段标记", "required = true" in src_ed),
+            ("EditEntity: required/error 字段", "val required: Boolean" in src_ee
+             and "var error: String?" in src_ee),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s12] 源码 {name} = {v}")
+
+        ok = bool(loaded_ok and done_seen and no_dup_ok and err_ok
+                  and edit_landed and req_mark and groups_ok and err_located and src_ok)
+    except Exception as e:
+        print(f"  [s12] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        release_reverse(GAL_PORT)
+        if server:
+            server.stop()
+        reset_app()
+        try:
+            rolled = m2._db_push(db_snap)
+            print(f"  [s12] 数据库快照已回滚={rolled}")
+        except Exception as e:
+            print(f"  [s12] 兜底回滚异常: {type(e).__name__}")
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -3941,6 +4359,7 @@ STEPS = {
     "s9": guarded(s9_usage_and_para_rule_page),
     "s10": guarded(s10_video_pages),
     "s11": guarded(s11_menu_and_bgm_pages),
+    "s12": guarded(s12_gallery_and_source_edit),
 }
 
 
@@ -3951,7 +4370,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
