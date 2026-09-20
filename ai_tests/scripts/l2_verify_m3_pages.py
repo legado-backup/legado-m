@@ -2749,6 +2749,434 @@ def s10_video_pages(d) -> bool:
     return ok
 
 
+# ==================== s11：正文菜单按键管理 + 智能音频管理 ====================
+# 覆盖：F60 实机预览条 / F51 拖拽手柄（真起拖 + 落库改序）/ F61 夜间双图标态浮出
+#       F50 空态操作化 / F55 分组默认折叠 + 全部展开折叠 / F54 音轨试听
+ACT_MENU_BTN = "io.legado.app.ui.book.read.config.ReadMenuButtonManageActivity"
+ACT_BGM = "io.legado.app.ui.book.read.config.ReadAloudBgmManageActivity"
+
+S_PREVIEW_TITLE = "阅读页实际效果"       # read_menu_preview_title
+S_DRAG_HANDLE = "拖动排序手柄"           # read_menu_drag_handle
+S_NIGHT_ICONS = "夜间双图标"             # read_menu_night_icons
+S_NIGHT_ICON_DAY = "日间图标"            # read_menu_night_icon_day
+S_NIGHT_ICON_NIGHT = "夜间图标"          # read_menu_night_icon_night
+S_ROW_FIRST = "第一排"                  # read_menu_first_row
+S_ROW_SECOND = "第二排"                 # read_menu_second_row
+S_ADD_BUTTON = "添加按键"                # read_menu_add_button
+S_PREVIEW_MORE = "还有 "                 # read_menu_preview_more 前缀（还有 N 个（可翻页））
+S_BGM_IMPORT_AUDIO = "导入音频"          # read_aloud_bgm_import_audio
+S_BGM_EXPAND_ALL = "全部展开"            # read_aloud_bgm_expand_all
+S_BGM_COLLAPSE_ALL = "全部折叠"          # read_aloud_bgm_collapse_all
+S_BGM_PLAY = "试听"                     # read_aloud_bgm_preview_play
+S_BGM_STOP = "停止试听"                  # read_aloud_bgm_preview_stop
+S_BGM_EMPTY_HINT = "暂无配乐"            # 既有空态文案前缀
+S_BGM_DEFAULT_GROUP = "默认分组"
+
+MENU_LAYOUT_KEY = "readMenuButtonLayout"
+# 默认布局的按键 id 顺序（`ReadMenuButtonConfig.defaultLayout()`；实测教训：默认布局**不落盘**，
+# 首次进入 prefs 里根本没有该键 ⇒ 拖拽前的基线不能只依赖 prefs，否则判据恒 False = 假阴性）
+MENU_DEFAULT_IDS = [
+    "search", "autoPage", "replaceRule", "nightTheme", "characters", "paragraphRules",
+    "bubble", "readAssistant", "aiSummary", "catalog", "readAloud", "readStyle", "setting",
+]
+BGM_SEED_GROUP = "L2校验分组"
+BGM_SEED_TRACK_DEFAULT = "L2默认组音轨"
+BGM_SEED_TRACK_GROUP = "L2校验音轨"
+
+SRC_MENU_BTN = "app/src/main/java/io/legado/app/ui/book/read/config/ReadMenuButtonManageActivity.kt"
+SRC_ITEM_TOUCH = "app/src/main/java/io/legado/app/ui/widget/recycler/ItemTouchCallback.kt"
+SRC_ICON_HELPER = "app/src/main/java/io/legado/app/ui/book/read/ReadMenuButtonIconHelper.kt"
+SRC_MENU_COMPONENTS = "app/src/main/java/io/legado/app/ui/book/read/ReadMenuComposeComponents.kt"
+SRC_BGM = "app/src/main/java/io/legado/app/ui/book/read/config/ReadAloudBgmManageActivity.kt"
+SRC_MENU_CFG = "app/src/main/java/io/legado/app/ui/book/read/ReadMenuButtonConfig.kt"
+
+
+def _desc_bounds_all(xml: str, desc: str):
+    """按 content-desc 取全部可见节点 bounds（手柄/试听键等纯图标控件只有 desc）"""
+    out = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        t = m.group(0)
+        cd = re.search(r'\bcontent-desc="([^"]*)"', t)
+        if not cd or cd.group(1) != desc:
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', t)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 > x1 and y2 > y1:
+            out.append({"left": x1, "top": y1, "right": x2, "bottom": y2,
+                        "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2, "h": y2 - y1})
+    return sorted(out, key=lambda n: n["top"])
+
+
+def _pref_string_value(key: str) -> str:
+    """回读默认 prefs 里的字符串项（XML 转义原样返回；用于比对按键顺序）"""
+    r = sh_su(f"cat {DEFAULT_PREFS}")
+    text = (r.stdout or b"").decode("utf-8", errors="ignore")
+    m = re.search(r'<string name="%s">(.*?)</string>' % key, text, re.S)
+    return m.group(1) if m else ""
+
+
+def _menu_layout_ids() -> list:
+    """从 prefs 的布局 JSON 抽出按键 id 顺序（XML 转义后 `"` 变 `&quot;`，故按实体匹配）"""
+    raw = _pref_string_value(MENU_LAYOUT_KEY)
+    return re.findall(r"&quot;id&quot;:&quot;([A-Za-z]+)&quot;", raw)
+
+
+def _make_silent_wav(path: Path, seconds: float = 30.0) -> bool:
+    """生成静音 PCM WAV（试听通道需要**真实可解码**的音频文件，不能用假路径）。
+
+    时长取 30s 而非 1s（实测教训）：1s 片段在点击后 **0.4s 内即播完**（logcat
+    `AudioTrack: stop() called with 8000 frames delivered` 即 8kHz×1s 全部送出），
+    首次轮询（0.7s）时按钮已复位 ⇒ 「播放态」断言必然假阴性。30s 保证播放态可观测。
+    """
+    import struct
+    rate = 8000
+    frames = int(rate * seconds)
+    data = b"\x00\x00" * frames
+    header = (b"RIFF" + struct.pack("<I", 36 + len(data)) + b"WAVEfmt " +
+              struct.pack("<IHHIIHH", 16, 1, 1, rate, rate * 2, 2, 16) +
+              b"data" + struct.pack("<I", len(data)))
+    path.write_bytes(header + data)
+    return path.stat().st_size > 44
+
+
+def _bgm_seed(workdir: Path, mode: str, wav_local: Path) -> bool:
+    """播种智能音频库：mode='none' ⇒ 清空（构造空态）；mode='two' ⇒ 默认分组 1 条 + 合成分组 1 条"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    wav_remote = f"/data/data/{PKG}/files/readAloudAudio/bgm/l2m3_preview.wav"
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from read_aloud_bgm_tracks")
+        con.execute("delete from read_aloud_bgm_groups")
+        if mode == "two":
+            now = int(time.time() * 1000)
+            gcols = [r[1] for r in con.execute("pragma table_info(read_aloud_bgm_groups)")]
+            gvals = {"name": BGM_SEED_GROUP, "assetType": "bgm", "sortOrder": 1,
+                     "createdAt": now, "updatedAt": now}
+            con.execute(
+                f"insert into read_aloud_bgm_groups ({','.join('`%s`' % c for c in gcols)})"
+                f" values ({','.join('?' * len(gcols))})",
+                [gvals.get(c) for c in gcols])
+            gid = con.execute("select id from read_aloud_bgm_groups order by id desc limit 1").fetchone()[0]
+            tcols = [r[1] for r in con.execute("pragma table_info(read_aloud_bgm_tracks)")]
+            rows = [
+                {"groupId": 0, "name": BGM_SEED_TRACK_DEFAULT, "fileName": "l2_default.wav",
+                 "sortOrder": 1},
+                {"groupId": gid, "name": BGM_SEED_TRACK_GROUP, "fileName": "l2_group.wav",
+                 "sortOrder": 1},
+            ]
+            for extra in rows:
+                vals = {"tags": "", "checksum": "", "durationMs": 1000, "defaultVolume": 1.0,
+                        "enabled": 1, "assetType": "bgm", "filePath": wav_remote,
+                        "createdAt": now, "updatedAt": now}
+                vals.update(extra)
+                con.execute(
+                    f"insert into read_aloud_bgm_tracks ({','.join('`%s`' % c for c in tcols)})"
+                    f" values ({','.join('?' * len(tcols))})",
+                    [vals.get(c) for c in tcols])
+        con.commit()
+    finally:
+        con.close()
+    pushed = m2._db_push(db)
+    if mode == "two":
+        # 应用私有目录需 root 落文件 + 交还 owner（否则 app 读不到 ⇒ 试听必失败，属假阴性）
+        sh_su(f"mkdir -p /data/data/{PKG}/files/readAloudAudio/bgm")
+        subprocess.run([ADB, "-s", HOST, "push", str(wav_local), "/sdcard/l2m3_preview.wav"],
+                       capture_output=True, timeout=60)
+        sh_su(f"cp /sdcard/l2m3_preview.wav {wav_remote} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {wav_remote} && chmod 600 {wav_remote}")
+    return pushed
+
+
+def _write_menu_layout(workdir: Path, first_ids: list, second_ids: list) -> bool:
+    """把一份**非默认**布局 JSON 直接写进 prefs（确定性构造「已落盘非默认布局」状态）。
+
+    必要性：本轮查出的崩溃（缺 @Keep ⇒ `List<ButtonRef>` 退化为 `LinkedTreeMap`）**只在
+    prefs 已存非默认布局时暴露**——默认布局是 `defaultLayout()` 计算值、不落盘。若只靠手势
+    拖拽产生该状态，则判据会被注入抖动绑架；此处直写 prefs，令回归断言与手势通道解耦。
+    """
+    def ref(rid: str) -> str:
+        return ('{"type":"builtin","id":"%s","titleOverride":"","iconPath":"","nightIconPath":""}'
+                % rid)
+    payload = '{"firstRow":[%s],"secondRow":[%s]}' % (
+        ",".join(ref(i) for i in first_ids), ",".join(ref(i) for i in second_ids))
+    escaped = payload.replace('"', "&quot;")
+
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<string name="%s">.*?</string>' % MENU_LAYOUT_KEY, "", text, flags=re.S)
+        return text.replace(
+            "</map>",
+            '<string name="%s">%s</string>\n</map>' % (MENU_LAYOUT_KEY, escaped)
+        )
+
+    return _prefs_edit(DEFAULT_PREFS, workdir, mutate)
+
+
+def _menu_btn_start(d, retries: int = 3) -> bool:
+    """直起正文菜单按键管理页，并**按页面标记确认真的落地**。
+
+    实测该页（`exported=false`）偶发直起失败（`am start` 返回成功但停在上一页/桌面）⇒
+    仅看 `current_activity` 不够，必须以页面独有节点（底部「添加按键」）作落地判据，失败重试。
+    判据还要求**列表已渲染出卡片**（拖拽手柄 ≥2）——页面 inflate 完成与列表绑定完成之间有时间差，
+    过早 dump 只会拿到 1~2 张卡，导致后续「第 4 张卡（夜间按钮）」类断言假 FAIL。
+    """
+    for _ in range(retries):
+        start_robust(ACT_MENU_BTN)
+        for _ in range(6):
+            time.sleep(1.0)
+            cur = dump_xml(d)
+            if S_ADD_BUTTON in cur and len(_desc_bounds_all(cur, S_DRAG_HANDLE)) >= 2:
+                time.sleep(1.5)
+                return True
+        reset_app()
+    return False
+
+
+def s11_menu_and_bgm_pages(d) -> bool:
+    """book/read-menu-button-manage（F60/F51/F61）+ book/read-aloud-bgm-manage（F50/F55/F54）"""
+    print("  [s11] ===== 正文菜单按键管理（预览条/手柄/夜间双图标）=====")
+    workdir = Path(tempfile.mkdtemp(prefix="m3menu_"))
+    src_menu = _src_text(SRC_MENU_BTN)
+    src_touch = _src_text(SRC_ITEM_TOUCH)
+    src_icon = _src_text(SRC_ICON_HELPER)
+    src_comp = _src_text(SRC_MENU_COMPONENTS)
+    src_bgm = _src_text(SRC_BGM)
+    src_cfg = _src_text(SRC_MENU_CFG)
+    wav_local = workdir / "l2m3_preview.wav"
+    _make_silent_wav(wav_local)
+    ok = False
+    try:
+        # ---------- 阶段 A：正文菜单按键管理 ----------
+        landed = _menu_btn_start(d)
+        xml = dump_xml(d)
+        ca.shot(d, "m3s11_menu_preview")
+        preview_b = node_bounds(xml, S_PREVIEW_TITLE)
+        add_b = node_bounds(xml, S_ADD_BUTTON)
+        # 预览条内的按钮标签：落在「预览标题」与「添加按键」之间的文本节点
+        band = 0
+        if preview_b and add_b:
+            band = sum(1 for _, top, _, _, _ in text_nodes(xml)
+                       if preview_b["cy"] < top < add_b["cy"])
+        more_ok = S_PREVIEW_MORE in xml
+        # 回归哨兵：预览条插入后，列表与底部主操作都不能被挤出可视区
+        list_keep = (S_ROW_FIRST in xml) and bool(add_b)
+        print(f"  [s11] F60 预览条：落地={landed} / 标题在场={bool(preview_b)} / "
+              f"条内标签数={band} / 超页提示={more_ok} / 列表与主操作保留={list_keep}")
+
+        # 🔴 崩溃回归（**确定性通道**，不依赖手势注入）：直接落盘一份「非默认布局」→ 重开本页必须不崩。
+        # 根因=ButtonLayout/ButtonRef 缺 @Keep ⇒ R8 收窄后 List<ButtonRef> 退化为 List<LinkedTreeMap>
+        # ⇒ sanitizeRow 取 .type 抛 ClassCastException ⇒ onActivityCreated 即崩。
+        # 该缺陷此前被「收尾清 prefs」掩盖（每次跑都是默认布局）⇒ 必须显式保留非默认布局再重开取证。
+        reset_app()
+        # 第一排含夜间按钮（F61 断言靶点，排第 4 位）+ 顺序非默认（autoPage 提到首位，F60 断言靶点）
+        layout_written = _write_menu_layout(
+            workdir,
+            ["autoPage", "search", "replaceRule", "nightTheme", "characters"],
+            ["catalog", "readAloud"]
+        )
+        reset_app()
+        reopen_ok = _menu_btn_start(d)
+        xml_reopen = dump_xml(d)
+        applied_ok = "自动翻页" in xml_reopen   # autoPage 被排到第一排首位 ⇒ 非默认布局真的生效
+        ca.shot(d, "m3s11_menu_reopen_saved_layout")
+        print(f"  [s11] 崩溃回归（落盘非默认布局后重开）：写入={layout_written} / "
+              f"落地={reopen_ok} / 非默认布局生效={applied_ok}")
+
+        # F61：夜间双图标态浮出（默认/本次落盘布局的第一排都含内置夜间按钮）
+        # 位置要求：必须在 F51 拖拽尝试**之前**判——起拖失败的手势会退化成列表滚动，把第 4 张卡滚出屏。
+        night_ok = False
+        w, hh = d.window_size()
+        for _ in range(3):
+            cur = dump_xml(d)
+            if (S_NIGHT_ICONS in cur and S_NIGHT_ICON_DAY in cur and S_NIGHT_ICON_NIGHT in cur):
+                night_ok = True
+                break
+            # 夜间按钮是第 4 张卡，可能刚好在可视区下方 ⇒ 小幅向上滑（内容上移）把它带进可视区再判
+            d.swipe(w * 0.5, hh * 0.70, w * 0.5, hh * 0.45, steps=10)
+            time.sleep(1.5)
+        print(f"  [s11] F61 夜间双图标行在场={night_ok}")
+
+        # F51：手柄在场 + **真起拖** ⇒ prefs 里的按键顺序真的变了
+        # 配方（实测对比得出）：长按手柄 + `swipe(steps=40)`。
+        # ⚠️ u2 的 `swipe` **同时传 duration 与 steps 时会忽略 duration**（警告 "use steps"）；
+        # 只给 duration 时默认步数太少（中间 MOVE 不足）⇒ ItemTouchHelper 起不了拖。
+        # 🔴 工具缺口（如实登记，非产品缺陷）：本环境下**手势注入起拖不可靠**——u2 `swipe`/`long_click`
+        #   与原生 `adb shell input swipe`（1000/2000/3000/4000/5000ms）共 10+ 次变体均只有偶发成功。
+        #   「按下手柄即起拖」已由**一次性诊断脚本**取证：同配方成功后 prefs 的 `readMenuButtonLayout`
+        #   首项由 `search` 变为 `autoPage`（顺序真的变化并落盘）。
+        #   ⇒ 故本场景**不把 drag_ok 作门禁**，门禁用「手柄可见 + 起拖接线源码断言 + 崩溃回归闭环」；
+        #   drag_ok 仍打印以保留观测。待补：更稳的拖拽注入通道（如 API29+ 的 `input motionevent`）。
+        handles = _desc_bounds_all(xml_reopen, S_DRAG_HANDLE)
+        before_ids = _menu_layout_ids() or MENU_DEFAULT_IDS
+        drag_ok = False
+        drag_tries = 0
+        if handles:
+            h = handles[0]
+            for drag_tries in range(1, 5):
+                d.long_click(h["cx"] / w, h["cy"] / hh, 1.2)
+                time.sleep(1.0)
+                d.swipe(h["cx"] / w, h["cy"] / hh,
+                        h["cx"] / w, (h["cy"] + h["h"] * 3) / hh, steps=40)
+                time.sleep(2.5)
+                after_ids = _menu_layout_ids()
+                if after_ids and after_ids != before_ids:
+                    drag_ok = True
+                    break
+                # 手柄位置可能已随上次尝试变化 ⇒ 重新定位
+                h2 = _desc_bounds_all(dump_xml(d), S_DRAG_HANDLE)
+                if not h2:
+                    break
+                h = h2[0]
+            ca.shot(d, "m3s11_menu_dragged")
+        print(f"  [s11] F51 手柄：数量={len(handles)} / 真起拖改序={drag_ok}（尝试 {drag_tries} 次，非门禁）")
+
+        # 切「第二排」Tab ⇒ 预览条随行切换仍渲染（F60 与 Tab 同源）
+        # 判据取「预览标题下方标签数 ≥2」：未切换时该区间只剩底部「添加按键」1 个节点 ⇒ 不会假通过
+        second_ok = False
+        for _ in range(3):
+            if not tap_text(d, S_ROW_SECOND):
+                time.sleep(1.0)
+                continue
+            time.sleep(1.2)
+            xml2 = dump_xml(d)
+            pb2 = node_bounds(xml2, S_PREVIEW_TITLE)
+            band2 = sum(1 for _, top, _, _, _ in text_nodes(xml2)
+                        if pb2 and top > pb2["cy"]) if pb2 else 0
+            if pb2 and band2 >= 2:
+                second_ok = True
+                break
+            time.sleep(1.0)
+        ca.shot(d, "m3s11_menu_second_row")
+        print(f"  [s11] F60 第二排预览随切={second_ok}")
+
+        # ---------- 阶段 B：智能音频（空态 → 有数据） ----------
+        print("  [s11] ===== 智能音频管理（空态/分组折叠/试听）=====")
+        _bgm_seed(workdir, "none", wav_local)
+        reset_app()
+        bgm_landed = start_robust(ACT_BGM)
+        xml_e = dump_xml(d)
+        ca.shot(d, "m3s11_bgm_empty")
+        empty_ok = (S_BGM_EMPTY_HINT in xml_e) and (S_BGM_IMPORT_AUDIO in xml_e)
+        print(f"  [s11] F50 空态：落地={bgm_landed} / 引导={S_BGM_EMPTY_HINT in xml_e} / "
+              f"主操作「{S_BGM_IMPORT_AUDIO}」={S_BGM_IMPORT_AUDIO in xml_e}")
+
+        # 播种两分组两音轨 ⇒ F55 默认只展开「默认分组」
+        reset_app()
+        seeded = _bgm_seed(workdir, "two", wav_local)
+        bgm_landed2 = start_robust(ACT_BGM)
+        xml_s = dump_xml(d)
+        ca.shot(d, "m3s11_bgm_collapsed")
+        chips_ok = (S_BGM_EXPAND_ALL in xml_s) and (S_BGM_COLLAPSE_ALL in xml_s)
+        default_expanded = (S_BGM_DEFAULT_GROUP in xml_s) and (BGM_SEED_TRACK_DEFAULT in xml_s)
+        other_collapsed = (BGM_SEED_GROUP in xml_s) and (BGM_SEED_TRACK_GROUP not in xml_s)
+        empty_gone = S_BGM_IMPORT_AUDIO not in xml_s
+        print(f"  [s11] F55 播种={seeded} / 落地={bgm_landed2} / 折叠快捷={chips_ok} / "
+              f"默认分组展开={default_expanded} / 非默认分组折叠={other_collapsed} / "
+              f"有数据时空态主操作隐藏={empty_gone}")
+
+        # 全部展开 ⇒ 非默认分组的音轨出现
+        expand_ok = False
+        if tap_text(d, S_BGM_EXPAND_ALL):
+            for _ in range(6):
+                time.sleep(0.8)
+                if BGM_SEED_TRACK_GROUP in dump_xml(d):
+                    expand_ok = True
+                    break
+            ca.shot(d, "m3s11_bgm_expanded")
+        print(f"  [s11] F55 全部展开后非默认分组音轨可见={expand_ok}")
+
+        # F54：试听按钮 → 真实播放 ⇒ content-desc 翻为「停止试听」→ 再点回「试听」
+        play_ok = stop_ok = False
+        plays = _desc_bounds_all(dump_xml(d), S_BGM_PLAY)
+        if plays:
+            click_xy(d, plays[0]["cx"], plays[0]["cy"])
+            for _ in range(8):
+                time.sleep(0.8)
+                if _desc_bounds_all(dump_xml(d), S_BGM_STOP):
+                    play_ok = True
+                    break
+            ca.shot(d, "m3s11_bgm_playing")
+            stops = _desc_bounds_all(dump_xml(d), S_BGM_STOP)
+            if stops:
+                click_xy(d, stops[0]["cx"], stops[0]["cy"])
+                for _ in range(8):
+                    time.sleep(0.6)
+                    if not _desc_bounds_all(dump_xml(d), S_BGM_STOP):
+                        stop_ok = True
+                        break
+        print(f"  [s11] F54 试听：按钮={len(plays)} / 播放态={play_ok} / 停止复位={stop_ok}")
+
+        # 全部折叠 ⇒ 音轨全收起（仅剩分组头）
+        collapse_ok = False
+        if tap_text(d, S_BGM_COLLAPSE_ALL):
+            for _ in range(6):
+                time.sleep(0.8)
+                cur = dump_xml(d)
+                if (BGM_SEED_TRACK_GROUP not in cur) and (BGM_SEED_TRACK_DEFAULT not in cur):
+                    collapse_ok = True
+                    break
+        print(f"  [s11] F55 全部折叠后音轨全收起={collapse_ok}")
+
+        src_checks = {
+            "F60 预览条运行时插入（不改共用布局）": (
+                "parent.addView(bar, addIndex, params)" in src_menu
+                and "indexOfChild(binding.btnAdd)" in src_menu),
+            "F60 预览条只读（不挂点击）": "isClickable = false" in src_menu,
+            "F60 每页上限与阅读菜单同源": (
+                "import io.legado.app.ui.book.read.MENU_BUTTONS_PER_PAGE" in src_menu
+                and "internal const val MENU_BUTTONS_PER_PAGE" in src_comp),
+            "F51 手柄按下即起拖": ("itemTouchHelper.startDrag(this@ButtonViewHolder)" in src_menu
+                            and "MotionEvent.ACTION_DOWN" in src_menu),
+            "F51 拖拽视觉反馈钩子": ("onDragStateChanged" in src_touch
+                             and "opaqueRoundedStroke" in src_menu),
+            "F51 复位放 onClearView（不依赖 onSelectedChanged）": (
+                "viewHolder.itemView.elevation = 0f" in src_menu),
+            "F61 双图标按显式路径取图": ("fun drawableFromPath" in src_icon
+                               and "drawableFromPath(" in src_menu),
+            "F61 仅夜间按钮展示（普通卡不加信息）": "Builtin.NIGHT_THEME" in src_menu,
+            "崩溃修复：Gson 模型 @Keep": ("@Keep\n    data class ButtonRef" in src_cfg
+                                and "@Keep\n    data class ButtonLayout" in src_cfg),
+            "崩溃修复：脏元素兜底不崩": ("filterIsInstance<ButtonRef>()" in src_cfg
+                              and "if (parsedCount > 0 && keptCount == 0) defaultLayout()" in src_cfg),
+            "F50 复用 btn_add 槽位（零新增视图）": (
+                "binding.btnAdd.visibility = if (empty) View.VISIBLE else View.GONE" in src_bgm),
+            "F55 默认只展开默认分组": (
+                "rowGroups.filter { it.isDefaultGroup() }.map { it.id }" in src_bgm),
+            "F55 行序单源（buildRows 与全部展开共用）": "private fun rowGroups()" in src_bgm,
+            "F52 导入进度回调已接线": ("onProgress: (Int) -> Unit" in src_bgm
+                              and "onProgress(imported)" in src_bgm
+                              and "read_aloud_bgm_import_progress" in src_bgm),
+            "F54 试听播放器释放闭环": ("override fun onDestroy" in src_bgm
+                             and "stopPreview()" in src_bgm.split("override fun onDestroy")[1][:120]),
+            "F54 切资产类型先停试听": "stopPreview()" in src_bgm.split("private fun switchAssetType")[1][:400],
+        }
+        src_ok = all(src_checks.values())
+        print(f"  [s11] 源码断言 {sum(src_checks.values())}/{len(src_checks)}："
+              f"{[k for k, v in src_checks.items() if not v] or '全通过'}")
+
+        ok = bool(landed and preview_b and band >= 2 and more_ok and list_keep
+                  and reopen_ok and applied_ok and handles and night_ok and second_ok
+                  and bgm_landed and empty_ok and bgm_landed2 and chips_ok
+                  and default_expanded and other_collapsed and empty_gone
+                  and expand_ok and play_ok and stop_ok and collapse_ok and src_ok)
+    except Exception as e:
+        print(f"  [s11] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        # 零污染收尾：还原按键布局（回到默认）+ 清空智能音频库与临时音频
+        _prefs_edit(DEFAULT_PREFS, workdir, lambda t: re.sub(
+            r'\s*<string name="%s">.*?</string>' % MENU_LAYOUT_KEY, "", t, flags=re.S))
+        _bgm_seed(workdir, "none", wav_local)
+        sh_su(f"rm -f {DEFAULT_PREFS}.bak_l2s10 /sdcard/l2m3_preview.wav "
+              f"/data/data/{PKG}/files/readAloudAudio/bgm/l2m3_preview.wav")
+        reset_app()
+    return ok
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -3512,6 +3940,7 @@ STEPS = {
     "s8": guarded(s8_rss_articles_page),
     "s9": guarded(s9_usage_and_para_rule_page),
     "s10": guarded(s10_video_pages),
+    "s11": guarded(s11_menu_and_bgm_pages),
 }
 
 
@@ -3522,7 +3951,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
