@@ -52,7 +52,31 @@
     ⚠️ 蓝图失实（已反哺 §1.5）：蓝图称「可拖取景框/角点缩放/90° 旋转入口已在前批完成」，实际源码 0 落点
        （`ImageCropOverlayView` 无触摸处理、布局无旋转按钮）⇒ 本轮不补、登记为缺口
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|all]
+【login/source-login · SourceLoginActivity】**s6（待跑）**：证书放行策略开关（**默认放行**，用户裁决 2026-09-20）
+    + 修复3 顶栏「完成登录」文案按钮 + 修复2 删除登录头二次确认 + F165 失败错误卡（完整报错可复制 + 重试）
+    + F166 密码可见性切换
+    s6 通道：DB 播种 2 个合成书源（A: loginUi 空 + loginUrl=本机自签名 HTTPS ⇒ WebView 分支；
+       B: loginUi=行 JSON + loginUrl=必抛 JS ⇒ 表单弹窗分支）+ 自签名 HTTPS + adb reverse
+       → 默认放行：顶栏文案按钮在场 + 无证书弹窗 + 服务端收到请求
+       → 策略切换：⋮「证书放行策略」⇒ prefs 回读翻转 + 状态回执文案（再切回还原）
+       → 关闭态：证书错误弹确认（取消 ⇒ 零请求）/ 表单分支：密码可见切换 / OK 失败 ⇒ 错误卡（重试轨迹）
+       → 源码断言 16/16（双文件）
+    s3 断言更新（2026-09-20）：证书策略改为**默认放行**后，原「默认拒绝 + 取消零请求」口径前移为
+       「先关策略 → 再验证确认三出口」，并新增默认放行正向断言（无弹窗 + 服务端收到请求）
+
+【rss/favorites · RssFavoritesActivity】**s7（待跑）**：F145 单分组标题上下文 / F144 删除类菜单 danger 分级与置底
+    / F1 空态操作化（空分组引导 + 出口）
+    s7 通道：DB 播种（整份快照 + 回滚，零污染）——①只留「唯一合成分组」1 条 ⇒ 单分组态
+       ②清空 rssStars ⇒ 全库无收藏（新手态，**空态真正可达的唯一形态**）
+       → 单分组标题「收藏夹 · {分组名}」在场 / 菜单危险头 + 删除所有 danger（像素）+ 置底顺序
+       → 空态标题+说明+「去订阅源逛逛」出口在场，且点击后落到主界面（跨页出口闭环）
+       → 源码断言：favorites activity 8/8 + MainActivity 4/4 + fragment 应删尽删 2/2
+    ⚠️ 口径修正（首轮实测）：蓝图按「空**分组**」设计，但分组清单由 `rssStars` 派生
+       （`flowGroups: select group … group by`）⇒ **空分组不可持久存在**，分组层空态不可达
+       （首轮按分组层实现，真机抓不到帧）⇒ 空态改落 Activity 层（新手态），蓝图 §1.5 已反哺
+    ⚠️ 运行中推库不可用（SQLite 连接持旧 inode）⇒ 需「页内数据变化」的场景一律走「应用已停 + 推库 + 重开」
+
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|s6|s7|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装；openssl（Git 自带，脚本自动定位）
 
 口径说明（F192）：跨年分支需要「去年」的日志条目，真机沙箱无法构造跨年数据（AppLog 为内存日志，
@@ -947,6 +971,68 @@ def clear_guide_flag() -> bool:
     return not left
 
 
+# ---- 证书放行策略（用户裁决 2026-09-20）：类爬虫场景源站自签名/过期证书极常见 ⇒ **默认放行** ----
+S_SSL_PASS = "证书放行策略"                     # ssl_passthrough（菜单项标题）
+S_SSL_ON_HINT = "证书放行已开启：证书校验失败直接放行，不再询问"    # ssl_passthrough_on_hint
+S_SSL_OFF_HINT = "证书放行已关闭：证书校验失败需确认后才能继续"     # ssl_passthrough_off_hint
+PREFS_DIR = f"/data/data/{PKG}/shared_prefs"
+
+
+def _pref_read(marker: str) -> str:
+    """按 marker 在 shared_prefs 下定位文件并回读全文（debug 包走 run-as 绝对路径）"""
+    r = sh_su(f"run-as {PKG} ls {PREFS_DIR}", timeout=30)
+    names = [n for n in (r.stdout or b"").decode(errors="ignore").split() if n.endswith(".xml")]
+    for n in names:
+        c = sh_su(f"run-as {PKG} cat {PREFS_DIR}/{n}", timeout=30)
+        txt = (c.stdout or b"").decode(errors="ignore")
+        if marker in txt:
+            return txt
+    return ""
+
+
+def _ssl_pref_state():
+    """证书放行策略当前值：True/False；键不存在 ⇒ None（AppConfig 取默认 True=放行）"""
+    txt = _pref_read("sslCertPassThrough")
+    m = re.search(r'name="sslCertPassThrough"\s+value="(\w+)"', txt)
+    return None if not m else (m.group(1) == "true")
+
+
+def toggle_ssl_pass_through(d) -> dict:
+    """顶栏 ⋮ →「证书放行策略」切换。返回 {menu, clicked, hint_on, hint_off}
+    （menu=菜单项在场；hint_*=点击后的状态回执文案，作为「用户看得见当前策略」的判据）"""
+    res = {"menu": False, "clicked": False, "hint_on": False, "hint_off": False}
+    more = topbar_action_bounds(dump_xml(d), 0)
+    if not more:
+        return res
+    click_xy(d, more["cx"], more["cy"])
+    time.sleep(1.5)
+    xmlm = dump_xml(d)
+    res["menu"] = S_SSL_PASS in xmlm
+    b = node_bounds(xmlm, S_SSL_PASS)
+    if not b:
+        d.press("back")          # 关掉误开的菜单，避免遮住后续动作
+        return res
+    click_xy(d, b["cx"], b["cy"])
+    res["clicked"] = True
+    # 回执是**短时 snackbar**（约 2s）⇒ 必须点击后立即轮询捕获；
+    # ⚠️ 反面教训（2026-09-20 s3 首轮）：固定 sleep 1s + click_xy 自带 1.2s = 2.2s 后 dump，
+    #    回执已消失 ⇒ 报「关闭提示=False」假 FAIL（而 prefs 回读已证 onClick 确实执行）。
+    for _ in range(6):
+        xml = dump_xml(d)
+        res["hint_on"] = res["hint_on"] or (S_SSL_ON_HINT in xml)
+        res["hint_off"] = res["hint_off"] or (S_SSL_OFF_HINT in xml)
+        if res["hint_on"] or res["hint_off"]:
+            break
+        time.sleep(0.7)
+    return res
+
+
+def _logcat_count(keyword: str) -> int:
+    """统计 logcat 当前缓冲里含 keyword 的行数（用于「某动作确实触发了某副作用」的客观增量判据）"""
+    out = sh("logcat", "-d", "-v", "brief", timeout=60).stdout.decode("utf-8", errors="ignore")
+    return sum(1 for line in out.splitlines() if keyword in line)
+
+
 def wait_ssl_dialog(d, rounds: int = 6, wait: float = 2.5):
     """等证书确认弹窗出现（**不点击**，用于断言弹窗内容）。冷启动 + WebView 池 + 首请求
     证书校验需要几秒，首次 dump 常常还没弹（实测 2026-09-20 首轮「齐备=False」的真因）。"""
@@ -1023,8 +1109,45 @@ def s3_browser_page(d) -> bool:
     clear_guide_flag()
     simple = ACT_BROWSER.rsplit(".", 1)[-1]
     try:
-        # ---------- 修复1：SSL 默认拒绝 + 确认弹窗（双出口） ----------
-        # 带 query 的两个 URL：确保两次运行的加载不落 WebView HTTP 缓存（否则第二次不再发起请求/不再告警）
+        # ---------- 证书放行策略（**默认放行**，用户裁决 2026-09-20）+ 关闭态的 SSL 知情确认 ----------
+        # 策略语义：本应用主体是类爬虫的书源/订阅源引擎，源站自签名/过期证书极常见 ⇒ 默认放行，
+        # 避免大量源被证书判死；用户可在 ⋮ 菜单关闭，关闭后才逐次知情确认。
+        # 带 query 的 URL：确保两次加载不落 WebView HTTP 缓存（否则第二次不再发起请求/不再告警）
+        pref_entry = _ssl_pref_state()
+        print(f"  [s3] 策略前置：pref={pref_entry}（None=未写入 ⇒ AppConfig 默认 True=放行）")
+        passthrough_ok = False
+        ssl_menu_ok = ssl_off_ok = ssl_off_hint = ssl_restore_ok = False
+        if pref_entry is False:
+            # 上次中断可能残留关闭态 ⇒ 先经 UI 拨回（幂等归一，不直接改 prefs 文件，避免绕过被验对象）
+            reset_app()
+            if start_browser(f"{hbase}/pre", "BTL2"):
+                toggle_ssl_pass_through(d)
+                print(f"  [s3] 策略前置归一：pref 回读={_ssl_pref_state()}（期望 True）")
+
+        # 默认放行：证书错误不打断加载（无弹窗 + 服务端真的收到请求）
+        HTTPS_REQS.clear()
+        reset_app()
+        if not start_browser(f"{sbase}/a?c0", "BTL2"):
+            print(f"  [s3] 未进入内嵌浏览器（栈顶={current_activity()}）")
+            return False
+        time.sleep(4.0)
+        xmlA = dump_xml(d)
+        no_dialog = (S_SSL_TITLE not in xmlA) and (S_SSL_CONTINUE not in xmlA)
+        got_c0 = any(p.startswith("/a") for p in HTTPS_REQS)
+        passthrough_ok = no_dialog and got_c0
+        ca.shot(d, "m3browser_s3_passthrough_default")
+        print(f"  [s3] 默认放行：无证书弹窗={no_dialog} / 服务端收到 /a={got_c0}（证书错误不阻断）")
+
+        # 关闭放行：⋮ →「证书放行策略」（菜单项在场 + prefs 回读 + 状态回执文案 三重判据）
+        tg = toggle_ssl_pass_through(d)
+        ssl_menu_ok = tg["menu"]
+        ssl_off_hint = tg["hint_off"]
+        ssl_off_ok = tg["clicked"] and (_ssl_pref_state() is False)
+        ca.shot(d, "m3browser_s3_passthrough_off")
+        print(f"  [s3] 关闭放行：菜单项在场={tg['menu']} / 已点击={tg['clicked']}"
+              f" / pref回读={_ssl_pref_state()}（期望 False）/ 关闭提示={tg['hint_off']}")
+
+        # 关闭态：证书错误 ⇒ 知情确认弹窗（下列断言沿用原「修复1」口径）
         HTTPS_REQS.clear()
         reset_app()
         if not start_browser(f"{sbase}/a?c1", "BTL2"):
@@ -1061,6 +1184,12 @@ def s3_browser_page(d) -> bool:
                     proceed_ok = got_a and loaded
                     print(f"  [s3] 修复1 继续出口：服务端收到 /a={got_a}"
                           f" / 顶栏标题=网页 title={loaded}")
+
+        # 出口③还原：把策略拨回默认放行（收尾不留关闭态，避免影响真实使用）
+        tg2 = toggle_ssl_pass_through(d)
+        ssl_restore_ok = tg2["clicked"] and tg2["hint_on"] and (_ssl_pref_state() is True)
+        print(f"  [s3] 策略还原：已点击={tg2['clicked']} / 开启提示={tg2['hint_on']}"
+              f" / pref回读={_ssl_pref_state()}（期望 True）")
 
         # ---------- F214-a：返回语义（本环境 canGoBack 恒 false ⇒ 落栈顶二次确认分支） ----------
         # ⚠️ 环境限制（实测 2026-09-20，MEmu + Chrome WebView 116.0.5845.173）：
@@ -1253,6 +1382,9 @@ def s3_browser_page(d) -> bool:
             "now - lastBackPressedTime < BACK_EXIT_INTERVAL",  # 栈顶二次确认
             "buildMenuActions(AppUiTokens.danger)",
             "tint = danger",
+            "if (AppConfig.sslCertPassThrough)",    # 放行策略开关生效点（默认放行）
+            "PreferKey.sslCertPassThrough",         # 策略持久化 key
+            "R.string.ssl_passthrough",             # 菜单项与状态回执
             "guidePrefs.edit().putBoolean(KEY_VERIFICATION_GUIDE_SHOWN, true)",  # 显示即记忆
         )
         must_absent = (
@@ -1267,7 +1399,8 @@ def s3_browser_page(d) -> bool:
               f" / 应删尽删 {len(must_absent) - len(leftovers)}/{len(must_absent)}"
               f" / 缺失={missing} 残留={leftovers}")
 
-        ok = bool(dialog_ok and ssl_danger and reject_ok and proceed_ok and nav_ok
+        ok = bool(passthrough_ok and ssl_menu_ok and ssl_off_ok and ssl_off_hint and ssl_restore_ok
+                  and dialog_ok and ssl_danger and reject_ok and proceed_ok and nav_ok
                   and predictable_ok and guide_first and guide_twice and cf_ok
                   and menu_ok and danger_ok and confirm_ok and cancel_ok and exec_ok
                   and bogus_absent and code_ok)
@@ -1280,6 +1413,15 @@ def s3_browser_page(d) -> bool:
             print(f"  [s3] 兜底回滚异常: {type(e).__name__}")
         # 引导条记忆位是本次测试造出来的新文件 ⇒ 删除还原，避免影响真实使用
         clear_guide_flag()
+        # 证书放行策略兜底还原：中断残留关闭态会让后续源/订阅源被证书拦住（best-effort）
+        try:
+            if _ssl_pref_state() is False:
+                reset_app()
+                if start_browser(f"{hbase}/restore", "BTL2"):
+                    toggle_ssl_pass_through(d)
+                print(f"  [s3] 策略兜底还原：pref 回读={_ssl_pref_state()}（期望 True/None）")
+        except Exception as e:
+            print(f"  [s3] 策略兜底还原异常: {type(e).__name__}")
         for p in (ssl_port, http_port):
             if p:
                 release_reverse(p)
@@ -1834,6 +1976,489 @@ def s5_image_crop_page(d) -> bool:
         reset_app()
 
 
+# ===================== s6：login/source-login（书源登录页）=====================
+# 覆盖：证书放行策略在登录页可开关（**默认放行**，用户裁决 2026-09-20）/ 修复3 顶栏「完成登录」文案按钮 /
+#       修复2 删除登录头二次确认 / 优化4 F165 登录执行等待态 + 失败错误卡（完整报错可复制 + 重试）/
+#       优化5 F166 密码可见性切换。
+# 双分支通道（合成源播种，零外网）：
+#   A) loginUi 空 + loginUrl=本机自签名 HTTPS ⇒ WebViewLoginFragment（证书策略 + 完成登录）
+#   B) loginUi=行 JSON + loginUrl=必抛异常的 JS ⇒ SourceLoginDialog（错误卡 / 密码可见 / 删除登录头确认）
+ACT_LOGIN = "io.legado.app.ui.login.SourceLoginActivity"
+S_FINISH_LOGIN = "完成登录"                      # finish_login
+S_LOGGING_IN = "正在登录"                        # logging_in（loading 态，弱判据）
+S_LOGIN_ERROR = "登录出错"                       # login_error
+S_COPY_ERR = "复制错误详情"                       # copy_error_detail
+S_PWD_SHOW = "显示密码"                          # password_show
+S_PWD_HIDE = "隐藏密码"                          # password_hide
+S_DEL_HEADER = "删除登录头"                       # del_login_header
+S_DEL_CONFIRM_FRAG = "此操作不可撤销"              # del_login_header_confirm
+S_OK = "确认"                                   # ok（表单弹窗 OK 键）
+S_MORE = "更多"                                  # more（表单弹窗 ⋮ 的 contentDescription）
+SEED_LOGIN_WEB = "l2seed://login-web"
+SEED_LOGIN_FORM = "l2seed://login-form"
+SEED_LOGIN_NAME = "L2登录校验源"
+# 表单行：纯 JSON（不以 @js:/<js> 开头 ⇒ 直接 parse），viewName 用带引号形态避免依赖 JS 求值
+SEED_LOGIN_UI = (
+    '[{"name":"u","type":"text","viewName":"\'账号\'","default":"l2user"},'
+    '{"name":"p","type":"password","viewName":"\'密码\'","default":"l2pass"}]'
+)
+# loginUrl 在表单分支只作 JS 执行（不加载网页）⇒ 直接抛异常制造**确定性失败**（错误卡硬判据）
+SEED_LOGIN_JS_THROW = "throw new Error('L2-LOGIN-FAIL')"
+SRC_LOGIN_FRAG = "app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt"
+SRC_LOGIN_DIALOG = "app/src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+
+
+def seed_login_sources(workdir: Path, web_url: str) -> bool:
+    """播种两个合成书源（整行复制既有源后改写 sourceUrl/name/loginUi/loginUrl）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        # ⚠️ 表名是 `book_sources`（下划线；订阅侧才是 `rssSources`）——写成 bookSources 会
+        #    抛 OperationalError: no such table（2026-09-20 s6 首轮真因）
+        cols = [r[1] for r in con.execute("pragma table_info(book_sources)")]
+        row = con.execute("select * from book_sources limit 1").fetchone()
+        if not row:
+            return False
+        base = dict(zip(cols, row))
+        for key, login_ui, login_url in (
+            (SEED_LOGIN_WEB, "", web_url),
+            (SEED_LOGIN_FORM, SEED_LOGIN_UI, SEED_LOGIN_JS_THROW),
+        ):
+            data = dict(base)
+            data["bookSourceUrl"] = key
+            data["bookSourceName"] = SEED_LOGIN_NAME
+            data["loginUrl"] = login_url
+            data["loginUi"] = login_ui
+            data["enabled"] = 1
+            con.execute(
+                f"insert or replace into book_sources ({','.join(cols)})"
+                f" values ({','.join('?' * len(cols))})",
+                [data[c] for c in cols]
+            )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def purge_login_sources(workdir: Path) -> bool:
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from book_sources where bookSourceUrl in (?, ?)",
+                    (SEED_LOGIN_WEB, SEED_LOGIN_FORM))
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _login_start(key: str) -> bool:
+    """非导出组件 am start + extras 直起登录页（bookSource 分支由 key/type 决定数据源）"""
+    simple = ACT_LOGIN.rsplit(".", 1)[-1]
+    reset_app()
+    sh("am", "start", "-n", f"{PKG}/{ACT_LOGIN}",
+       "--es", "key", key, "--es", "type", "bookSource")
+    for _ in range(12):
+        time.sleep(1.2)
+        if simple in current_activity():
+            time.sleep(2.2)
+            return True
+    sh_su(f"am start -n {PKG}/{ACT_LOGIN} --es key {key} --es type bookSource")
+    time.sleep(3.5)
+    return simple in current_activity()
+
+
+def s6_login_page(d) -> bool:
+    """登录页：证书放行策略开关（默认放行）/ 完成登录 / 删除登录头确认 / 失败错误卡 / 密码可见"""
+    print("  [s6] ===== 登录页放行策略、错误卡与输入辅助 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m3login_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s6] 数据库快照失败（前置）")
+        return False
+    (ssl_srv, ssl_port), (http_srv, http_port), _certdir = _start_servers()
+    if ssl_srv is None or http_srv is None:
+        print("  [s6] 本机测试服务启动失败（openssl 不可用或端口占用）")
+        return False
+    if not (_reverse_on(ssl_port) and _reverse_on(http_port)):
+        print(f"  [s6] adb reverse 通道不可用（{ssl_port}/{http_port}）")
+        return False
+    sbase = f"https://127.0.0.1:{ssl_port}"
+    hbase = f"http://127.0.0.1:{http_port}"
+    if not (_device_reachable(sbase) and _device_reachable(hbase)):
+        print("  [s6] 设备侧连通探针失败（curl 非 200）")
+        return False
+    if not seed_login_sources(workdir, f"{sbase}/login"):
+        print("  [s6] 合成登录源播种失败")
+        return False
+    print(f"  [s6] 通道就绪：合成源 2 个 + 自签名 HTTPS :{ssl_port} + adb reverse")
+    try:
+        # 前置归一：策略须处默认「放行」态（上次中断残留关闭态会让「默认放行」断言假失败）
+        if _ssl_pref_state() is False:
+            if _login_start(SEED_LOGIN_WEB):
+                toggle_ssl_pass_through(d)
+            print(f"  [s6] 策略前置归一：pref={_ssl_pref_state()}（期望 True/None）")
+        # ---------- A) WebViewLoginFragment：默认放行 + 完成登录文案按钮 ----------
+        HTTPS_REQS.clear()
+        if not _login_start(SEED_LOGIN_WEB):
+            print(f"  [s6] 未进入登录页（栈顶={current_activity()}）")
+            return False
+        time.sleep(4.0)
+        xmlA = dump_xml(d)
+        ca.shot(d, "m3login_s6_web_default")
+        entry_ok = S_FINISH_LOGIN in xmlA          # 修复3：✔ 图标歧义 → 文案按钮
+        no_dialog = (S_SSL_TITLE not in xmlA) and (S_SSL_CONTINUE not in xmlA)
+        got_login = any(p.startswith("/login") for p in HTTPS_REQS)
+        passthrough_ok = entry_ok and no_dialog and got_login
+        print(f"  [s6] 默认态：顶栏「{S_FINISH_LOGIN}」在场={entry_ok}"
+              f" / 无证书弹窗={no_dialog} / 服务端收到 /login={got_login}（默认放行）")
+
+        # ---------- A2) 登录页同样可切换策略（默认放行 → 关闭 ⇒ 弹确认） ----------
+        pref_before = _ssl_pref_state()
+        tg = toggle_ssl_pass_through(d)
+        off_ok = tg["clicked"] and tg["hint_off"] and (_ssl_pref_state() is False)
+        ca.shot(d, "m3login_s6_strategy_off")
+        print(f"  [s6] 策略切换：菜单项={tg['menu']} 已点击={tg['clicked']}"
+              f" pref {pref_before}→{_ssl_pref_state()} 关闭提示={tg['hint_off']}")
+        HTTPS_REQS.clear()
+        dialog_ok = cancel_ok = False
+        if _login_start(SEED_LOGIN_WEB):
+            xmld = wait_ssl_dialog(d)
+            dialog_ok = bool(xmld) and all(s in xmld for s in (S_SSL_TITLE, S_SSL_CONTINUE,
+                                                              S_SSL_CERT_INFO, S_SSL_CANCEL))
+            ca.shot(d, "m3login_s6_ssl_dialog")
+            if dialog_ok:
+                HTTPS_REQS.clear()
+                cancel_ok = tap_text(d, S_SSL_CANCEL)
+                time.sleep(2.5)
+                cancel_ok = cancel_ok and not any(p.startswith("/login") for p in HTTPS_REQS)
+            print(f"  [s6] 关闭态：弹窗齐备={dialog_ok} / 取消后零请求={cancel_ok}")
+        # 还原放行（收尾不留关闭态）
+        tg2 = toggle_ssl_pass_through(d)
+        restore_ok = tg2["clicked"] and tg2["hint_on"] and (_ssl_pref_state() is not False)
+        print(f"  [s6] 策略还原：已点击={tg2['clicked']} 开启提示={tg2['hint_on']}"
+              f" pref={_ssl_pref_state()}（期望 True/None）")
+
+        # ---------- B) SourceLoginDialog：错误卡 / 密码可见 / 删除登录头确认 ----------
+        reset_app()
+        form_started = _login_start(SEED_LOGIN_FORM)
+        # ⚠️ 轮询而非单次 dump：弹窗内容首次组合 + uiautomator 可能返回上一拍缓存快照
+        #    ⇒ 单次断言实测出现「上轮 True / 本轮 False」的假失败；改为最多 8 拍重取。
+        xmlb = ""
+        for _ in range(8):
+            xmlb = dump_xml(d)
+            if "账号" in xmlb:
+                break
+            time.sleep(1.0)
+        ca.shot(d, "m3login_s6_form_default")
+        rows_ok = form_started and ("账号" in xmlb) and ("密码" in xmlb)
+        print(f"  [s6] 表单分支：启动={form_started} 账号/密码行在场={rows_ok}")
+
+        # 优化5：密码行尾 👁 切换（contentDescription 轨迹 = 正向判据）
+        eye_ok = False
+        b_eye = node_bounds(xmlb, S_PWD_SHOW, contains=True)
+        if b_eye:
+            click_xy(d, b_eye["cx"], b_eye["cy"])
+            time.sleep(1.2)
+            xmlp = dump_xml(d)
+            eye_ok = (S_PWD_HIDE in xmlp) and (S_PWD_SHOW not in xmlp)
+            ca.shot(d, "m3login_s6_pwd_visible")
+            print(f"  [s6] 密码可见性：点「{S_PWD_SHOW}」⇒「{S_PWD_HIDE}」在场={eye_ok}")
+
+        # 优化4：OK ⇒ 确定性失败（loginUrl 为必抛 JS）⇒ 错误卡（不关窗 + 完整报错 + 复制/重试）
+        err_ok = retry_ok = False
+        b_ok = node_bounds(dump_xml(d), S_OK)
+        if b_ok:
+            click_xy(d, b_ok["cx"], b_ok["cy"])
+            seen_running = False
+            for _ in range(8):
+                x = dump_xml(d)
+                if S_LOGGING_IN in x:
+                    seen_running = True
+                if S_LOGIN_ERROR in x:
+                    break
+                time.sleep(1.0)
+            xmle = dump_xml(d)
+            ca.shot(d, "m3login_s6_error_card")
+            alive = ACT_LOGIN.rsplit(".", 1)[-1] in current_activity()
+            err_ok = all(s in xmle for s in (S_LOGIN_ERROR, S_COPY_ERR, S_RETRY)) and alive
+            print(f"  [s6] 失败错误卡：标题/复制错误详情/重试 齐备={err_ok}"
+                  f" / 弹窗未关（页面存活）={alive} / 捕获到「{S_LOGGING_IN}」={seen_running}")
+            # 重试闭环（判据修正）：点重试 ⇒ **AppLog 失败条数 +1**（证明确实重跑了 login）
+            # ⚠️ 不能用「卡片先消失再出现」判：失败是同步瞬时的（同一帧内 loginError 清空→再置位，
+            #    Compose 合并状态 ⇒ UI 根本不渲染中间态；实测 40 拍密集 dump 也抓不到消失帧）。
+            b_retry = node_bounds(xmle, S_RETRY)
+            if b_retry:
+                before = _logcat_count(S_LOGIN_ERROR)
+                click_xy(d, b_retry["cx"], b_retry["cy"])
+                time.sleep(4.0)
+                after = _logcat_count(S_LOGIN_ERROR)
+                xr = dump_xml(d)
+                card_still = S_LOGIN_ERROR in xr
+                retry_ok = (after > before) and card_still
+                print(f"  [s6] 重试闭环：AppLog 失败条数 {before}→{after}（+1 ⇒ 重试确实重跑了 login）"
+                      f" / 失败卡仍在={card_still}")
+                ca.shot(d, "m3login_s6_retry")
+
+        # 修复2：删除登录头二次确认（对象名 + 影响面 + 取消零副作用）
+        del_menu_ok = del_confirm_ok = del_cancel_ok = False
+        # 表单分支无顶栏 ⇒ 用弹窗标题栏 ⋮ 的 contentDescription（R.string.more）定位
+        more = node_bounds(dump_xml(d), S_MORE)
+        if more:
+            click_xy(d, more["cx"], more["cy"])
+            time.sleep(1.5)
+            xmlm = dump_xml(d)
+            del_menu_ok = S_DEL_HEADER in xmlm
+            b = node_bounds(xmlm, S_DEL_HEADER)
+            if b:
+                click_xy(d, b["cx"], b["cy"])
+                time.sleep(1.6)
+                xmlc = dump_xml(d)
+                ca.shot(d, "m3login_s6_del_confirm")
+                del_confirm_ok = (S_DEL_HEADER in xmlc and S_DEL_CONFIRM_FRAG in xmlc
+                                  and "删除" in xmlc and "取消" in xmlc)
+                if del_confirm_ok:
+                    tap_text(d, "取消")
+                    time.sleep(1.4)
+                    xmln = dump_xml(d)
+                    del_cancel_ok = (S_DEL_CONFIRM_FRAG not in xmln) and ("账号" in xmln)
+                print(f"  [s6] 删除登录头确认：菜单项={del_menu_ok} 影响面/按钮齐备={del_confirm_ok}"
+                      f" / 取消后回表单={del_cancel_ok}")
+        else:
+            print("  [s6] 未定位表单弹窗 ⋮ 动作")
+
+        # ---------- 源码断言（双文件） ----------
+        frag = _src_text(SRC_LOGIN_FRAG)
+        dlg = _src_text(SRC_LOGIN_DIALOG)
+        frag_must = ("if (AppConfig.sslCertPassThrough)", "PreferKey.sslCertPassThrough",
+                     "R.string.finish_login", "R.string.ssl_passthrough",
+                     "onPositive = { handler.proceed() }", "onNegative = { handler.cancel() }")
+        dlg_must = ("R.string.del_login_header_confirm", "R.string.del_login_header",
+                    "R.string.logging_in", "R.string.login_error", "R.string.copy_error_detail",
+                    "R.string.password_show", "R.string.password_hide",
+                    "catch (e: CancellationException)",     # 取消不得误报为登录失败
+                    "e.stackTraceToString()",               # 错误卡正文=完整堆栈
+                    "enabled = !loginRunning", "loading = loginRunning")
+        frag_missing = [k for k in frag_must if k not in frag]
+        dlg_missing = [k for k in dlg_must if k not in dlg]
+        code_ok = not frag_missing and not dlg_missing
+        print(f"  [s6] 源码断言：fragment {len(frag_must) - len(frag_missing)}/{len(frag_must)}"
+              f" / dialog {len(dlg_must) - len(dlg_missing)}/{len(dlg_must)}"
+              f" / 缺失={frag_missing + dlg_missing}")
+
+        ok = all([entry_ok, passthrough_ok, off_ok, dialog_ok, cancel_ok, restore_ok,
+                  rows_ok, eye_ok, err_ok, retry_ok, del_menu_ok, del_confirm_ok,
+                  del_cancel_ok, code_ok])
+        print(f"  [s6] 小计: {'PASS' if ok else 'FAIL'}")
+        return ok
+    finally:
+        try:
+            print(f"  [s6] 合成登录源清理={purge_login_sources(workdir)}")
+        except Exception as e:
+            print(f"  [s6] 合成源清理异常: {type(e).__name__}")
+        try:
+            print(f"  [s6] 数据库快照回滚={m2._db_push(db_snap)}")
+        except Exception as e:
+            print(f"  [s6] 兜底回滚异常: {type(e).__name__}")
+        try:
+            if _ssl_pref_state() is False:      # 策略兜底还原（放行是产品默认态）
+                reset_app()
+                if _login_start(SEED_LOGIN_WEB):
+                    toggle_ssl_pass_through(d)
+                print(f"  [s6] 策略兜底还原：pref={_ssl_pref_state()}（期望 True/None）")
+        except Exception as e:
+            print(f"  [s6] 策略兜底还原异常: {type(e).__name__}")
+        for p in (ssl_port, http_port):
+            if p:
+                release_reverse(p)
+        for s in (ssl_srv, http_srv):
+            try:
+                s.shutdown()
+            except Exception:
+                pass
+        reset_app()
+
+
+# ===================== s7：rss/favorites（收藏夹）=====================
+# 覆盖：F1 空态操作化（优化 4）/ F144 删除类菜单 danger 分级（优化 5）/ F145 单分组标题上下文（优化 6）
+# 通道：DB 播种（整份快照 + 回滚，零污染）——清空既有收藏后只留「唯一合成分组」的一条收藏，
+#       以构造「单分组」与「空分组」两个确定性状态；数据源为 rssStars（分组由收藏行派生）。
+ACT_FAV = "io.legado.app.ui.rss.favorites.RssFavoritesActivity"
+S_FAV_TITLE = "收藏夹"                        # favorites
+S_FAV_EMPTY_TITLE = "这个分组还没有收藏"          # favorites_empty_title
+S_FAV_EMPTY_DESC = "在文章列表点条目上的星标"        # favorites_empty_desc
+S_FAV_EMPTY_ACTION = "去订阅源逛逛"              # favorites_empty_browse_rss
+SRC_MAIN_ACT = "app/src/main/java/io/legado/app/ui/main/MainActivity.kt"
+S_FAV_GROUP_DANGER = "危险操作"                 # rss_sort_group_danger
+S_FAV_DEL_ALL = "删除所有"                     # delete_all
+SEED_FAV_GROUP = "L2收藏校验分组"
+SEED_FAV_ORIGIN = "l2seed://fav-origin"
+SEED_FAV_LINK = "l2seed://fav-link"
+SEED_FAV_TITLE = "L2收藏校验条目"
+SRC_FAV_ACT = "app/src/main/java/io/legado/app/ui/rss/favorites/RssFavoritesActivity.kt"
+SRC_FAV_FRAG = "app/src/main/java/io/legado/app/ui/rss/favorites/RssFavoritesFragment.kt"
+
+
+def _fav_seed(workdir: Path, mode: str) -> bool:
+    """播种收藏数据：mode='one' ⇒ 仅唯一分组 1 条（构造单分组/标题上下文）；mode='none' ⇒ 清空（构造空态）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        meta = [(r[1], (r[2] or "").upper(), r[3], r[4]) for r in con.execute("pragma table_info(rssStars)")]
+        con.execute("delete from rssStars")
+        if mode == "one":
+            overrides = {
+                "origin": SEED_FAV_ORIGIN,
+                "link": SEED_FAV_LINK,
+                "title": SEED_FAV_TITLE,
+                "group": SEED_FAV_GROUP,
+                "sort": SEED_FAV_GROUP,
+                "starTime": int(time.time() * 1000),
+                "pubDate": "",
+                "type": 0,
+                "durPos": 0,
+            }
+            vals = []
+            for name, ctype, notnull, dflt in meta:
+                if name in overrides:
+                    vals.append(overrides[name])
+                elif notnull and dflt is None:
+                    vals.append(0 if ("INT" in ctype or "REAL" in ctype) else "")
+                else:
+                    vals.append(None)
+            names = ",".join(f"`{n}`" for n, _, _, _ in meta)
+            con.execute(f"insert into rssStars ({names}) values ({','.join('?' * len(meta))})", vals)
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _fav_start() -> bool:
+    """直起收藏夹页（非导出组件：shell 直起 + su 兜底）"""
+    simple = ACT_FAV.rsplit(".", 1)[-1]
+    reset_app()
+    sh("am", "start", "-n", f"{PKG}/{ACT_FAV}")
+    for _ in range(10):
+        time.sleep(1.2)
+        if simple in current_activity():
+            time.sleep(2.2)
+            return True
+    sh_su(f"am start -n {PKG}/{ACT_FAV}")
+    time.sleep(3.5)
+    return simple in current_activity()
+
+
+def s7_favorites_page(d) -> bool:
+    """收藏夹：单分组标题上下文 / 删除类菜单 danger 分级 / 空分组空态引导"""
+    print("  [s7] ===== 收藏夹标题上下文、菜单分级与空态 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m3fav_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s7] 数据库快照失败（前置）")
+        return False
+    try:
+        # ---------- F145：单分组 ⇒ 标题携带分组名 ----------
+        if not _fav_seed(workdir, "one"):
+            print("  [s7] 合成收藏播种失败")
+            return False
+        title_ok = False
+        if _fav_start():
+            xml = dump_xml(d)
+            ca.shot(d, "m3fav_s7_single_group_title")
+            title_ok = (S_FAV_TITLE + " · " + SEED_FAV_GROUP) in xml
+            print(f"  [s7] F145 单分组标题：「{S_FAV_TITLE} · {SEED_FAV_GROUP}」在场={title_ok}")
+
+            # ---------- F144：⋮ 菜单危险分组头 + 删除所有 danger + 置底 ----------
+            menu_ok = danger_ok = order_ok = False
+            more = topbar_action_bounds(dump_xml(d), 0)
+            if more:
+                click_xy(d, more["cx"], more["cy"])
+                time.sleep(1.5)
+                xmlm = dump_xml(d)
+                ca.shot(d, "m3fav_s7_menu")
+                menu_ok = (S_FAV_GROUP_DANGER in xmlm) and (S_FAV_DEL_ALL in xmlm)
+                fg_all, danger_ok = _danger_foreground(d, xmlm, S_FAV_DEL_ALL)
+                b_hdr = node_bounds(xmlm, S_FAV_GROUP_DANGER)
+                b_all = node_bounds(xmlm, S_FAV_DEL_ALL)
+                b_grp = node_bounds(xmlm, "删除当前分组")
+                # 置底口径：分组头/删除所有 的 y 均大于「删除当前分组」
+                order_ok = bool(b_grp and b_hdr and b_all
+                                and b_hdr["top"] > b_grp["top"] and b_all["top"] > b_grp["top"])
+                print(f"  [s7] F144 菜单：危险头+删除所有在场={menu_ok} / 删除所有前景={fg_all}"
+                      f" danger={danger_ok} / 置底顺序={order_ok}")
+                d.press("back")
+                time.sleep(1.0)
+            else:
+                print("  [s7] 未定位顶栏 ⋮")
+        else:
+            print(f"  [s7] 未进入收藏夹页（栈顶={current_activity()}）")
+            return False
+
+        # ---------- F1：空态（全库无收藏 ⇒ 无分组 ⇒ 无 Tab 无列表） ----------
+        # ⚠️ 口径（源码实证 + 首轮实测修正）：分组清单由 rssStars 派生（`flowGroups: select group … group by`）
+        #    ⇒ **空「分组」不可持久存在**，分组层空态只存在于瞬态窗口（首轮按分组层实现，真机抓不到帧）。
+        #    真正可达且对用户有意义的是「一条收藏都没有」（新手态）⇒ 空态改落 **Activity 层**，
+        #    构造通道 = 清空 rssStars（应用已停 ⇒ 无 inode 竞态）+ 重开页面，确定性可复现。
+        empty_ok = action_ok = browse_ok = False
+        if _fav_seed(workdir, "none") and _fav_start():
+            xe = dump_xml(d)
+            ca.shot(d, "m3fav_s7_empty")
+            empty_ok = (S_FAV_EMPTY_TITLE in xe) and (S_FAV_EMPTY_DESC in xe)
+            b_act = node_bounds(xe, S_FAV_EMPTY_ACTION)
+            action_ok = b_act is not None
+            if b_act:
+                click_xy(d, b_act["cx"], b_act["cy"])
+                time.sleep(3.5)
+                browse_ok = "MainActivity" in current_activity()
+            print(f"  [s7] F1 空态：标题+说明在场={empty_ok} / 出口「{S_FAV_EMPTY_ACTION}」在场={action_ok}"
+                  f" / 点击后落到主界面={browse_ok}")
+        else:
+            print("  [s7] F1 空态：清库或页面启动失败")
+
+        # ---------- 源码断言 ----------
+        act_src = _src_text(SRC_FAV_ACT)
+        frag_src = _src_text(SRC_FAV_FRAG)
+        main_src = _src_text(SRC_MAIN_ACT)
+        act_must = ("composeGroups.size == 1", "rss_sort_group_danger", "tint = danger",
+                    "fun initEmptyState()", "binding.emptyOverlay", "MainActivity.openRss",
+                    "favorites_empty_browse_rss", "fun buildMenuActions(danger: Color)")
+        main_must = ("fun openRss(context: Context)", "TARGET_RSS ->", "private fun openRssPage()",
+                     "R.id.menu_discovery")
+        # 应删尽删：分组层空态实现已撤（避免留死代码）
+        frag_absent = ("favorites_empty", "emptyOverlay")
+        a_missing = [k for k in act_must if k not in act_src]
+        m_missing = [k for k in main_must if k not in main_src]
+        f_left = [k for k in frag_absent if k in frag_src]
+        code_ok = not a_missing and not m_missing and not f_left
+        print(f"  [s7] 源码断言：activity {len(act_must) - len(a_missing)}/{len(act_must)}"
+              f" / MainActivity {len(main_must) - len(m_missing)}/{len(main_must)}"
+              f" / fragment 应删尽删 {len(frag_absent) - len(f_left)}/{len(frag_absent)}"
+              f" / 缺失={a_missing + m_missing} 残留={f_left}")
+
+        ok = all([title_ok, menu_ok, danger_ok, order_ok, empty_ok, action_ok, browse_ok, code_ok])
+        print(f"  [s7] 小计: {'PASS' if ok else 'FAIL'}")
+        return ok
+    finally:
+        try:
+            print(f"  [s7] 数据库快照回滚={m2._db_push(db_snap)}")
+        except Exception as e:
+            print(f"  [s7] 兜底回滚异常: {type(e).__name__}")
+        reset_app()
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -1852,6 +2477,8 @@ STEPS = {
     "s3": guarded(s3_browser_page),
     "s4": guarded(s4_qrcode_page),
     "s5": guarded(s5_image_crop_page),
+    "s6": guarded(s6_login_page),
+    "s7": guarded(s7_favorites_page),
 }
 
 
@@ -1862,7 +2489,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3", "s4", "s5"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
     ok = True
     for sid in targets:
         ok = ca.run_steps({sid: STEPS[sid]}, scenario=sid, tag_keywords=[], since_ts=since, ctx=d) and ok
