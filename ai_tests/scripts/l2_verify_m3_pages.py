@@ -115,7 +115,7 @@
        （首轮按分组层实现，真机抓不到帧）⇒ 空态改落 Activity 层（新手态），蓝图 §1.5 已反哺
     ⚠️ 运行中推库不可用（SQLite 连接持旧 inode）⇒ 需「页内数据变化」的场景一律走「应用已停 + 推库 + 重开」
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|s6|s7|s8|s9|s10|s11|s12|all]
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m3_pages.py [--scenario s1|s3|s4|s5|s6|s7|s8|s9|s10|s11|s12|s13|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装；openssl（Git 自带，脚本自动定位）
 
 口径说明（F192）：跨年分支需要「去年」的日志条目，真机沙箱无法构造跨年数据（AppLog 为内存日志，
@@ -4347,6 +4347,389 @@ def s12_gallery_and_source_edit(d) -> bool:
     return ok
 
 
+# ============================ s13：M4 批次（main/settings-search + book/replace-edit） ============================
+
+ACT_SETTINGS_SEARCH = "io.legado.app.ui.main.my.SettingsSearchActivity"
+ACT_REPLACE_EDIT = "io.legado.app.ui.replace.edit.ReplaceEditActivity"
+
+# 文案取自 values-zh/strings.xml 真值
+S_SET_SEARCH_HINT = "搜索设置"
+S_SET_EXACT_GROUP = "精确匹配"          # settings_search_exact_group
+S_SET_ROW_EXACT_A = "主题模式"          # theme_mode（前缀命中）
+S_SET_ROW_EXACT_B = "主题设置"          # theme_setting（前缀命中）
+S_SET_ROW_NONEXACT = "应用主题"          # appearance_kit_manage（含关键词但非前缀 ⇒ 非精确桶）
+S_SET_SECTION_APPEARANCE = "外观"        # config_category_appearance（组标题用 accent ⇒ 高亮参考色）
+S_SET_QUERY = "主题"
+SET_BADGE_PAT = re.compile(r"^含 \d+ 项$")   # settings_search_sub_item_count
+
+S_REP_ADV_GROUP = "高级配置"            # replace_advanced_group
+S_REP_ADV_GROUP_HINT = "低频字段，默认收起"  # replace_advanced_group_hint（同一可点 Row 内）
+S_REP_SAMPLE_GROUP = "样本试运行"        # replace_sample_group
+S_REP_SAMPLE_RUN = "试运行"             # replace_sample_run
+S_REP_SAMPLE_RESULT = "替换结果"         # replace_sample_result_label
+S_REP_SAMPLE_HIT_PREFIX = "命中 "        # replace_sample_hit = 命中 %1$d 处
+S_REP_SCOPE_HINT = "替换范围"            # replace_scope（高级字段之一）
+S_REP_TIMEOUT_HINT = "超时毫秒数"        # timeout_millisecond（高级字段之一）
+S_REP_PASTE_MENU = "粘贴规则"            # paste_rule
+S_REP_COPY_MENU = "拷贝规则"             # copy_rule（注意是「拷贝」不是「复制」）
+S_REP_USE_REGEX = "使用正则表达式"        # use_regex（用于制造 1 项字段差异）
+S_REP_PASTE_TITLE_PREFIX = "粘贴将覆盖 "  # replace_paste_diff_title
+S_REP_PASTE_CONFIRM = "覆盖粘贴"         # replace_paste_diff_confirm
+S_REP_PATTERN = "abc"
+S_REP_SAMPLE_TEXT = "xabcxabcx"
+S_REP_EXPECT_OUTPUT = "xxx"
+S_REP_PASTED_PATTERN = "xyz"
+S_REP_PASTE_JSON = '{"name":"L2粘贴规则","pattern":"xyz","replacement":"R","isRegex":true}'
+
+SRC_MY_SETTINGS_SCREEN = "app/src/main/java/io/legado/app/ui/main/my/MySettingsScreen.kt"
+SRC_REPLACE_EDIT = "app/src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt"
+SRC_COLLAPSE_HEADER = "app/src/main/java/io/legado/app/ui/widget/components/CollapseSectionHeader.kt"
+
+
+def _edittext_bounds_all(xml: str):
+    """全部 EditText 节点 bounds（按 top 升序）——页面里多个输入框时用于取「最后一个」"""
+    out = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        cls = re.search(r'class="([^"]*)"', tag)
+        if not cls or cls.group(1) != "android.widget.EditText":
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 > x1 and y2 > y1:
+            out.append({"left": x1, "top": y1, "right": x2, "bottom": y2,
+                        "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2})
+    return sorted(out, key=lambda n: n["top"])
+
+
+def type_unicode(d, text: str) -> bool:
+    """CJK 输入通道：启用 u2 的 FastInputIME 后 `send_keys` 支持任意 Unicode。
+
+    ⚠️ 本仓既有 `type_search` 只喂过 ASCII 关键词（s1 从日志正文抽 ASCII 串），
+    而设置搜索页的标题/摘要全中文 ⇒ 必须显式走 FastInputIME（`adb shell input text` 只吃 ASCII）。
+    """
+    try:
+        d.set_input_ime()
+    except Exception as e:
+        print(f"  [s13] set_input_ime 失败: {type(e).__name__}: {e}")
+        return False
+    time.sleep(1.0)
+    try:
+        d.send_keys(text)
+    except Exception as e:
+        print(f"  [s13] send_keys 失败: {type(e).__name__}: {e}")
+        return False
+    time.sleep(1.5)
+    return True
+
+
+def _tap_label_scrolled(d, label: str, contains: bool = False, tries: int = 4) -> bool:
+    """按文本点击；节点若落在屏幕下缘之外，**先上滑把它带进视口再点**。
+
+    必要性（s13 实测 2026-09-21）：本页表单在 `NoChildScrollNestedScrollView` 内，
+    uiautomator 会把**视口外**的子节点也 dump 出来（带屏外 bounds）⇒ 直接点中心会打到屏幕外，
+    表现为「点了没反应」（首轮 B1 展开失败即此因，而非功能缺陷）。
+    """
+    h = (d.info or {}).get("displayHeight") or 1280
+    for _ in range(tries):
+        b = node_bounds(dump_xml(d), label, contains=contains)
+        if b and b["cy"] < h * 0.82:
+            click_xy(d, b["cx"], b["cy"])
+            return True
+        d.swipe(0.5, 0.72, 0.5, 0.36, 0.15)
+        time.sleep(0.9)
+    b = node_bounds(dump_xml(d), label, contains=contains)
+    if b:
+        click_xy(d, b["cx"], min(b["cy"], int(h * 0.78)))
+        return True
+    return False
+
+
+def _attr_by_id(xml: str, res_suffix: str, attr: str) -> str:
+    """按 resource-id 后缀取节点某属性（如 checkbox 的 checked）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', tag)
+        if not rid or not rid.group(1).endswith(res_suffix):
+            continue
+        v = re.search(r'\b%s="([^"]*)"' % attr, tag)
+        return v.group(1) if v else ""
+    return ""
+
+
+def _id_present(xml: str, res_suffix: str) -> bool:
+    """节点是否在 dump 中（不可见节点不在 dump 中 ⇒ 兼作可见性判据）。
+
+    ⚠️ s13 实测（2026-09-21）：`TextInputLayout` 的 hint **不出现在 a11y 树的 text 属性里**
+    ⇒ 用 hint 文案判「字段是否可见」会恒为 False（首轮 B0/B1 双假判定的根因）。改用 resource-id 存在性。
+    """
+    for m in re.finditer(r"<node[^>]*>", xml):
+        rid = re.search(r'resource-id="([^"]*)"', m.group(0))
+        if rid and rid.group(1).endswith(res_suffix):
+            return True
+    return False
+
+
+def s13_settings_search_and_replace_edit(d) -> bool:
+    """M4 4-5/11：main/settings-search（F30 命中高亮 + 子项计数 / F31 精确命中置顶）
+    + book/replace-edit（F69 样本试运行 / F63 粘贴差异预览 / F64 高级字段渐进披露）"""
+    print("  [s13] ===== 设置搜索高亮与精确置顶 + 替换规则试运行与粘贴预览 =====")
+    ok = False
+    try:
+        from PIL import Image
+        shot_dir = Path(tempfile.mkdtemp(prefix="m4s13_"))
+
+        # ---------- A：设置搜索（关键词「主题」：前缀命中 2 行 + 非前缀命中 1 行 + 子项 ≥2） ----------
+        reset_app()
+        a_landed = False
+        for _ in range(2):
+            sh("am", "start", "-n", f"{PKG}/{ACT_SETTINGS_SEARCH}")
+            time.sleep(3.5)
+            if "SettingsSearchActivity" in current_activity():
+                a_landed = True
+                break
+            sh_su(f"am start -n {PKG}/{ACT_SETTINGS_SEARCH}")
+            time.sleep(3.5)
+            if "SettingsSearchActivity" in current_activity():
+                a_landed = True
+                break
+        base_xml = dump_xml(d)
+        ca.shot(d, "m4s13_settings_search_base")
+        # 基线（未搜索）：同一行的 accent 像素数作为对照；accent 参考色取自「外观」组标题
+        p_base = str(shot_dir / "search_base.png")
+        d.screenshot(p_base)
+        img_base = Image.open(p_base).convert("RGB")
+        row_a_before = _clickable_bounds(base_xml, S_SET_ROW_EXACT_A) \
+            or node_bounds(base_xml, S_SET_ROW_EXACT_A)
+        sec_before = node_bounds(base_xml, S_SET_SECTION_APPEARANCE)
+        ref = foreground(img_base, sec_before)[0] if sec_before else None
+        cnt_before = count_near(img_base, row_a_before, ref) if (row_a_before and ref) else -1
+        print(f"  [s13] A0 落地={a_landed} 基线行「{S_SET_ROW_EXACT_A}」在场={bool(row_a_before)} "
+              f"accent 参考色={ref} 基线 accent 像素={cnt_before}")
+
+        typed = False
+        field = _edittext_bounds_all(base_xml)
+        if field:
+            click_xy(d, field[0]["cx"], field[0]["cy"])
+            time.sleep(0.8)
+            typed = type_unicode(d, S_SET_QUERY)
+        hit_xml = dump_xml(d)
+        ca.shot(d, "m4s13_settings_search_query")
+        query_set = S_SET_QUERY in hit_xml
+        exact_header = S_SET_EXACT_GROUP in hit_xml
+        exact_rows = all(t in hit_xml for t in (S_SET_ROW_EXACT_A, S_SET_ROW_EXACT_B))
+        nonexact_row = S_SET_ROW_NONEXACT in hit_xml
+        badges = [t for t, *_ in text_nodes(hit_xml) if SET_BADGE_PAT.match(t)]
+        print(f"  [s13] A1 输入={typed} 关键词落地={query_set} / F31 精确组头={exact_header} "
+              f"精确行齐={exact_rows} 非精确行仍在={nonexact_row} / F30 子项徽章={badges}")
+
+        # F30 高亮（像素口径，自校准）：过滤 + 置顶后行位置会变 ⇒ **必须用搜索后的新 bounds**，
+        # 否则量的是旧位置（首轮实测旧 bounds 命中 0 像素即此因）
+        cnt_after = -1
+        if query_set:
+            p_after = str(shot_dir / "search_query.png")
+            d.screenshot(p_after)
+            img_after = Image.open(p_after).convert("RGB")
+            row_a_after = _clickable_bounds(hit_xml, S_SET_ROW_EXACT_A) \
+                or node_bounds(hit_xml, S_SET_ROW_EXACT_A)
+            sec_after = node_bounds(hit_xml, S_SET_SECTION_APPEARANCE)
+            ref2 = foreground(img_after, sec_after)[0] if sec_after else ref
+            cnt_after = count_near(img_after, row_a_after, ref2) if (row_a_after and ref2) else -1
+            print(f"  [s13] A2 F30 高亮：accent 参考色={ref2} 命中行 accent 像素={cnt_after}"
+                  f"（基线 {cnt_before}）")
+        highlight_ok = cnt_after > 20 and cnt_after > cnt_before + 15
+        a_ok = bool(a_landed and typed and query_set and exact_header and exact_rows
+                    and nonexact_row and badges and highlight_ok)
+        print(f"  [s13] A 结论={a_ok}（高亮增量达标={highlight_ok}）")
+        try:
+            d.clear_input_ime()
+        except Exception:
+            pass
+
+        # ---------- B：替换规则编辑（F64 高级配置 + F69 样本试运行） ----------
+        reset_app()
+        b_landed = False
+        for _ in range(2):
+            sh("am", "start", "-n", f"{PKG}/{ACT_REPLACE_EDIT}", "--es", "pattern", S_REP_PATTERN)
+            time.sleep(3.5)
+            if "ReplaceEditActivity" in current_activity():
+                b_landed = True
+                break
+            sh_su(f"am start -n {PKG}/{ACT_REPLACE_EDIT} --es pattern {S_REP_PATTERN}")
+            time.sleep(3.5)
+            if "ReplaceEditActivity" in current_activity():
+                b_landed = True
+                break
+        b_xml = dump_xml(d)
+        ca.shot(d, "m4s13_replace_edit_base")
+        adv_header = node_bounds(b_xml, S_REP_ADV_GROUP)
+        # 判据用 resource-id 存在性（hint 文案不进 a11y 树，见 _id_present 注释）
+        adv_collapsed = not _id_present(b_xml, "et_scope")
+        sample_header = node_bounds(b_xml, S_REP_SAMPLE_GROUP)
+        print(f"  [s13] B0 落地={b_landed} / F64 组头={bool(adv_header)} 高级字段已收起={adv_collapsed} "
+              f"/ F69 组头={bool(sample_header)}")
+
+        # F64：点组头 ⇒ 高级字段出现（组头在表单下方，先确保滚进视口再点）
+        adv_expanded = False
+        if adv_header:
+            for attempt in range(2):
+                tap_ok = _tap_label_scrolled(d, S_REP_ADV_GROUP)
+                time.sleep(1.5)
+                adv_xml = dump_xml(d)
+                adv_expanded = _id_present(adv_xml, "et_scope") \
+                    and _id_present(adv_xml, "et_exclude_scope") \
+                    and _id_present(adv_xml, "et_timeout")
+                if adv_expanded:
+                    break
+                print(f"  [s13] B1 第{attempt + 1}轮未展开（tap={tap_ok} 组头仍在="
+                      f"{S_REP_ADV_GROUP in adv_xml} EditText数={len(_edittext_bounds_all(adv_xml))}）")
+                # 兜底：点同一可点 Row 内的右侧 hint 文本
+                _tap_label_scrolled(d, S_REP_ADV_GROUP_HINT)
+                time.sleep(1.2)
+                adv_xml = dump_xml(d)
+                adv_expanded = _id_present(adv_xml, "et_scope") \
+                    and _id_present(adv_xml, "et_exclude_scope") \
+                    and _id_present(adv_xml, "et_timeout")
+                if adv_expanded:
+                    break
+            ca.shot(d, "m4s13_replace_advanced_open")
+        print(f"  [s13] B1 F64 展开后高级字段在场={adv_expanded}")
+
+        # F69：展开样本区 ⇒ 输入样本 ⇒ 试运行 ⇒ 命中数 + 替换结果
+        sample_ok = False
+        if sample_header:
+            _tap_label_scrolled(d, S_REP_SAMPLE_GROUP)
+            time.sleep(1.5)
+            # 样本输入区在表单最底部：连续上滑把底部带进视口（否则节点 bounds 在屏外，点击无效）
+            for _ in range(4):
+                d.swipe(0.5, 0.75, 0.5, 0.35, 0.12)
+                time.sleep(0.6)
+            s_xml = dump_xml(d)
+            ca.shot(d, "m4s13_replace_sample_open")
+            inputs = _edittext_bounds_all(s_xml)
+            h = (d.info or {}).get("displayHeight") or 1280
+            inputs = [b for b in inputs if b["cy"] < h * 0.9]
+            run_b = _clickable_bounds(s_xml, S_REP_SAMPLE_RUN)
+            typed_sample = False
+            if inputs and run_b:
+                last = inputs[-1]
+                click_xy(d, last["cx"], last["cy"])
+                time.sleep(0.8)
+                try:
+                    d.send_keys(S_REP_SAMPLE_TEXT)
+                    typed_sample = True
+                except Exception as e:
+                    print(f"  [s13] B2 样本输入失败: {type(e).__name__}")
+                time.sleep(1.0)
+                click_xy(d, run_b["cx"], run_b["cy"])
+                time.sleep(3.0)
+            r_xml = dump_xml(d)
+            ca.shot(d, "m4s13_replace_sample_result")
+            hit_line = any(t.startswith(S_REP_SAMPLE_HIT_PREFIX) for t, *_ in text_nodes(r_xml))
+            result_ok = (S_REP_SAMPLE_RESULT in r_xml) and (S_REP_EXPECT_OUTPUT in r_xml)
+            sample_ok = bool(typed_sample and hit_line and result_ok)
+            print(f"  [s13] B2 F69 输入={typed_sample} 命中行={hit_line} 替换结果「{S_REP_EXPECT_OUTPUT}」={result_ok}")
+
+        # ---------- C：F63 粘贴差异预览（覆盖前确认） ----------
+        # ⚠️ 不用 u2 的剪贴板 API：本机 uiautomator server 不支持（实测 `RPCUnknownError`）。
+        # 改为**页内自产剪贴板内容**——先 ⋮ →「复制规则」把当前规则写入剪贴板，
+        # 再改动一个字段（正则开关）制造差异，最后 ⋮ →「粘贴规则」⇒ 差异预览弹窗。
+        # 先收键盘（KEYCODE_ESCAPE）：不能用 back（本页无返回拦截 ⇒ 会直接 finish 掉页面）
+        sh("input", "keyevent", "111")
+        time.sleep(1.2)
+        paste_ok = False
+        copy_ok = False
+        diff_title_ok = False
+        applied = False
+        # 1) 复制当前规则
+        more_b = topbar_action_bounds(dump_xml(d), from_right=0)
+        if more_b:
+            click_xy(d, more_b["cx"], more_b["cy"])
+            time.sleep(1.8)
+            copy_b = _clickable_bounds(dump_xml(d), S_REP_COPY_MENU)
+            if copy_b:
+                click_xy(d, copy_b["cx"], copy_b["cy"])
+                copy_ok = True
+                time.sleep(1.5)
+        print(f"  [s13] C0 复制规则已触发={copy_ok}")
+        if copy_ok:
+            # 2) 改动「使用正则表达式」开关制造 1 项字段差异
+            cb_before = _attr_by_id(dump_xml(d), "cb_use_regex", "checked")
+            cb_node = _clickable_bounds(dump_xml(d), S_REP_USE_REGEX) \
+                or node_bounds(dump_xml(d), S_REP_USE_REGEX)
+            if cb_node:
+                click_xy(d, cb_node["cx"], cb_node["cy"])
+                time.sleep(1.2)
+            cb_after = _attr_by_id(dump_xml(d), "cb_use_regex", "checked")
+            toggled = (cb_before != cb_after) and cb_after != ""
+            print(f"  [s13] C1 正则开关 {cb_before!r} → {cb_after!r}（已制造差异={toggled}）")
+            # 3) 粘贴 ⇒ 差异预览
+            if toggled:
+                more_b2 = topbar_action_bounds(dump_xml(d), from_right=0)
+                if more_b2:
+                    click_xy(d, more_b2["cx"], more_b2["cy"])
+                    time.sleep(1.8)
+                    paste_b = _clickable_bounds(dump_xml(d), S_REP_PASTE_MENU)
+                    if paste_b:
+                        click_xy(d, paste_b["cx"], paste_b["cy"])
+                        time.sleep(2.0)
+                        dlg_xml = dump_xml(d)
+                        ca.shot(d, "m4s13_replace_paste_diff")
+                        diff_title_ok = any(t.startswith(S_REP_PASTE_TITLE_PREFIX)
+                                            for t, *_ in text_nodes(dlg_xml))
+                        confirm_b = _clickable_bounds(dlg_xml, S_REP_PASTE_CONFIRM)
+                        if confirm_b:
+                            click_xy(d, confirm_b["cx"], confirm_b["cy"])
+                            time.sleep(2.0)
+                            after_xml = dump_xml(d)
+                            ca.shot(d, "m4s13_replace_paste_applied")
+                            # 回填证据：正则开关被还原为剪贴板里的值
+                            applied = _attr_by_id(after_xml, "cb_use_regex", "checked") == cb_before
+                        paste_ok = bool(diff_title_ok and confirm_b and applied)
+                        print(f"  [s13] C2 F63 差异标题={diff_title_ok} 确认键={bool(confirm_b)} "
+                              f"确认后已回填（开关还原={applied}）")
+                    else:
+                        print("  [s13] C2 未定位到「粘贴规则」菜单项")
+                else:
+                    print("  [s13] C2 未定位到 ⋮ 入口")
+
+        # ---------- 源码断言 ----------
+        src_set = _src_text(SRC_MY_SETTINGS_SCREEN)
+        src_rep = _src_text(SRC_REPLACE_EDIT)
+        src_col = _src_text(SRC_COLLAPSE_HEADER)
+        checks = [
+            ("settings-search: 命中高亮", "private fun highlightMatches(" in src_set
+             and "FontWeight.SemiBold" in src_set),
+            ("settings-search: 子项计数徽章", "matchedSubItemCount > 1" in src_set
+             and "settings_search_sub_item_count" in src_set),
+            ("settings-search: 精确命中置顶", "private fun pinExactTitleMatches(" in src_set
+             and "settings_search_exact_group" in src_set),
+            ("settings-search: 分组 key 唯一", 'key = "s:${section.title}"' in src_set
+             and 'key = "exact"' in src_set),
+            ("replace-edit: 高级字段渐进披露", "private fun applyAdvancedVisibility(" in src_rep
+             and "CollapseSectionHeader(" in src_rep),
+            ("replace-edit: 已有高级值自动展开", "advancedExpanded = true" in src_rep),
+            ("replace-edit: 样本试运行复用引擎", "input.replace(ruleName, regex, replacement, timeout)" in src_rep),
+            ("replace-edit: 粘贴差异预览", "private fun showPasteDiffDialog(" in src_rep
+             and "replace_paste_diff_confirm" in src_rep),
+            ("replace-edit: 超时字段不再崩", ".toLong()" not in src_rep
+             and "private fun validateTimeout(" in src_rep),
+            ("CollapseSectionHeader 已建", "fun CollapseSectionHeader(" in src_col),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s13] 源码 {name} = {v}")
+
+        ok = bool(a_ok and b_landed and adv_expanded and sample_ok and paste_ok and src_ok)
+    except Exception as e:
+        print(f"  [s13] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -4360,6 +4743,7 @@ STEPS = {
     "s10": guarded(s10_video_pages),
     "s11": guarded(s11_menu_and_bgm_pages),
     "s12": guarded(s12_gallery_and_source_edit),
+    "s13": guarded(s13_settings_search_and_replace_edit),
 }
 
 
@@ -4370,7 +4754,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
