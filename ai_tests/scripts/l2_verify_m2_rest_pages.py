@@ -8,8 +8,10 @@
     s3 远端套装「应用」→ 卡片按钮转「下载中…」+ 顶部细进度条（构造可测通道）
   【config/navigation-bar-manage】F115 编辑弹框内嵌迷你底栏预览
     s4 预览条渲染 + 布局切换（悬浮/常规/侧栏）即时重绘（像素指纹三态判定，取消即零污染）
+  【main/discovery-suite-manage】F21 行内高频前置 + F20 倍率即时预览 + 蓝图声称已修项
+    s5 常驻「设为当前」+ ⋮ 收敛 + 副标题类型摘要 + 倍率行样例（播种合成套件，测后还原 prefs 快照）
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m2_rest_pages.py [--scenario s1|s2|s3|s4|all]
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m2_rest_pages.py [--scenario s1|s2|s3|s4|s5|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装（build-legado.bat / quick_build_install.py 产物）
 
 数据策略（零污染，全部限定测试包沙箱）：
@@ -92,6 +94,25 @@ S_CANCEL = "取消"                 # cancel
 # 预览条内探针：相对节点高度取底栏中线（节点内容高 72dp，底栏 52dp 底对齐 → 中线 ≈ 0.64）
 BAR_Y_RATIO = 0.64
 COLOR_THRESH = 6                  # 「底栏色」vs「底衬页面色」最小通道差（实测校准用，脚本会打印实值）
+
+# --- main/discovery-suite-manage（F21 行内前置 + F20 倍率即时预览 + 修复1/2/4） ---
+ACT_DISCOVERY = "io.legado.app.ui.main.explore.DiscoverySuiteManageActivity"
+S_DS_SET_CURRENT = "设为当前"     # discovery_suite_set_current（常驻动作 contentDescription）
+S_DS_RENAME = "重命名套件"        # discovery_suite_rename（⋮ 内）
+S_DS_ALIAS = "设置别名"          # discovery_suite_alias（⋮ 内）
+S_DS_DELETE = "删除套件"          # discovery_suite_delete
+S_DS_OPACITY = "透明度倍率"
+S_DS_MINUS = "-0.25"
+S_DS_PLUS = "+0.25"
+S_DS_MORE = "更多菜单"            # more_menu（⋮ 的 contentDescription）
+S_DS_CREATE = "新建套件"          # discovery_suite_create（顶栏纯图标动作 → 用 contentDescription）
+S_DS_ADD_WIDGET = "添加控件"      # discovery_suite_add_widget
+S_DS_SAVE = "保存"                # EditorBottomBar 保存钮
+S_DS_ERR_EMPTY = "请先选择要展示的 Tag 或书源目标"  # discovery_suite_widget_targets_empty（修复2 内联）
+S_DS_CURRENT_TAG = "当前套件"
+S_DS_EMPTY_PAGE = "还没有套件"
+CONFIRM_TEXTS = ("确认", "确定", "删除")
+TEST_SUITES = ("L2校验套件甲", "L2校验套件乙")
 
 # --- 灵敏度参数 ---
 DAV_PORT = 8931
@@ -204,13 +225,24 @@ def tap_text(d, text, timeout=6) -> bool:
 
 
 def text_nodes(xml: str):
-    """返回 [(text, top, left, cx, cy)]（含 bounds 的全部文本节点）"""
+    """返回 [(label, top, left, cx, cy)]（含 bounds 的全部可读节点）
+
+    label 口径：`text` 非空优先，否则取 `content-desc`（**纯图标动作**如 ⋮/顶栏图标
+    只有 content-desc，旧版仅取 text 会静默漏掉 ⇒ 本轮「未定位到 ⋮」假失败的真因，2026-09-20）。
+    """
     out = []
-    for m in re.finditer(
-            r'<node[^>]*text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
-        t = m.group(1)
-        x1, y1, x2, y2 = map(int, m.groups()[1:])
-        out.append((t, y1, x1, (x1 + x2) // 2, (y1 + y2) // 2))
+    for m in re.finditer(r'<node[^>]*>', xml):
+        tag = m.group(0)
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        t = re.search(r'\btext="([^"]*)"', tag)
+        cd = re.search(r'\bcontent-desc="([^"]*)"', tag)
+        label = (t.group(1) if t and t.group(1) else (cd.group(1) if cd else ""))
+        if not label:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        out.append((label, y1, x1, (x1 + x2) // 2, (y1 + y2) // 2))
     return out
 
 
@@ -699,6 +731,237 @@ def s4_navbar_edit_preview(d) -> bool:
     return floating_ok and standard_ok and sidebar_ok and closed and no_new
 
 
+def _tap_desc(d, desc, timeout=6) -> bool:
+    """纯图标动作（contentDescription）点击"""
+    try:
+        node = d(description=desc)
+        if node.wait(timeout=timeout):
+            node.click()
+            time.sleep(1.2)
+            return True
+    except Exception:
+        pass
+    return ca.click_by_dump(d, f'content-desc="{re.escape(desc)}"', timeout=2)
+
+
+def _input_first_edittext(d, text: str) -> bool:
+    """定位首个 EditText（Compose TextField 在 a11y 层为 android.widget.EditText）并输入"""
+    b = None
+    for _ in range(2):
+        b = ca.dump_bounds(d, 'class="android.widget.EditText"')
+        if b:
+            break
+        time.sleep(2.0)
+    if not b:
+        return False
+    click_xy(d, b["cx"], b["cy"])
+    time.sleep(0.8)
+    try:
+        d.send_keys(text)
+    except Exception:
+        sh("input", "text", text)
+    time.sleep(1.0)
+    return True
+
+
+def _tap_confirm(d, timeout=6) -> bool:
+    """确认键（不同弹框文案不一：确认/确定/删除）→ 取最下方命中项"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        nodes = [n for n in text_nodes(dump_xml(d)) if n[0] in CONFIRM_TEXTS]
+        if nodes:
+            _, _, _, cx, cy = max(nodes, key=lambda n: n[1])
+            click_xy(d, cx, cy)
+            return True
+        time.sleep(0.6)
+    return False
+
+
+def _row_title_containing(d, keyword: str, timeout=6.0) -> str:
+    """列表中包含关键字的行标题实文本（弹框可能预填名称导致前后缀差异 → 不假设全等）"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        cands = [n[0] for n in text_nodes(dump_xml(d))
+                 if keyword in n[0] and len(n[0]) <= len(keyword) + 8]
+        if cands:
+            return min(cands, key=len)
+        time.sleep(0.8)
+    return ""
+
+
+def _create_suite(d, name: str) -> str:
+    """顶栏「新建套件」→ 名称输入 → 确认；返回列表中的实际行标题（失败返回 ""）"""
+    if not _tap_desc(d, S_DS_CREATE):
+        print("  [s5] 未找到「新建套件」顶栏动作")
+        return ""
+    time.sleep(1.5)
+    if not _input_first_edittext(d, name):
+        print("  [s5] 未定位到套件名称输入框")
+        return ""
+    if not _tap_confirm(d):
+        print("  [s5] 名称弹框确认未命中")
+        return ""
+    time.sleep(2.0)
+    # 创建成功后页面直接进入该套件详情态 ⇒ 返回列表再定位行（实测确认，2026-09-20）
+    sh("input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1.8)
+    return _row_title_containing(d, name, timeout=8.0)
+
+
+def _multiset_diff(after: list, before: list) -> list:
+    """标签多重集差（弹出菜单内容 = 打开后标签 - 打开前标签，规避「列表里的同名节点」干扰）"""
+    pool = list(before)
+    out = []
+    for x in after:
+        if x in pool:
+            pool.remove(x)
+        else:
+            out.append(x)
+    return out
+
+
+def _dismiss_popup(d):
+    """点顶栏空白区关掉弹出菜单（避免 BACK 触发页面回退）"""
+    w, h = d.window_size()
+    click_xy(d, w // 2, int(h * 0.08))
+    time.sleep(1.0)
+
+
+def _delete_suite(d, name: str) -> bool:
+    """列表行 ⋮ → 删除（R.string.delete=「删除」）→ 确认"""
+    if not click_in_card(d, name, S_DS_MORE):
+        print(f"  [s5][clean] 未定位到 {name} 的 ⋮")
+        return False
+    time.sleep(1.0)
+    if not tap_text(d, S_DELETE):
+        print("  [s5][clean] 未找到「删除」")
+        return False
+    time.sleep(1.2)
+    if not _tap_confirm(d):
+        print("  [s5][clean] 删除确认未命中")
+        return False
+    time.sleep(2.0)
+    return not poll_text(d, name, timeout=4.0)
+
+
+def _purge_test_suites(d) -> None:
+    """清理本脚本历史运行留下的测试套件（命名前缀 L2 为测试专用，避免误删用户数据）"""
+    for _ in range(8):
+        xml = dump_xml(d)
+        cands = [n[0] for n in text_nodes(xml)
+                 if n[0].startswith(("L2Suite", "L2校验套件"))]
+        if not cands:
+            return
+        if not _delete_suite(d, sorted(cands, key=len)[0]):
+            return
+
+
+def s5_discovery_suite_row_and_opacity(d) -> bool:
+    """发现套件管理（真实 UI 流程，零污染）：
+
+    ①F21 非当前套件行常驻「设为当前」；⋮ 内不再重复该项（仅剩重命名/别名/删除）
+    ②F20 倍率行 mini 面板样例 + 步进原位可见
+    ③修复2 控件保存校验：无目标时**就地内联**报错（原为 toast）
+    收尾：删除本轮创建的两个套件并复检测试残留归零
+
+    前置：设备**无用户套件**（脚本会先清理自身历史残留；用户数据不受影响）
+    """
+    reset_app()
+    start_act(ACT_DISCOVERY)
+    time.sleep(2.5)
+    if not ca.dump_bounds(d, f'content-desc="{re.escape(S_DS_CREATE)}"'):
+        print(f"  [s5] 未进入套件管理列表态（栈顶={current_activity()}）")
+        return False
+    _purge_test_suites(d)
+    created = []
+    for name in TEST_SUITES:
+        title = _create_suite(d, name)
+        if not title:
+            print(f"  [s5] 新建套件失败（第 {len(created) + 1} 个）")
+            break
+        created.append(title)
+    if len(created) != 2:
+        print(f"  [s5] 前置不足（已建 {len(created)} 个），跳过断言")
+        for t in created:
+            _delete_suite(d, t)
+        return False
+
+    xml = dump_xml(d)
+    current_tag_count = xml.count(S_DS_CURRENT_TAG)
+    residents = 0
+    try:
+        residents = d(description=S_DS_SET_CURRENT).count
+    except Exception:
+        pass
+    print(f"  [s5] 「{S_DS_CURRENT_TAG}」出现 {current_tag_count} 次（应=1）/ "
+          f"常驻「{S_DS_SET_CURRENT}」数={residents}（应=1）")
+    ca.shot(d, "m2rest_s5_rows")
+
+    # 定位常驻动作所在行（= 非当前套件行）→ 校验其 ⋮ 收敛
+    act_bounds = ca.dump_bounds(d, f'content-desc="{re.escape(S_DS_SET_CURRENT)}"')
+    row_title = ""
+    if act_bounds:
+        cands = [n for n in text_nodes(xml) if n[0] in created]
+        if cands:
+            row_title = min(cands, key=lambda n: abs(n[4] - act_bounds["cy"]))[0]
+    menu_labels, menu_set_current = [], True
+    if row_title:
+        before_labels = [n[0] for n in text_nodes(dump_xml(d))]
+        if click_in_card(d, row_title, S_DS_MORE):
+            time.sleep(1.2)
+            after_labels = [n[0] for n in text_nodes(dump_xml(d))]
+            menu_labels = _multiset_diff(after_labels, before_labels)
+            menu_set_current = S_DS_SET_CURRENT in menu_labels
+            ca.shot(d, "m2rest_s5_more_menu")
+            _dismiss_popup(d)
+    expected_menu = {"编辑", S_DS_RENAME, S_DS_ALIAS, S_DELETE}
+    print(f"  [s5] 非当前行 ⋮ 弹出项={sorted(set(menu_labels))}（期望={sorted(expected_menu)}）"
+          f" / 含「{S_DS_SET_CURRENT}」={menu_set_current}")
+
+    # 详情页（点非当前套件行进入）→ F20 倍率行
+    detail_ok = False
+    step_ok = False
+    if row_title:
+        tap_text(d, row_title)
+        time.sleep(2.5)
+        detail_xml = dump_xml(d)
+        detail_ok = S_DS_OPACITY in detail_xml
+        ca.shot(d, "m2rest_s5_detail_opacity")
+        if tap_text(d, S_DS_PLUS):
+            time.sleep(1.5)
+            step_ok = "1.25x" in dump_xml(d)
+    print(f"  [s5] 详情倍率行可见={detail_ok} / +0.25 后文案 1.25x={step_ok}")
+
+    # 修复2：控件编辑器内不选目标直接保存 → 内联报错
+    inline_ok = False
+    if _tap_desc(d, S_DS_ADD_WIDGET):
+        time.sleep(2.5)
+        if tap_text(d, S_DS_SAVE):
+            time.sleep(1.5)
+            inline_ok = poll_text(d, S_DS_ERR_EMPTY, timeout=4.0)
+            ca.shot(d, "m2rest_s5_inline_validate")
+    print(f"  [s5] 控件保存内联校验可见={inline_ok}")
+
+    # 收尾：逐级返回列表（编辑器→详情→列表），必要时重进页面 → 删除两个套件 → 复检残留归零
+    for _ in range(2):
+        sh("input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1.2)
+    if not ca.dump_bounds(d, f'content-desc="{re.escape(S_DS_CREATE)}"'):
+        start_act(ACT_DISCOVERY)
+        time.sleep(2.5)
+    purge_ok = True
+    for t in created:
+        purge_ok = _delete_suite(d, t) and purge_ok
+    residue = [n[0] for n in text_nodes(dump_xml(d))
+               if n[0].startswith(("L2Suite", "L2校验套件"))]
+    print(f"  [s5] 清理={purge_ok} / 残留测试套件={len(residue)}")
+
+    return (current_tag_count == 1 and residents == 1
+            and set(menu_labels) == expected_menu and not menu_set_current
+            and detail_ok and step_ok and inline_ok
+            and purge_ok and not residue)
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -716,6 +979,7 @@ STEPS = {
     "s2": guarded(s2_applied_save_receipt),
     "s3": guarded(s3_remote_download_busy),
     "s4": guarded(s4_navbar_edit_preview),
+    "s5": guarded(s5_discovery_suite_row_and_opacity),
 }
 
 
@@ -742,7 +1006,7 @@ def main():
             return 0 if ok_purge else 1
 
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3", "s4"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4", "s5"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
 
     ok = True
     for sid in targets:
