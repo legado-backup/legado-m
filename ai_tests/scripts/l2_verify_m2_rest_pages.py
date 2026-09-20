@@ -6,8 +6,10 @@
     s1 本地套装保存 → 次级回执（「主题已保存到本地」）
     s2 应用中套装保存 → accent 强调回执（含「全局生效」）
     s3 远端套装「应用」→ 卡片按钮转「下载中…」+ 顶部细进度条（构造可测通道）
+  【config/navigation-bar-manage】F115 编辑弹框内嵌迷你底栏预览
+    s4 预览条渲染 + 布局切换（悬浮/常规/侧栏）即时重绘（像素指纹三态判定，取消即零污染）
 
-执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m2_rest_pages.py [--scenario s1|s2|s3|all]
+执行（铁律）：ai_tests\\venv\\Scripts\\python.exe ai_tests/scripts/l2_verify_m2_rest_pages.py [--scenario s1|s2|s3|s4|all]
 前置：MEmu 已启动；测试包 io.legado.miss.app.debug 已安装（build-legado.bat / quick_build_install.py 产物）
 
 数据策略（零污染，全部限定测试包沙箱）：
@@ -73,6 +75,23 @@ S_DELETE = "删除"                          # delete
 # --- 合成远端套装（仅播种在测试包缓存目录，测后删除） ---
 SEED_NAME = "L2校验远端套装"
 SEED_DIR = "l2_verify_remote"
+
+# --- navigation-bar-manage（F115 编辑弹框内嵌迷你预览） ---
+ACT_NAVBAR = "io.legado.app.ui.config.NavigationBarManageActivity"
+NB_TYPE_DIR = f"{EXT}/navigationBarPackages"
+S_NB_MANAGE = "底栏管理"          # navigation_bar_manage
+S_NB_ADD = "添加主题"             # theme_add（底栏页复用同一入口文案）
+S_NB_MANUAL = "手动配置"          # theme_manual_config
+S_NB_EDIT = "底栏主题"            # navigation_bar_edit（弹框标题）
+S_NB_PREVIEW = "底栏预览"         # navigation_bar_preview（预览条 contentDescription）
+S_NB_LAYOUT = "底栏样式"          # bottom_bar_layout_mode
+S_NB_FLOATING = "悬浮底栏"        # bottom_bar_layout_floating
+S_NB_STANDARD = "常规底栏"        # bottom_bar_layout_standard
+S_NB_SIDEBAR = "侧边栏"           # bottom_bar_layout_sidebar
+S_CANCEL = "取消"                 # cancel
+# 预览条内探针：相对节点高度取底栏中线（节点内容高 72dp，底栏 52dp 底对齐 → 中线 ≈ 0.64）
+BAR_Y_RATIO = 0.64
+COLOR_THRESH = 6                  # 「底栏色」vs「底衬页面色」最小通道差（实测校准用，脚本会打印实值）
 
 # --- 灵敏度参数 ---
 DAV_PORT = 8931
@@ -527,6 +546,159 @@ def sc_purge_created(d) -> bool:
     return ok
 
 
+def nav_pkg_names(kind: str = "day") -> set:
+    """底栏套装名集合（目录内 navigation.json 的 name 字段；仅用于零污染校验）"""
+    r = sh(f"ls -1 '{NB_TYPE_DIR}/{kind}' 2>/dev/null")
+    dirs = [x.strip() for x in r.stdout.decode("utf-8", "ignore").splitlines() if x.strip()]
+    names = set()
+    for dn in dirs:
+        rr = sh(f"cat '{NB_TYPE_DIR}/{kind}/{dn}/navigation.json' 2>/dev/null")
+        m = re.search(r'"name"\s*:\s*"([^"]*)"', rr.stdout.decode("utf-8", "ignore"))
+        if m:
+            names.add(m.group(1))
+    return names
+
+
+# ---------------------- 像素探针（预览条是否随配置重绘的客观判定） ----------------------
+
+def _mean_rgb(img, cx, cy, rad=2):
+    xs = range(max(0, cx - rad), min(img.width, cx + rad + 1))
+    ys = range(max(0, cy - rad), min(img.height, cy + rad + 1))
+    px = [img.getpixel((x, y)) for x in xs for y in ys]
+    if not px:
+        return (0, 0, 0)
+    return tuple(sum(p[i] for p in px) // len(px) for i in range(3))
+
+
+def _dist(a, b) -> int:
+    return max(abs(a[i] - b[i]) for i in range(3))
+
+
+def preview_signature(shot_path: str, bounds: dict):
+    """返回预览条的布局指纹：(底栏中线左缘 6px 处是否底栏色, 顶部左缘 30px 处是否底栏色)
+
+    三种布局的可判别签名（相对节点自身边界，与屏幕尺寸/密度无关）：
+      悬浮：底栏内缩 8dp → (中线左缘 6px=底衬, 顶部=底衬)
+      常规：底栏贴左 → (中线左缘 6px=底栏, 顶部=底衬)
+      侧栏：竖条贴左且全高 → (中线左缘 6px=底栏, 顶部=底栏)
+    """
+    from PIL import Image
+    img = Image.open(shot_path).convert("RGB")
+    # 底衬参考点取「顶部水平居中」：三种布局下该点都是底衬（侧栏条只占左侧 50dp）
+    # ⚠️ 不可取左上角——侧栏布局下左上角落在竖条内，会把参考色取成底栏色（实测踩坑 2026-09-20）
+    cx = (bounds["left"] + bounds["right"]) // 2
+    plate = _mean_rgb(img, cx, bounds["top"] + 6)
+    h = bounds["bottom"] - bounds["top"]
+    bar_y = bounds["top"] + int(h * BAR_Y_RATIO)
+    mid_left = _mean_rgb(img, bounds["left"] + 6, bar_y)
+    top_left = _mean_rgb(img, bounds["left"] + 30, bounds["top"] + 12)
+    sig = (_dist(mid_left, plate) > COLOR_THRESH, _dist(top_left, plate) > COLOR_THRESH)
+    print(f"    [probe] plate={plate} mid_left={mid_left}(d={_dist(mid_left, plate)}) "
+          f"top_left={top_left}(d={_dist(top_left, plate)}) → sig={sig}")
+    return sig
+
+
+def preview_bounds(d):
+    """定位预览条（contentDescription 语义节点）"""
+    try:
+        node = d(description=S_NB_PREVIEW)
+        if node.exists:
+            return node.info["bounds"]
+    except Exception:
+        pass
+    return None
+
+
+def _open_navbar_edit_dialog(d) -> bool:
+    """底栏页 → 添加主题 → 手动配置 → 编辑弹框（不落盘，取消即零污染）"""
+    reset_app()
+    start_act(ACT_NAVBAR)
+    if not wait_texts(d, [S_NB_MANAGE], timeout=10):
+        print(f"  [s4] 未进入底栏管理页（栈顶={current_activity()}）")
+        return False
+    if not tap_text(d, S_NB_ADD):
+        print("  [s4] 未找到「添加主题」")
+        return False
+    if not tap_text(d, S_NB_MANUAL):
+        print("  [s4] 未找到「手动配置」")
+        return False
+    ok = wait_texts(d, [S_NB_EDIT, S_NB_PREVIEW], timeout=8)
+    if not ok:
+        xml = dump_xml(d)
+        has_edit = S_NB_EDIT in xml
+        has_name = S_CANCEL in xml
+        has_preview_desc = S_NB_PREVIEW in xml
+        print(f"  [s4][diag] 弹框标题={has_edit} / 取消键={has_name} / 预览描述={has_preview_desc} "
+              f"/ preview_bounds={bool(preview_bounds(d))} / 栈顶={current_activity()}")
+    return ok
+
+
+def s4_navbar_edit_preview(d) -> bool:
+    """F115：编辑弹框内嵌迷你底栏预览 + 布局切换即时重绘（像素指纹三态判定）"""
+    import tempfile as _tf
+    before = nav_pkg_names()
+    if not _open_navbar_edit_dialog(d):
+        return False
+    shot_dir = Path(_tf.mkdtemp(prefix="m2shot_"))
+    ok_gate = True
+    observed = {}
+
+    def capture(tag: str):
+        b = preview_bounds(d)
+        if not b:
+            print(f"  [s4] {tag}: 预览条不可定位（content-desc 未命中）")
+            return None
+        p = str(shot_dir / f"{tag}.png")
+        d.screenshot(p)
+        return preview_signature(p, b)
+
+    # 1) 显式切「悬浮底栏」再采基线（设备侧 AppConfig.bottomBarLayoutMode 未必是悬浮，实测为常规）
+    if tap_text(d, S_NB_LAYOUT):
+        time.sleep(1.0)
+        tap_text(d, S_NB_FLOATING)
+        time.sleep(2.0)
+    observed["floating"] = capture("floating")
+    ca.shot(d, "m2rest_s4_preview_floating")
+
+    # 2) 切「常规底栏」
+    if tap_text(d, S_NB_LAYOUT):
+        time.sleep(1.0)
+        tap_text(d, S_NB_STANDARD)
+        time.sleep(2.0)
+        observed["standard"] = capture("standard")
+        ca.shot(d, "m2rest_s4_preview_standard")
+    else:
+        print("  [s4] 未找到「底栏样式」行")
+        ok_gate = False
+
+    # 3) 切「侧边栏」
+    if tap_text(d, S_NB_LAYOUT):
+        time.sleep(1.0)
+        tap_text(d, S_NB_SIDEBAR)
+        time.sleep(2.0)
+        observed["sidebar"] = capture("sidebar")
+        ca.shot(d, "m2rest_s4_preview_sidebar")
+
+    ok_gate = ok_gate and all(observed.get(k) is not None for k in ("floating", "standard", "sidebar"))
+    if not ok_gate:
+        print(f"  [s4] 指纹采集不全：{observed}")
+        return False
+
+    floating_ok = observed["floating"] == (False, False)
+    standard_ok = observed["standard"] == (True, False)
+    sidebar_ok = observed["sidebar"] == (True, True)
+    print(f"  [s4] 指纹判定 悬浮={floating_ok} 常规={standard_ok} 侧栏={sidebar_ok}")
+
+    # 4) 取消 → 零污染校验（未落盘、未新建套装）
+    tap_text(d, S_CANCEL)
+    time.sleep(1.5)
+    closed = preview_bounds(d) is None
+    after = nav_pkg_names()
+    no_new = (after - before) == set()
+    print(f"  [s4] 弹框已关闭={closed} / 未新建套装={no_new}")
+    return floating_ok and standard_ok and sidebar_ok and closed and no_new
+
+
 def guarded(fn):
     def inner(d):
         try:
@@ -543,6 +715,7 @@ STEPS = {
     "s1": guarded(s1_local_save_receipt),
     "s2": guarded(s2_applied_save_receipt),
     "s3": guarded(s3_remote_download_busy),
+    "s4": guarded(s4_navbar_edit_preview),
 }
 
 
@@ -569,7 +742,7 @@ def main():
             return 0 if ok_purge else 1
 
     scen = (args.scenario or "all").strip()
-    targets = ["s1", "s2", "s3"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
+    targets = ["s1", "s2", "s3", "s4"] if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()]
 
     ok = True
     for sid in targets:
