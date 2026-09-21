@@ -140,6 +140,7 @@
 import argparse
 import base64
 import hashlib
+import json
 import re
 import socket
 import sqlite3
@@ -9305,6 +9306,416 @@ def s33_file_association(d) -> bool:
     return ok
 
 
+# ============================ s34：M6-5 association/online-import ============================
+# F354 下载进度卡 + 修复 2 预览结构化 + 修复 3 失败重试/复制 + F357 成功去向引导 + F356 Invalid 复制链接
+# 通道：本机 http.server（0.0.0.0 绑定）——设备侧**不可用 127.0.0.1**（导入策略硬拒回环地址），
+#       必须走 10.0.2.2（模拟器宿主别名，site-local）⇒ 首轮必过「私有网络确认」（真实分支，顺带覆盖）。
+#   /ping 204 探针 · /rules.json 200 + Content-Length + **分片慢吐**（进度卡可观测） · /missing.json 404
+
+S34_ACT = "io.legado.app.ui.association.OnLineImportActivity"
+S34_PORT = 18834
+S34_DEV_HOST = "10.0.2.2"
+S34_SRC_ACT = "app/src/main/java/io/legado/app/ui/association/OnLineImportActivity.kt"
+S34_SRC_DLG = "app/src/main/java/io/legado/app/ui/association/OnlineImportDialogs.kt"
+S34_SRC_CARD = "app/src/main/java/io/legado/app/ui/association/OnlineImportProgressCard.kt"
+S34_SRC_FAIL = "app/src/main/java/io/legado/app/ui/association/OnlineImportFailure.kt"
+S34_SRC_DL = "app/src/main/java/io/legado/app/ui/association/OnlineImportDownloader.kt"
+S34_SRC_VM = "app/src/main/java/io/legado/app/ui/association/OnLineImportViewModel.kt"
+S34_SRC_BASEVM = "app/src/main/java/io/legado/app/ui/association/BaseAssociationViewModel.kt"
+S34_SRC_XML = "app/src/main/res/layout/activity_translucence.xml"
+S34_RETIRED = "app/src/main/java/io/legado/app/ui/association/ParagraphRuleOnlineImportDialog.kt"
+S34_OTHERS = [
+    "app/src/main/java/io/legado/app/ui/association/FileAssociationActivity.kt",
+    "app/src/main/java/io/legado/app/ui/association/OpenUrlConfirmActivity.kt",
+    "app/src/main/java/io/legado/app/ui/association/VerificationCodeActivity.kt",
+    "app/src/main/java/io/legado/app/ui/file/HandleFileActivity.kt",
+]
+S34_RULE_NAME = "L2在线导入规则"
+S34_RULE_COUNT = 200
+S34_PING = "/ping"
+S34_RULES_PATH = "/rules.json"
+S34_MISSING_PATH = "/missing.json"
+
+S34_PRIVATE_TITLE = "私有网络导入"
+S34_DL_TITLE = "正在下载导入包"
+S34_STEP_INSPECT = "预检校验"
+S34_STEP_CONFIRM = "导入确认"
+S34_PREVIEW_TITLE = "确认在线导入"
+S34_FIELDS = ["类型", "原始来源", "最终地址", "大小", "私有网络"]
+S34_EXPAND = "展开"
+S34_COLLAPSE = "收起"
+S34_SUMMARY_PREFIX = "规则总数："
+S34_GO_VIEW = "去查看"
+S34_RETRY = "重试"
+S34_COPY_ERROR = "复制错误详情"
+S34_HTTP_404 = "服务器返回 HTTP 404"
+S34_INVALID_HOST = "这不是有效的导入链接"
+S34_INVALID_SRC = "导入链接缺少 src 参数"
+S34_RAW_LINK = "原始链接"
+S34_COPY_LINK = "复制链接"
+
+
+def _s34_package_body() -> bytes:
+    """合法段落规则包（200 条 ⇒ 正文 ≈90KB，跨过 32KB 进度上报步长 ⇒ 进度卡有真实推进）。
+
+    规则字段**全量给出**：不依赖 GSON 对 Kotlin data class 默认值的还原能力。
+    """
+    rules = []
+    for i in range(S34_RULE_COUNT):
+        rules.append({
+            "rule": {
+                "id": 0,
+                "name": S34_RULE_NAME if i == 0 else f"{S34_RULE_NAME}{i + 1}",
+                "jsLib": "",
+                "loginUrl": "",
+                "loginUi": "",
+                "enabledCookieJar": False,
+                "script": "return ctx" + " /* l2 filler */" + "x" * 380,
+                "timeoutMillisecond": 3000,
+                "order": i,
+                "updateTime": 0,
+            },
+            "vars": {},
+        })
+    return json.dumps(
+        {"format": "legado.paragraph-rules", "schemaVersion": 1, "rules": rules},
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+class _ImportPackageServer(threading.Thread):
+    """/ping 204 探针 · /rules.json 慢吐包 · /missing.json 404"""
+
+    def __init__(self, port: int):
+        super().__init__(daemon=True)
+        self.port = port
+        self.hits = []
+        self._httpd = None
+
+    def run(self):
+        import http.server
+        outer = self
+        body = _s34_package_body()
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = urlparse(self.path).path
+                outer.hits.append(path)
+                if path == S34_PING:
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                if path == S34_MISSING_PATH:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                # 分片慢吐（20 片 × 0.2s ≈ 4s）：进度卡（下载阶段）在真机上可观测
+                step = max(1, len(body) // 20)
+                for i in range(0, len(body), step):
+                    try:
+                        self.wfile.write(body[i:i + step])
+                        self.wfile.flush()
+                    except Exception:
+                        return
+                    time.sleep(0.2)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("0.0.0.0", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _s34_host() -> str:
+    """设备可达宿主：先探 10.0.2.2（模拟器宿主别名），失败再探本机 LAN 地址（两者都是 site-local）"""
+    cands = [S34_DEV_HOST]
+    try:
+        lan = socket.gethostbyname(socket.gethostname())
+        if lan and not lan.startswith("127.") and lan not in cands:
+            cands.append(lan)
+    except Exception:
+        pass
+    for host in cands:
+        r = sh("curl", "-s", "--max-time", "5", "-o", "/dev/null", "-w", "%{http_code}",
+               f"http://{host}:{S34_PORT}{S34_PING}", timeout=30)
+        out = (r.stdout or b"").decode("utf-8", errors="ignore")
+        print(f"  [s34] 宿主探针 {host} → {out.strip() or 'none'}")
+        if "204" in out:
+            return host
+    return ""
+
+
+def _s34_purge(workdir: Path) -> bool:
+    """清掉本次样本规则（保证冲突数为 0 ⇒ 弹窗不出冲突策略区，判据可确定复现）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from paragraph_rules where name like ?", (S34_RULE_NAME + "%",))
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s34_rule_count(workdir: Path) -> int:
+    """导入后落库条数（写回通道的真实校验，不看弹窗自称）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return -1
+    con = sqlite3.connect(str(db))
+    try:
+        return con.execute(
+            "select count(*) from paragraph_rules where name like ?",
+            (S34_RULE_NAME + "%",),
+        ).fetchone()[0]
+    finally:
+        con.close()
+
+
+def _s34_start(uri: str) -> bool:
+    for _ in range(2):
+        sh("am", "start", "-a", "android.intent.action.VIEW", "-d", uri, "-n", f"{PKG}/{S34_ACT}")
+        time.sleep(3.0)
+        if "OnLineImportActivity" in current_activity():
+            return True
+        sh_su(f"am start -a android.intent.action.VIEW -d '{uri}' -n {PKG}/{S34_ACT}")
+        time.sleep(3.0)
+        if "OnLineImportActivity" in current_activity():
+            return True
+    return False
+
+
+def _s34_wait_fast(d, marker: str, timeout: float = 12.0, interval: float = 0.4) -> str:
+    """短窗口轮询：进度卡只在下载期出现（≈4s），慢一拍就抓不到"""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if marker in xml:
+            return xml
+        time.sleep(interval)
+    return xml
+
+
+def s34_online_import(d) -> bool:
+    """M6-5：association/online-import（F354 进度卡 / 修复 2 预览 / 修复 3 重试 / F357 去向引导 / F356 原始链接）"""
+    print("  [s34] ===== 网络一键导入：进度卡 / 预览结构化 / 失败重试 / 去向引导 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s34_"))
+    reset_app()
+    srv = _ImportPackageServer(S34_PORT)
+    srv.start()
+    time.sleep(0.8)
+    ok = False
+    try:
+        host = _s34_host()
+        if not host:
+            print("  [s34] 宿主不可达（10.0.2.2 与 LAN 均探针失败）⇒ 无法离线验证，判失败")
+            return False
+        rules_url = f"http://{host}:{S34_PORT}{S34_RULES_PATH}"
+        missing_url = f"http://{host}:{S34_PORT}{S34_MISSING_PATH}"
+        purged = _s34_purge(workdir)
+        print(f"  [s34] 通道就绪 host={host} 清场样本={purged}")
+
+        # ---------- A：Invalid 路由（host 非 import）⇒ 原始链接可携带 ----------
+        started_a = _s34_start(f"legado://notimport/paragraphRule?src={rules_url}")
+        xml_a = _wait_marker(d, S34_INVALID_HOST, 18)
+        invalid_host = S34_INVALID_HOST in xml_a
+        invalid_link = S34_RAW_LINK in xml_a and S34_COPY_LINK in xml_a
+        link_visible = "legado://notimport/paragraphRule" in xml_a
+        ca.shot(d, "m6s34_invalid_link")
+        d.press("back")
+        time.sleep(1.2)
+        reset_app()
+        print(f"  [s34] A 直起={started_a} 原因={invalid_host} 链接块={invalid_link} 链接文本可见={link_visible}")
+
+        # ---------- B：Invalid 路由（缺 src）⇒ 原因随 kind 本地化 ----------
+        started_b = _s34_start("legado://import/paragraphRule")
+        xml_b = _wait_marker(d, S34_INVALID_SRC, 18)
+        invalid_src = S34_INVALID_SRC in xml_b
+        d.press("back")
+        time.sleep(1.2)
+        reset_app()
+        print(f"  [s34] B 直起={started_b} 缺src原因={invalid_src}")
+
+        # ---------- C：主链路 私有网络确认 → 进度卡 → 预览结构化 → 导入 → 去向引导 ----------
+        started_c = _s34_start(f"legado://import/paragraphRule?src={rules_url}")
+        xml_priv = _wait_marker(d, S34_PRIVATE_TITLE, 18)
+        private_prompt = S34_PRIVATE_TITLE in xml_priv
+        tap_text(d, "继续", timeout=4)
+        xml_prog = _s34_wait_fast(d, S34_DL_TITLE, 10.0)
+        progress_card = (S34_DL_TITLE in xml_prog and S34_STEP_INSPECT in xml_prog
+                         and S34_STEP_CONFIRM in xml_prog)
+        ca.shot(d, "m6s34_progress_card")
+        xml_prev = _wait_marker(d, S34_PREVIEW_TITLE, 30)
+        preview_title = S34_PREVIEW_TITLE in xml_prev
+        field_hits = sum(1 for m in S34_FIELDS if m in xml_prev)
+        summary_ok = f"{S34_SUMMARY_PREFIX}{S34_RULE_COUNT}" in xml_prev
+        expand_before = S34_EXPAND in xml_prev and S34_COLLAPSE not in xml_prev
+        ca.shot(d, "m6s34_preview")
+        tap_text(d, S34_EXPAND, timeout=4)
+        time.sleep(1.0)
+        xml_expanded = dump_xml(d)
+        expand_after = S34_COLLAPSE in xml_expanded
+        ca.shot(d, "m6s34_preview_expanded")
+        tap_text(d, "导入", timeout=5)
+        xml_ok = _wait_marker(d, "成功", 25)
+        success_ok = "成功" in xml_ok
+        stats_ok = f"新增：{S34_RULE_COUNT}" in xml_ok
+        go_view_ok = S34_GO_VIEW in xml_ok
+        ca.shot(d, "m6s34_success")
+        tap_text(d, S34_GO_VIEW, timeout=5)
+        time.sleep(2.5)
+        after_go = current_activity().rsplit("/", 1)[-1]
+        landed_manage = "ParagraphRuleManageActivity" in after_go
+        print(f"  [s34] C 直起={started_c} 私有网络确认={private_prompt} 进度卡={progress_card} "
+              f"预览弹窗={preview_title} 字段={field_hits}/5 摘要={summary_ok} "
+              f"展开双向={expand_before and expand_after} 成功={success_ok} 统计={stats_ok} "
+              f"去查看={go_view_ok} 落点={after_go}")
+
+        # ---------- D：失败态「重试 + 复制错误详情」（404），重试保留 allowPrivateNetwork ----------
+        reset_app()
+        started_d = _s34_start(f"legado://import/paragraphRule?src={missing_url}")
+        _wait_marker(d, S34_PRIVATE_TITLE, 18)
+        tap_text(d, "继续", timeout=4)
+        xml_fail = _wait_marker(d, S34_HTTP_404, 22)
+        fail_reason = S34_HTTP_404 in xml_fail
+        retry_btn = S34_RETRY in xml_fail
+        copy_btn = S34_COPY_ERROR in xml_fail
+        ca.shot(d, "m6s34_failure")
+        tap_text(d, S34_RETRY, timeout=4)
+        xml_fail2 = _wait_marker(d, S34_HTTP_404, 22)
+        retry_again = S34_HTTP_404 in xml_fail2 and S34_RETRY in xml_fail2
+        no_repeat_private = S34_PRIVATE_TITLE not in xml_fail2
+        d.press("back")
+        time.sleep(1.2)
+        d.press("back")
+        time.sleep(1.2)
+        exited = "OnLineImportActivity" not in current_activity()
+        print(f"  [s34] D 直起={started_d} 失败原因={fail_reason} 重试={retry_btn} 复制详情={copy_btn} "
+              f"重试再次失败={retry_again} 未重复问私有网络={no_repeat_private} 退出={exited}")
+
+        # ---------- E：落库校验（不看弹窗自称，直接查 paragraph_rules） ----------
+        count_after = _s34_rule_count(workdir)
+        db_ok = count_after == S34_RULE_COUNT
+        served = S34_RULES_PATH in srv.hits and S34_MISSING_PATH in srv.hits
+        print(f"  [s34] E 落库={count_after}（期望 {S34_RULE_COUNT}） 服务端命中={served}")
+
+        # ---------- F：源码断言 ----------
+        src_act = Path(S34_SRC_ACT).read_text(encoding="utf-8")
+        src_dlg = Path(S34_SRC_DLG).read_text(encoding="utf-8")
+        src_card = Path(S34_SRC_CARD).read_text(encoding="utf-8")
+        src_fail = Path(S34_SRC_FAIL).read_text(encoding="utf-8")
+        src_dl = Path(S34_SRC_DL).read_text(encoding="utf-8")
+        src_vm = Path(S34_SRC_VM).read_text(encoding="utf-8")
+        src_basevm = Path(S34_SRC_BASEVM).read_text(encoding="utf-8")
+        src_xml = Path(S34_SRC_XML).read_text(encoding="utf-8")
+        checks = [
+            ("F354 进度卡（槽位接线 + 三步阶段 + 自绘进度条）",
+             "cv_import_progress" in src_xml and "cvImportProgress" in src_act
+             and "OnlineImportProgressCard(" in src_act
+             and "enum class OnlineImportStage { DOWNLOAD, INSPECT, CONFIRM }" in src_card
+             and all(k in src_card for k in ("online_import_step_download",
+                                             "online_import_step_inspect",
+                                             "online_import_step_confirm"))
+             and "ProgressTrack(" in src_card),
+            ("F354 取消真实中断（关闭在途 call）+ 槽位为页级专用",
+             "fun cancelActive()" in src_dl and "activeCall" in src_dl
+             and "onlineImportDownloader.cancelActive()" in src_act
+             and all("cvImportProgress" not in Path(p).read_text(encoding="utf-8") for p in S34_OTHERS)),
+            ("修复 2 预览结构化（kv 行 + URL 省略/展开/复制）",
+             "OnlineImportConfirmDialog" in src_act
+             and all(k in src_dlg for k in ("online_import_field_type", "online_import_field_source",
+                                            "online_import_field_final", "online_import_field_size",
+                                            "online_import_field_private"))
+             and "TextOverflow.Ellipsis" in src_dlg
+             and "online_import_expand" in src_dlg and "online_import_collapse" in src_dlg
+             and "context.sendToClip(sourceUrl)" in src_dlg
+             and "ConvertUtils.formatFileSize(download.size)" in src_act
+             and "Formatter.formatFileSize" not in src_act),
+            ("F357 成功去向引导（去查看按来源直达管理页，无管理页则不给）",
+             "online_import_go_view" in src_act and "manageTargetFor(" in src_act
+             and "ParagraphRuleManageActivity::class.java" in src_act
+             and "BubbleManageActivity::class.java" in src_act
+             and "if (target == null)" in src_act),
+            ("修复 3 失败可重试 + 复制错误详情（重试保留 allowPrivateNetwork）",
+             "online_import_retry" in src_dlg and "online_import_copy_error" in src_dlg
+             and "onOnlineImportRetry" in src_act
+             and "retryAction" in src_act
+             and "downloadOnlinePackage(route, payloadType, allowPrivateNetwork)" in src_act
+             and "allowRetry" in src_dlg),
+            ("F356 Invalid 路由附原始链接 + 复制链接",
+             "showInvalidLink(" in src_act and "online_import_copy_link" in src_dlg
+             and "online_import_raw_link_label" in src_dlg
+             and "intent.data?.toString()" in src_act),
+            ("F353 失败文案按 kind 本地化（英文内部消息不出现在弹窗）",
+             "OnlineImportFailureKind" in src_fail
+             and "localizedImportFailureKind(" in src_act
+             and all(k in src_act for k in ("online_import_error_http_status",
+                                            "online_import_error_too_large",
+                                            "online_import_error_package_malformed"))
+             and 'IOException("Import' not in src_dl),
+            ("既有缺陷：排版导入真落库（按名查找 + save）且硬编码中文清零",
+             "indexOfFirst { it.name == config.name }" in src_vm
+             and "ReadBookConfig.save()" in src_vm
+             and "import_read_config_success" in src_act
+             and "导入排版成功" not in src_vm
+             and "格式不对" not in src_basevm),
+            ("旧件退役（无死件/死文案；KDoc 中的「替换自 X」说明不算引用）",
+             not Path(S34_RETIRED).exists()
+             and "ParagraphRuleOnlineImportDialog(" not in src_act
+             and "ParagraphRuleOnlineImportDialog(" not in src_dlg
+             and "buildOnlineImportPreviewMessage" not in src_act
+             and "online_import_preview_message" not in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s34] 源码 {nm} = {v}")
+
+        ok = bool(invalid_host and invalid_link and link_visible and invalid_src
+                  and private_prompt and progress_card and preview_title and field_hits >= 5
+                  and summary_ok and expand_before and expand_after
+                  and success_ok and stats_ok and go_view_ok and landed_manage
+                  and fail_reason and retry_btn and copy_btn and retry_again
+                  and no_repeat_private and exited and db_ok and served and src_ok)
+    except Exception as e:
+        print(f"  [s34] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        try:
+            srv.stop()
+        except Exception:
+            pass
+        reset_app()
+        try:
+            _s34_purge(workdir)
+        except Exception:
+            pass
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -9339,6 +9750,7 @@ STEPS = {
     "s31": guarded(s31_read_menu_custom_button_edit),
     "s32": guarded(s32_book_source_edit),
     "s33": guarded(s33_file_association),
+    "s34": guarded(s34_online_import),
 }
 
 
@@ -9351,7 +9763,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
