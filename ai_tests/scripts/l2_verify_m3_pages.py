@@ -7441,6 +7441,135 @@ def s24_book_info(d) -> bool:
     return ok
 
 
+ACT_AUDIO_PLAY = "io.legado.app.ui.book.audio.AudioPlayActivity"
+S25_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt"
+S25_SRC_POPUP = "app/src/main/java/io/legado/app/ui/widget/ModernActionPopup.kt"
+S25_SLIDER_OLD = "app/src/main/java/io/legado/app/ui/book/audio/SliderPopup.kt"
+S25_BOOK_URL = "l2seed://audio/one"
+S25_BOOK_NAME = "L2音频书"
+# 面板唯一样本：`timer_m` 档位文案（面板标题「定时」与底栏按钮 contentDescription 同名，不可作判据）
+S25_TIMER_PRESETS = ["15 分钟", "30 分钟", "60 分钟", "90 分钟"]
+S25_SPEED_PRESETS = ["0.75X", "2.0X"]
+S25_STOP_TITLE = "停止播放"      # audio_stop_play
+S25_CONTINUE = "继续播放"        # audio_continue_play
+
+
+def _s25_seed(workdir: Path) -> bool:
+    """一本音频书（type=32）：让顶栏拿到书名、页面进入真实态；
+    `tocUrl` 必须非空，否则 `AudioPlayViewModel.initBook` 会去联网取目录（本机无书源）"""
+    return _books_upsert(workdir, [{
+        "bookUrl": S25_BOOK_URL, "name": S25_BOOK_NAME, "author": "L2",
+        "origin": "l2seed://audio", "originName": "L2校验源", "type": 32,
+        "group": 0, "order": 0, "tocUrl": "l2seed://audio/toc",
+        "totalChapterNum": 3, "durChapterIndex": 0,
+    }])
+
+
+def s25_audio_play(d) -> bool:
+    """M5：book/audio（F34 长按停止确认 + 可发现入口 · F35 定时/倍速滑杆迁共享弹层族 · 优化2 歌词态封面缩图）"""
+    print("  [s25] ===== 音频播放 停止确认 + 滑杆迁共享弹层 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s25_"))
+    reset_app()
+    ok = False
+    try:
+        if not _s25_seed(workdir):
+            print("  [s25] 书目播种失败")
+            return False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_AUDIO_PLAY}", "--es", "bookUrl", S25_BOOK_URL)
+        time.sleep(3.0)
+        landed = "AudioPlayActivity" in current_activity()
+        r = sh("ps", "-A", timeout=20)
+        proc_alive = PKG.encode() in (r.stdout or b"")
+        xml = dump_xml(d)
+        ca.shot(d, "m5s25_audio_play")
+        page_ok = S25_BOOK_NAME in xml
+        timer_btn = node_bounds_by_id(xml, "iv_timer")
+        speed_btn = node_bounds_by_id(xml, "iv_speed_control")
+        fab = node_bounds_by_id(xml, "fab_play_stop")
+        print(f"  [s25] A 落地={landed} 进程存活={proc_alive} 书名在场={page_ok} "
+              f"定时键={bool(timer_btn)} 倍速键={bool(speed_btn)} FAB={bool(fab)}")
+        if not page_ok:
+            print(f"  [s25] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # ---------- B：定时 ⇒ 共享滑杆弹层（档位行即「已迁共享族」的真机证据） ----------
+        timer_panel = 0
+        if timer_btn:
+            click_xy(d, timer_btn["cx"], timer_btn["cy"])
+            time.sleep(1.6)
+            xml_t = dump_xml(d)
+            ca.shot(d, "m5s25_timer_panel")
+            labels = {lab for lab, *_ in text_nodes(xml_t)}
+            timer_panel = sum(1 for p in S25_TIMER_PRESETS if p in labels)
+            print(f"  [s25] B 定时弹层档位命中={timer_panel}/4")
+            sh("input", "keyevent", "4")
+            time.sleep(1.0)
+
+        # ---------- C：倍速 ⇒ 同构弹层 ----------
+        speed_panel = 0
+        if speed_btn:
+            click_xy(d, speed_btn["cx"], speed_btn["cy"])
+            time.sleep(1.6)
+            xml_s = dump_xml(d)
+            ca.shot(d, "m5s25_speed_panel")
+            labels = {lab for lab, *_ in text_nodes(xml_s)}
+            speed_panel = sum(1 for p in S25_SPEED_PRESETS if p in labels)
+            print(f"  [s25] C 倍速弹层档位命中={speed_panel}/2")
+            sh("input", "keyevent", "4")
+            time.sleep(1.0)
+
+        # ---------- D：长按 FAB ⇒ 停止确认（破坏性动作必须先确认） ----------
+        # 本机 u2 手势注入起拖不可靠（见 s11 登记缺口）⇒ 长按失败时回退 `input swipe` 同点长按
+        stop_dialog = False
+        if fab:
+            for attempt in range(2):
+                if attempt == 0:
+                    d.long_click(fab["cx"], fab["cy"], 1.2)
+                else:
+                    sh("input", "swipe", str(fab["cx"]), str(fab["cy"]),
+                       str(fab["cx"]), str(fab["cy"]), "1200")
+                time.sleep(1.6)
+                xml_d = dump_xml(d)
+                ca.shot(d, "m5s25_stop_confirm")
+                labels = {lab for lab, *_ in text_nodes(xml_d)}
+                stop_dialog = (S25_STOP_TITLE in labels) and (S25_CONTINUE in labels)
+                if stop_dialog:
+                    break
+            print(f"  [s25] D 长按确认框出现={stop_dialog}（标题 + 继续播放按钮）")
+            if stop_dialog:
+                sh("input", "keyevent", "4")
+                time.sleep(1.0)
+
+        # ---------- E：源码断言 ----------
+        src_act = Path(S25_SRC_ACT).read_text(encoding="utf-8")
+        src_pop = Path(S25_SRC_POPUP).read_text(encoding="utf-8")
+        checks = [
+            ("F34 长按改走确认（不再直接停止）",
+             re.search(r"fabPlayStop\.onLongClick\s*\{\s*(//[^\n]*\n\s*)*confirmStopPlay\(\)",
+                       src_act) is not None and "dangerPositive = true" in src_act),
+            ("F34 更多菜单补可发现入口（danger 语义）",
+             "R.string.audio_stop_play" in src_act and "AppUiTokens.danger" in src_act),
+            ("F35 滑杆走共享弹层（旧 PopupWindow 已移除）",
+             "ModernActionPopup.SliderSpec(" in src_act and not Path(S25_SLIDER_OLD).exists()),
+            ("F35 共享件可选滑杆行（默认不生效）",
+             "val slider: SliderSpec? = null" in src_pop and "ModernSliderRow(" in src_pop
+             and "invoke: () -> Unit = {}" in src_pop),
+            ("优化2 歌词态封面缩图（双向居中约束改单侧置顶）",
+             "applyLyricCoverMode" in src_act and "LYRIC_COVER_SIZE_DP = 120" in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s25] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and page_ok and timer_btn and speed_btn
+                  and timer_panel >= 4 and speed_panel >= 2 and stop_dialog and src_ok)
+    except Exception as e:
+        print(f"  [s25] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7466,6 +7595,7 @@ STEPS = {
     "s22": guarded(s22_code_edit),
     "s23": guarded(s23_bookshelf_manage),
     "s24": guarded(s24_book_info),
+    "s25": guarded(s25_audio_play),
 }
 
 
@@ -7477,7 +7607,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
