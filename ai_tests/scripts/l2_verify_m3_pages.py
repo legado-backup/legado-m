@@ -9131,6 +9131,180 @@ def s32_book_source_edit(d) -> bool:
     return ok
 
 
+# ============================ s33：M6-4 association/file-association（F350 书籍导入摘要卡 / F351 壳结果卡 / 修复 3 文案资源化）============================
+# 通道：应用自身 FileProvider 构造 content URI（data.canRead() 必真）→ 播种 probe.epub / bad.zip
+#       → A 首导（treeUri 清空）摘要卡 → B 老用户（treeUri 置值）零打断 → C 坏 zip 触发失败结果卡
+
+S33_ACT = "io.legado.app.ui.association.FileAssociationActivity"
+S33_SRC_ACT = "app/src/main/java/io/legado/app/ui/association/FileAssociationActivity.kt"
+S33_SRC_VM = "app/src/main/java/io/legado/app/ui/association/FileAssociationViewModel.kt"
+S33_SRC_XML = "app/src/main/res/layout/activity_translucence.xml"
+S33_SRC_OTHERS = [
+    "app/src/main/java/io/legado/app/ui/file/HandleFileActivity.kt",
+    "app/src/main/java/io/legado/app/ui/association/OnLineImportActivity.kt",
+    "app/src/main/java/io/legado/app/ui/association/OpenUrlConfirmActivity.kt",
+    "app/src/main/java/io/legado/app/ui/association/VerificationCodeActivity.kt",
+]
+S33_FILES_DIR = f"/data/data/{PKG}/files/l2s33"
+S33_PROBE_DIR = "l2s33"
+S33_EPUB = "probe.epub"
+S33_BAD_ZIP = "bad.zip"
+S33_TREE_URI = "content://com.android.externalstorage.documents/tree/primary%3ADownload"
+
+S33_SUMMARY_TITLE = "导入到书架"
+S33_SUMMARY_MARKS = ["文件：", "格式：EPUB", "大小："]
+S33_PICK_FOLDER = "选择保存书籍的文件夹"
+S33_RESULT_FAIL = "导入失败"
+S33_HARDCODE = ["导入气泡失败", "导入书籍失败", "请重新设置书籍保存位置",
+                "请求存储权限失败", "无法打开文件"]
+
+
+def _s33_provider_uri(name: str) -> str:
+    return f"content://{PKG}.fileProvider/files/{S33_PROBE_DIR}/{name}"
+
+
+def _s33_seed() -> bool:
+    """播种两个样本（内容为随机字节 ⇒ 不会被判为 JSON）：probe.epub 命中书籍判型 / bad.zip 命中压缩包判型但非法"""
+    sh_su(f"mkdir -p {S33_FILES_DIR}")
+    sh_su(f"head -c 2048 /dev/urandom > {S33_FILES_DIR}/{S33_EPUB}")
+    sh_su(f"head -c 512 /dev/urandom > {S33_FILES_DIR}/{S33_BAD_ZIP}")
+    out = sh_su(f"ls -l {S33_FILES_DIR}").stdout.decode("utf-8", errors="ignore")
+    return S33_EPUB in out and S33_BAD_ZIP in out
+
+
+def _s33_tree_uri(workdir: Path, value: str) -> bool:
+    """写/清 `defaultBookTreeUri`（AppConfig 走默认 prefs）：A 段清空=首导、B 段置值=老用户零打断"""
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<string name="defaultBookTreeUri"[^>]*/>', "", text)
+        if not value:
+            return text
+        return text.replace("</map>", f'<string name="defaultBookTreeUri">{value}</string>\n</map>')
+    return _prefs_edit(DEFAULT_PREFS, workdir, mutate)
+
+
+def _s33_start(name: str, mime: str) -> bool:
+    """带 content URI 直起透明壳（URI 走应用自身 FileProvider ⇒ 可读性确定）"""
+    uri = _s33_provider_uri(name)
+    for _ in range(2):
+        sh("am", "start", "-a", "android.intent.action.VIEW", "-t", mime, "-d", uri,
+           "-n", f"{PKG}/{S33_ACT}")
+        time.sleep(3.0)
+        if "FileAssociationActivity" in current_activity():
+            return True
+        sh_su(f"am start -a android.intent.action.VIEW -t {mime} -d {uri} -n {PKG}/{S33_ACT}")
+        time.sleep(3.0)
+        if "FileAssociationActivity" in current_activity():
+            return True
+    return False
+
+
+def _s33_wait_fast(d, marker: str, timeout: float = 9.0, interval: float = 0.3) -> str:
+    """结果卡只驻留 ~2s（随后自动 finish）⇒ 高密度轮询抓取"""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if marker in xml:
+            return xml
+        time.sleep(interval)
+    return xml
+
+
+def s33_file_association(d) -> bool:
+    """M6-4：association/file-association（F350 摘要卡 / F351 结果卡 / 文案资源化）"""
+    print("  [s33] ===== 文件关联导入：书籍摘要卡 + 壳结果卡 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s33_"))
+    reset_app()
+    ok = False
+    try:
+        seeded = _s33_seed()
+        cleared = _s33_tree_uri(workdir, "")
+        print(f"  [s33] 播种={seeded} 清 defaultBookTreeUri={cleared}")
+
+        # ---------- A：F350 首导摘要卡（先看货再选仓；壳内不拉起 SAF） ----------
+        started_a = _s33_start(S33_EPUB, "application/epub+zip")
+        xml_a = _wait_marker(d, S33_SUMMARY_TITLE, 18)
+        summary_ok = S33_SUMMARY_TITLE in xml_a
+        mark_hits = sum(1 for m in S33_SUMMARY_MARKS if m in xml_a)
+        pick_ok = S33_PICK_FOLDER in xml_a
+        still_shell = "FileAssociationActivity" in current_activity()
+        ca.shot(d, "m6s33_book_summary")
+        cancel_ok = False
+        if tap_text(d, "取消", timeout=3):
+            time.sleep(1.5)
+            cancel_ok = "FileAssociationActivity" not in current_activity()
+        print(f"  [s33] A 直起={started_a} 摘要卡={summary_ok} 摘要字段={mark_hits}/3 "
+              f"主按钮={pick_ok} 仍在壳内(未拉起SAF)={still_shell} 取消后退出={cancel_ok}")
+
+        # ---------- B：F350 老用户零打断（treeUri 已持久化 ⇒ 不看到摘要卡） ----------
+        reset_app()
+        set_tree = _s33_tree_uri(workdir, S33_TREE_URI)
+        started_b = _s33_start(S33_EPUB, "application/epub+zip")
+        time.sleep(6.0)
+        xml_b = dump_xml(d)
+        no_summary = S33_SUMMARY_TITLE not in xml_b
+        after_state = current_activity().rsplit('/', 1)[-1]
+        print(f"  [s33] B 置值={set_tree} 直起={started_b} 摘要卡不再出现={no_summary} 之后页面={after_state}")
+
+        # ---------- C：F351 失败结果卡（坏 zip → 解压抛错 → errorLive → 结果卡） ----------
+        reset_app()
+        result_fail = False
+        for attempt in range(3):
+            _s33_start(S33_BAD_ZIP, "application/zip")
+            xml_c = _s33_wait_fast(d, S33_RESULT_FAIL, 9.0)
+            result_fail = S33_RESULT_FAIL in xml_c
+            print(f"  [s33] C 失败结果卡尝试#{attempt + 1} 命中={result_fail} 当前={current_activity().rsplit('/', 1)[-1]}")
+            if result_fail:
+                ca.shot(d, "m6s33_result_card")
+                break
+            reset_app()
+        print(f"  [s33] C 失败结果卡={result_fail}")
+
+        # ---------- D：源码断言 ----------
+        src_act = Path(S33_SRC_ACT).read_text(encoding="utf-8")
+        src_vm = Path(S33_SRC_VM).read_text(encoding="utf-8")
+        src_xml = Path(S33_SRC_XML).read_text(encoding="utf-8")
+        checks = [
+            ("F350 首导先出摘要卡（treeUri 为空分支指向确认卡，确认后才拉起目录选择器）",
+             "confirmBookImport(uri)" in src_act
+             and "book_import_summary_title" in src_act
+             and "positiveText = getString(R.string.select_book_folder)" in src_act
+             and "onPositive = { launchBookTreeSelect() }" in src_act
+             and "messageInContent = true" in src_act),
+            ("F350 摘要只用 intent 元数据（文件名/格式/大小，不读文件内容、不解析封面）",
+             "describeBookUri" in src_act and "DocumentFile.fromSingleUri" in src_act
+             and "formatFileSize(" in src_act and "book_import_summary_size" in src_act),
+            ("F351 壳结果卡（成功/失败两态 + 副文案 + 差分槽位）",
+             "AssociationResultCard(" in src_act and "AssociationResult.Ok" in src_act
+             and "AssociationResult.Fail" in src_act and "association_result_hint" in src_act
+             and "cv_result_card" in src_xml),
+            ("F351 槽位为页级专用（其余四页零接线，恒 gone 零占位）",
+             "binding.cvResultCard.setContent" in src_act
+             and all("cvResultCard" not in Path(p).read_text(encoding="utf-8") for p in S33_SRC_OTHERS)),
+            ("修复 3 壳内硬编码失败文案已全部资源化（活动 + ViewModel 双向清零）",
+             all(h not in src_act and h not in src_vm for h in S33_HARDCODE)
+             and all(k in src_act for k in ("import_bubble_failed", "import_book_failed",
+                                            "books_dir_permission_denied", "tip_perm_request_storage_failed"))
+             and "association_open_file_failed" in src_vm),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s33] 源码 {nm} = {v}")
+
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = bool(seeded and cleared and summary_ok and mark_hits >= 3 and pick_ok and still_shell
+                  and cancel_ok and set_tree and no_summary and result_fail and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s33] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"rm -rf {S33_FILES_DIR}")
+        sh_su(f"rm -f {DEFAULT_PREFS}.bak_l2s10")
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -9164,6 +9338,7 @@ STEPS = {
     "s30": guarded(s30_paragraph_rule_edit),
     "s31": guarded(s31_read_menu_custom_button_edit),
     "s32": guarded(s32_book_source_edit),
+    "s33": guarded(s33_file_association),
 }
 
 
@@ -9176,7 +9351,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
