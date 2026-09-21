@@ -139,6 +139,7 @@
 """
 import argparse
 import base64
+import hashlib
 import re
 import socket
 import sqlite3
@@ -5228,6 +5229,549 @@ def s14_rss_search_and_my(d) -> bool:
     return ok
 
 
+# ============================ s15：M4 批次（book/search-content） ============================
+
+ACT_SEARCH_CONTENT = "io.legado.app.ui.book.searchContent.SearchContentActivity"
+
+S15_BOOK_URL = "l2seed://full-text-search"
+S15_BOOK_NAME = "L2全文搜索校验书"
+S15_AUTHOR = "L2校验"
+S15_KEYWORD = "L2KEY"
+S15_CH_TITLES = ("L2第一章", "L2第二章", "L2第三章")
+# 每章只放 1 次关键词 ⇒ 命中数 = 缓存章数，断言可精确到字面量（不依赖内容随机的真实源）
+S15_TEXT = (
+    "本段为全文搜索校验正文 L2KEY 仅出现一次。\n",
+    "第二章正文同样只有一处命中 L2KEY，用于验证「分布于 2 章」。\n",
+)
+# 期望覆盖率文案：命中 2 处 / 分布 2 章 / 已搜 2 章 / 1 章未缓存（第 3 章不写缓存文件）
+S15_EXPECT_COVER = "命中 2 处 · 分布于 2 章 · 已搜 2 章；1 章未缓存未参与搜索，缓存后重搜可提升覆盖"
+S15_DIST_TITLE = "命中分布 · 2 章"
+S15_DIST_LABEL = "命中分布"
+S15_DIST_ROW = "L2第一章 · 1 处"
+# 已被替换掉的旧口径（回归哨兵：旧格式出现即说明覆盖率改造被回退）
+S15_OLD_FORMAT = "搜索结果："
+
+SRC_SEARCH_CONTENT_ACT = "app/src/main/java/io/legado/app/ui/book/searchContent/SearchContentActivity.kt"
+
+
+def _md5_16(text: str) -> str:
+    """与 `MD5Utils.md5Encode16` 同口径（md5 十六进制串的 [8,24) 区间）"""
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[8:24]
+
+
+def _s15_cache_base() -> str:
+    return f"/storage/emulated/0/Android/data/{PKG}/files/book_cache"
+
+
+def _s15_folder() -> str:
+    """`Book.getFolderNameNoCache()`：名称去非法字符取前 9 位 + bookUrl 的 md5_16（本名无非法字符）"""
+    return S15_BOOK_NAME[:9] + _md5_16(S15_BOOK_URL)
+
+
+def _s15_cache_path(index: int, title: str) -> str:
+    """`BookChapter.getFileName()`：%05d-md5_16(title).nb"""
+    return f"{_s15_cache_base()}/{_s15_folder()}/%05d-{_md5_16(title)}.nb" % index
+
+
+def _s15_seed(workdir: Path) -> bool:
+    """播种「3 章 / 前 2 章有缓存」的合成书（覆盖 F76 的「已搜 N 章 + 未缓存明示」）。
+
+    为什么必须**自己写缓存文件**：本机 `book_cache` 为空（实测），真实书一律「0 章可搜」——
+    只验得出「全部跳过」一种态。写入 2 章缓存后，覆盖率文案的四个数字（命中/分布/已搜/未缓存）
+    全部由数据决定，可精确断言。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(books)")]
+        row = con.execute("select * from books limit 1").fetchone()
+        if not row:
+            return False
+        data = dict(zip(cols, row))
+        now = int(time.time() * 1000)
+        data.update({
+            "bookUrl": S15_BOOK_URL, "name": S15_BOOK_NAME, "author": S15_AUTHOR,
+            "origin": S15_BOOK_URL, "originName": "L2校验源",
+            "type": 8,  # BookType.text（网络文本；不带 local / notShelf 位）
+            "group": 0, "order": 0,
+            "durChapterIndex": 0, "durChapterTitle": S15_CH_TITLES[0],
+            "latestChapterTitle": S15_CH_TITLES[-1], "totalChapterNum": len(S15_CH_TITLES),
+            "latestChapterTime": now,
+        })
+        # 列名统一加反引号：books 表有保留字列 `group`（直接拼接会 SQL 语法错误）
+        con.execute(
+            f"insert or replace into books ({','.join('`' + c + '`' for c in cols)})"
+            f" values ({','.join('?' * len(cols))})",
+            [data[c] for c in cols]
+        )
+
+        con.execute("delete from chapters where bookUrl = ?", (S15_BOOK_URL,))
+        ccols = [r[1] for r in con.execute("pragma table_info(chapters)")]
+        for index, title in enumerate(S15_CH_TITLES):
+            cdata = {}
+            for name in ccols:
+                cdata[name] = ""
+            cdata.update({
+                "url": f"{S15_BOOK_URL}/{index}", "title": title,
+                "bookUrl": S15_BOOK_URL, "index": index, "baseUrl": "",
+                "isVolume": 0, "isVip": 0, "isPay": 0,
+            })
+            con.execute(
+                f"insert or replace into chapters ({','.join('`' + c + '`' for c in ccols)})"
+                f" values ({','.join('?' * len(ccols))})",
+                [cdata[c] for c in ccols]
+            )
+        con.commit()
+    finally:
+        con.close()
+    if not m2._db_push(db):
+        return False
+
+    # 章节缓存：写真实文本文件（`BookHelp.getContent` 直接 file.readText()）
+    sh_su(f"mkdir -p {_s15_cache_base()}/{_s15_folder()}")
+    for index in (0, 1):
+        local = workdir / f"ch{index}.txt"
+        local.write_text(S15_TEXT[index], encoding="utf-8")
+        remote_sd = f"/sdcard/l2s15_ch{index}.nb"
+        subprocess.run([ADB, "-s", HOST, "push", str(local), remote_sd],
+                       capture_output=True, timeout=60)
+        target = _s15_cache_path(index, S15_CH_TITLES[index])
+        # 交还 owner（否则 app 读不到 ⇒ 覆盖率断言会因「读不到缓存」而整段假阴性）
+        sh_su(f"cp {remote_sd} {target} && chown $(stat -c %u /data/data/{PKG}) {target} "
+              f"&& chmod 600 {target}")
+    return True
+
+
+def _s15_purge(workdir: Path) -> bool:
+    """清掉合成书与其缓存目录（零污染收尾；DB 另有整库快照回滚兜底）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is not None:
+        con = sqlite3.connect(str(db))
+        try:
+            con.execute("delete from chapters where bookUrl = ?", (S15_BOOK_URL,))
+            con.execute("delete from books where bookUrl = ?", (S15_BOOK_URL,))
+            con.commit()
+        finally:
+            con.close()
+        m2._db_push(db)
+    sh_su(f"rm -rf {_s15_cache_base()}/{_s15_folder()}")
+    return True
+
+
+def s15_search_content_page(d) -> bool:
+    """M4 8/11：book/search-content（F76 覆盖率诚实呈现 / F77 命中分布按章直达）"""
+    print("  [s15] ===== 全文搜索覆盖率与命中分布 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s15_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s15] 数据库快照失败（前置）")
+        return False
+    ok = False
+    try:
+        reset_app()
+        if not _s15_seed(workdir):
+            print("  [s15] 合成书播种失败")
+            return False
+        reset_app()
+
+        landed = False
+        for _ in range(3):
+            sh("am", "start", "-n", f"{PKG}/{ACT_SEARCH_CONTENT}",
+               "--es", "bookUrl", S15_BOOK_URL, "--es", "searchWord", S15_KEYWORD)
+            time.sleep(3.0)
+            if "SearchContentActivity" in current_activity():
+                landed = True
+                break
+            sh_su(f"am start -n {PKG}/{ACT_SEARCH_CONTENT} "
+                  f"--es bookUrl {S15_BOOK_URL} --es searchWord {S15_KEYWORD}")
+            time.sleep(3.0)
+            if "SearchContentActivity" in current_activity():
+                landed = True
+                break
+
+        full_xml = ""
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            time.sleep(1.0)
+            cur = dump_xml(d)
+            if S15_EXPECT_COVER in cur:
+                full_xml = cur
+                break
+        ca.shot(d, "m4s15_coverage")
+        cover_ok = bool(full_xml)
+        old_gone = S15_OLD_FORMAT not in (full_xml or dump_xml(d))
+        print(f"  [s15] A 落地={landed} 覆盖率文案命中={cover_ok} 旧口径已消失={old_gone}")
+        if not cover_ok:
+            print(f"  [s15] 底栏实际文案={_text_by_id(dump_xml(d), 'tv_current_search_info')!r}")
+
+        # ---------- B：命中分布（≥2 章才出现入口）→ 弹层 → 按章直达 ----------
+        dist_xml = full_xml or dump_xml(d)
+        # 入口是**纯图标按钮**（只有 content-desc），且 desc 必须是独立标签串——
+        # 若误用带 %1$d 的标题串，desc 会渲染成原文「命中分布 · %1$d 章」（本轮实测踩到）
+        dist_b = (_desc_bounds_all(dist_xml, S15_DIST_LABEL) or [None])[0]
+        sheet_ok = False
+        row_clicked = False
+        alive = False
+        if dist_b:
+            click_xy(d, dist_b["cx"], dist_b["cy"])
+            time.sleep(1.8)
+            sheet_xml = dump_xml(d)
+            ca.shot(d, "m4s15_distribution_sheet")
+            sheet_ok = S15_DIST_ROW in sheet_xml and S15_DIST_TITLE in sheet_xml
+            row_b = node_bounds(sheet_xml, S15_DIST_ROW)
+            if row_b:
+                click_xy(d, row_b["cx"], row_b["cy"])
+                time.sleep(1.5)
+                row_clicked = (S15_DIST_ROW not in dump_xml(d)) \
+                    and ("SearchContentActivity" in current_activity())
+                alive = "SearchContentActivity" in current_activity()
+        print(f"  [s15] B 分布入口={bool(dist_b)} 弹层含章节行={sheet_ok} "
+              f"点行后弹层收起且存活={row_clicked}")
+
+        # ---------- C：源码断言 ----------
+        src_act = _src_text(SRC_SEARCH_CONTENT_ACT)
+        checks = [
+            ("search-content: 覆盖率摘要（含未缓存明示）",
+             "search_content_coverage_uncached" in src_act
+             and "search_content_coverage_scanned" in src_act),
+            ("search-content: 搜索进行中确定性进度",
+             "search_content_progress" in src_act
+             and "PROGRESS_STEP_CHAPTERS" in src_act),
+            ("search-content: 旧「搜索结果：N」口径已删",
+             "search_content_size" not in src_act),
+            ("search-content: 命中分布按章聚合",
+             "private fun updateDistribution(" in src_act
+             and "groupBy { it.value.chapterIndex }" in src_act),
+            ("search-content: 分布入口 ≥2 章才给",
+             "hitDistribution.size >= 2" in src_act),
+            ("search-content: 按章滚动锚点", "scrollToPositionWithOffset(hit.firstIndex, 0)" in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s15] 源码 {name} = {v}")
+
+        ok = bool(landed and cover_ok and old_gone and dist_b and sheet_ok and row_clicked
+                  and alive and src_ok)
+    except Exception as e:
+        print(f"  [s15] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        _s15_purge(workdir)
+        print(f"  [s15] 数据库快照回滚={m2._db_push(db_snap)}")
+        reset_app()
+    return ok
+
+
+# ============================ s16：M4 批次（book/explore-show） ============================
+
+ACT_EXPLORE_SHOW = "io.legado.app.ui.book.explore.ExploreShowActivity"
+
+S16_PORT = 18581
+S16_SOURCE_URL = "l2seed://explore-show"
+S16_SOURCE_NAME = "L2发现校验源"
+S16_EXPLORE_URL = f"http://127.0.0.1:{S16_PORT}/list"
+S16_BOOK_A = "L2ExploreBookA"
+S16_BOOK_B = "L2ExploreBookB"
+S16_AUTHOR_A = "L2作者A"
+S16_EMPTY = 1  # BookType.notShelf 位
+
+# 文案取自 values-zh/strings.xml 真值
+S16_MORE = "更多"                    # more（⋮ 的 content-desc）
+S16_CANCEL = "取消"                  # cancel（一次性提示的关闭键）
+S16_ADD_SHELF = "放入书架"            # add_to_bookshelf
+S16_PREVIEW = "预览"                 # preview
+S16_BOOK_INFO = "书籍信息"            # book_info
+S16_HINT = "长按书籍可预览简介与目录，不用先打开"   # explore_show_preview_hint
+S16_TITLE = "L2分类"
+
+SRC_EXPLORE_SHOW_ACT = "app/src/main/java/io/legado/app/ui/book/explore/ExploreShowActivity.kt"
+SRC_EXPLORE_SHOW_SCREEN = "app/src/main/java/io/legado/app/ui/book/explore/ExploreShowComposeScreen.kt"
+SRC_EXPLORE_SHOW_VM = "app/src/main/java/io/legado/app/ui/book/explore/ExploreShowViewModel.kt"
+SRC_SEARCH_BOOK_ITEM = "app/src/main/java/io/legado/app/ui/widget/compose/SearchBookListItem.kt"
+
+
+class _ExploreListServer(threading.Thread):
+    """本机发现分类列表服务：`/list` 返回两份条目（标题/作者/链接均取自合成规则）。
+
+    为什么用 HTML + 自定义规则（而不是标准 RSS）：BookSource 的发现解析走 `BookList.analyzeBookList`
+    → `getExploreRule()`，只认 CSS/XPath/JSON 规则，**没有「标准 RSS 免规则」通道**。
+    """
+
+    def __init__(self, port: int):
+        super().__init__(daemon=True)
+        self.port = port
+        self.hits = 0
+        self._httpd = None
+
+    def run(self):
+        import http.server
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                items = "".join(
+                    f'<div class="item"><a class="a" href="http://127.0.0.1:{outer.port}/b{i}">'
+                    f'<span class="t">{name}</span></a>'
+                    f'<span class="au">{author}</span></div>'
+                    for i, (name, author) in enumerate(
+                        ((S16_BOOK_A, S16_AUTHOR_A), (S16_BOOK_B, "L2作者B")), start=1
+                    )
+                )
+                body = (f'<html><body><div class="list">{items}</div></body></html>'
+                        ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _s16_seed(workdir: Path) -> bool:
+    """播种发现校验源（整行复制既有书源后改写；`ruleExplore` 为 Gson JSON 串）。
+
+    另外**清掉一次性提示位**：F48 的断言前提是「提示可展示」，若上一轮已置位则首屏不出现
+    ⇒ 必须先复位（并同时验证「关闭后重启不再出现」的后半段）。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(book_sources)")]
+        row = con.execute("select * from book_sources limit 1").fetchone()
+        if not row:
+            return False
+        data = dict(zip(cols, row))
+        data.update({
+            "bookSourceUrl": S16_SOURCE_URL, "bookSourceName": S16_SOURCE_NAME,
+            "bookSourceGroup": "", "bookSourceType": 0, "bookSourceComment": "",
+            "customOrder": 0, "enabled": 1, "enabledExplore": 1,
+            "exploreUrl": f"L2分类::{S16_EXPLORE_URL}",
+            "ruleExplore": '{"bookList":"class.item","name":"class.t@text",'
+                           '"bookUrl":"class.a@href","author":"class.au@text"}',
+            "ruleSearch": None, "ruleBookInfo": None, "ruleToc": None, "ruleContent": None,
+            "loginUrl": None, "loginCheckJs": None, "header": None,
+            "enabledCookieJar": 0, "concurrentRate": "", "lastUpdateTime": 0,
+        })
+        con.execute(
+            f"insert or replace into book_sources ({','.join('`' + c + '`' for c in cols)})"
+            f" values ({','.join('?' * len(cols))})",
+            [data[c] for c in cols]
+        )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s16_reset_hint(workdir: Path) -> bool:
+    """复位「长按可预览」一次性提示位（默认 prefs）——保证提示可展示"""
+    remote = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+    return _prefs_edit(
+        remote, workdir,
+        lambda t: re.sub(r'\s*<boolean name="%s"[^/]*/>' % "exploreShowPreviewHintShown", "", t)
+    )
+
+
+def _s16_purge(workdir: Path) -> bool:
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from book_sources where bookSourceUrl = ?", (S16_SOURCE_URL,))
+        con.execute("delete from books where name in (?,?)", (S16_BOOK_A, S16_BOOK_B))
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s16_book_in_shelf(workdir: Path, name: str) -> bool:
+    """客观证据：拉库确认该书**已在书架**（`notShelf` 位被清）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        row = con.execute(
+            "select type from books where name = ? limit 1", (name,)
+        ).fetchone()
+        if not row:
+            return False
+        return (int(row[0]) & S16_EMPTY) == 0
+    finally:
+        con.close()
+
+
+def s16_explore_show_page(d) -> bool:
+    """M4 9/11：book/explore-show（F46 列表项就地放入书架 / F48 预览可发现性 + 触觉反馈）"""
+    print("  [s16] ===== 发现列表更多动作与预览提示 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s16_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s16] 数据库快照失败（前置）")
+        return False
+    server = None
+    ok = False
+    try:
+        server = _ExploreListServer(S16_PORT)
+        server.start()
+        if not _reverse_on(S16_PORT):
+            print("  [s16] adb reverse 未建立（设备侧不可达本机列表服务）")
+            return False
+        reset_app()
+        if not _s16_seed(workdir):
+            print("  [s16] 合成书源播种失败")
+            return False
+        _s16_reset_hint(workdir)
+        reset_app()
+
+        # ---------- A：落地 + 列表 + 一次性提示 ----------
+        landed = False
+        for _ in range(3):
+            sh("am", "start", "-n", f"{PKG}/{ACT_EXPLORE_SHOW}",
+               "--es", "sourceUrl", S16_SOURCE_URL,
+               "--es", "exploreUrl", S16_EXPLORE_URL,
+               "--es", "exploreName", S16_TITLE)
+            time.sleep(4.0)
+            if "ExploreShowActivity" in current_activity():
+                landed = True
+                break
+            sh_su(f"am start -n {PKG}/{ACT_EXPLORE_SHOW} --es sourceUrl {S16_SOURCE_URL} "
+                  f"--es exploreUrl {S16_EXPLORE_URL} --es exploreName {S16_TITLE}")
+            time.sleep(4.0)
+            if "ExploreShowActivity" in current_activity():
+                landed = True
+                break
+
+        list_xml = ""
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            time.sleep(1.0)
+            cur = dump_xml(d)
+            if S16_BOOK_A in cur and S16_BOOK_B in cur:
+                list_xml = cur
+                break
+        ca.shot(d, "m4s16_list")
+        list_ok = bool(list_xml)
+        hint_ok = S16_HINT in (list_xml or dump_xml(d))
+        more_nodes = _desc_bounds_all(list_xml or dump_xml(d), S16_MORE)
+        print(f"  [s16] A 落地={landed} 列表两书在场={list_ok} 一次性提示={hint_ok} "
+              f"⋮入口数={len(more_nodes)} 服务命中={server.hits}")
+
+        # ---------- B：⋮ → 上下文菜单 → 放入书架（UI 动作，库证据放在 C 之后取）----------
+        # ⚠️ 顺序铁律：`_db_pull` 内部会 `reset_app()`（force-stop 才能安全拷库）⇒
+        # 库断言绝不能插在 UI 步骤中间，否则后续 UI 步骤会在**桌面**上执行（本轮首跑即此因：
+        # 放入书架后截图是桌面、关闭键 desc 定位不到 ⇒ 假失败）
+        sheet_ok = False
+        more_b = more_nodes[0] if more_nodes else None
+        added_clicked = False
+        if more_b:
+            click_xy(d, more_b["cx"], more_b["cy"])
+            time.sleep(1.8)
+            sheet_xml = dump_xml(d)
+            ca.shot(d, "m4s16_item_sheet")
+            sheet_ok = all(t in sheet_xml for t in (S16_ADD_SHELF, S16_PREVIEW, S16_BOOK_INFO))
+            add_b = node_bounds(sheet_xml, S16_ADD_SHELF)
+            if add_b:
+                click_xy(d, add_b["cx"], add_b["cy"])
+                time.sleep(3.0)
+                added_clicked = S16_ADD_SHELF not in dump_xml(d)
+                ca.shot(d, "m4s16_added")
+        print(f"  [s16] B ⋮ 菜单三动作={sheet_ok} 点放入书架后菜单收起={added_clicked}")
+
+        # ---------- C：提示关闭 + 重启不再出现（一次性的后半段）----------
+        dismissed = False
+        gone_after_restart = False
+        close_b = (_desc_bounds_all(dump_xml(d), S16_CANCEL) or [None])[0]
+        print(f"  [s16] C 关闭键定位={bool(close_b)}")
+        if close_b:
+            click_xy(d, close_b["cx"], close_b["cy"])
+            time.sleep(1.5)
+            dismissed = S16_HINT not in dump_xml(d)
+        if dismissed:
+            reset_app()
+            sh("am", "start", "-n", f"{PKG}/{ACT_EXPLORE_SHOW}",
+               "--es", "sourceUrl", S16_SOURCE_URL,
+               "--es", "exploreUrl", S16_EXPLORE_URL,
+               "--es", "exploreName", S16_TITLE)
+            time.sleep(7.0)
+            gone_after_restart = S16_HINT not in dump_xml(d)
+        print(f"  [s16] C 点关闭后消失={dismissed} 重启后不再出现={gone_after_restart}")
+
+        # ---------- D：库证据（放最后：`_db_pull` 会 force-stop）----------
+        added_ok = _s16_book_in_shelf(workdir, S16_BOOK_A)
+        print(f"  [s16] D 放入书架后库内已在架={added_ok}")
+
+        # ---------- E：源码断言 ----------
+        src_act = _src_text(SRC_EXPLORE_SHOW_ACT)
+        src_screen = _src_text(SRC_EXPLORE_SHOW_SCREEN)
+        src_vm = _src_text(SRC_EXPLORE_SHOW_VM)
+        src_item = _src_text(SRC_SEARCH_BOOK_ITEM)
+        checks = [
+            ("explore-show: 行尾 ⋮ 入口（可选参数）", "onMore: (() -> Unit)? = null" in src_item),
+            ("explore-show: 长按触觉反馈", "HapticFeedbackType.LongPress" in src_item),
+            ("explore-show: 菜单含放入书架/预览/详情",
+             "R.string.add_to_bookshelf" in src_act and "R.string.preview" in src_act
+             and "R.string.book_info" in src_act),
+            ("explore-show: 已在书架则不显示放入书架", "if (!isInBookshelf(book))" in src_act),
+            ("explore-show: 放入书架不预加载目录（进度不归零）",
+             "fun addToBookshelf(" in src_vm
+             and "target.durChapterIndex = it.durChapterIndex" in src_vm),
+            ("explore-show: 一次性提示项常驻 + 内容门控",
+             'item(key = "explore_show_preview_hint"' in src_screen
+             and "if (showPreviewHint)" in src_screen),
+            ("explore-show: 长按成功即撤提示", "LaunchedEffect(previewState)" in src_screen),
+            ("explore-show: 提示位带迁移语义（默认 false 只看一次）",
+             "exploreShowPreviewHintShown" in _src_text("app/src/main/java/io/legado/app/constant/PreferKey.kt")),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s16] 源码 {name} = {v}")
+
+        ok = bool(landed and list_ok and hint_ok and more_nodes and sheet_ok and added_clicked
+                  and dismissed and gone_after_restart and added_ok and src_ok)
+    except Exception as e:
+        print(f"  [s16] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        if server:
+            server.stop()
+        _s16_purge(workdir)
+        print(f"  [s16] 数据库快照回滚={m2._db_push(db_snap)}")
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -5243,6 +5787,8 @@ STEPS = {
     "s12": guarded(s12_gallery_and_source_edit),
     "s13": guarded(s13_settings_search_and_replace_edit),
     "s14": guarded(s14_rss_search_and_my),
+    "s15": guarded(s15_search_content_page),
+    "s16": guarded(s16_explore_show_page),
 }
 
 
@@ -5253,7 +5799,8 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
+                "s14", "s15", "s16"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
