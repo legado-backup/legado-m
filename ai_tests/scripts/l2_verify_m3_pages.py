@@ -9843,6 +9843,176 @@ def s35_compose_shell_batch(d) -> bool:
         time.sleep(0.6)
 
 
+# ============================ s36：M7 清壳第 2 批（16 页「容器 + 唯一子元素=ComposeView」纯壳）============================
+# 纯壳枚举口径：根是 ComposeView，或根是容器且**唯一子元素**是 ComposeView 且根**无背景/标题属性**
+# （`.temp/probe_m7_pure_shells.py` 实测 23 个纯壳：M7-1 清 6 个 + 本批 16 个 + `dialog_video_settings` 已是死资源）。
+# 判据：①16 页可直起且停留 ②Compose 内容确实挂上（a11y 非空文本节点 ≥3；空白页退化 0~1）
+#       ③源码 16/16 已换装（attachComposeContent + 无 databinding/viewbindingdelegate/R.layout）
+#       ④16 个壳布局三通道（R.layout / @layout / XxxBinding）零引用 ⑤FATAL=0
+
+S36_PAGES = [
+    ("io.legado.app.ui.book.bookmark.AllBookmarkActivity", "所有书签"),
+    ("io.legado.app.ui.autoTask.AutoTaskActivity", ""),
+    ("io.legado.app.ui.autoTask.AutoTaskEditActivity", "编辑任务"),
+    ("io.legado.app.ui.book.info.edit.BookInfoEditActivity", ""),
+    ("io.legado.app.ui.book.cache.CacheManageActivity", ""),
+    ("io.legado.app.ui.config.CoverCollectionDetailActivity", "导入图片"),
+    ("io.legado.app.ui.dict.rule.DictRuleActivity", ""),
+    ("io.legado.app.ui.download.DownloadManageActivity", ""),
+    ("io.legado.app.ui.file.FileManageActivity", ""),
+    ("io.legado.app.ui.highlight.HighlightRuleActivity", "高亮规则管理"),
+    ("io.legado.app.ui.log.LogActivity", ""),
+    ("io.legado.app.ui.source.recycle.RecycleBinActivity", ""),
+    ("io.legado.app.ui.book.storage.StorageManageActivity", ""),
+    ("io.legado.app.ui.book.toc.rule.TxtTocRuleActivity", ""),
+    ("io.legado.app.ui.urlrecord.UrlRecordActivity", ""),
+    # 欢迎页特殊：设计上即"展示 N 毫秒后跳主壳" ⇒ 「仍在页」不是它的正确判据，
+    # 改为**把展示时长拉长**后断言欢迎页自有文案（阅读M/享受美好时光/品读万千故事）在场
+    ("io.legado.app.ui.welcome.WelcomeActivity", "享受美好时光"),
+]
+
+S36_RETIRED_LAYOUTS = [
+    "activity_all_bookmark", "activity_auto_task", "activity_auto_task_edit",
+    "activity_book_info_edit", "activity_cache_manage", "activity_cover_collection_detail",
+    "activity_dict_rule", "activity_download_manage", "activity_file_manage",
+    "activity_highlight_rule", "activity_log_manage", "activity_recycle_bin",
+    "activity_storage_manage", "activity_txt_toc_rule", "activity_url_record",
+    "activity_welcome",
+]
+
+S36_SRC_FILES = [
+    "app/src/main/java/io/legado/app/ui/book/bookmark/AllBookmarkActivity.kt",
+    "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt",
+    "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/info/edit/BookInfoEditActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/cache/CacheManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/config/CoverCollectionDetailActivity.kt",
+    "app/src/main/java/io/legado/app/ui/dict/rule/DictRuleActivity.kt",
+    "app/src/main/java/io/legado/app/ui/download/DownloadManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/file/FileManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/highlight/HighlightRuleActivity.kt",
+    "app/src/main/java/io/legado/app/ui/log/LogActivity.kt",
+    "app/src/main/java/io/legado/app/ui/source/recycle/RecycleBinActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/storage/StorageManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/toc/rule/TxtTocRuleActivity.kt",
+    "app/src/main/java/io/legado/app/ui/urlrecord/UrlRecordActivity.kt",
+    "app/src/main/java/io/legado/app/ui/welcome/WelcomeActivity.kt",
+]
+
+
+def _s36_welcome_show_time(workdir: Path, value: str) -> bool:
+    """写 `welcomeShowTime`（默认 prefs）：拉长欢迎页驻留 ⇒ 其自有文案可被 dump 到"""
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<int name="welcomeShowTime"[^>]*/>', "", text)
+        return text.replace("</map>", f'<int name="welcomeShowTime" value="{value}" />\n</map>')
+    return _prefs_edit(DEFAULT_PREFS, workdir, mutate)
+
+
+def s36_compose_shell_batch2(d) -> bool:
+    """M7 清壳第 2 批：16 页「容器+唯一 ComposeView」纯壳换装"""
+    print("  [s36] ===== M7 清壳第 2 批：16 页纯壳换装 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m7s36_"))
+    reset_app()
+    try:
+        welcome_ok = _s36_welcome_show_time(workdir, "9000")
+        results = []
+        for act, marker in S36_PAGES:
+            simple = act.rsplit(".", 1)[-1]
+            is_welcome = simple == "WelcomeActivity"
+            reset_app()
+            launched = _s35_launch(act)
+            # 有独有文案的页用**文案命中**（更硬）；其余用文本节点数
+            # ⚠️ 数据驱动页（如 HighlightRule 的规则列表）从 DB 加载 ⇒ 单次 dump 可能落在数据到达前，
+            #    必须**重试式**判定（实测：单次 dump 偶得 1~2 节点，重试后稳定 11 节点，属判据抖动非回归）
+            content_ok = False
+            xml = ""
+            for _ in range(3):
+                if marker:
+                    xml = _wait_marker(d, marker, 6)
+                    content_ok = marker in xml
+                else:
+                    xml = dump_xml(d)
+                    content_ok = _s35_text_nodes(xml) >= 3
+                if content_ok:
+                    break
+                time.sleep(1.5)
+            # 欢迎页会自行跳主壳 ⇒ 「仍在页」不作判据，改判"确实启动过"
+            stayed = (simple in current_activity()) or is_welcome
+            hit = bool(launched and stayed and content_ok)
+            results.append(hit)
+            print(f"  [s36] {simple}: 直起={launched} 仍在页={stayed} "
+                  f"内容{'(文案 ' + marker + ')' if marker else '(文本节点)'}={content_ok} → {'PASS' if hit else 'FAIL'}")
+            if simple in ("WelcomeActivity", "AutoTaskEditActivity", "CoverCollectionDetailActivity"):
+                ca.shot(d, f"m7s36b_{simple[:10].lower()}")
+            d.press("back")
+            time.sleep(0.8)
+
+        # 源码断言
+        text_all = []
+        for f in list(Path("app/src/main/java").rglob("*.kt")) + list(Path("app/src/main/java").rglob("*.java")):
+            text_all.append(f.read_text(encoding="utf-8", errors="ignore"))
+        xml_all = [f.read_text(encoding="utf-8", errors="ignore")
+                   for f in Path("app/src/main/res").rglob("*.xml")]
+
+        def camel(name: str) -> str:
+            return "".join(p[:1].upper() + p[1:] for p in re.split(r"[_\W]+", name) if p) + "Binding"
+
+        retired_ok = True
+        for name in S36_RETIRED_LAYOUTS:
+            in_code = any(f"R.layout.{name}" in t for t in text_all)
+            in_xml = any(f"@layout/{name}" in t for t in xml_all)
+            in_binding = any(camel(name) in t for t in text_all)
+            ok = not (in_code or in_xml or in_binding)
+            retired_ok = retired_ok and ok
+            if not ok:
+                print(f"  [s36] ⚠️ 仍被引用 {name}: R.layout={in_code} @layout={in_xml} Binding={in_binding}")
+        print(f"  [s36] 死资源核验 {len(S36_RETIRED_LAYOUTS)} 个壳布局三通道零引用 = {retired_ok}")
+
+        src_ok = True
+        for p in S36_SRC_FILES:
+            t = Path(p).read_text(encoding="utf-8")
+            one = ("attachComposeContent" in t and "composeShell(this)" in t
+                   and "R.layout." not in t and "databinding." not in t
+                   and "viewbindingdelegate" not in t)
+            src_ok = src_ok and one
+            if not one:
+                print(f"  [s36] ⚠️ 源码未达标 {p.rsplit('/', 1)[-1]}")
+        print(f"  [s36] 源码 16 页换装达标 = {src_ok}")
+
+        # 语言包断言（既有缺陷修复）：这 17 个键此前在 values-zh 缺失 ⇒ 中文用户看到英文
+        zh = Path("app/src/main/res/values-zh/strings.xml").read_text(encoding="utf-8")
+        zh_keys = [
+            "source_parse_concurrency", "source_parse_concurrency_summary",
+            "video_download_no_url", "check_rss_source_config",
+            "check_rss_source_config_summary", "check_rss_source_item",
+            "check_rss_articles", "check_rss_sort", "enable_dedup",
+            "dedup_enabled", "dedup_disabled", "rss_check_source",
+            "highlight_rule_export_done", "cover_collection_empty",
+            "selection_search_engine_hide_css_enabled",
+            "selection_search_engine_hide_css_hint", "auto_task_item_summary",
+        ]
+        zh_missing = [k for k in zh_keys if f'name="{k}"' not in zh]
+        zh_ok = not zh_missing
+        print(f"  [s36] 中文语言包补全 {len(zh_keys) - len(zh_missing)}/{len(zh_keys)} 缺失={zh_missing}")
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = all(results) and retired_ok and src_ok and alive and welcome_ok and zh_ok
+        print(f"  [s36] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} "
+              f"死资源={retired_ok} 源码={src_ok} 进程存活={alive} 欢迎页前置={welcome_ok} 中文包={zh_ok}")
+        return ok
+    except Exception as e:
+        print(f"  [s36] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        # 复原 welcomeShowTime（防污染后续用例的启动节奏）
+        try:
+            _s36_welcome_show_time(workdir, "500")
+        except Exception:
+            pass
+        time.sleep(0.6)
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -9879,6 +10049,7 @@ STEPS = {
     "s33": guarded(s33_file_association),
     "s34": guarded(s34_online_import),
     "s35": guarded(s35_compose_shell_batch),
+    "s36": guarded(s36_compose_shell_batch2),
 }
 
 
@@ -9891,7 +10062,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
