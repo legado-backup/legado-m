@@ -8931,6 +8931,206 @@ def s31_read_menu_custom_button_edit(d) -> bool:
     return ok
 
 
+# ============================ s32：M6-3 book/source-edit（优化 1 溢出菜单三组收纳 / 优化 2 规则帮助引导条 / 既有缺陷：退出拦截动词式按钮）============================
+# 通道：清 `ruleHelpVersion`（一次性键）→ 直起书源编辑页 → A 引导条（在场→×关闭→重启不再出）→ B 溢出菜单三组
+#       → C 弄脏表单后 BACK（继续编辑 / 放弃修改）→ 退出
+
+S32_ACT = "io.legado.app.ui.book.source.edit.BookSourceEditActivity"
+S32_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
+S32_SRC_BAR = "app/src/main/java/io/legado/app/ui/widget/components/InlineGuideBar.kt"
+S32_SRC_XML = "app/src/main/res/layout/activity_book_source_edit.xml"
+
+S32_GUIDE = "查看书源规则帮助"
+S32_CLOSE_DESC = "关闭"                       # 引导条 × 的 contentDescription（R.string.close）
+S32_TAB_BASE = "基本"
+S32_GROUPS = ["源操作", "导入 · 导出 · 分享", "诊断与帮助"]
+S32_ITEMS = ["自动补全", "清除 Cookie", "拷贝源", "粘贴源", "二维码导入", "二维码分享",
+             "字符串分享", "设置源变量", "日志", "帮助"]
+S32_CB_ENABLE = "启用"
+S32_EXIT_CONTINUE = "继续编辑"
+S32_EXIT_DISCARD = "放弃修改"
+
+
+def _s32_reset_help_flag(workdir: Path) -> bool:
+    """移除 `ruleHelpVersion`（LocalConfig `isLastVersion` **读时写入**的一次性键）⇒ 还原「首次进入」态。
+
+    ⚠️ 该键在 **`LocalConfig` 专属 prefs 文件 `shared_prefs/local.xml`**（`appCtx.getSharedPreferences("local")`），
+    不在默认 `{pkg}_preferences.xml` 里（实测首版清错文件 ⇒ 引导条恒不出现、假失败）。
+    """
+    remote = f"/data/data/{PKG}/shared_prefs/local.xml"
+    return _prefs_edit(remote, workdir, lambda t: re.sub(r'\s*<int name="ruleHelpVersion"[^/]*/>', "", t))
+
+
+def _s32_top_right_icon(xml: str):
+    """顶栏最右可点节点：溢出 ⋮ 的 contentDescription 为 null（`MenuActionIcon` 只给一级动作配 desc）
+    ⇒ 只能按位置取（顶栏高度带内 + 宽度 > 30px 的最大右缘节点）"""
+    best = None
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        if 'clickable="true"' not in tag:
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if y2 > 300 or (x2 - x1) < 30 or (y2 - y1) < 30:
+            continue
+        if best is None or x2 > best["right"]:
+            best = {"left": x1, "top": y1, "right": x2, "bottom": y2,
+                    "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2}
+    return best
+
+
+def _s32_collect_groups(d, rounds: int = 4) -> set:
+    """菜单行数超面板可视高度（F331）⇒ 累集组标题判据，必要时在菜单内上滑补抓"""
+    acc = set()
+    for _ in range(rounds):
+        xml = dump_xml(d)
+        acc |= {g for g in S32_GROUPS if g in xml}
+        if len(acc) == len(S32_GROUPS):
+            break
+        d.swipe(0.52, 0.80, 0.52, 0.40, 0.15)
+        time.sleep(0.8)
+    return acc
+
+
+def s32_book_source_edit(d) -> bool:
+    """M6-3：book/source-edit（优化 1 菜单三组 / 优化 2 帮助引导条 / 退出拦截动词式按钮）"""
+    print("  [s32] ===== 书源编辑：溢出菜单三组 + 规则帮助引导条 + 退出拦截文案 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s32_"))
+    reset_app()
+    ok = False
+    try:
+        flag_reset = _s32_reset_help_flag(workdir)
+        print(f"  [s32] 前置：清 ruleHelpVersion={flag_reset}")
+
+        # ---------- A：优化 2 引导条（在场 → ×关闭 → 重启不再出） ----------
+        started = start_robust(S32_ACT)
+        # 先等页面就绪再等引导条：引导条由「读时写入」的一次性旗标驱动，冷启动期可能稍晚一帧
+        _wait_marker(d, S32_TAB_BASE, 25)
+        xml_a = _wait_marker(d, S32_GUIDE, 20)
+        guide_ok = S32_GUIDE in xml_a
+        tabs_ok = S32_TAB_BASE in xml_a
+        ca.shot(d, "m6s32_guide")
+        close_b = node_bounds(xml_a, S32_CLOSE_DESC)
+        dismissed_ok = False
+        if close_b:
+            # 真机 tap 偶发不生效（F339）⇒ 带判据重试
+            for attempt in range(3):
+                click_xy(d, close_b["cx"], close_b["cy"])
+                time.sleep(1.0)
+                if S32_GUIDE not in dump_xml(d):
+                    dismissed_ok = True
+                    break
+                print(f"  [s32] A 关闭引导条重试#{attempt + 1}")
+        reset_app()
+        time.sleep(2.0)   # 等上一次进程窗口彻底消失，避免 dump 到陈旧窗口（实测竞态）
+        started2 = start_robust(S32_ACT)
+        xml_a2 = _wait_marker(d, S32_TAB_BASE, 25)
+        time.sleep(1.5)
+        xml_a3 = dump_xml(d)
+        # 双采样一致才算「不再出」（单采样会被重启瞬态窗口污染）
+        gone_ok = (S32_GUIDE not in xml_a2) and (S32_GUIDE not in xml_a3) and (S32_TAB_BASE in xml_a3)
+        print(f"  [s32] A 直起={started} 引导条在场={guide_ok} 页主体在场={tabs_ok} "
+              f"关闭={dismissed_ok} 重启后不再出={gone_ok}（二次直起={started2}）")
+
+        # ---------- B：优化 1 溢出菜单三组收纳 ----------
+        # 冷启动期 App 会发 EventBus.RECREATE 令本页重建（F34x）⇒ 顶栏节点可能瞬态缺失，带重试
+        overflow = None
+        for attempt in range(3):
+            xml_b = dump_xml(d)
+            overflow = _s32_top_right_icon(xml_b)
+            if overflow:
+                break
+            print(f"  [s32] B 顶栏溢出键未定位，重试#{attempt + 1}")
+            time.sleep(2.0)
+        groups = set()
+        item_hits = 0
+        if overflow:
+            click_xy(d, overflow["cx"], overflow["cy"])
+            time.sleep(1.5)
+            groups = _s32_collect_groups(d)
+            xml_menu = dump_xml(d)
+            item_hits = sum(1 for it in S32_ITEMS if it in xml_menu)
+            ca.shot(d, "m6s32_menu_grouped")
+            # 关菜单（BACK 会触发脏数据拦截 ⇒ 用点击空白处收菜单）
+            d.click(0.5, 0.95)
+            time.sleep(1.0)
+        groups_ok = len(groups) == len(S32_GROUPS)
+        print(f"  [s32] B 溢出键定位={bool(overflow)} 组标题命中={sorted(groups)} "
+              f"三组齐全={groups_ok} 菜单项命中={item_hits}/{len(S32_ITEMS)}")
+
+        # ---------- C：退出拦截动词式按钮（弄脏 → BACK → 继续编辑 / 放弃修改） ----------
+        cb = node_bounds(dump_xml(d), S32_CB_ENABLE)
+        dirty = False
+        if cb:
+            click_xy(d, cb["cx"], cb["cy"])
+            dirty = True
+        dialog_ok = stay_ok = exit_ok = False
+        if dirty:
+            sh("input", "keyevent", "4")
+            xml_c = _s31_wait_any(d, (S32_EXIT_CONTINUE, S32_EXIT_DISCARD), 10)
+            dialog_ok = S32_EXIT_CONTINUE in xml_c and S32_EXIT_DISCARD in xml_c
+            ca.shot(d, "m6s32_exit_dialog")
+            if tap_text(d, S32_EXIT_CONTINUE, timeout=3):
+                time.sleep(1.0)
+                stay_ok = "BookSourceEditActivity" in current_activity()
+            sh("input", "keyevent", "4")
+            time.sleep(1.5)
+            if tap_text(d, S32_EXIT_DISCARD, timeout=3):
+                time.sleep(1.5)
+                exit_ok = "BookSourceEditActivity" not in current_activity()
+        print(f"  [s32] C 弄脏={dirty} 弹窗={dialog_ok} 继续编辑仍在本页={stay_ok} 放弃修改已退出={exit_ok}")
+
+        # ---------- D：源码断言 ----------
+        src_act = Path(S32_SRC_ACT).read_text(encoding="utf-8")
+        src_bar = Path(S32_SRC_BAR).read_text(encoding="utf-8")
+        src_xml = Path(S32_SRC_XML).read_text(encoding="utf-8")
+        checks = [
+            ("优化 1 菜单三组 + 组标题（header=true），12 项文案沿用既有 R.string",
+             all(k in src_act for k in ("book_source_menu_group_ops", "book_source_menu_group_share",
+                                        "book_source_menu_group_diag", "header = true"))
+             and all(k in src_act for k in ("R.string.copy_source", "R.string.paste_source",
+                                            "R.string.set_source_variable", "R.string.import_by_qr_code",
+                                            "R.string.qr_share", "R.string.str_share", "R.string.log",
+                                            "R.string.help", "R.string.search", "R.string.cookie",
+                                            "R.string.auto_complete", "R.string.login"))),
+            ("优化 2 进页即弹全屏帮助已退役 + 引导条一次性判定走进程内状态（版本旗标读时写入，重建后不可重读）",
+             "override fun onPostCreate" not in src_act
+             and "initRuleHelpGuide()" in src_act
+             and "InlineGuideBar(" in src_act
+             and "RuleHelpGuideOnce.armed = RuleHelpGuideOnce.armed ?: !LocalConfig.ruleHelpVersionIsLast" in src_act
+             and "private object RuleHelpGuideOnce" in src_act),
+            ("优化 2 引导条为共享件且取色/图标走单源（无硬编码色、无 R.color.md_）",
+             "fun InlineGuideBar(" in src_bar and "AppUiTokens.settingPalette()" in src_bar
+             and "Color(0x" not in src_bar and "R.color.md_" not in src_bar
+             and "painterResource(R.drawable.ic_help)" in src_bar
+             and "painterResource(R.drawable.ic_close_x)" in src_bar),
+            ("优化 2 槽位声明在布局（页面级专用槽）",
+             "cv_rule_help_guide" in src_xml and "ComposeView" in src_xml),
+            ("既有缺陷：退出拦截按钮文案改为动词式（是/否 退役），停留/退出语义不变",
+             "R.string.edit_continue" in src_act and "R.string.edit_discard" in src_act
+             and "positiveText = getString(R.string.yes)" not in src_act
+             and "onNegative = { super.finish() }" in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s32] 源码 {nm} = {v}")
+
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = bool(flag_reset and guide_ok and tabs_ok and dismissed_ok and gone_ok
+                  and bool(overflow) and groups_ok and item_hits >= 8
+                  and dialog_ok and stay_ok and exit_ok and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s32] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"rm -f /data/data/{PKG}/shared_prefs/local.xml.bak_l2s10")
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -8963,6 +9163,7 @@ STEPS = {
     "s29": guarded(s29_bookshelf_batch2),
     "s30": guarded(s30_paragraph_rule_edit),
     "s31": guarded(s31_read_menu_custom_button_edit),
+    "s32": guarded(s32_book_source_edit),
 }
 
 
@@ -8975,7 +9176,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31"]
+                "s27", "s28", "s29", "s30", "s31", "s32"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
