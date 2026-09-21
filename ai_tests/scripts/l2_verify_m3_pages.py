@@ -6881,6 +6881,114 @@ def s20_ai_world_book_manage(d) -> bool:
     return ok
 
 
+# ============================ M5 s21：AI 对话（F10 空态首启引导 / F11 配置缺失闭环） ============================
+
+ACT_AI_CHAT = "io.legado.app.ui.main.ai.AiChatActivity"
+S21_EMPTY = "开始新的对话。"          # ai_chat_empty
+S21_HINT = "问 AI"                    # ai_chat_hint
+S21_SEND = "发送"                     # ai_chat_send
+S21_MISSING = "请先完成提供商和模型配置"   # ai_missing_config
+S21_GOTO = "去配置"                   # ai_missing_config_action（本轮新增）
+S21_PICK = "选择角色卡开始"            # ai_chat_empty_pick_companion（本轮新增）
+S21_SUGGESTIONS = ["概括我正在读的这本书", "解释一下这段内容的背景", "帮我写一段读书笔记"]
+S21_INPUT = "l2hello"
+S21_SRC_SCREEN = "app/src/main/java/io/legado/app/ui/main/ai/compose/AiChatScreen.kt"
+S21_SRC_ACT = "app/src/main/java/io/legado/app/ui/main/ai/AiChatActivity.kt"
+
+
+def _s21_proc_alive() -> bool:
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def s21_ai_chat(d) -> bool:
+    """M5：main/ai-chat（F10 空态首启引导 / F11 配置缺失可操作闭环）"""
+    print("  [s21] ===== AI 对话 空态引导 + 配置缺失闭环 =====")
+    reset_app()
+    ok = False
+    try:
+        sh("am", "start", "-n", f"{PKG}/{ACT_AI_CHAT}")
+        time.sleep(3.0)
+        landed = "AiChatActivity" in current_activity()
+        proc_alive = _s21_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s21_ai_chat")
+        empty_state = S21_EMPTY in xml
+        pills_ok = all(s in xml for s in S21_SUGGESTIONS) and (S21_PICK in xml)
+        print(f"  [s21] A 落地={landed} 进程存活={proc_alive} 空态在场={empty_state} "
+              f"示例与角色卡入口={pills_ok}")
+        if not empty_state:
+            print(f"  [s21] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # ---------- B：触发「未配置服务商」守卫（优先点示例 ⇒ 同时验证 F10 示例可发送） ----------
+        sent_path = ""
+        sb = None
+        if empty_state:
+            sb = node_bounds(xml, S21_SUGGESTIONS[0], contains=True)
+            if sb:
+                sent_path = "suggestion"
+                click_xy(d, sb["cx"], sb["cy"])
+        if not sent_path:
+            hb = node_bounds(xml, S21_HINT, contains=True)
+            if hb:
+                sent_path = "composer"
+                click_xy(d, hb["cx"], hb["cy"])
+                time.sleep(1.0)
+                sh("input", "text", S21_INPUT)
+                time.sleep(1.0)
+                snd = node_bounds(dump_xml(d), S21_SEND, contains=True)
+                if snd:
+                    click_xy(d, snd["cx"], snd["cy"])
+        time.sleep(0.6)
+        # Snackbar 是宿主 View 层临时挂载（LENGTH_LONG≈3.5s），dump 本身耗时 ⇒ 必须轮询抓窗口
+        snack_ok = False
+        xml_b = dump_xml(d)
+        deadline = time.time() + 6
+        while time.time() < deadline:
+            xml_b = dump_xml(d)
+            if (S21_MISSING in xml_b) and (S21_GOTO in xml_b):
+                snack_ok = True
+                break
+        ca.shot(d, "m5s21_missing_config")
+        print(f"  [s21] B 发送路径={sent_path or '未定位'} 缺失配置回执含动作={snack_ok}")
+
+        # ---------- C：点「去配置」⇒ 直达配置页 ----------
+        config_landed = False
+        gb = node_bounds(xml_b, S21_GOTO, contains=True)
+        if gb:
+            click_xy(d, gb["cx"], gb["cy"])
+            time.sleep(2.5)
+            ca.shot(d, "m5s21_config_page")
+            config_landed = "ConfigActivity" in current_activity()
+        print(f"  [s21] C 去配置键定位={bool(gb)} 直达配置页={config_landed}")
+
+        # ---------- D：源码断言 ----------
+        src_s = Path(S21_SRC_SCREEN).read_text(encoding="utf-8")
+        src_a = Path(S21_SRC_ACT).read_text(encoding="utf-8")
+        checks = [
+            ("F10 空态示例 ≤3 条且可发送",
+             "ai_chat_suggestion_book" in src_s and "onSendSuggestion" in src_s),
+            ("F10 角色卡入口复用既有弹框",
+             "ai_chat_empty_pick_companion" in src_s and "onPickCompanion" in src_s),
+            ("F11 配置缺失改可操作回执",
+             "showMissingAiConfigHint" in src_a and "longSnackbar(" in src_a),
+            ("F11 直达 AI 配置（复用既有路由）",
+             "ConfigTag.AI_CONFIG" in src_a),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s21] 源码 {name} = {v}")
+
+        # 空态未命中（设备已有历史）时不把 pills 计入硬失败，但必须打印状态供登记
+        ok = bool(landed and proc_alive and snack_ok and config_landed and src_ok
+                  and (pills_ok or not empty_state))
+    except Exception as e:
+        print(f"  [s21] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -6902,6 +7010,7 @@ STEPS = {
     "s18": guarded(s18_rss_read_page),
     "s19": guarded(s19_ai_provider_manage),
     "s20": guarded(s20_ai_world_book_manage),
+    "s21": guarded(s21_ai_chat),
 }
 
 
@@ -6913,7 +7022,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
