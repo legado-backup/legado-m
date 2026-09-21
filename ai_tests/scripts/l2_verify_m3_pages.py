@@ -7723,6 +7723,134 @@ def s26_video_player(d) -> bool:
     return ok
 
 
+S27_SRC_SUITE = "app/src/main/java/io/legado/app/ui/main/explore/DiscoverySuiteHomeScreen.kt"
+S27_SRC_STRINGS = "app/src/main/res/values-zh/strings.xml"
+S27_SUITE_NAME = "L2校验套件"
+S27_ARROW = "▾"                                  # discovery_suite_chip_arrow
+S27_MENU_EDIT = "编辑套件"                        # discovery_suite_manage
+S27_MENU_CURRENT = f"当前 {S27_SUITE_NAME}"       # 源码既有「当前 X」拼接文案
+S27_HINT_PENDING = "控件的书源和标签将在套件编辑中配置。"   # discovery_suite_widget_pending
+S27_SUITE_JSON = (
+    '{"suites":[{"id":"l2s27suite","name":"' + S27_SUITE_NAME + '","alias":"",'
+    '"opacityMultiplier":1.0,"order":0,"widgets":[{"id":"l2s27w1","type":"horizontal_books",'
+    '"title":"L2横排","targets":[],"sourceUrls":[],"tagUrls":[],"displayLimit":12,"order":0},'
+    '{"id":"l2s27w2","type":"waterfall_books","title":"L2瀑布","targets":[],"sourceUrls":[],'
+    '"tagUrls":[],"displayLimit":12,"order":1}]}]}'
+)
+
+
+def _s27_seed_suite(workdir: Path) -> bool:
+    """播种「套件模式 + 一个含横排/瀑布流控件的套件」：
+    ①`discoverySuiteConfig` 为 Gson 串（字段名与 `DiscoverySuiteConfig`/@Keep 模型一致）
+    ②`selectedDiscoverySuiteId` 指向该套件 ③`discoveryPageMode`=suite（三模式默认 suite，显式写死防环境漂移）
+    控件 `targets` 留空 ⇒ 内容态为「待配置」提示（**不触发**任何联网）"""
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<string name="discoverySuiteConfig">.*?</string>', "", text, flags=re.S)
+        text = re.sub(r'\s*<string name="selectedDiscoverySuiteId">.*?</string>', "", text, flags=re.S)
+        text = re.sub(r'\s*<string name="discoveryPageMode">.*?</string>', "", text, flags=re.S)
+        insert = (
+            f'<string name="discoverySuiteConfig">{S27_SUITE_JSON}</string>\n'
+            '<string name="selectedDiscoverySuiteId">l2s27suite</string>\n'
+            '<string name="discoveryPageMode">suite</string>\n'
+        )
+        return text.replace("</map>", insert + "</map>")
+    return _prefs_edit(DEFAULT_PREFS, workdir, mutate)
+
+
+def s27_explore_tab(d) -> bool:
+    """M5：main/explore（F22 套件上下文胶囊 · F23 横排/瀑布流补换一批）"""
+    print("  [s27] ===== 发现页 套件上下文胶囊 + 换一批补齐 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s27_"))
+    reset_app()
+    ok = False
+    try:
+        # ---------- A：套件模式下进入发现 Tab ⇒ 套件名常驻可见（原为无语义 ⋮ 图标） ----------
+        reset_app()
+        seeded = _s27_seed_suite(workdir)
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        time.sleep(6.0)
+        main_xml = dump_xml(d)
+        # 底栏 icon-only ⇒ 「发现」二字不进 a11y 树，按容器几何点第 2 格（4 Tab：书架/发现/订阅/我的）
+        nav_container = node_bounds_by_id(main_xml, "bottom_navigation_view")
+        nav_b = None
+        if nav_container:
+            w4 = nav_container["right"] - nav_container["left"]
+            nav_b = {
+                "cx": nav_container["left"] + w4 * 3 // 8,
+                "cy": (nav_container["top"] + nav_container["bottom"]) // 2,
+            }
+        if nav_b:
+            click_xy(d, nav_b["cx"], nav_b["cy"])
+            time.sleep(4.5)
+        xml = dump_xml(d)
+        ca.shot(d, "m5s27_explore_suite_chip")
+        name_ok = S27_SUITE_NAME in xml
+        arrow_ok = S27_ARROW in xml
+        pending_ok = S27_HINT_PENDING in xml
+        print(f"  [s27] A 播种={seeded} 底栏定位={bool(nav_b)} 套件名常驻={name_ok} "
+              f"下拉箭头={arrow_ok} 控件待配置提示={pending_ok}")
+
+        # ---------- B：点胶囊 ⇒ 同源菜单（编辑套件 + 当前套件带「当前 」前缀） ----------
+        menu_ok = False
+        chip_b = node_bounds(xml, S27_SUITE_NAME)
+        if chip_b:
+            click_xy(d, chip_b["cx"], chip_b["cy"])
+            for _ in range(6):
+                cur = dump_xml(d)
+                if S27_MENU_EDIT in cur and S27_MENU_CURRENT in cur:
+                    menu_ok = True
+                    break
+                time.sleep(0.4)
+            ca.shot(d, "m5s27_suite_menu")
+            if menu_ok:
+                sh("input", "keyevent", "4")
+                time.sleep(0.8)
+        print(f"  [s27] B 胶囊定位={bool(chip_b)} 菜单出现（编辑套件 + 当前套件）= {menu_ok}")
+
+        # ---------- C：源码断言 ----------
+        src_suite = Path(S27_SRC_SUITE).read_text(encoding="utf-8")
+        src_str = Path(S27_SRC_STRINGS).read_text(encoding="utf-8")
+        checks = [
+            ("F22 胶囊展示套件名 + 箭头（不再是无语义 ⋮）",
+             "currentSuiteName" in src_suite and "discovery_suite_chip_arrow" in src_suite
+             and "AppManagementMoreActionButton" not in src_suite.split("DiscoverySuiteSearchBar")[1][:4000]),
+            ("F22 菜单沿用共享 AppDropdownMenu（文案与当前项标记不变）",
+             "AppDropdownMenu(" in src_suite and "当前 ${suite.displayName}" in src_suite
+             and "R.string.discovery_suite_manage" in src_suite),
+            ("F22 新增箭头资源双语齐备",
+             'name="discovery_suite_chip_arrow"' in src_str),
+            ("F23 横排接线 onRefreshClick → onRefreshWidget",
+             "onRefreshClick = { onRefreshWidget(widget) }" in src_suite
+             and "DiscoverySuiteHorizontalBooksWidget(" in src_suite),
+            ("F23 瀑布流同上（同页同动词能力一致）",
+             src_suite.count("DiscoverySuiteRefreshButton(") >= 4
+             and src_suite.count("onRefreshClick = { onRefreshWidget(widget) }") >= 3),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s27] 源码 {name} = {v}")
+
+        # F23 真机缺口（如实登记，非缺陷）：横排/瀑布流的「换一批」只在**控件有内容**时渲染
+        # （与随机推荐同结构：`books.isEmpty()` 分支先于控件分支）⇒ 真机取证需一个能返回书籍的
+        # 发现源。可复用 s16 的合成发现源（本地 HTTP + ruleExplore）构造套件控件 target。
+        print("  [s27] D F23 真机缺口：换一批仅在控件有内容时渲染，需可返回书籍的发现源（配方：复用 s16 合成源）")
+
+        ok = bool(seeded and name_ok and arrow_ok and pending_ok and menu_ok and src_ok)
+    except Exception as e:
+        print(f"  [s27] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        # 还原 prefs：移除三个播种键（保持环境可复跑）
+        _prefs_edit(DEFAULT_PREFS, workdir, lambda t: re.sub(
+            r'\s*<string name="(discoverySuiteConfig|selectedDiscoverySuiteId|discoveryPageMode)">.*?</string>',
+            "", t, flags=re.S))
+        sh_su(f"rm -f {DEFAULT_PREFS}.bak_l2s10")
+        time.sleep(0.5)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7750,6 +7878,7 @@ STEPS = {
     "s24": guarded(s24_book_info),
     "s25": guarded(s25_audio_play),
     "s26": guarded(s26_video_player),
+    "s27": guarded(s27_explore_tab),
 }
 
 
@@ -7761,7 +7890,8 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
+                "s27"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
