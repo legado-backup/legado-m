@@ -5772,6 +5772,948 @@ def s16_explore_show_page(d) -> bool:
     return ok
 
 
+# ============================ s17：M4 批次（book/search + 证书静默放行） ============================
+
+ACT_BOOK_SEARCH = "io.legado.app.ui.book.search.SearchActivity"
+ACT_SILENT_SSL_SRC = "app/src/main/java/io/legado/app/help/webView/SilentSslWebViewClient.kt"
+
+S17_PORT = 18591          # 明文书源搜索服务
+S17_CERT_PORT = 18592     # 自签证书 HTTPS 服务
+S17_SOURCE_URL = "l2seed://book-search"
+S17_SOURCE_NAME = "L2搜书校验源"
+S17_KEYWORD = "L2SearchKw"
+S17_BOOK_A = "L2SearchBookAlpha"
+S17_AUTHOR_A = "L2作者甲"
+# 简介唯一串：紧凑模式隐藏简介行 ⇒ 该串必须从 a11y 树消失（改动前后同屏对照，不靠像素猜）
+S17_INTRO_A = "L2INTROALPHA"
+S17_BOOK_B = "L2SearchBookBeta"
+S17_CERT_MARKER = "L2CERTPASSMARKER"
+S17_COUNT_DONE = "共命中"          # search_result_count_done
+S17_COMPACT = "紧凑"               # search_result_compact
+S17_PRECISION = "精准搜索"          # precision_search
+S17_MORE = "更多"                  # more
+S17_MENU_SOURCE = "书源管理"        # book_source_manage（⋮ 菜单可用性佐证）
+S17_SSL_LABEL = "证书放行策略"       # 已删除的开关（回归哨兵：出现即说明被回退）
+S17_CERT_URL = f"https://127.0.0.1:{S17_CERT_PORT}/"
+# 不存在的分组名（用于把持久化搜索范围强制回落为「全部启用源」，见 A 段注释）
+S17_SCOPE_DUMMY = "L2NOSUCHGROUP"
+
+SRC_BOOK_SEARCH_ACT = "app/src/main/java/io/legado/app/ui/book/search/SearchActivity.kt"
+SRC_BOOK_SEARCH_SCREEN = "app/src/main/java/io/legado/app/ui/book/search/SearchResultScreen.kt"
+SRC_BOOK_SEARCH_MENU = "app/src/main/res/menu/book_search.xml"
+SRC_BROWSER_ACT = "app/src/main/java/io/legado/app/ui/browser/WebViewActivity.kt"
+SRC_LOGIN_FRAG = "app/src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt"
+
+
+class _BookSearchServer(threading.Thread):
+    """本机书源搜索服务：返回一份可被最简 `ruleSearch` 解析的 HTML（两本书，A 带唯一简介串）。
+
+    与 s14 不同**不注入延迟**：书源搜索并发单源秒回，本场景不需要观测「进行中」窗口
+    （书源列表结果条的进行中态由源码断言覆盖），保持测试快。
+    """
+
+    def __init__(self, port: int):
+        super().__init__(daemon=True)
+        self.port = port
+        self.hits = 0
+        self._httpd = None
+
+    def _html(self) -> bytes:
+        p = self.port
+        return (
+            '<html><body>'
+            f'<div class="item"><a class="a" href="http://127.0.0.1:{p}/b1">'
+            f'<span class="t">{S17_BOOK_A}</span></a>'
+            f'<span class="au">{S17_AUTHOR_A}</span>'
+            f'<span class="in">{S17_INTRO_A}</span></div>'
+            f'<div class="item"><a class="a" href="http://127.0.0.1:{p}/b2">'
+            f'<span class="t">{S17_BOOK_B}</span></a>'
+            '<span class="au">L2作者乙</span>'
+            '<span class="in">L2INTROBETA</span></div>'
+            '</body></html>'
+        ).encode("utf-8")
+
+    def run(self):
+        import http.server
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                body = outer._html()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+class _CertServer(threading.Thread):
+    """自签证书 + 主机名不匹配的 HTTPS 服务：验证 WebView 证书错误被**静默放行**。
+
+    证书 CN 故意写成 `l2cert.invalid`（≠ 127.0.0.1）⇒ 信任校验与主机名校验**同时失败**，
+    这是「默认拒绝」最容易被触发的形态；若放行逻辑被回退，页面必然白屏（marker 抓不到）。
+    """
+
+    def __init__(self, port: int, cert: Path, key: Path):
+        super().__init__(daemon=True)
+        self.port = port
+        self.cert = cert
+        self.key = key
+        self.hits = 0
+        self._httpd = None
+
+    def run(self):
+        import http.server
+        import ssl as _ssl
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                body = f"<html><body><p>{S17_CERT_MARKER}</p></body></html>".encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+            ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(str(self.cert), str(self.key))
+            self._httpd.socket = ctx.wrap_socket(self._httpd.socket, server_side=True)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _s17_openssl() -> str:
+    for cand in (r"C:\Program Files\Git\usr\bin\openssl.exe",
+                 r"C:\Program Files\Git\mingw64\bin\openssl.exe",
+                 "openssl"):
+        if cand == "openssl" or Path(cand).exists():
+            return cand
+    return ""
+
+
+def _s17_make_cert(workdir: Path):
+    """生成自签证书（CN 故意与 127.0.0.1 不匹配）"""
+    exe = _s17_openssl()
+    if not exe:
+        return None, None
+    cert = workdir / "l2cert.pem"
+    key = workdir / "l2key.pem"
+    r = subprocess.run(
+        [exe, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+         "-keyout", str(key), "-out", str(cert), "-days", "1",
+         "-subj", "/CN=l2cert.invalid"],
+        capture_output=True, text=True
+    )
+    if r.returncode != 0 or not cert.exists():
+        print(f"  [s17] openssl 生成证书失败 rc={r.returncode}")
+        return None, None
+    return cert, key
+
+
+def _s17_seed(workdir: Path) -> bool:
+    """播种搜书校验源（整行复制既有书源后改写；`ruleSearch` 为 Gson JSON 串）。
+
+    必须**临时禁用其它书源**：书源搜索会并发跑所有启用源，留着存量源会让「共命中 N 本」
+    不确定、等待也长；收尾走整库快照回滚（零残留，不用逐条清理）。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(book_sources)")]
+        row = con.execute("select * from book_sources limit 1").fetchone()
+        if not row:
+            return False
+        data = dict(zip(cols, row))
+        con.execute("update book_sources set enabled = 0")
+        data.update({
+            "bookSourceUrl": S17_SOURCE_URL, "bookSourceName": S17_SOURCE_NAME,
+            "bookSourceGroup": "", "bookSourceType": 0, "bookSourceComment": "",
+            "customOrder": 0, "enabled": 1, "enabledExplore": 0,
+            # {{key}} 由 AnalyzeUrl 以搜索词替换（与真实源同口径）
+            "searchUrl": f"http://127.0.0.1:{S17_PORT}/search?k={{{{key}}}}",
+            "ruleSearch": '{"bookList":"class.item","name":"class.t@text",'
+                          '"author":"class.au@text","intro":"class.in@text",'
+                          '"bookUrl":"class.a@href"}',
+            "ruleExplore": None, "ruleBookInfo": None, "ruleToc": None, "ruleContent": None,
+            "loginUrl": None, "loginCheckJs": None, "header": None,
+            "enabledCookieJar": 0, "concurrentRate": "", "lastUpdateTime": 0,
+        })
+        con.execute(
+            f"insert or replace into book_sources ({','.join('`' + c + '`' for c in cols)})"
+            f" values ({','.join('?' * len(cols))})",
+            [data[c] for c in cols]
+        )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s17_reset_prefs(workdir: Path) -> bool:
+    """复位本轮写下的两个页面偏好（**偏好不在 DB 快照内**，必须单独清）"""
+    remote = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+
+    def mutate(text: str) -> str:
+        for k in ("precisionSearch", "searchResultCompact"):
+            text = re.sub(r'\s*<boolean name="%s"[^/]*/>' % k, "", text)
+        return text
+
+    return _prefs_edit(remote, workdir, mutate)
+
+
+def _s17_wait_results(d, deadline_s: float = 40.0):
+    """等到搜索**收敛到「2 本」且两本书都在场**；返回 (xml, ok)。
+
+    只等「共命中」字样不可靠：`SearchViewModel.search()` 每次都会先
+    `cancelSearch()` + `postValue(emptyList())` ⇒ `isSearchLiveData` 瞬间回到 false、结果清空，
+    状态条会**一闪「共命中 0 本」**（首轮实测抓到这一帧 ⇒ 假失败）。必须等到目标计数 + 双书在场。
+    """
+    deadline = time.time() + deadline_s
+    xml = dump_xml(d)
+    target = f"{S17_COUNT_DONE} 2 本"
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if target in xml and S17_BOOK_A in xml and S17_BOOK_B in xml:
+            return xml, True
+        time.sleep(1.0)
+    return xml, False
+
+
+def _s17_verify_seed(workdir: Path) -> bool:
+    """回读确认播种**真的落到设备库**（区分「播种没落库」与「搜索没用上」两类失败）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        row = con.execute(
+            "select enabled, searchUrl, ruleSearch is not null from book_sources"
+            " where bookSourceUrl = ? limit 1", (S17_SOURCE_URL,)
+        ).fetchone()
+        if not row:
+            print("  [s17] 复查：播种源不在库中")
+            return False
+        print(f"  [s17] 复查：enabled={row[0]} hasSearchUrl={bool(row[1])} hasRule={bool(row[2])}")
+        n_enabled = con.execute("select count(*) from book_sources where enabled = 1").fetchone()[0]
+        print(f"  [s17] 复查：启用书源数={n_enabled}")
+        return int(row[0]) == 1 and bool(row[1]) and bool(row[2])
+    finally:
+        con.close()
+
+
+def _s17_diag_texts(xml: str, limit: int = 12) -> list:
+    """失败诊断：把 dump 里与「搜索/命中/本」相关的短文本抽出来（无需猜节点名）"""
+    out = []
+    for m in re.finditer(r'text="([^"]{1,40})"', xml):
+        t = m.group(1)
+        if any(k in t for k in ("搜索", "命中", "本", "为空", "暂无")):
+            out.append(t)
+    return out[:limit]
+
+
+def _s17_diag_applog(workdir: Path) -> None:
+    """失败诊断：读库内 appLog 最近与「搜书」相关的行（AppLog 落库，logcat 拿不到）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        print("  [s17] 诊断：拉库失败")
+        return
+    con = sqlite3.connect(str(db))
+    try:
+        # 表名不做硬编码猜测：按名字含 log 的表去找（AppLog 实体表名随版本变过）
+        names = [r[0] for r in con.execute(
+            "select name from sqlite_master where type='table'").fetchall()]
+        tbl = next((n for n in names if "log" in n.lower()), None)
+        if not tbl:
+            print(f"  [s17] 诊断：库内无日志表（tables={len(names)}）")
+            return
+        rows = con.execute(
+            f"select msg from `{tbl}` where msg like ? order by date desc limit 6",
+            ("%" + S17_SOURCE_NAME + "%",)
+        ).fetchall()
+        for r in rows:
+            print(f"  [s17] 诊断 日志表({tbl}): {str(r[0])[:160]}")
+        if not rows:
+            print(f"  [s17] 诊断 日志表({tbl}): 无与本页源相关的记录")
+    except Exception as e:
+        print(f"  [s17] 诊断 查询失败: {type(e).__name__}")
+    finally:
+        con.close()
+
+
+def _s17_proc_alive() -> bool:
+    """进程存活探测。①本机模拟器**无 `pidof`**（rc=1、无输出）②`sh()` 已内含 `shell` 子命令
+    ⇒ 传「设备侧命令」本身，且 stdout 是 **bytes**（不 decode 会静默匹配失败）。"""
+    raw = sh("ps -A").stdout or b""
+    text = raw.decode("utf-8", "ignore") if isinstance(raw, (bytes, bytearray)) else str(raw)
+    return PKG in text
+
+
+def s17_book_search_and_cert(d) -> bool:
+    """M4 余页：book/search（F73 实时命中计数 / F74 精准搜索前置 / F75 紧凑密度）
+    + 全项目证书静默放行（WebView 域一律 proceed）"""
+    print("  [s17] ===== 搜书结果状态条 + 证书静默放行 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s17_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s17] 数据库快照失败（前置）")
+        return False
+    search_srv = None
+    cert_srv = None
+    ok = False
+    try:
+        search_srv = _BookSearchServer(S17_PORT)
+        search_srv.start()
+        cert, key = _s17_make_cert(workdir)
+        if cert:
+            cert_srv = _CertServer(S17_CERT_PORT, cert, key)
+            cert_srv.start()
+        if not _reverse_on(S17_PORT):
+            print("  [s17] adb reverse 未建立（设备侧不可达本机搜书服务）")
+            return False
+        _reverse_on(S17_CERT_PORT)
+        reset_app()
+        _s17_reset_prefs(workdir)
+        if not _s17_seed(workdir):
+            print("  [s17] 书源播种失败（库内无 book_sources 行可复制）")
+            return False
+        seed_ok = _s17_verify_seed(workdir)
+        reset_app()
+
+        # ---------- A：搜书落地 + 状态条实时命中计数 ----------
+        # 必须显式给一个**不存在**的搜索范围：`SearchViewModel.searchScope` 初值是持久化的
+        # `AppConfig.searchScope`，设备上若残留了分组/单源范围，本机播种源不会被搜到 ⇒ 服务命中恒 0
+        # （首轮实测失败的真正原因）。注意 `am` **不接受空串参数**（`Argument expected after`），
+        # 故用不存在的分组名走 `getBookSourceParts()` 的「范围解析为空即回落全部启用源」分支。
+        sh("am", "start", "-n", f"{PKG}/{ACT_BOOK_SEARCH}",
+           "--es", "key", S17_KEYWORD, "--es", "searchScope", S17_SCOPE_DUMMY)
+        time.sleep(1.0)
+        landed = "SearchActivity" in current_activity()
+        xml, found = _s17_wait_results(d)
+        ca.shot(d, "m4s17_search_summary")
+        # 进程存活断言：Activity 构造期崩溃（如 Context 未 attach 就读偏好）时 `am start` 仍报
+        # 成功、且 `current_activity()` 有一瞬间能抓到 ActivityRecord ⇒ 只看「落地」会假阴性
+        proc_alive = _s17_proc_alive()
+        count_ok = found and f"{S17_COUNT_DONE} 2 本" in xml
+        both_books = S17_BOOK_A in xml and S17_BOOK_B in xml
+        print(f"  [s17] A 落地={landed} 进程存活={proc_alive} 播种复查={seed_ok} "
+              f"状态条命中={count_ok} 双书在场={both_books} 服务命中={search_srv.hits}")
+        if not both_books:
+            print(f"  [s17] A 诊断（dump 相关短文本）={_s17_diag_texts(xml)}")
+
+        # ---------- B：紧凑密度（同屏对照：简介串消失/回归） ----------
+        compact_on = compact_off = False
+        intro_before = S17_INTRO_A in xml
+        cb = node_bounds(xml, S17_COMPACT)
+        if cb:
+            click_xy(d, cb["cx"], cb["cy"])
+            time.sleep(1.5)
+            xml_c = dump_xml(d)
+            ca.shot(d, "m4s17_compact_on")
+            compact_on = (S17_INTRO_A not in xml_c) and (S17_BOOK_A in xml_c)
+            cb2 = node_bounds(xml_c, S17_COMPACT)
+            if cb2:
+                click_xy(d, cb2["cx"], cb2["cy"])
+                time.sleep(1.5)
+                xml_d = dump_xml(d)
+                ca.shot(d, "m4s17_compact_off")
+                compact_off = S17_INTRO_A in xml_d
+        print(f"  [s17] B 简介改动前在场={intro_before} 紧凑后简介消失={compact_on} "
+              f"再点恢复={compact_off}")
+
+        # ---------- C：精准搜索 chip ⇒ 触发重搜且结果集按新口径收敛 ----------
+        precision_ok = False
+        hits_before = search_srv.hits
+        pb = node_bounds(dump_xml(d), S17_PRECISION)
+        if pb:
+            click_xy(d, pb["cx"], pb["cy"])
+            deadline = time.time() + 40
+            while time.time() < deadline:
+                time.sleep(1.0)
+                cur = dump_xml(d)
+                # 精准=结果集过滤（SearchModel: 书名/作者/分类须含关键词）⇒ 两本书都不含关键词 ⇒ 0 本。
+                # 判据必须同时要求「双书消失」：直读「共命中 0 本」会被 search() 的 cancel 闪帧命中。
+                if f"{S17_COUNT_DONE} 0 本" in cur and S17_BOOK_A not in cur and S17_BOOK_B not in cur:
+                    precision_ok = True
+                    break
+            ca.shot(d, "m4s17_precision_on")
+        print(f"  [s17] C 精准搜索后命中归零={precision_ok} 服务命中增量={search_srv.hits - hits_before}")
+
+        # ---------- D：⋮ 菜单可用（精准项已上浮 ⇒ 菜单里不再有同状态入口） ----------
+        menu_ok = False
+        # 菜单按钮按 **resource-id** 定位：其 contentDescription 是 `@string/menu`（「菜单」）
+        # 而非「更多」，按文案找会落空（首轮实测）
+        mb = node_bounds_by_id(dump_xml(d), "btn_menu")
+        if mb:
+            click_xy(d, mb["cx"], mb["cy"])
+            time.sleep(1.5)
+            mxml = dump_xml(d)
+            menu_ok = S17_MENU_SOURCE in mxml
+            # 菜单打开后 dump 会含底层页面 ⇒ 不能用「文案不存在」判单入口；用源码断言（下方 F）
+        print(f"  [s17] D ⋮ 菜单可用={menu_ok}")
+
+        # ---------- E：证书静默放行（自签 + 主机名不匹配的 HTTPS 页面能加载） ----------
+        reset_app()
+        cert_loaded = False
+        if cert_srv:
+            sh("am", "start", "-n", f"{PKG}/{ACT_BROWSER}",
+               "--es", "url", S17_CERT_URL, "--es", "title", "l2cert")
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                time.sleep(1.5)
+                cur = dump_xml(d)
+                if S17_CERT_MARKER in cur:
+                    cert_loaded = True
+                    break
+            ca.shot(d, "m4s17_cert_passthrough")
+            print(f"  [s17] E 证书错误页面加载={cert_loaded} HTTPS 命中={cert_srv.hits}")
+        else:
+            print("  [s17] E 跳过（本机缺 openssl，无法构造自签证书）")
+
+        # ---------- F：源码断言 ----------
+        src_act = _src_text(SRC_BOOK_SEARCH_ACT)
+        src_screen = _src_text(SRC_BOOK_SEARCH_SCREEN)
+        src_menu = _src_text(SRC_BOOK_SEARCH_MENU)
+        src_base = _src_text(ACT_SILENT_SSL_SRC)
+        src_browser = _src_text(SRC_BROWSER_ACT)
+        src_login = _src_text(SRC_LOGIN_FRAG)
+        checks = [
+            ("search: 状态条计数（搜索中/结束双文案）",
+             "search_result_counting" in src_screen and "search_result_count_done" in src_screen),
+            ("search: 多源聚合计数（origins.size > 1）", "it.origins.size > 1" in src_screen),
+            ("search: 状态条搜过即亮（含 0 命中）",
+             "resultSummaryVisible = true" in src_act
+             and "resultSummaryVisible = false" in src_act),
+            ("search: 精准搜索切后重搜", "putPrefBoolean(PreferKey.precisionSearch, enabled)" in src_act),
+            ("search: 菜单精准项已上浮（单入口）",
+             "menu_precision_search" not in src_menu and "menu_precision_search" not in src_act),
+            ("search: 紧凑密度走本页私有偏好",
+             "PreferKey.searchResultCompact" in src_act and "compact = compactMode" in src_screen),
+            ("search: 空结果弹窗文案已资源化", "search_book_empty_precision" in src_act),
+            ("ssl: 静默放行基类存在且 proceed",
+             "open class SilentSslWebViewClient" in src_base and "handler?.proceed()" in src_base),
+            ("ssl: 浏览器/登录页无拦截分支（无放行开关）",
+             "sslCertPassThrough" not in src_browser and "sslCertPassThrough" not in src_login
+             and "onReceivedSslError" not in src_browser
+             and "onReceivedSslError" not in src_login),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s17] 源码 {name} = {v}")
+
+        ok = bool(seed_ok and proc_alive and landed and count_ok and both_books and intro_before
+                  and compact_on and compact_off and precision_ok and menu_ok and src_ok
+                  and (cert_loaded or not cert_srv))
+    except Exception as e:
+        print(f"  [s17] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        if search_srv:
+            search_srv.stop()
+        if cert_srv:
+            cert_srv.stop()
+        if not ok:
+            _s17_diag_applog(workdir)
+        _s17_reset_prefs(workdir)
+        print(f"  [s17] 数据库快照回滚={m2._db_push(db_snap)}")
+        reset_app()
+    return ok
+
+
+# ============================ s18：M4 收官（rss/read） ============================
+
+ACT_RSS_READ = "io.legado.app.ui.rss.read.ReadRssActivity"
+
+S18_PORT = 18593
+S18_SOURCE_URL = "l2seed://rss-read"
+S18_SOURCE_NAME = "L2订阅阅读源"
+S18_ARTICLE_URL = f"http://127.0.0.1:{S18_PORT}/article"
+S18_TITLE = "L2LONGARTICLE"
+# 长文标记：正文够长才滚得动（顶栏收起需要真实滚动）
+S18_PARA = "L2READPARA"
+S18_GROUP_CONTENT = "内容"        # rss_read_menu_group_content
+S18_GROUP_READING = "阅读工具"     # rss_read_menu_group_reading
+S18_GROUP_SOURCE = "源"           # rss_read_menu_group_source
+S18_GROUP_TOOLS = "工具"          # source_menu_group_tools
+S18_TTS_RUNNING = "朗读中"        # rss_read_tts_running
+
+SRC_RSS_READ = "app/src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt"
+SRC_RSS_READ_BP = "docs/UI/rss/read/OPTIMIZATION.md"
+
+
+class _LongArticleServer(threading.Thread):
+    """本机长文服务：给 `rss/read` 提供可滚动的正文页（顶栏收起必须靠真实滚动触发）"""
+
+    def __init__(self, port: int, paragraphs: int = 60):
+        super().__init__(daemon=True)
+        self.port = port
+        self.paragraphs = paragraphs
+        self.hits = 0
+        self._httpd = None
+
+    def _html(self) -> bytes:
+        body = "".join(
+            f"<p>{S18_PARA} 第 {i} 段：用于验证滚动收起顶栏的占位正文。</p>"
+            for i in range(self.paragraphs)
+        )
+        return (
+            f"<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{S18_TITLE}</title></head>"
+            f"<body><h1>{S18_TITLE}</h1>{body}</body></html>"
+        ).encode("utf-8")
+
+    def run(self):
+        import http.server
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                body = outer._html()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _s18_seed(workdir: Path) -> bool:
+    """播种订阅阅读源（整行复制既有源后改写；`singleUrl=1` + 无 ruleContent ⇒ 直接 loadUrl 原文）"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(rssSources)")]
+        row = con.execute("select * from rssSources limit 1").fetchone()
+        if not row:
+            return False
+        data = dict(zip(cols, row))
+        data.update({
+            "sourceUrl": S18_SOURCE_URL, "sourceName": S18_SOURCE_NAME, "type": 0,
+            "enabled": 1, "enabledCookieJar": 0,
+            "searchUrl": None, "sortUrl": f"L2分类::{S18_ARTICLE_URL}",
+            "ruleArticles": None, "ruleNextPage": None, "ruleContent": None,
+            "singleUrl": 1, "header": None, "loginUrl": None, "loginCheckJs": None,
+            "preload": 0, "customOrder": 0,
+        })
+        _s12_upsert(con, "rssSources", cols, data)
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s18_topbar_visible(xml: str, min_h: int = 20) -> bool:
+    """顶栏可见性：`compose_top_bar` 的 bounds 高度 ≥ [min_h] 视为可见。
+
+    **不能**用「高度 > 0」：收起（layoutParams.height=0）后该节点仍会在 dump 里带 1px 级边界，
+    会得到「收起失败」的假结论（首轮实测：沉浸日志已 collapsed=true，断言却仍判可见）。
+    展开态实测高度 132px，故 20px 阈值分辨力充足。
+    """
+    b = node_bounds_by_id(xml, "compose_top_bar")
+    return bool(b and (b["bottom"] - b["top"]) >= min_h)
+
+
+def _s18_topbar_h(xml: str) -> int:
+    b = node_bounds_by_id(xml, "compose_top_bar")
+    return (b["bottom"] - b["top"]) if b else -1
+
+
+def _s18_top_strip_ink(png: str, strip_h: int = 60) -> float:
+    """顶栏所在区域（图片顶部 [0,strip_h)）的**暗像素占比**。
+
+    收起后该区域只剩背景/正文留白，占比应显著低于展开态（展开态该区含标题与图标文字）。
+    a11y 树对「顶栏 GONE」的反映存在滞后（实测截图已收起、同刻 dump 仍报 132px），
+    故以截图墨量 + 沉浸日志为权威判据。
+    """
+    from PIL import Image
+    im = Image.open(png).convert("L")
+    w, hh = im.size
+    strip = im.crop((0, 0, w, min(strip_h, hh)))
+    px = list(strip.getdata())
+    return sum(1 for p in px if p < 140) / max(1, len(px))
+
+
+def _s18_immersive_log_state() -> tuple:
+    """读设备 logcat 的沉浸联动跃迁（true=收起 / false=展开 各出现的次数）"""
+    raw = sh("logcat", "-d", "-s", "RssReadImmersive").stdout or b""
+    text = raw.decode("utf-8", "ignore") if isinstance(raw, (bytes, bytearray)) else str(raw)
+    return text.count("collapsed=true"), text.count("collapsed=false")
+
+
+def s18_rss_read_page(d) -> bool:
+    """M4 收官页：rss/read（F2 菜单四组 / F146 滚动收起顶栏 / F147 朗读状态条）"""
+    print("  [s18] ===== 订阅阅读：菜单四组 + 滚动沉浸 + 朗读状态条 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s18_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s18] 数据库快照失败（前置）")
+        return False
+    server = None
+    ok = False
+    try:
+        server = _LongArticleServer(S18_PORT)
+        server.start()
+        if not _reverse_on(S18_PORT):
+            print("  [s18] adb reverse 未建立（设备侧不可达本机长文服务）")
+            return False
+        reset_app()
+        if not _s18_seed(workdir):
+            print("  [s18] 订阅源播种失败（库内无 rssSources 行可复制）")
+            return False
+        reset_app()
+
+        sh("am", "start", "-n", f"{PKG}/{ACT_RSS_READ}",
+           "--es", "origin", S18_SOURCE_URL, "--es", "title", S18_TITLE,
+           "--es", "openUrl", S18_ARTICLE_URL)
+        time.sleep(1.0)
+        landed = "ReadRssActivity" in current_activity()
+        proc_alive = _s17_proc_alive()
+        xml = ""
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            time.sleep(1.0)
+            xml = dump_xml(d)
+            if _s18_topbar_visible(xml) and S18_PARA in xml:
+                break
+        ca.shot(d, "m4s18_read_loaded")
+        topbar_initial = _s18_topbar_visible(xml)
+        article_loaded = S18_PARA in xml
+        print(f"  [s18] A 落地={landed} 进程存活={proc_alive} 正文加载={article_loaded} "
+              f"顶栏初始可见={topbar_initial} 服务命中={server.hits}")
+
+        # ---------- B：下滚收起顶栏 ⇒ 上滚唤回（F146） ----------
+        collapsed = False
+        restored = False
+        scrolled = False
+        ink_c = ink_r = -1.0
+        if article_loaded:
+            png_c = str(workdir / "collapsed.png")
+            png_r = str(workdir / "restored.png")
+            # 慢速滑动（0.6s）而非 fling：快甩在部分 WebView 上被当作惯性滚动起点，
+            # 首屏可能还没滚起来就结束（首轮实测 collapsed=False 的疑似根因）
+            for _ in range(4):
+                d.swipe(0.5, 0.72, 0.5, 0.30, 0.6)
+                time.sleep(0.5)
+            time.sleep(1.2)
+            xml_c = dump_xml(d)
+            d.screenshot(png_c)
+            ca.shot(d, "m4s18_topbar_collapsed")
+            ink_c = _s18_top_strip_ink(png_c)
+            scrolled = "第 0 段" not in xml_c
+            for _ in range(4):
+                d.swipe(0.5, 0.30, 0.5, 0.72, 0.6)
+                time.sleep(0.5)
+            time.sleep(1.2)
+            xml_r = dump_xml(d)
+            d.screenshot(png_r)
+            ca.shot(d, "m4s18_topbar_restored")
+            ink_r = _s18_top_strip_ink(png_r)
+        c_seen, e_seen = _s18_immersive_log_state()
+        # 主判据：a11y 树里顶栏是否还在（抖动消除后 dump 可正确反映 GONE/VISIBLE）；
+        # 墨量只作诊断打印——正文文字密度可能高于顶栏标题，方向不可反推（首轮实测踩过）
+        collapsed = not _s18_topbar_visible(xml_c) if article_loaded else False
+        restored = _s18_topbar_visible(xml_r) if article_loaded else False
+        # 抖动哨兵：一次进出各只应触发 1~3 次；600+ 说明「逐事件判向」被滑动抖动反复触发
+        not_thrashing = 1 <= c_seen <= 6 and 1 <= e_seen <= 6
+        restored = restored and not_thrashing
+        collapsed = collapsed and not_thrashing
+        print(f"  [s18] B 正文确实滚动={scrolled} 顶栏高度 收起/展开={_s18_topbar_h(xml_c)}/{_s18_topbar_h(xml_r)}"
+              f" 顶栏区墨量={ink_c:.4f}/{ink_r:.4f} ⇒ 收起={collapsed} 唤回={restored}"
+              f"（沉浸日志 collapsed=true×{c_seen} / false×{e_seen}，抖动哨兵={not_thrashing}）")
+
+        # ---------- C：更多菜单四组（F2） ----------
+        menu_ok = False
+        groups_ok = False
+        mb = node_bounds(dump_xml(d), "更多")
+        if mb:
+            click_xy(d, mb["cx"], mb["cy"])
+            time.sleep(1.5)
+            mxml = dump_xml(d)
+            ca.shot(d, "m4s18_menu_groups")
+            menu_ok = any(t in mxml for t in ("分享", "编辑源"))
+            groups_ok = all(t in mxml for t in
+                            (S18_GROUP_CONTENT, S18_GROUP_READING, S18_GROUP_SOURCE, S18_GROUP_TOOLS))
+            # 关闭菜单
+            d.press("back")
+            time.sleep(1.0)
+        print(f"  [s18] C 菜单可开={menu_ok} 四组标题齐={groups_ok}")
+
+        # ---------- D：朗读状态条（F147，尽力而为：模拟器可能无可用 TTS 引擎） ----------
+        tts_bar_seen = False
+        if menu_ok and article_loaded:
+            mb2 = node_bounds(dump_xml(d), "更多")
+            if mb2:
+                click_xy(d, mb2["cx"], mb2["cy"])
+                time.sleep(1.2)
+                rb = node_bounds(dump_xml(d), "朗读")
+                if rb:
+                    click_xy(d, rb["cx"], rb["cy"])
+                    deadline = time.time() + 20
+                    while time.time() < deadline:
+                        time.sleep(1.0)
+                        if S18_TTS_RUNNING in dump_xml(d):
+                            tts_bar_seen = True
+                            break
+                    ca.shot(d, "m4s18_tts_bar")
+        print(f"  [s18] D 朗读状态条出现={tts_bar_seen}（模拟器无 TTS 引擎时为 False，不计入判定）")
+
+        # ---------- E：源码断言 ----------
+        src = _src_text(SRC_RSS_READ)
+        checks = [
+            ("rss/read: 菜单四组标题", "rss_read_menu_group_content" in src
+             and "rss_read_menu_group_reading" in src and "rss_read_menu_group_source" in src),
+            ("rss/read: 联动信号来自触摸方向（View 滚动监听/JS 桥在真机均不可用）",
+             "initImmersiveScroll" in src and "MotionEvent.ACTION_MOVE" in src
+             and "setTopBarCollapsed" in src),
+            ("rss/read: 收起用 GONE（ConstraintLayout 的 height=0 会被内容撑开）",
+             "bar.visibility = View.GONE" in src),
+            ("rss/read: 顶栏动画时长常量", "TOP_BAR_ANIM_MS" in src),
+            ("rss/read: 全屏视频退出/新页面 顶栏复位",
+             "setTopBarCollapsed(false, animate = false)" in src),
+            ("rss/read: 朗读状态条复用 InlineTaskBar",
+             "InlineTaskBar(" in src and "InlineTaskState.Running" in src),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s18] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and article_loaded and topbar_initial
+                  and scrolled and collapsed and restored and menu_ok and groups_ok and src_ok)
+    except Exception as e:
+        print(f"  [s18] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        if server:
+            server.stop()
+        print(f"  [s18] 数据库快照回滚={m2._db_push(db_snap)}")
+        reset_app()
+    return ok
+
+
+# ============================ M5 s19：供应商管理（F90 / F91 / F4） ============================
+
+ACT_AI_PROVIDER_MANAGE = "io.legado.app.ui.config.AiProviderManageActivity"
+ACT_AI_PROVIDER_EDIT = "io.legado.app.ui.config.AiProviderEditActivity"
+S19_PREFS = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+S19_PROVIDER_A = "L2provAlpha"
+S19_PROVIDER_B = "L2provBeta"
+S19_MODEL_ID = "l2-s19-model-zeta"
+S19_STAT_USABLE = "可用"          # ai_provider_stat_usable
+S19_STAT_MODELS = "模型总数"      # ai_provider_stat_models
+S19_STAT_CURRENT = "当前使用"     # ai_provider_stat_current
+S19_SEARCH_HINT = "搜索提供商"    # ai_provider_search_hint
+S19_EMPTY_TITLE = "没有匹配"      # ai_provider_search_empty_title
+S19_EMPTY_CLEAR = "清除搜索"      # ai_provider_search_empty_clear
+S19_MODELS_ROW = "已添加"         # ai_manage_models_summary（values-zh）= 已添加 %1$d 个模型
+S19_QUERY = "zzzq"
+S19_SRC_MANAGE = "app/src/main/java/io/legado/app/ui/config/AiProviderManageActivity.kt"
+S19_SRC_EDIT = "app/src/main/java/io/legado/app/ui/config/AiProviderEditActivity.kt"
+
+
+def _s19_proc_alive() -> bool:
+    """进程存活探测：模拟器无 pidof，用 ps -A 匹配包名（构造期崩溃时 am start 仍报成功）"""
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def _s19_seed(workdir: Path) -> bool:
+    """播种两个供应商（甲含 1 个模型 / 乙 0 个模型）+ 当前供应商=甲。
+    前置：应用已停（SharedPreferences 内存态会覆盖文件）。"""
+    providers = (
+        '[{"id":"l2p1","name":"%s","baseUrl":"http://127.0.0.1:1/v1","apiKey":"k",'
+        '"headers":"","apiMode":"chat_completions","promptCache":false},'
+        '{"id":"l2p2","name":"%s","baseUrl":"http://127.0.0.1:2/v1","apiKey":"k",'
+        '"headers":"","apiMode":"chat_completions","promptCache":false}]'
+    ) % (S19_PROVIDER_A, S19_PROVIDER_B)
+    models = '[{"id":"l2m1","providerId":"l2p1","modelId":"%s"}]' % S19_MODEL_ID
+    esc_prov = providers.replace('"', "&quot;")
+    esc_models = models.replace('"', "&quot;")
+
+    def mutate(text: str) -> str:
+        for k in ("aiProviderList", "aiModelConfigList", "aiCurrentProviderId"):
+            text = re.sub(r'\s*<[a-z]+ name="%s"[^>]*>[^<]*</[a-z]+>' % k, "", text)
+            text = re.sub(r'\s*<[a-z]+ name="%s"[^/]*/>' % k, "", text)
+        inject = (
+            '<string name="aiProviderList">%s</string>\n'
+            '<string name="aiModelConfigList">%s</string>\n'
+            '<string name="aiCurrentProviderId">l2p1</string>\n'
+        ) % (esc_prov, esc_models)
+        return text.replace("</map>", inject + "</map>")
+
+    return _prefs_edit(S19_PREFS, workdir, mutate)
+
+
+def _s19_prefs_restored() -> bool:
+    r = sh_su(f"cat {S19_PREFS}")
+    return S19_PROVIDER_A not in (r.stdout or b"").decode("utf-8", errors="ignore")
+
+
+def s19_ai_provider_manage(d) -> bool:
+    """M5：config/ai-provider-manage（F90 统计摘要条 / F91 页内搜索与空结果闭环 / F4 模型行直达模型 Tab）"""
+    print("  [s19] ===== 供应商管理 统计条 + 搜索闭环 + 模型行直达 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s19_"))
+    reset_app()
+    # 本轮覆写三个 AI 偏好键，先整文件备份，收尾原样还原（偏好不在 DB 快照内）
+    sh_su(f"cp {S19_PREFS} {S19_PREFS}.l2s19bak")
+    ok = False
+    try:
+        if not _s19_seed(workdir):
+            print("  [s19] 偏好播种失败（写入后回读不一致）")
+            return False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_AI_PROVIDER_MANAGE}")
+        time.sleep(2.5)
+        landed = "AiProviderManageActivity" in current_activity()
+        proc_alive = _s19_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s19_provider_manage")
+        # 甲 1 个模型 / 共 2 个 ⇒ 统计条第一格应为「1 / 2」
+        stat_ratio = "1 / 2" in xml
+        stat_models = S19_STAT_MODELS in xml and S19_STAT_USABLE in xml and S19_STAT_CURRENT in xml
+        rows = S19_PROVIDER_A in xml and S19_PROVIDER_B in xml
+        print(f"  [s19] A 落地={landed} 进程存活={proc_alive} 统计比={stat_ratio} "
+              f"统计文案={stat_models} 双供应商在场={rows}")
+        if not rows:
+            print(f"  [s19] A 诊断（短文本）= {text_nodes(xml)[:14]}")
+
+        # ---------- B：搜索不命中 ⇒ 空结果卡（F91 闭环） ----------
+        xml_b = xml
+        sb = node_bounds(xml, S19_SEARCH_HINT, contains=True)
+        empty_ok = rows_gone = False
+        if sb:
+            click_xy(d, sb["cx"], sb["cy"])
+            time.sleep(1.0)
+            sh("input", "text", S19_QUERY)
+            time.sleep(1.5)
+            xml_b = dump_xml(d)
+            ca.shot(d, "m5s19_search_empty")
+            empty_ok = (S19_EMPTY_TITLE in xml_b) and (S19_QUERY in xml_b)
+            # 判据不能含「当前供应商名」：统计条第三格恒显当前供应商（甲）⇒ 列表已隐藏仍会命中假阴性。
+            # 行专属标记 = 模型数行「已添加 N 个模型」（两行都渲染该文案）+ 非当前的乙名。
+            rows_gone = (S19_MODELS_ROW not in xml_b) and (S19_PROVIDER_B not in xml_b)
+        print(f"  [s19] B 搜索框定位={bool(sb)} 空结果卡={empty_ok} 双供应商已隐藏={rows_gone}")
+
+        # ---------- C：清除搜索 ⇒ 列表回归 ----------
+        xml_c = xml_b
+        cleared = False
+        cb = node_bounds(xml_b, S19_EMPTY_CLEAR, contains=True)
+        if cb:
+            click_xy(d, cb["cx"], cb["cy"])
+            time.sleep(1.5)
+            xml_c = dump_xml(d)
+            ca.shot(d, "m5s19_search_cleared")
+            cleared = (S19_PROVIDER_A in xml_c) and (S19_PROVIDER_B in xml_c) \
+                and (S19_EMPTY_TITLE not in xml_c)
+        print(f"  [s19] C 清除搜索键定位={bool(cb)} 列表回归={cleared}")
+
+        # ---------- D：模型数行直达模型 Tab（F4 落地判据 = 模型 id 在场） ----------
+        models_tab = False
+        mb = node_bounds(xml_c, S19_MODELS_ROW, contains=True)
+        if mb:
+            click_xy(d, mb["cx"], mb["cy"])
+            time.sleep(2.5)
+            xml_d = dump_xml(d)
+            ca.shot(d, "m5s19_models_tab")
+            models_tab = ("AiProviderEditActivity" in current_activity()) and (S19_MODEL_ID in xml_d)
+        print(f"  [s19] D 模型数行定位={bool(mb)} 直达模型 Tab={models_tab}")
+
+        # ---------- E：源码断言 ----------
+        src_m = Path(S19_SRC_MANAGE).read_text(encoding="utf-8")
+        src_e = Path(S19_SRC_EDIT).read_text(encoding="utf-8")
+        checks = [
+            ("F90 统计摘要条落地",
+             "AiProviderStatsRow(" in src_m and "ai_provider_stat_models" in src_m),
+            ("F91 页内搜索 + 空结果闭环",
+             "SettingsSearchBar(" in src_m and "ai_provider_search_empty_clear" in src_m),
+            ("F4 模型行直达（管理页传参）", "EXTRA_TAB_MODEL" in src_m),
+            ("F4 编辑页接收并落到模型 Tab",
+             "EXTRA_TAB_MODEL" in src_e and "currentTab = TAB_MODEL" in src_e),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s19] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and stat_ratio and stat_models and rows
+                  and empty_ok and rows_gone and cleared and models_tab and src_ok)
+    except Exception as e:
+        print(f"  [s19] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"cp {S19_PREFS}.l2s19bak {S19_PREFS} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {S19_PREFS} && chmod 600 {S19_PREFS}")
+        time.sleep(0.5)
+        print(f"  [s19] 偏好还原={_s19_prefs_restored()}")
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -5789,6 +6731,9 @@ STEPS = {
     "s14": guarded(s14_rss_search_and_my),
     "s15": guarded(s15_search_content_page),
     "s16": guarded(s16_explore_show_page),
+    "s17": guarded(s17_book_search_and_cert),
+    "s18": guarded(s18_rss_read_page),
+    "s19": guarded(s19_ai_provider_manage),
 }
 
 
@@ -5800,7 +6745,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16"]
+                "s14", "s15", "s16", "s17", "s18", "s19"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
