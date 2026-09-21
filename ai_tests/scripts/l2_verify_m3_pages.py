@@ -10290,6 +10290,159 @@ def s38_compose_shell_merge(d) -> bool:
         time.sleep(0.6)
 
 
+# ============================ s39：书源编辑「必填标星 + 保存失败定位」（F155 同构，2026-09-22）============================
+# 背景：订阅源编辑页早在 M4 落地 F155（必填项 label 标 danger `*` + 保存失败把错误落到字段并滚动定位），
+#      书源编辑页（同为编辑类表单页，且是**类爬虫软件的核心工作流**）**未同构**——ViewModel.save 校验
+#      bookSourceUrl/bookSourceName 空即抛异常 ⇒ 只弹一句 toast，用户需自己在 6 个 Tab 数十个字段里找。
+# 判据：①源码 6 项（先校验后保存 / 保存单点收口 / 必填双标 / 定位件齐备 / adapter 三件 / 错误态撤下）
+#      ②真机 A：新建态首屏出现必填标星（`* ` 前缀文本节点 ≥2）
+#      ③真机 B（核心）：**先向下滚动**再点顶栏「保存」⇒ 仍在本页 + 出现「必填项，不能为空」
+#        且该错误节点 **top < 50% 屏高**（证明"定位"把字段滚回可见，而非停在原滚动位）
+#      ④真机 C（双向）：在 URL 字段输入合法值 ⇒ 错误文案**撤下**（watcher 清 error）；再点保存 ⇒ **重新出现**
+#        （校验按字段推进：名称仍空）——不依赖"保存成功即离页"，避开 `finish()` 未保存确认的干扰
+
+S39_ACT = "io.legado.app.ui.book.source.edit.BookSourceEditActivity"
+S39_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
+S39_SRC_ADAPTER = "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt"
+S39_TAB_BASE = "基本"
+S39_SAVE_DESC = "保存"                 # 顶栏一级动作 contentDescription（MenuAction.title）
+S39_ERR = "必填项，不能为空"            # R.string.source_required_hint（与订阅源编辑同源，未新增字符串）
+S39_URL = "https://l2probe.example/book"
+
+
+def _s39_field_nodes(xml: str) -> list:
+    """本页字段控件 bounds（按 top 升序）。
+
+    ⚠️ 不能用 `_edittext_bounds_all`——它精确匹配 `class="android.widget.EditText"`，
+    而本页字段编辑器是项目自研 `AutoCompleteTextView`（继承 `MultiAutoCompleteTextView`，
+    带规则自动补全）⇒ 精确匹配命中 **0**（专项探针 `.temp/probe_s39c_field.py` 实测：
+    dump 里 12 个 `android.widget.MultiAutoCompleteTextView`，`_edittext_bounds_all` 命中 0）。
+    ⚠️ 且 `MultiAutoCompleteTextView` **不含**子串 `EditText`（是 `…pleteTextView`）⇒ 类名
+    正则必须显式带上 `AutoCompleteTextView`，只写 `EditText|CodeView|CodeEditor` 仍会命中 0。
+    """
+    out = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        cls = re.search(r'class="([^"]*)"', tag)
+        if not cls or not re.search(r"(EditText|CodeView|CodeEditor|AutoCompleteTextView)",
+                                    cls.group(1)):
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 > x1 and y2 > y1:
+            out.append({"left": x1, "top": y1, "right": x2, "bottom": y2,
+                        "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2})
+    return sorted(out, key=lambda n: n["top"])
+
+
+def _s39_star_nodes(xml: str) -> list:
+    """必填标星节点（label 前置 `* `）：返回 bounds 列表（按 top 升序）"""
+    out = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        t = re.search(r'\btext="([^"]*)"', tag)
+        if not t or not t.group(1).startswith("* "):
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        out.append({"left": x1, "top": y1, "right": x2, "bottom": y2,
+                    "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2})
+    return sorted(out, key=lambda n: n["top"])
+
+
+def s39_book_source_edit_required(d) -> bool:
+    """书源编辑页：必填标星 + 保存失败定位（与订阅源编辑 F155 同构）"""
+    print("  [s39] ===== 书源编辑：必填标星 + 保存失败定位 =====")
+    reset_app()
+    try:
+        w, win_h = d.window_size()
+
+        # ---- 真机 A：新建态 + 必填标星 ----
+        started = start_robust(S39_ACT)
+        xml_a = _wait_marker(d, S39_TAB_BASE, 25)
+        stars = _s39_star_nodes(xml_a)
+        stayed_a = "BookSourceEditActivity" in current_activity()
+        a_ok = bool(started and stayed_a and len(stars) >= 2)
+        ca.shot(d, "f155s39_a_new_source")
+        print(f"  [s39] A 新建态: 直起={started} 仍在页={stayed_a} 必填标星节点={len(stars)} "
+              f"→ {'PASS' if a_ok else 'FAIL'}")
+
+        # ---- 真机 B：先向下滚动，再点保存 ⇒ 错误落到字段并滚回可见 ----
+        for _ in range(3):
+            d.swipe(w * 0.5, win_h * 0.72, w * 0.5, win_h * 0.28, 0.15)
+            time.sleep(0.5)
+        time.sleep(0.8)
+        save_b = node_bounds(dump_xml(d), S39_SAVE_DESC)
+        clicked = False
+        if save_b:
+            click_xy(d, save_b["cx"], save_b["cy"])
+            clicked = True
+        err_xml = _wait_marker(d, S39_ERR, 8)
+        err_b = node_bounds(err_xml, S39_ERR, contains=True)
+        stayed_b = "BookSourceEditActivity" in current_activity()
+        located = bool(err_b) and err_b["top"] < int(win_h * 0.5)
+        b_ok = bool(clicked and stayed_b and located)
+        ca.shot(d, "f155s39_b_locate")
+        print(f"  [s39] B 保存失败定位: 点保存={clicked} 仍在页={stayed_b} 错误在场={bool(err_b)} "
+              f"错误top={err_b['top'] if err_b else -1}(<{int(win_h * 0.5)}=已滚回可见) "
+              f"→ {'PASS' if b_ok else 'FAIL'}")
+
+        # ---- 真机 C：输入 URL ⇒ 错误撤下；再点保存 ⇒ 错误重现（双向） ----
+        # 字段控件是 `MultiAutoCompleteTextView`（EditText 子类）⇒ 用 `_s39_field_nodes`（见其 KDoc）
+        boxes = _s39_field_nodes(dump_xml(d))
+        typed = False
+        if boxes:
+            click_xy(d, boxes[0]["cx"], boxes[0]["cy"])
+            typed = type_unicode(d, S39_URL)
+        print(f"  [s39] C 字段节点={len(boxes)} 首字段 top={boxes[0]['top'] if boxes else -1}")
+        time.sleep(0.8)
+        err_cleared = S39_ERR not in dump_xml(d)
+        save_c = node_bounds(dump_xml(d), S39_SAVE_DESC)
+        if save_c:
+            click_xy(d, save_c["cx"], save_c["cy"])
+        err_again_xml = _wait_marker(d, S39_ERR, 8)
+        err_again = node_bounds(err_again_xml, S39_ERR, contains=True)
+        c_ok = bool(typed and err_cleared and err_again)
+        ca.shot(d, "f155s39_c_bidirectional")
+        print(f"  [s39] C 双向: 输入URL={typed} 错误已撤下={err_cleared} 再保存错误重现={bool(err_again)} "
+              f"→ {'PASS' if c_ok else 'FAIL'}")
+
+        # ---- 源码断言（6 项） ----
+        act = Path(S39_SRC_ACT).read_text(encoding="utf-8")
+        adp = Path(S39_SRC_ADAPTER).read_text(encoding="utf-8")
+        save_idx = act.find("viewModel.save(")
+        blank_idx = act.find("source.bookSourceUrl.isBlank()")
+        src = {
+            "先校验后保存": 0 <= blank_idx < save_idx,
+            "保存单点收口(仅1处 viewModel.save)": act.count("viewModel.save(") == 1,
+            "必填双标(required = true ×2)": act.count("required = true") == 2,
+            "定位件齐备": ("fun locateField(" in act and "fun clearFieldErrors(" in act
+                       and "R.string.source_required_hint" in act),
+            "adapter 三件(indexOfKey/hintWithRequired/Danger)": (
+                "fun indexOfKey(" in adp and "fun hintWithRequired(" in adp
+                and "AppSemanticColors.Danger" in adp),
+            "错误态撤下(watcher 清 error)": "editEntity.error = null" in adp,
+        }
+        for k, v in src.items():
+            print(f"  [s39] 源码 {k} = {v}")
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = bool(a_ok and b_ok and c_ok and all(src.values()) and alive)
+        print(f"  [s39] 汇总: 真机A={a_ok} B={b_ok} C={c_ok} 源码={sum(src.values())}/{len(src)} "
+              f"进程存活={alive}")
+        return ok
+    except Exception as e:
+        print(f"  [s39] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        time.sleep(0.6)
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10329,6 +10482,7 @@ STEPS = {
     "s36": guarded(s36_compose_shell_batch2),
     "s37": guarded(s37_c6_fix_verify),
     "s38": guarded(s38_compose_shell_merge),
+    "s39": guarded(s39_book_source_edit_required),
 }
 
 
@@ -10341,7 +10495,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
