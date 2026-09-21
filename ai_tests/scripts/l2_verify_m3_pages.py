@@ -10026,6 +10026,7 @@ S37_VM = "app/src/main/java/io/legado/app/ui/association/OnLineImportViewModel.k
 S37_DL = "app/src/main/java/io/legado/app/ui/association/OnlineImportDownloader.kt"
 S37_MYSET = "app/src/main/java/io/legado/app/ui/main/my/MySettingsData.kt"
 S37_DEADRES = "app/src/main/res/drawable/speed_dialog_panel_bg.xml"
+S37_APPCFG = "app/src/main/java/io/legado/app/help/config/AppConfig.kt"
 
 S37_TITLE = "视频设置"
 S37_PLAY_CONTROL = "播放控制"
@@ -10103,6 +10104,7 @@ def s37_c6_fix_verify(d) -> bool:
         vm = _s37_strip_comments(Path(S37_VM).read_text(encoding="utf-8"))
         dl = _s37_strip_comments(Path(S37_DL).read_text(encoding="utf-8"))
         myset = _s37_strip_comments(Path(S37_MYSET).read_text(encoding="utf-8"))
+        appcfg = _s37_strip_comments(Path(S37_APPCFG).read_text(encoding="utf-8"))
 
         checks = [
             ("A1 配置弹框收窄宿主（host=GLOBAL，不再渲染播放控制区）",
@@ -10122,6 +10124,10 @@ def s37_c6_fix_verify(d) -> bool:
              'key = "videoCache"' in myset and 'key = "cachePlay"' not in myset),
             ("本轮死资源 speed_dialog_panel_bg 已删且零代码引用",
              not Path(S37_DEADRES).exists()),
+            ("C6 死件 AppConfig.uiCornerEffectMode/Level 已删（保留 PreferKey 常量）",
+             "var uiCornerEffectMode" not in appcfg
+             and "var uiCornerEffectLevel" not in appcfg
+             and "PreferKey.uiCornerEffectLevel" in appcfg),
         ]
         src_ok = all(v for _, v in checks)
         for nm, v in checks:
