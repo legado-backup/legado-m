@@ -9716,6 +9716,133 @@ def s34_online_import(d) -> bool:
     return ok
 
 
+# ============================ s35：M7 清壳第 1 批（7 页「根布局仅一个 ComposeView」的纯壳）============================
+# 清壳口径：原壳布局没有 View 语义（根就是 ComposeView）⇒ 换 composeShell + attachComposeContent，
+#           代码侧不再引用 R.layout（壳布局随之为死资源，按 Goal 模式危险操作口径**不批量删除**、登记待批）。
+# 判据：①每页可直起且停留 ②Compose 内容确实挂上（a11y 文本节点数 ≥3；空白页会退化为 0~1）
+#       ③三页有页面独有标题做精确断言 ④源码：6 个壳布局三通道（R.layout / @layout / XxxBinding）全零 ⑤FATAL=0
+
+S35_PAGES = [
+    ("io.legado.app.ui.config.AiProviderManageActivity", "提供商"),
+    ("io.legado.app.ui.config.AiImageProviderManageActivity", ""),
+    ("io.legado.app.ui.config.AiWorldBookManageActivity", ""),
+    ("io.legado.app.ui.main.bookshelf.BookshelfTagManageActivity", "管理标签"),
+    ("io.legado.app.ui.book.toc.TocActivity", ""),
+    ("io.legado.app.ui.main.my.SettingsSearchActivity", "搜索设置"),
+    ("io.legado.app.ui.main.ai.AiChatActivity", ""),
+]
+
+S35_RETIRED_LAYOUTS = [
+    "activity_ai_chat",
+    "activity_ai_provider_manage",
+    "activity_ai_world_book_manage",
+    "activity_bookshelf_tag_manage",
+    "activity_chapter_list",
+    "activity_settings_search",
+]
+
+S35_SRC_FILES = [
+    "app/src/main/java/io/legado/app/ui/main/ai/AiChatActivity.kt",
+    "app/src/main/java/io/legado/app/ui/config/AiProviderManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/config/AiImageProviderManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/config/AiWorldBookManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfTagManageActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/toc/TocActivity.kt",
+    "app/src/main/java/io/legado/app/ui/main/my/SettingsSearchActivity.kt",
+]
+S35_SHELL = "app/src/main/java/io/legado/app/base/ComposeBindingShells.kt"
+
+
+def _s35_text_nodes(xml: str) -> int:
+    """a11y 树里的非空 text 节点数（Compose 内容是否挂上的判据）"""
+    n = 0
+    for m in re.finditer(r"<node[^>]*>", xml):
+        t = re.search(r'\btext="([^"]*)"', m.group(0))
+        if t and t.group(1).strip():
+            n += 1
+    return n
+
+
+def _s35_launch(act: str) -> bool:
+    simple = act.rsplit(".", 1)[-1]
+    for _ in range(2):
+        sh("am", "start", "-n", f"{PKG}/{act}")
+        time.sleep(2.5)
+        if simple in current_activity():
+            return True
+        sh_su(f"am start -n {PKG}/{act}")
+        time.sleep(2.5)
+        if simple in current_activity():
+            return True
+    return False
+
+
+def s35_compose_shell_batch(d) -> bool:
+    """M7 清壳第 1 批：7 页纯壳（根=ComposeView）换装 composeShell + attachComposeContent"""
+    print("  [s35] ===== M7 清壳第 1 批：7 页纯壳换装 =====")
+    reset_app()
+    try:
+        results = []
+        for act, marker in S35_PAGES:
+            simple = act.rsplit(".", 1)[-1]
+            reset_app()
+            launched = _s35_launch(act)
+            xml = dump_xml(d)
+            nodes = _s35_text_nodes(xml)
+            marker_ok = (marker in xml) if marker else True
+            stayed = simple in current_activity()
+            shot = ""
+            if simple in ("AiProviderManageActivity", "SettingsSearchActivity"):
+                shot = f"m7s35_{simple[:12].lower()}"
+                ca.shot(d, shot)
+            hit = bool(launched and stayed and nodes >= 3 and marker_ok)
+            results.append(hit)
+            print(f"  [s35] {simple}: 直起={launched} 仍在页={stayed} 文本节点={nodes} "
+                  f"独有标题{marker or '-'}={marker_ok} → {'PASS' if hit else 'FAIL'}")
+            d.press("back")
+            time.sleep(1.0)
+
+        # 源码断言：6 个壳布局三通道（R.layout / @layout / XxxBinding）全零 ⇒ 已成死资源
+        java_files = list(Path("app/src/main/java").rglob("*.kt"))
+        java_files += list(Path("app/src/main/java").rglob("*.java"))
+        res_xml = list(Path("app/src/main/res").rglob("*.xml"))
+        text_all = [f.read_text(encoding="utf-8", errors="ignore") for f in java_files]
+        xml_all = [f.read_text(encoding="utf-8", errors="ignore") for f in res_xml]
+
+        def camel(name: str) -> str:
+            return "".join(p[:1].upper() + p[1:] for p in re.split(r"[_\W]+", name) if p) + "Binding"
+
+        retired_ok = True
+        for name in S35_RETIRED_LAYOUTS:
+            in_code = any(f"R.layout.{name}" in t for t in text_all)
+            in_xml = any(f"@layout/{name}" in t for t in xml_all)
+            in_binding = any(camel(name) in t for t in text_all)
+            ok = not (in_code or in_xml or in_binding)
+            retired_ok = retired_ok and ok
+            print(f"  [s35] 死资源核验 {name}: R.layout={in_code} @layout={in_xml} "
+                  f"Binding={in_binding} → {'零引用' if ok else '仍被引用'}")
+
+        shell_src = Path(S35_SHELL).read_text(encoding="utf-8")
+        src_ok = retired_ok and "fun View.attachComposeContent" in shell_src
+        for p in S35_SRC_FILES:
+            t = Path(p).read_text(encoding="utf-8")
+            one = ("attachComposeContent" in t and "R.layout." not in t
+                   and "viewbindingdelegate" not in t)
+            src_ok = src_ok and one
+            print(f"  [s35] 源码 {p.rsplit('/', 1)[-1]}: 已换装={one}")
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = all(results) and src_ok and alive
+        print(f"  [s35] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} 源码={src_ok} 进程存活={alive}")
+        return ok
+    except Exception as e:
+        print(f"  [s35] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        time.sleep(0.6)
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -9751,6 +9878,7 @@ STEPS = {
     "s32": guarded(s32_book_source_edit),
     "s33": guarded(s33_file_association),
     "s34": guarded(s34_online_import),
+    "s35": guarded(s35_compose_shell_batch),
 }
 
 
@@ -9763,7 +9891,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
