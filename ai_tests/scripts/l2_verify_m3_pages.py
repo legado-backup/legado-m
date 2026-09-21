@@ -7851,6 +7851,159 @@ def s27_explore_tab(d) -> bool:
     return ok
 
 
+S28_SRC_BASE = "app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt"
+S28_SRC_SCREEN = "app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfScreen.kt"
+S28_SRC_MAIN = "app/src/main/java/io/legado/app/ui/main/MainActivity.kt"
+S28_SRC_FRAG1 = "app/src/main/java/io/legado/app/ui/main/bookshelf/style1/BookshelfFragment1.kt"
+S28_SRC_FRAG2 = "app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt"
+S28_EMPTY_TITLE = "这里还没有书"            # bookshelf_empty_title
+S28_PRIMARY = "添加本地"                    # book_local（空态主操作复用菜单串）
+S28_SECONDARY = ["添加网址", "远程书籍", "去发现看看"]   # add_url / add_remote_book / bookshelf_empty_go_discovery
+S28_GO_DISCOVERY = "去发现看看"
+S28_DISCOVERY_EMPTY = "当前没有发现源！"     # explore_empty（跨 Tab 落地判据：MODERN 模式无源时的空态文案）
+# 组标题中「书架管理」与菜单项 bookshelf_management 同名 ⇒ 不可作判据；只取三个独有组名
+S28_GROUPS_UNIQUE = ["添加书籍", "导入·导出", "布局与工具"]
+# 书架顶栏「更多」按钮由 MainTopBarView 以 AppCompatImageButton **程序化创建、无 android:id**
+# ⇒ 只能按 contentDescription 定位（`R.string.menu` = 「菜单」）
+S28_MORE_DESC = "菜单"
+
+
+def _s28_clear_books(workdir: Path):
+    """清空 books 表以呈现空书架；返回 (ok, backup_path)。backup 供 finally 回推还原（保护既有测试书目）。"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False, None
+    backup = workdir / "books_backup.db"
+    backup.write_bytes(db.read_bytes())
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from books")
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db), backup
+
+
+def _s28_restore_books(backup) -> bool:
+    """把 `_s28_clear_books` 的备份库回推（还原既有测试书目）；缺备份时返回 False 不静默成功。"""
+    if not backup or not Path(backup).exists():
+        return False
+    return _m2()._db_push(Path(backup))
+
+
+def s28_bookshelf(d) -> bool:
+    """M5 10/10：main/bookshelf（优化1 更多菜单四组收纳 · 优化3/F1 空态操作化）"""
+    print("  [s28] ===== 书架 更多菜单分组 + 空态操作化 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s28_"))
+    reset_app()
+    ok = False
+    backup = None
+    try:
+        # ---------- A：清空书架 ⇒ 空态四操作（原来只有一句文案、零入口） ----------
+        cleared, backup = _s28_clear_books(workdir)
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        time.sleep(6.0)
+        xml = dump_xml(d)
+        ca.shot(d, "m5s28_empty_state")
+        title_ok = S28_EMPTY_TITLE in xml
+        primary_ok = S28_PRIMARY in xml
+        sec_hits = sum(1 for s in S28_SECONDARY if s in xml)
+        print(f"  [s28] A 清空书目={cleared} 空态标题={title_ok} 主操作「{S28_PRIMARY}」={primary_ok} "
+              f"次操作命中={sec_hits}/3")
+        if not title_ok:
+            print(f"  [s28] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # ---------- B：点「去发现看看」⇒ 经既有 TAB 出口机制跨到发现页 ----------
+        jump_ok = False
+        gb = node_bounds(xml, S28_GO_DISCOVERY)
+        if gb:
+            click_xy(d, gb["cx"], gb["cy"])
+            time.sleep(4.0)
+            cur = dump_xml(d)
+            ca.shot(d, "m5s28_jump_discovery")
+            jump_ok = S28_DISCOVERY_EMPTY in cur
+        print(f"  [s28] B 「{S28_GO_DISCOVERY}」定位={bool(gb)} 跨 Tab 落地发现页={jump_ok}")
+
+        # ---------- C：还原书目 ⇒ 更多菜单四组（含滚动补抓：15 行超面板高度，末尾组需滚动才可见） ----------
+        restored = _s28_restore_books(backup) if backup else False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        time.sleep(6.0)
+        xml_c = dump_xml(d)
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        mb = node_bounds(xml_c, S28_MORE_DESC)
+        if not mb:
+            mb = node_bounds(xml_c, "更多菜单", contains=True)
+        seen = set()
+        if mb:
+            click_xy(d, mb["cx"], mb["cy"])
+            for _ in range(6):
+                cur = dump_xml(d)
+                seen |= {lab for lab, *_ in text_nodes(cur)}
+                if all(g in seen for g in S28_GROUPS_UNIQUE):
+                    break
+                time.sleep(0.5)
+            ca.shot(d, "m5s28_menu_grouped")
+            if not all(g in seen for g in S28_GROUPS_UNIQUE):
+                # 面板 maxHeight≈0.62 屏，末尾组在可视区外 ⇒ 面板内上滑补抓
+                w, h = d.window_size()
+                sh("input", "swipe", str(w // 2), str(int(h * 0.62)), str(w // 2), str(int(h * 0.40)), "300")
+                time.sleep(1.0)
+                seen |= {lab for lab, *_ in text_nodes(dump_xml(d))}
+                ca.shot(d, "m5s28_menu_grouped_scrolled")
+            sh("input", "keyevent", "4")
+            time.sleep(0.8)
+        groups = sum(1 for g in S28_GROUPS_UNIQUE if g in seen)
+        print(f"  [s28] C 书目还原={restored} 进程存活={proc_alive} 更多键定位={bool(mb)} "
+              f"独有组标题命中={groups}/3")
+
+        # ---------- D：源码断言 ----------
+        src_base = Path(S28_SRC_BASE).read_text(encoding="utf-8")
+        src_screen = Path(S28_SRC_SCREEN).read_text(encoding="utf-8")
+        src_main = Path(S28_SRC_MAIN).read_text(encoding="utf-8")
+        checks = [
+            ("优化1 四组标题 + 高频组置顶（仅排列变更）",
+             src_base.count("groupHeader(") >= 5
+             and "bookshelf_menu_group_manage" in src_base
+             and "header = true" in src_base),
+            ("优化1 12 项文案/流程零改动（仍全部沿用 R.string）",
+             all(k in src_base for k in ("update_toc", "book_local", "add_remote_book", "add_url",
+                                         "bookshelf_management", "cache_export", "group_manage",
+                                         "bookshelf_layout", "bookshelf_tag_manage",
+                                         "export_bookshelf", "import_bookshelf", "log"))),
+            ("优化3 空态动作槽为可选参数（既有调用点零改动）",
+             "emptyPrimaryAction: EmptyStateAction? = null" in src_screen
+             and "emptySecondaryActions: List<EmptyStateAction> = emptyList()" in src_screen),
+            ("优化3 两个风格页均接线空态动作",
+             "emptyPrimaryAction = emptyPrimaryAction()" in
+             Path(S28_SRC_FRAG1).read_text(encoding="utf-8")
+             and "emptyPrimaryAction = emptyPrimaryAction()" in
+             Path(S28_SRC_FRAG2).read_text(encoding="utf-8")),
+            ("优化3「去发现看看」走既有 TAB 出口机制（不新建跳转通道）",
+             "fun openDiscovery(context: Context)" in src_main
+             and "TARGET_DISCOVERY" in src_main
+             and "openDiscoveryPage()" in src_main
+             and "MainActivity.openDiscovery(requireContext())" in src_base),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s28] 源码 {name} = {v}")
+
+        ok = bool(cleared and title_ok and primary_ok and sec_hits >= 3 and jump_ok
+                  and restored and proc_alive and groups >= 3 and src_ok)
+    except Exception as e:
+        print(f"  [s28] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        if backup:
+            _s28_restore_books(backup)   # 双保险：异常路径也还原书目
+        time.sleep(0.5)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7879,6 +8032,7 @@ STEPS = {
     "s25": guarded(s25_audio_play),
     "s26": guarded(s26_video_player),
     "s27": guarded(s27_explore_tab),
+    "s28": guarded(s28_bookshelf),
 }
 
 
@@ -7891,7 +8045,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27"]
+                "s27", "s28"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
