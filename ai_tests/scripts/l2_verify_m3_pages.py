@@ -7570,6 +7570,159 @@ def s25_audio_play(d) -> bool:
     return ok
 
 
+S26_SRC_ACT = "app/src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt"
+S26_SRC_ADAPTER = "app/src/main/java/io/legado/app/ui/video/RssEpisodeAdapter.kt"
+S26_SRC_DAO = "app/src/main/java/io/legado/app/data/dao/PlayHistoryDao.kt"
+S26_SRC_STORE = "app/src/main/java/io/legado/app/data/PlayHistoryStore.kt"
+S26_LAYOUT_SWITCHING = "正在切换布局…"     # video_layout_switching
+S26_MODE_TRADITIONAL = "传统布局"          # video_layout_mode_traditional（精确匹配，避开 summary 内含同名子串）
+S26_CONFIRM = "确认"                       # SingleChoiceDialog 的提交键（两段式：先选项再提交）
+
+
+def _s26_history_schema_ok() -> bool:
+    """F183 数据层证据：`playHistories` 表与 DAO 新查询用到的两列真实存在，且语句形状可执行。
+    （Room @Query 已在编译期校验列名；此处证明**运行库 schema** 与之一致——新增纯查询不涉迁移）"""
+    workdir = Path(tempfile.mkdtemp(prefix="m5s26db_"))
+    m2 = _m2()
+    db = m2._db_pull(workdir)   # 只读拉取，不回写
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = {row[1] for row in con.execute("pragma table_info(playHistories)").fetchall()}
+        if not {"articleUrl", "videoUrl"}.issubset(cols):
+            return False
+        con.execute("select videoUrl from playHistories where articleUrl = ?", ("",)).fetchall()
+        return True
+    finally:
+        con.close()
+
+
+def s26_video_player(d) -> bool:
+    """M5：video/video-player（F182 布局切换过渡反馈 · F183 选集位置计数 + 已看态）"""
+    print("  [s26] ===== 视频播放 布局切换过渡反馈 + 选集三态 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s26_"))
+    reset_app()
+    sh_su(f"cp {VIDEO_PREFS} {VIDEO_PREFS}.l2s26bak")
+    ok = False
+    try:
+        # ---------- A：本地视频直启（沉浸式基线 layoutMode=0） ----------
+        reset_app()
+        prefs_ok = _force_immersive_and_reset_guide(workdir)
+        landed = _start_local_video()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s26_video_immersive")
+        front_ok = "VideoPlayerActivity" in current_activity()
+        print(f"  [s26] A prefs 预置(沉浸式)={prefs_ok} 落地={landed} 前台={front_ok}")
+
+        # ---------- B：设置 → 布局模式 → 选「传统布局」⇒ 顶栏第二行出现切换提示 ----------
+        switch_notice = mode_written = False
+        sb = _node_by_id(xml, "btn_settings")
+        if not sb:
+            w, h = d.window_size()
+            for _ in range(3):
+                d.click(w // 2, h // 4)
+                time.sleep(1.5)
+                sb = _node_by_id(dump_xml(d), "btn_settings")
+                if sb:
+                    break
+        row_b = opt_b = cf_b = None
+        if sb:
+            click_xy(d, sb["cx"], sb["cy"])
+            for _ in range(8):
+                time.sleep(1.0)
+                row_b = _clickable_bounds(dump_xml(d), S_LAYOUT_MODE_ROW)
+                if row_b:
+                    break
+        if row_b:
+            click_xy(d, row_b["cx"], row_b["cy"])
+            for _ in range(8):
+                time.sleep(0.8)
+                opt_b = node_bounds(dump_xml(d), S26_MODE_TRADITIONAL)
+                if opt_b:
+                    break
+        if opt_b:
+            click_xy(d, opt_b["cx"], opt_b["cy"])
+            # 🔴 本弹窗是「选择 + 确认」两段式（截图铁证：点选项只切单选项，`onSelect` 挂在「确认」上）
+            # ⇒ 必须补点「确认」，否则回调不触发、偏好不落库（首轮 s26 假失败的唯一真因）
+            time.sleep(0.8)
+            cf_b = None
+            for _ in range(5):
+                cf_b = node_bounds(dump_xml(d), S26_CONFIRM)
+                if cf_b:
+                    break
+                time.sleep(0.4)
+            if cf_b:
+                click_xy(d, cf_b["cx"], cf_b["cy"])
+            # F182：提示保持 4s，但 dump 单次 1-3s 且切换期 UI churn 时可能失败重试（F314）
+            # ⇒ 点击后立即开始轮询，不先长睡
+            for _ in range(8):
+                if S26_LAYOUT_SWITCHING in dump_xml(d):
+                    switch_notice = True
+                    break
+                time.sleep(0.3)
+            ca.shot(d, "m5s26_layout_switching")
+            # 切换已执行的独立证据：video_config.xml 的 layoutMode 落 1
+            r = sh_su(f"cat {VIDEO_PREFS}")
+            mode_written = 'name="layoutMode" value="1"' in (r.stdout or b"").decode("utf-8", errors="ignore")
+        print(f"  [s26] B 设置键={bool(sb)} 布局行={bool(row_b)} 传统项={bool(opt_b)} "
+              f"确认键={bool(cf_b)} 切换提示在场={switch_notice} 偏好落1={mode_written}")
+
+        # ---------- C：切换后仍在前台（无崩溃/无误退） ----------
+        time.sleep(3.0)
+        ca.shot(d, "m5s26_after_switch")
+        alive = "VideoPlayerActivity" in current_activity()
+        print(f"  [s26] C 切换后前台={alive}")
+
+        # ---------- D：源码断言 ----------
+        src_act = Path(S26_SRC_ACT).read_text(encoding="utf-8")
+        src_adapter = Path(S26_SRC_ADAPTER).read_text(encoding="utf-8")
+        src_dao = Path(S26_SRC_DAO).read_text(encoding="utf-8")
+        src_store = Path(S26_SRC_STORE).read_text(encoding="utf-8")
+        checks = [
+            ("F182 切换提示走 secondRow（F317，禁 subtitle 承载状态）",
+             "secondRow = when {" in src_act and "video_layout_switching" in src_act
+             and "layoutSwitching" in src_act),
+            ("F182 让出一帧后再执行切换（否则提示等于没显示）",
+             "requestLayoutModeSwitch" in src_act and "binding.root.post {" in src_act),
+            ("F182 同模式不亮提示（靠返回值判定）",
+             "internal fun switchLayoutMode(targetMode: Int): Boolean" in src_act
+             and "if (!switched)" in src_act),
+            ("F182 两个布局切换入口都走带反馈入口（禁双入口不一致）",
+             src_act.count("requestLayoutModeSwitch(") >= 3
+             and "override fun onLayoutModeSelected(target: Int) {\n        requestLayoutModeSwitch(target)" in src_act),
+            ("F183 已看集合：DAO 纯查询 + Store 门面（含历史关闭兜底）",
+             "getWatchedVideoUrls" in src_dao and "watchedVideoUrls" in src_store
+             and "playerHistoryEnabled" in src_store),
+            ("F183 适配器三态（已看集合默认空集 ⇒ 既有调用点零改动）",
+             "var watchedUrls: Set<String> = emptySet()" in src_adapter
+             and "video_episode_watched_mark" in src_adapter),
+            ("F183 位置计数接线（列表首帧 + 切集同步）",
+             src_act.count("upEpisodeLabelPosition(") >= 3
+             and "video_playlist_position_episode" in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s26] 源码 {name} = {v}")
+
+        db_ok = _s26_history_schema_ok()
+        print(f"  [s26] E playHistories 表/列存在（F183 查询运行期前提）={db_ok}")
+
+        ok = bool(prefs_ok and landed and front_ok and switch_notice and mode_written
+                  and alive and src_ok and db_ok)
+    except Exception as e:
+        print(f"  [s26] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"cp {VIDEO_PREFS}.l2s26bak {VIDEO_PREFS} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {VIDEO_PREFS} && chmod 600 {VIDEO_PREFS}")
+        sh_su(f"rm -f {VIDEO_PREFS}.l2s26bak {VIDEO_PREFS}.bak_l2s10 "
+              f"{DEFAULT_PREFS}.bak_l2s10 /data/data/{PKG}/files/l2m3_*.mp4")
+        time.sleep(0.5)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7596,6 +7749,7 @@ STEPS = {
     "s23": guarded(s23_bookshelf_manage),
     "s24": guarded(s24_book_info),
     "s25": guarded(s25_audio_play),
+    "s26": guarded(s26_video_player),
 }
 
 
@@ -7607,7 +7761,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
