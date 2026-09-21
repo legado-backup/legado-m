@@ -10605,6 +10605,179 @@ def s40_rule_editor_required_and_exit_guard(d) -> bool:
         time.sleep(0.6)
 
 
+# ============================ s41：用户可选 LEGACY/CLASSIC 样式路径（M7 B2 清单纠正配套验证）============================
+# 背景：M7 B2 原把 `BookInfoActivity` / `ExploreAdapter` 列为「待迁移的真 View 主体」，
+# 源码实证二者实为**用户可选样式**（Compose 版 `BookInfoComposeActivity` / `ExploreModernListScreen` 才是缺省）。
+# 本场景补测这条**非缺省路径**真机可用（应测尽测）：CLASSIC 书籍信息页是完整 View 页
+# （SwipeRefreshLayout + ArcView/CoverImageView/LabelsBar/AccentBgTextView + `view_book_intro` inflate），
+# 若历史迁移把它改坏，选了 CLASSIC 的用户会直接撞上 ⇒ 必须验证。
+
+S41_BOOK_URL = "l2seed://s41/book"
+S41_BOOK_NAME = "L2样式样本"
+S41_CHAPTERS = ["第一章 起", "第二章 承"]
+S41_KEY_BOOK_INFO_STYLE = "bookInfoPageStyle"      # PreferKey.bookInfoPageStyle
+S41_KEY_DISCOVERY_MODE = "discoveryPageMode"       # PreferKey.discoveryPageMode
+S41_ACT_BOOK_INFO = "io.legado.app.ui.book.info.BookInfoActivity"
+S41_ACT_BOOK_INFO_COMPOSE = "io.legado.app.ui.book.info.BookInfoComposeActivity"
+S41_ACT_MAIN = "io.legado.app.ui.main.MainActivity"
+S41_TAB_DISCOVERY = "发现"
+
+S41_SRC_NAVIGATOR = "app/src/main/java/io/legado/app/ui/book/info/BookInfoNavigator.kt"
+S41_SRC_CONFIG = "app/src/main/java/io/legado/app/help/config/BookInfoComponentConfig.kt"
+S41_SRC_APPCONFIG = "app/src/main/java/io/legado/app/help/config/AppConfig.kt"
+S41_SRC_EXPLORE = "app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt"
+S41_SRC_MANAGE_SCREEN = "app/src/main/java/io/legado/app/ui/config/BookInfoManageScreen.kt"
+
+
+def _s41_seed(workdir: Path) -> bool:
+    """播 1 本样本：两种书籍信息样式都需库内书籍才取得到数据（否则页面空白、判据无意义）"""
+    return _books_upsert(workdir, [{
+        "bookUrl": S41_BOOK_URL, "name": S41_BOOK_NAME, "author": "L2作者",
+        "origin": "l2seed://s41/source", "originName": "L2样本源", "type": 0,
+        "group": 0, "order": 0, "intro": "L2 样式路径验证样本",
+        "tocUrl": "l2seed://s41/toc", "totalChapterNum": len(S41_CHAPTERS),
+        "latestChapterTitle": S41_CHAPTERS[-1], "durChapterIndex": 0,
+        "durChapterTitle": S41_CHAPTERS[0], "durChapterPos": 0, "canUpdate": 1,
+    }]) and _chapters_upsert(workdir, S41_BOOK_URL, S41_CHAPTERS)
+
+
+def _s41_set_pref(workdir: Path, key: str, value: str) -> bool:
+    """写字符串偏好（应用需已停）"""
+    def mut(t: str) -> str:
+        if f'name="{key}"' in t:
+            return re.sub(r'(<string name="%s">)[^<]*(</string>)' % key,
+                          r"\g<1>%s\g<2>" % value, t)
+        return t.replace("</map>", f'<string name="{key}">{value}</string>\n</map>')
+    return _prefs_edit(DEFAULT_PREFS, workdir, mut)
+
+
+def _s41_clear_pref(workdir: Path, key: str) -> bool:
+    """移除偏好键 ⇒ 回到 `fromKey` 缺省（`IMMERSIVE_COMPOSE` / `MODERN`），防污染后续场景"""
+    return _prefs_edit(DEFAULT_PREFS, workdir,
+                       lambda t: re.sub(r'\s*<string name="%s">[^<]*</string>' % key, "", t))
+
+
+def _s41_proc_alive(retries: int = 3) -> bool:
+    """进程存活探测（带重试）。
+
+    ⚠️ 模拟器卡顿期 `ps -A` 会超时返回空 ⇒ 单次判定会**假失败**（F364/F308 同源，本场景首轮即踩）。
+    """
+    for _ in range(retries):
+        if PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b""):
+            return True
+        time.sleep(1.5)
+    return False
+
+
+def s41_legacy_style_paths(d) -> bool:
+    """M7 B2 配套：验证「CLASSIC 书籍信息页 / LEGACY 发现页」两条非缺省路径真机可用"""
+    print("  [s41] ===== 用户可选样式路径：CLASSIC 书籍信息 + LEGACY 发现 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s41_"))
+    reset_app()
+    ok = False
+    backup = None
+    m2 = _m2()
+    try:
+        db = m2._db_pull(workdir)
+        if db is None:
+            raise RuntimeError("db pull 失败")
+        backup = workdir / "s41_backup.db"
+        backup.write_bytes(db.read_bytes())
+        seeded = _s41_seed(workdir)
+        print(f"  [s41] 播种 样本={seeded}（1 本样本，供两种样式取数）")
+
+        # ---------- A：CLASSIC 书籍信息页（View 版，非缺省路径） ----------
+        reset_app()
+        a_pref = _s41_set_pref(workdir, S41_KEY_BOOK_INFO_STYLE, "classic")
+        sh("am", "start", "-n", f"{PKG}/{S41_ACT_BOOK_INFO}",
+           "--es", "name", S41_BOOK_NAME, "--es", "author", "L2作者",
+           "--es", "bookUrl", S41_BOOK_URL, "--es", "origin", "l2seed://s41/source",
+           "--es", "originName", "L2样本源")
+        xml_a = ""
+        name_ok = False
+        for _ in range(3):
+            xml_a = _wait_marker(d, S41_BOOK_NAME, 12)
+            name_ok = S41_BOOK_NAME in xml_a
+            if name_ok:
+                break
+            time.sleep(1.5)
+        act_a = current_activity()
+        author_ok = "L2作者" in xml_a
+        # ⚠️ `current_activity()` 返回**全限定组件名**（如 `io.legado.app.ui.book.info.BookInfoActivity`），
+        # 不能用等值比较（本场景首轮即因此假失败）⇒ 统一用 `in` 子串判定（与 s32 既有写法一致）
+        classic_ok = S41_ACT_BOOK_INFO in act_a
+        compose_act_ok = S41_ACT_BOOK_INFO_COMPOSE not in act_a
+        ca.shot(d, "m7s41_bookinfo_classic")
+        print(f"  [s41] A 写偏好={a_pref} 当前={act_a} 走 View 版={classic_ok} 未走 Compose 版={compose_act_ok} "
+              f"书名在场={name_ok} 作者在场={author_ok}")
+
+        # ---------- B：LEGACY 发现页（非缺省路径）不崩 + 分流正确 ----------
+        reset_app()
+        b_pref = _s41_set_pref(workdir, S41_KEY_DISCOVERY_MODE, "legacy")
+        started = start_robust(S41_ACT_MAIN)
+        time.sleep(4.0)
+        tab_ok = tap_text(d, S41_TAB_DISCOVERY, timeout=8)
+        time.sleep(2.5)
+        xml_b = dump_xml(d)
+        act_b = current_activity()
+        stay_ok = S41_ACT_MAIN in act_b
+        nodes_b = len(text_nodes(xml_b))
+        # 底栏四 Tab 文案在场 ⇒ 主壳正常渲染（非白屏/非崩溃页）
+        tabs_b = sum(1 for k in ("书架", "发现", "订阅", "我的") if k in xml_b)
+        ca.shot(d, "m7s41_discovery_legacy")
+        # ⚠️ 存活探测必须放在 Part C 之前——Part C 的 `reset_app()` 是 `am force-stop`（实测 `:216`），
+        # 之后再探必然 False（本场景第二轮即因此假失败）
+        proc_alive = _s41_proc_alive()
+        print(f"  [s41] B 写偏好={b_pref} 直起={started} 切发现={tab_ok} 停留主壳={stay_ok} "
+              f"底栏Tab文案={tabs_b}/4 文本节点={nodes_b} 进程存活={proc_alive}"
+              f"（LEGACY 列表内容依赖库内书源，本场景只验「路径不崩 + 分流正确」）")
+
+        # ---------- C：还原缺省偏好（防污染后续场景） ----------
+        reset_app()
+        restore_ok = _s41_clear_pref(workdir, S41_KEY_BOOK_INFO_STYLE) \
+            and _s41_clear_pref(workdir, S41_KEY_DISCOVERY_MODE)
+        print(f"  [s41] C 缺省偏好已还原={restore_ok}")
+
+        # ---------- D：源码断言（分流链路） ----------
+        src_nav = Path(S41_SRC_NAVIGATOR).read_text(encoding="utf-8")
+        src_cfg = Path(S41_SRC_CONFIG).read_text(encoding="utf-8")
+        src_app = Path(S41_SRC_APPCONFIG).read_text(encoding="utf-8")
+        src_exp = Path(S41_SRC_EXPLORE).read_text(encoding="utf-8")
+        src_mng = Path(S41_SRC_MANAGE_SCREEN).read_text(encoding="utf-8")
+        checks = [
+            ("书籍信息：按样式分流到 Compose 版 / View 版两个实现（非「待迁移」）",
+             "BookInfoComposeActivity::class.java" in src_nav
+             and "BookInfoActivity::class.java" in src_nav
+             and "BookInfoComponentConfig.loadStyle()" in src_nav),
+            ("书籍信息：样式键缺省即 IMMERSIVE_COMPOSE（Compose 版才是默认路径）",
+             "?: IMMERSIVE_COMPOSE" in src_cfg),
+            ("书籍信息：CLASSIC 由管理页提供切换（用户可选功能，非死代码）",
+             "BookInfoPageStyle.CLASSIC" in src_mng and "onStyleChanged" in src_mng),
+            ("发现页：三模式并存且缺省 MODERN（LEGACY 为可选功能，非死代码）",
+             "DISCOVERY_PAGE_MODE_LEGACY" in src_app
+             and "DISCOVERY_PAGE_MODE_MODERN" in src_app
+             and "usingModernDiscovery" in src_exp and "usingSuiteDiscovery" in src_exp),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s41] 源码 {nm} = {v}")
+
+        # B 段为「不崩 + 分流正确」口径（LEGACY 列表内容依赖库内书源，本场景未播源）：
+        # 判据 = 停留主壳 + 发现 Tab 可点 + 页面有可读文本节点（非白屏）
+        ok = bool(seeded and a_pref and classic_ok and compose_act_ok and name_ok and author_ok
+                  and b_pref and started and tab_ok and stay_ok and nodes_b >= 8 and restore_ok
+                  and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s41] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        if backup:
+            m2._db_push(Path(backup))
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10646,6 +10819,7 @@ STEPS = {
     "s38": guarded(s38_compose_shell_merge),
     "s39": guarded(s39_book_source_edit_required),
     "s40": guarded(s40_rule_editor_required_and_exit_guard),
+    "s41": guarded(s41_legacy_style_paths),
 }
 
 
@@ -10659,7 +10833,7 @@ def main():
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
                 "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39",
-                "s40"]
+                "s40", "s41"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
