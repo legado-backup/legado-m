@@ -2,6 +2,21 @@
 """l2_verify_m3_pages.py — M3 批（设置与阅读器配置页 14 页）真机 L2 验证，按落地顺序增量登记
 
 已覆盖：
+  【rss/search + main/my】**s14（M4 6-7/11）**：F199 进行中计数条+停止出口 / F200 类型筛选外显 chips
+    / 修复 2 历史长按删除先确认 / 结果命中高亮 / F26 我的页头部资产概览 / Web 服务运行中徽章
+    s14 通道：本机 `_SearchServer` 返回**标准 RSS 2.0**（合成源 `ruleArticles` 留空 ⇒ 走默认解析，
+      零自定义规则面）+ adb reverse；两个合成源 type=0/2 分别指向 `/web` `/video`，
+      每请求固定 sleep 3s ⇒ 「正在搜索 · 已得 N 条」窗口可稳定 dump
+      → A1：chips 四文案在场 + 进行中条在场 + 点「停止」后条消退
+      → A2：完整搜索出双条；关键词只出现在网页源标题 ⇒ **同屏对照**（命中行 accent 像素 >0 / 未命中行 ≈0）
+      → A3：点「视频」⇒ 仅剩视频源结果（类型筛选功能口径，非像素猜色）；再点「全部类型」⇒ 双条回归（可逆 + 复位 rssSearchType）
+      → A4：播种 type=1 历史词 ⇒ 输入 1 字符展开历史 ⇒ 长按 ⇒ 「删除搜索记录」确认框
+         （点「否」标签仍在 ⇒ 点「是」标签消失，证明确认真的拦住了删除）
+      → B1：主 Tab「我的」⇒ 四指标 + 版本行在场；B2：点 Web 服务开关 ⇒「运行中」徽章出现/关闭后消退
+      → 库快照回滚 + 源码断言 10 项
+    ⚠️ 播种口径：搜索会并行跑**所有启用且 searchUrl 非空**的源 ⇒ 播种时先把其余源 `enabled=0`
+       （收尾整库回滚，零残留），否则「已得 N 条」与结果集不确定
+
   【book/ai-read-aloud-usage + book/paragraph-rule-manage】**s9 PASS（2026-09-21）**：F30 摘要拆行+主指标强调
     / F31 选中态批量栏（删除选中/导出）/ F51 拖拽手柄可见化 / F50 空态操作化 / F52 导入进度闭环
     s9 通道：DB 播种 2 条消耗记录（A 模型大额 + B 模型小额，校验千分位与按模型汇总）+
@@ -4730,6 +4745,489 @@ def s13_settings_search_and_replace_edit(d) -> bool:
     return ok
 
 
+# ============================ s14：M4 批次（rss/search + main/my） ============================
+
+ACT_RSS_SEARCH = "io.legado.app.ui.rss.search.RssSearchActivity"
+ACT_MAIN = "io.legado.app.ui.main.MainActivity"
+
+S14_PORT = 18571
+S14_WEB_SOURCE = "l2seed://search-web"
+S14_VIDEO_SOURCE = "l2seed://search-video"
+S14_WEB_NAME = "L2搜索源W"
+S14_VIDEO_NAME = "L2搜索源V"
+# 关键词只出现在**网页源**条目标题里 ⇒ 同一屏内「命中行 accent 像素 > 0 / 未命中行 ≈ 0」互为对照，
+# 不必再构造「未搜索」基线（结果页的 highlightQuery 恒非空，拿不到同行的无高亮态）
+S14_KEYWORD = "L2Article"
+S14_WEB_TITLE = "L2ArticleWebAlpha"
+S14_VIDEO_TITLE = "BetaVideoPlain"
+S14_HISTORY_WORD = "l2histword"
+
+# 文案取自 values-zh/strings.xml 真值
+S14_RUNNING_PREFIX = "正在搜索"      # rss_search_running
+S14_STOP = "停止"                    # rss_search_stop
+S14_TYPE_ALL = "全部类型"            # rss_search_type_all
+S14_TYPE_WEB = "网页"                # rss_article_type_web
+S14_TYPE_IMAGE = "图片"              # rss_article_type_image
+S14_TYPE_VIDEO = "视频"              # rss_article_type_video
+S14_HIST_DEL_TITLE = "删除搜索记录"   # search_history_delete_title
+S14_YES = "是"                       # yes
+S14_NO = "否"                        # no
+S14_METRIC_LABELS = ("书架书籍", "使用书源", "订阅源", "累计阅读")   # my_metric_*
+S14_NAV_MY = "我的"                  # my
+S14_VERSION_PREFIX = "版本"          # version
+S_WEB_SERVICE_TITLE = "Web 服务"     # web_service
+S_WEB_RUNNING = "运行中"             # web_service_running
+
+SRC_RSS_SEARCH_ACT = "app/src/main/java/io/legado/app/ui/rss/search/RssSearchActivity.kt"
+SRC_RSS_SEARCH_RESULT = "app/src/main/java/io/legado/app/ui/rss/search/RssSearchResultScreen.kt"
+SRC_MY_SCREEN = "app/src/main/java/io/legado/app/ui/main/my/MySettingsScreen.kt"
+SRC_MY_FRAGMENT = "app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt"
+SRC_HIGHLIGHT_TEXT = "app/src/main/java/io/legado/app/ui/widget/components/HighlightText.kt"
+
+
+class _SearchServer(threading.Thread):
+    """本机订阅搜索服务：`/web` 与 `/video` 各返回一份**标准 RSS 2.0** XML。
+
+    为什么用标准 RSS 而不是自定义规则：`RssParserByRule.parseXML` 在 `ruleArticles` 为空时
+    走 `RssParserDefault`（默认 RSS/Atom 解析）⇒ 合成源只需 `searchUrl`，**零自定义规则面**，
+    把「规则写错导致空结果」这类假阴性风险直接消掉。
+
+    为什么每请求固定 sleep：`isSearching` 的窗口只有网络往返那几百毫秒，不延迟就 dump 不到
+    「正在搜索 · 已得 N 条」；固定 3s 让进行中态可稳定观测（双源并行 ⇒ 窗口 ≈ 3s）。
+    """
+
+    def __init__(self, port: int, delay: float = 3.0):
+        super().__init__(daemon=True)
+        self.port = port
+        self.delay = delay
+        self.hits = 0
+        self._httpd = None
+
+    def _feed(self, title: str, link: str) -> bytes:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<rss version="2.0"><channel><title>L2Search</title>'
+            f'<item><title>{title}</title><link>{link}</link>'
+            f'<description>L2 fixture {title}</description>'
+            '<pubDate>Fri, 19 Sep 2026 10:00:00 GMT</pubDate>'
+            '</item></channel></rss>'
+        ).encode("utf-8")
+
+    def _html(self, title: str, link: str) -> bytes:
+        """视频源用 **HTML + 自定义规则**：`RssParserDefault` 从不设 `article.type`（恒 0），
+        只有 `RssParserByRule` 会写 `rssArticle.type = rssSource.type` ⇒ 要验证「类型筛选」
+        必须走自定义规则路径，否则视频源的文章也是 type=0、按「视频」过滤后必然为空。"""
+        return (
+            '<html><body><div class="item">'
+            f'<a class="a" href="{link}"><span class="t">{title}</span></a>'
+            '</div></body></html>'
+        ).encode("utf-8")
+
+    def run(self):
+        import http.server
+        outer = self
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.hits += 1
+                time.sleep(outer.delay)
+                if urlparse(self.path).path.startswith("/video"):
+                    body = outer._html(S14_VIDEO_TITLE, f"http://127.0.0.1:{outer.port}/v1")
+                    ctype = "text/html; charset=utf-8"
+                else:
+                    body = outer._feed(S14_WEB_TITLE, f"http://127.0.0.1:{outer.port}/w1")
+                    ctype = "application/rss+xml; charset=utf-8"
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        class _Srv(http.server.ThreadingHTTPServer):
+            daemon_threads = True
+
+        try:
+            self._httpd = _Srv(("127.0.0.1", self.port), _H)
+        except OSError:
+            return
+        self._httpd.serve_forever()
+
+    def stop(self):
+        try:
+            if self._httpd:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+        except Exception:
+            pass
+
+
+def _s14_seed(workdir: Path) -> bool:
+    """播种两个合成搜索源（type=0 网页 / type=2 视频）+ 一条订阅搜索历史（type=1）。
+
+    为什么必须**临时禁用其它启用源**：`RssSearchScope.getRssSources()` 在「全部分组」下取
+    **所有启用且 searchUrl 非空**的源并行搜索——留着存量源会让「已得 N 条」与结果集不确定，
+    还会把等待时间拖长。收尾走 `_snapshot_db` 整库回滚（零残留，不用逐条清理）。
+    """
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = [r[1] for r in con.execute("pragma table_info(rssSources)")]
+        row = con.execute("select * from rssSources where enabled = 1 limit 1").fetchone()
+        if not row:
+            return False
+        base = dict(zip(cols, row))
+        con.execute("update rssSources set enabled = 0")
+        for url, name, stype, path in (
+            (S14_WEB_SOURCE, S14_WEB_NAME, 0, "web"),
+            (S14_VIDEO_SOURCE, S14_VIDEO_NAME, 2, "video"),
+        ):
+            data = dict(base)
+            data.update({
+                "sourceUrl": url, "sourceName": name, "type": stype, "enabled": 1,
+                # {{key}} 由 AnalyzeUrl 以搜索词替换（与真实源同口径）
+                "searchUrl": f"http://127.0.0.1:{S14_PORT}/{path}?k={{{{key}}}}",
+                "sortUrl": f"L2搜索::{url}",
+                "ruleArticles": None, "ruleNextPage": None,
+                "header": None, "loginUrl": None, "loginCheckJs": None,
+                "enabledCookieJar": 0, "preload": 0,
+            })
+            if stype == 2:
+                # 视频源走自定义规则（唯一能把 article.type 写成源 type 的通道，见 _SearchServer._html）
+                data.update({
+                    "ruleArticles": "class.item",
+                    "ruleTitle": "class.t@text",
+                    "ruleLink": "class.a@href",
+                })
+            _s12_upsert(con, "rssSources", cols, data)
+        # 订阅源搜索历史（type=1）：供「长按删除先确认」构造真实入口
+        con.execute("delete from search_keywords where type = 1")
+        con.execute(
+            "insert or replace into search_keywords (word, usage, lastUseTime, type)"
+            " values (?,?,?,?)",
+            (S14_HISTORY_WORD, 1, int(time.time() * 1000), 1)
+        )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def node_bounds_by_id(xml: str, res_suffix: str):
+    """按 resource-id 后缀取节点 bounds（纯图标容器只能靠 id 定位）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        rid = re.search(r'resource-id="([^"]*)"', tag)
+        if not rid or not rid.group(1).endswith(res_suffix):
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if x2 > x1 and y2 > y1:
+            return {"left": x1, "top": y1, "right": x2, "bottom": y2,
+                    "cx": (x1 + x2) // 2, "cy": (y1 + y2) // 2}
+    return None
+
+
+def _scroll_label_into_view(d, label: str, tries: int = 5):
+    """只滚动把目标行带进视口（**不点击**）——设置行点击会跳页，不能用 `_tap_label_scrolled`"""
+    h = (d.info or {}).get("displayHeight") or 1280
+    for _ in range(tries):
+        b = node_bounds(dump_xml(d), label)
+        if b and b["cy"] < h * 0.82:
+            return b
+        d.swipe(0.5, 0.72, 0.5, 0.4, 0.15)
+        time.sleep(0.9)
+    return node_bounds(dump_xml(d), label)
+
+
+def _switch_bounds_in_row(xml: str, row_label: str):
+    """取「某设置行」内开关节点的 bounds（按行标题的 y 区间圈定，避免命中别行的开关）"""
+    row = node_bounds(xml, row_label)
+    if not row:
+        return None
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        if 'checkable="true"' not in tag:
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        cy = (y1 + y2) // 2
+        if row["top"] - 8 <= cy <= row["bottom"] + 8 and x2 > x1:
+            return {"left": x1, "top": y1, "right": x2, "bottom": y2,
+                    "cx": (x1 + x2) // 2, "cy": cy}
+    return None
+
+
+def _s14_launch_search(d, key: str, wait: float = 1.0) -> bool:
+    """带 key 启动/复用搜索页（同 Activity 再收 onNewIntent ⇒ 直接发起搜索，无需打输入法）"""
+    sh("am", "start", "-n", f"{PKG}/{ACT_RSS_SEARCH}", "--es", "key", key)
+    time.sleep(wait)
+    return "RssSearchActivity" in current_activity()
+
+
+def s14_rss_search_and_my(d) -> bool:
+    """M4 6-7/11：rss/search（F199 进行中计数条 + F200 类型筛选外显 + 修历史删除无确认/结果无高亮）
+    + main/my（F26 头部资产概览 + Web 服务运行中徽章）"""
+    print("  [s14] ===== 订阅搜索进行中回执/类型外显/历史确认 + 我的页头部概览 =====")
+    m2 = _m2()
+    workdir = Path(tempfile.mkdtemp(prefix="m4s14_"))
+    db_snap = workdir / "legado_snapshot.db"
+    if not m2._snapshot_db(workdir, db_snap):
+        print("  [s14] 数据库快照失败（前置）")
+        return False
+    server = None
+    ok = False
+    try:
+        from PIL import Image
+        shot_dir = Path(tempfile.mkdtemp(prefix="m4s14img_"))
+        server = _SearchServer(S14_PORT)
+        server.start()
+        if not _reverse_on(S14_PORT):
+            print("  [s14] adb reverse 未建立（设备侧不可达本机搜索服务）")
+            return False
+        reset_app()
+        if not _s14_seed(workdir):
+            print("  [s14] 合成源播种失败")
+            return False
+        reset_app()
+
+        # ---------- A1：chips 行在场 + 进行中计数条 + 停止出口 ----------
+        a_landed = _s14_launch_search(d, S14_KEYWORD, wait=0.8)
+        running_seen = False
+        chips_ok = False
+        stop_b = None
+        for _ in range(14):
+            time.sleep(0.5)
+            xml = dump_xml(d)
+            if S14_RUNNING_PREFIX in xml:
+                running_seen = True
+                stop_b = node_bounds(xml, S14_STOP)
+                chips_ok = all(t in xml for t in
+                               (S14_TYPE_ALL, S14_TYPE_WEB, S14_TYPE_IMAGE, S14_TYPE_VIDEO))
+                ca.shot(d, "m4s14_search_running")
+                break
+        print(f"  [s14] A1 落地={a_landed} 进行中条={running_seen} chips4项={chips_ok} "
+              f"停止钮={bool(stop_b)} 服务命中={server.hits}")
+
+        stopped = False
+        if stop_b:
+            click_xy(d, stop_b["cx"], stop_b["cy"])
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                time.sleep(0.8)
+                if S14_RUNNING_PREFIX not in dump_xml(d):
+                    stopped = True
+                    break
+        print(f"  [s14] A1 停止后任务条消退={stopped}")
+
+        # ---------- A2：完整搜索 ⇒ 结果 + 命中高亮（同屏对照） ----------
+        # 必须 force-stop 后冷启：同页 `am start` 是否落到新实例受 launchMode 影响（首轮实测
+        # 停在 A1 那个「已停止」实例上 ⇒ 看到的是空结果态，误判成「搜不到」）
+        reset_app()
+        _s14_launch_search(d, S14_KEYWORD, wait=1.0)
+        hits_before = server.hits
+        deadline = time.time() + 30
+        full_xml = ""
+        while time.time() < deadline:
+            time.sleep(1.0)
+            cur = dump_xml(d)
+            if S14_WEB_TITLE in cur and S14_VIDEO_TITLE in cur and S14_RUNNING_PREFIX not in cur:
+                full_xml = cur
+                break
+        both_ok = bool(full_xml)
+        ca.shot(d, "m4s14_search_all_types")
+        print(f"  [s14] A2 服务命中增量={server.hits - hits_before}")
+        hl_hit = hl_miss = -1
+        if both_ok:
+            png = str(shot_dir / "all.png")
+            d.screenshot(png)
+            img = Image.open(png).convert("RGB")
+            # accent 参考色自校准：选中 chip「全部类型」的文字像素均值（不猜主题色值）
+            chip_b = node_bounds(full_xml, S14_TYPE_ALL)
+            ref = foreground(img, chip_b)[0] if chip_b else None
+            row_hit = node_bounds(full_xml, S14_WEB_TITLE)
+            row_miss = node_bounds(full_xml, S14_VIDEO_TITLE)
+            if ref and row_hit and row_miss:
+                hl_hit = count_near(img, row_hit, ref)
+                hl_miss = count_near(img, row_miss, ref)
+        print(f"  [s14] A2 全部类型：双条在场={both_ok} accent参考={ref if both_ok else None} "
+              f"命中行像素={hl_hit} 未命中行像素={hl_miss}")
+
+        # ---------- A3：点「视频」chip ⇒ 只留视频源结果；再点「全部类型」⇒ 双条回归 ----------
+        type_ok = False
+        restored_ok = False
+        if both_ok:
+            vb = node_bounds(full_xml, S14_TYPE_VIDEO)
+            if vb:
+                click_xy(d, vb["cx"], vb["cy"])
+                deadline = time.time() + 30
+                while time.time() < deadline:
+                    time.sleep(1.0)
+                    cur = dump_xml(d)
+                    if S14_VIDEO_TITLE in cur and S14_WEB_TITLE not in cur \
+                            and S14_RUNNING_PREFIX not in cur:
+                        type_ok = True
+                        break
+            ca.shot(d, "m4s14_search_video_only")
+            # 复位：切回「全部类型」（同时验证筛选可逆 + 不把 rssSearchType 留在 2）
+            ab = node_bounds(dump_xml(d), S14_TYPE_ALL)
+            if ab:
+                click_xy(d, ab["cx"], ab["cy"])
+                deadline = time.time() + 30
+                while time.time() < deadline:
+                    time.sleep(1.0)
+                    cur = dump_xml(d)
+                    if S14_WEB_TITLE in cur and S14_VIDEO_TITLE in cur \
+                            and S14_RUNNING_PREFIX not in cur:
+                        restored_ok = True
+                        break
+        print(f"  [s14] A3 选「视频」后仅剩视频源结果={type_ok} 切回「全部类型」双条回归={restored_ok} "
+              f"服务命中累计={server.hits}")
+
+        # ---------- A4：历史长按删除先确认（修复 2） ----------
+        reset_app()
+        a4_landed = False
+        for _ in range(6):
+            sh("am", "start", "-n", f"{PKG}/{ACT_RSS_SEARCH}")
+            time.sleep(2.5)
+            if "RssSearchActivity" in current_activity():
+                a4_landed = True
+                break
+        # 输入帮助区只在「输入变化」时展开（空 key 启动只聚焦不出历史）⇒ 必须真打一个字
+        typed = type_search(d, "l") if a4_landed else False
+        time.sleep(2.0)
+        hist_xml = dump_xml(d)
+        hist_b = node_bounds(hist_xml, S14_HISTORY_WORD)
+        dlg_seen = False
+        kept_after_no = False
+        gone_after_yes = False
+        if hist_b:
+            w, h = d.window_size()
+            d.long_click(hist_b["cx"] / w, hist_b["cy"] / h, 1.2)
+            time.sleep(1.8)
+            dlg_xml = dump_xml(d)
+            dlg_seen = S14_HIST_DEL_TITLE in dlg_xml and S14_HISTORY_WORD in dlg_xml
+            ca.shot(d, "m4s14_history_delete_confirm")
+            no_b = node_bounds(dlg_xml, S14_NO)
+            if no_b:
+                click_xy(d, no_b["cx"], no_b["cy"])
+                time.sleep(1.5)
+                kept_after_no = bool(node_bounds(dump_xml(d), S14_HISTORY_WORD))
+            if kept_after_no:
+                b2 = node_bounds(dump_xml(d), S14_HISTORY_WORD)
+                d.long_click(b2["cx"] / w, b2["cy"] / h, 1.2)
+                time.sleep(1.8)
+                yes_b = node_bounds(dump_xml(d), S14_YES)
+                if yes_b:
+                    click_xy(d, yes_b["cx"], yes_b["cy"])
+                    time.sleep(1.8)
+                    gone_after_yes = not node_bounds(dump_xml(d), S14_HISTORY_WORD)
+        print(f"  [s14] A4 落地={a4_landed} 已输入={typed} 历史标签在场={bool(hist_b)} "
+              f"删除确认弹窗={dlg_seen} 点「否」保留={kept_after_no} 点「是」已删={gone_after_yes}")
+
+        # ---------- B1：我的页头部资产概览（F26） ----------
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        time.sleep(6.0)
+        main_xml = dump_xml(d)
+        # 底栏为**纯图标模式**（labelVisibilityMode 走 icon-only）⇒ 「我的」二字不进 a11y 树，
+        # 只能按容器几何点第 4 格（4 Tab：书架/发现/订阅/我的）
+        nav_container = node_bounds_by_id(main_xml, "bottom_navigation_view")
+        nav_b = None
+        if nav_container:
+            w4 = nav_container["right"] - nav_container["left"]
+            nav_b = {
+                "cx": nav_container["left"] + w4 * 7 // 8,
+                "cy": (nav_container["top"] + nav_container["bottom"]) // 2,
+            }
+        if nav_b:
+            click_xy(d, nav_b["cx"], nav_b["cy"])
+            time.sleep(4.0)
+        my_xml = dump_xml(d)
+        ca.shot(d, "m4s14_my_profile_header")
+        metrics_ok = all(t in my_xml for t in S14_METRIC_LABELS)
+        rows_ok = "内容与规则" in my_xml
+        version_ok = S14_VERSION_PREFIX in my_xml
+        print(f"  [s14] B1 底栏「我的」定位={bool(nav_b)} 四指标={metrics_ok} 设置分区={rows_ok} 版本行={version_ok}")
+
+        # ---------- B2：Web 服务「● 运行中」徽章（开→出现，关→消失） ----------
+        badge_on = badge_off = False
+        row_b = _scroll_label_into_view(d, S_WEB_SERVICE_TITLE)
+        sw = _switch_bounds_in_row(dump_xml(d), S_WEB_SERVICE_TITLE) if row_b else None
+        if sw:
+            click_xy(d, sw["cx"], sw["cy"])
+            deadline = time.time() + 12
+            while time.time() < deadline:
+                time.sleep(1.0)
+                if S_WEB_RUNNING in dump_xml(d):
+                    badge_on = True
+                    break
+            ca.shot(d, "m4s14_web_service_running")
+            sw2 = _switch_bounds_in_row(dump_xml(d), S_WEB_SERVICE_TITLE)
+            if badge_on and sw2:
+                click_xy(d, sw2["cx"], sw2["cy"])
+                time.sleep(3.0)
+                badge_off = S_WEB_RUNNING not in dump_xml(d)
+        print(f"  [s14] B2 服务行可见={bool(row_b)} 开关定位={bool(sw)} 开启后徽章={badge_on} "
+              f"关闭后消退={badge_off}")
+
+        # ---------- 源码断言（口径回归护栏） ----------
+        src_act = _src_text(SRC_RSS_SEARCH_ACT)
+        src_res = _src_text(SRC_RSS_SEARCH_RESULT)
+        src_my = _src_text(SRC_MY_SCREEN)
+        src_frag = _src_text(SRC_MY_FRAGMENT)
+        src_hl = _src_text(SRC_HIGHLIGHT_TEXT)
+        checks = [
+            ("rss/search: 进行中条复用 InlineTaskBar", "InlineTaskBar(" in src_act
+             and "InlineTaskState.Running" in src_act),
+            ("rss/search: 停止出口单源", "private fun stopSearch()" in src_act
+             and src_act.count("isManualStopSearch = true") == 1),
+            ("rss/search: 类型 chips 外显", "private fun RssSearchTypeChipsRow(" in src_act
+             and "RssSearchTypeChipsRow(" in src_act.replace("private fun RssSearchTypeChipsRow(", "")),
+            ("rss/search: 菜单不再重复类型入口", "menu_type_all" not in src_act),
+            ("rss/search: 空结果弹窗文案资源化", "搜索结果为空" not in src_act
+             and "rss_search_empty_title" in src_act),
+            ("rss/search: 历史删除先确认", "search_history_delete_title" in src_act
+             and "dangerPositive = true" in src_act),
+            ("rss/search: 结果命中高亮", "highlightMatches(item.title" in src_res
+             and "highlightQuery" in src_res),
+            ("highlightMatches 已单源收口", "fun highlightMatches(" in src_hl
+             and "private fun highlightMatches(" not in src_my
+             and "private fun highlightMatches(" not in src_res),
+            ("main/my: 头部资产概览", "private fun MyProfileHeader(" in src_my
+             and "profileName" in src_frag and "loadMetrics()" in src_frag),
+            ("main/my: 头部项常驻 + 内容门控", 'item("profile") {' in src_my
+             and src_my.index('item("profile") {') < src_my.index("MyProfileHeader(", src_my.index('item("profile") {'))),
+            ("main/my: 服务运行徽章", "private fun RunningBadge(" in src_my
+             and "web_service_running" in src_my),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s14] 源码 {name} = {v}")
+
+        ok = bool(a_landed and running_seen and chips_ok and stopped and both_ok
+                  and hl_hit > 0 and hl_miss <= 2 and type_ok and restored_ok
+                  and dlg_seen and kept_after_no and gone_after_yes
+                  and metrics_ok and rows_ok and version_ok and badge_on and badge_off and src_ok)
+    except Exception as e:
+        print(f"  [s14] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        if server:
+            server.stop()
+        print(f"  [s14] 数据库快照回滚={m2._db_push(db_snap)}")
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -4744,6 +5242,7 @@ STEPS = {
     "s11": guarded(s11_menu_and_bgm_pages),
     "s12": guarded(s12_gallery_and_source_edit),
     "s13": guarded(s13_settings_search_and_replace_edit),
+    "s14": guarded(s14_rss_search_and_my),
 }
 
 
@@ -4754,7 +5253,7 @@ def main():
     d = connect_robust()
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
-    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13"]
+    targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
