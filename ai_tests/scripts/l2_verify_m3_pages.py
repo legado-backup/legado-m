@@ -8431,6 +8431,204 @@ def s29_bookshelf_batch2(d) -> bool:
     return ok
 
 
+# ============================ s30：M6-1 book/paragraph-rule-edit（F62 调试结构化 / F63 空脚本模板）============================
+# 通道：整库备份 → 播一本「非本地 + 带库内章节正文」样本 → 直起阅读页（令 ReadBook.book 就绪，调试前置）
+#       → 直起段落规则编辑页(id=0 新建 = 空脚本) → F63 判据/点按注入 → 调试全链（选章 → 结果弹窗）→ 整库回推
+
+S30_ACT_EDIT = "io.legado.app.ui.book.read.config.ParagraphRuleEditActivity"
+S30_ACT_READ = "io.legado.app.ui.book.read.ReadBookActivity"
+S30_BOOK_URL = "l2seed://s30/rule-book"
+S30_BOOK_NAME = "L2段落规则样本"
+S30_CHAPTERS = ["第一章 初章", "第二章 测试章", "第三章 收尾"]
+
+S30_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleEditActivity.kt"
+S30_SRC_DLG = "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleDebugDialog.kt"
+S30_SRC_PROC = "app/src/main/java/io/legado/app/help/book/ParagraphRuleProcessor.kt"
+S30_SRC_ROW = "app/src/main/java/io/legado/app/ui/widget/components/EmptyFieldTemplateRow.kt"
+S30_SRC_XML = "app/src/main/res/layout/activity_paragraph_rule_edit.xml"
+
+S30_TEMPLATE_TITLE = "插入模板"
+S30_CHIPS = ["短行合并", "去广告行", "缩进清理", "空模板骨架"]
+S30_CHIP_MERGE = S30_CHIPS[0]      # 点按注入用（短行合并模板）
+S30_SCRIPT_MARK = "MIN_LEN"        # 短行合并模板独有 token（判"已注入"，不看整段文本）
+S30_DEBUG_DESC = "调试"             # 顶栏 action contentDescription（MenuActionIcon 取 action.title）
+S30_STATUS_OK = "处理成功"
+S30_STATUS_FAIL = "处理失败"
+S30_PARAS = "段落数"
+S30_LENGTH = "总长度"
+S30_LOGS = "日志"
+S30_PREVIEW = "正文预览"
+S30_COPY = "复制结果"
+
+
+def _wait_marker(d, marker: str, timeout: float = 25.0) -> str:
+    """轮询直到 dump 中出现标记文本（Compose 页就绪判据；比固定 sleep 稳）"""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if marker in xml:
+            return xml
+        time.sleep(1.0)
+    return xml
+
+
+def _s30_seed(workdir: Path) -> bool:
+    """播「非本地 + 库内目录」样本：调试链路需 ReadBook.book 就绪（章节正文由源/缓存提供，
+    本机无源 ⇒ 预期走**失败态**，弹窗结构判据仍成立；成功态数值配方见 tasks 登记缺口）"""
+    return _books_upsert(workdir, [{
+        "bookUrl": S30_BOOK_URL, "name": S30_BOOK_NAME, "author": "L2作者",
+        "origin": "l2seed://s30/source", "originName": "L2样本源", "type": 8,
+        "group": 0, "order": 0, "intro": "L2 段落规则调试样本",
+        "tocUrl": "l2seed://s30/toc", "totalChapterNum": len(S30_CHAPTERS),
+        "latestChapterTitle": S30_CHAPTERS[-1], "durChapterIndex": 0,
+        "durChapterTitle": S30_CHAPTERS[0], "durChapterPos": 0,
+        "canUpdate": 1,
+    }]) and _chapters_upsert(workdir, S30_BOOK_URL, S30_CHAPTERS)
+
+
+def s30_paragraph_rule_edit(d) -> bool:
+    """M6-1：book/paragraph-rule-edit（F62 调试结果结构化 / F63 空脚本模板）"""
+    print("  [s30] ===== 段落规则编辑：调试结构化 + 空脚本模板 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s30_"))
+    reset_app()
+    ok = False
+    backup = None
+    m2 = _m2()
+    try:
+        db = m2._db_pull(workdir)
+        if db is None:
+            raise RuntimeError("db pull 失败")
+        backup = workdir / "s30_backup.db"
+        backup.write_bytes(db.read_bytes())
+        seeded = _s30_seed(workdir)
+        print(f"  [s30] 播种 样本={seeded}（非本地书 + 3 章 + 第 1 章正文）")
+
+        # ---------- A：F63 空脚本模板（新建态 = 脚本为空） ----------
+        edit_started = start_robust(S30_ACT_EDIT)
+        xml_a = _wait_marker(d, S30_TEMPLATE_TITLE, 25)
+        ca.shot(d, "m6s30_templates")
+        title_ok = S30_TEMPLATE_TITLE in xml_a
+        chip_hits = sum(1 for c in S30_CHIPS if c in xml_a)
+        merge_b = node_bounds(xml_a, S30_CHIP_MERGE)
+        injected = False
+        chips_gone = False
+        if merge_b:
+            # 真机 tap 偶发不生效（F339 同源）⇒ 带判据重试
+            for attempt in range(3):
+                click_xy(d, merge_b["cx"], merge_b["cy"])
+                xml_a2 = _wait_marker(d, S30_SCRIPT_MARK, 8)
+                injected = S30_SCRIPT_MARK in xml_a2
+                chips_gone = S30_TEMPLATE_TITLE not in xml_a2
+                print(f"  [s30] A 注入尝试#{attempt + 1} 命中={injected} chip行消失={chips_gone}")
+                if injected:
+                    ca.shot(d, "m6s30_template_injected")
+                    break
+            if not injected:
+                # 诊断：脚本域节点文本长度（不回显业务文本）
+                sv = [len(lab) for lab, *_ in text_nodes(xml_a2) if len(lab) > 40]
+                print(f"  [s30] A 诊断 长文本节点数={len(sv)} chip行仍在={S30_TEMPLATE_TITLE in xml_a2}")
+        print(f"  [s30] A 编辑页直起={edit_started} 模板行标题={title_ok} chip命中={chip_hits}/4 "
+              f"点「{S30_CHIP_MERGE}」注入={injected} 注入后chip行消失={chips_gone}")
+
+        # ---------- B：F62 调试结果结构化（前置：令 ReadBook.book 就绪） ----------
+        read_ok = start_robust(S30_ACT_READ)
+        time.sleep(5.0)
+        # 阅读页在顶会顶掉后续 am start（实测 3 次重试均未把编辑页带回前台）⇒ 用 BACK 回栈（编辑页在栈内）
+        print(f"  [s30] B 阅读页当前={current_activity().rsplit('/', 1)[-1]}")
+        sh("input", "keyevent", "4")
+        time.sleep(2.5)
+        print(f"  [s30] B 返回后当前={current_activity().rsplit('/', 1)[-1]}")
+        xml_b = _wait_marker(d, S30_DEBUG_DESC, 12)
+        dbg = node_bounds(xml_b, S30_DEBUG_DESC)
+        if not dbg:
+            # 兜底：编辑页若已销毁则重新直起（此时阅读会话已就绪）
+            start_robust(S30_ACT_EDIT)
+            xml_b = _wait_marker(d, S30_DEBUG_DESC, 20)
+            dbg = node_bounds(xml_b, S30_DEBUG_DESC)
+        if not dbg:
+            # 诊断：顶栏动作的 content-desc 集合（静态 UI 文案，非业务数据）
+            descs = sorted({m.group(1) for m in re.finditer(r'content-desc="([^"]+)"', xml_b)})
+            print(f"  [s30] B 诊断 当前={current_activity().rsplit('/', 1)[-1]} desc={descs}")
+        dialog_ok = False
+        status_ok = False
+        metric_hits = 0
+        arrow_ok = False
+        if dbg:
+            click_xy(d, dbg["cx"], dbg["cy"])
+            # 章节选择弹窗（showComposeChoiceListDialog）：条目文案形如「1. 第一章 初章」
+            chapter_clicked = False
+            for _ in range(8):
+                xm = dump_xml(d)
+                cand = [b for b in (node_bounds(xm, f"{i + 1}. ", contains=True) for i in range(3)) if b]
+                if cand:
+                    click_xy(d, cand[0]["cx"], cand[0]["cy"])
+                    chapter_clicked = True
+                    break
+                time.sleep(1.0)
+            if chapter_clicked:
+                xml_d = _wait_marker(d, S30_PARAS, 30)
+                dialog_ok = S30_PARAS in xml_d and S30_LENGTH in xml_d
+                status_ok = (S30_STATUS_OK in xml_d) or (S30_STATUS_FAIL in xml_d)
+                metric_hits = sum(1 for k in (S30_LOGS, S30_PREVIEW, S30_COPY) if k in xml_d)
+                arrow_ok = any(" → " in lab for lab, *_ in text_nodes(xml_d))
+                ca.shot(d, "m6s30_debug_dialog")
+                if S30_STATUS_FAIL in xml_d:
+                    print("  [s30] B 本次走失败态（无网络取材属预期）——弹窗结构判据仍成立")
+            else:
+                print("  [s30] B 章节选择弹窗未定位")
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        print(f"  [s30] B 阅读页直起={read_ok} 调试键定位={bool(dbg)} 弹窗={dialog_ok} 状态行={status_ok} "
+              f"三段命中={metric_hits}/3 前→后指标={arrow_ok} 进程存活={proc_alive}")
+
+        # ---------- C：源码断言 ----------
+        src_act = Path(S30_SRC_ACT).read_text(encoding="utf-8")
+        src_dlg = Path(S30_SRC_DLG).read_text(encoding="utf-8")
+        src_proc = Path(S30_SRC_PROC).read_text(encoding="utf-8")
+        src_row = Path(S30_SRC_ROW).read_text(encoding="utf-8")
+        src_xml = Path(S30_SRC_XML).read_text(encoding="utf-8")
+        checks = [
+            ("F62 旧「一整块 buildString + 确认框」已退役（无 take(4000) 截断）",
+             "buildString" not in src_act and ".take(4000)" not in src_act
+             and "showComposeConfirmDialog" not in src_act),
+            ("F62 调试结果走结构化弹窗（概要 + 日志 + 正文预览三段）",
+             "ParagraphRuleDebugDialog(" in src_act
+             and "CollapseSectionHeader(" in src_dlg
+             and "paragraph_rule_debug_preview" in src_dlg),
+            ("F62 概要为前→后对比（processor 回传 inputContent）",
+             "inputContent = normalizedContent" in src_proc
+             and "beforeParagraphs" in src_dlg and "afterParagraphs" in src_dlg),
+            ("F62 正文预览不截断 + 可复制结果",
+             "heightIn(min = 160.dp, max = 360.dp)" in src_dlg
+             and "sendToClip(content)" in src_dlg),
+            ("F63 模板槽为可选/条件渲染（脚本非空零占位）",
+             "cv_script_templates" in src_xml
+             and "if (scriptTemplateVisible)" in src_act
+             and "doAfterTextChanged" in src_act),
+            ("F63 4 个模板骨架齐备且为 process(ctx) 可运行结构",
+             all(k in src_act for k in ("TEMPLATE_SHORT_MERGE", "TEMPLATE_REMOVE_ADS",
+                                        "TEMPLATE_INDENT", "TEMPLATE_BLANK"))
+             and src_act.count("function process(ctx)") >= 4),
+            ("F63 共享件只做可选扩展（不新造胶囊视觉，复用 AppFilterChip）",
+             "fun EmptyFieldTemplateRow(" in src_row and "AppFilterChip(" in src_row),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s30] 源码 {nm} = {v}")
+
+        ok = bool(seeded and title_ok and chip_hits >= 4 and injected and chips_gone
+                  and dialog_ok and status_ok and metric_hits >= 3 and arrow_ok and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s30] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        if backup:
+            m2._db_push(Path(backup))
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -8461,6 +8659,7 @@ STEPS = {
     "s27": guarded(s27_explore_tab),
     "s28": guarded(s28_bookshelf),
     "s29": guarded(s29_bookshelf_batch2),
+    "s30": guarded(s30_paragraph_rule_edit),
 }
 
 
@@ -8473,7 +8672,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29"]
+                "s27", "s28", "s29", "s30"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
