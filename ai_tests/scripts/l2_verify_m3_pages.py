@@ -10153,6 +10153,143 @@ def s37_c6_fix_verify(d) -> bool:
         reset_app()
 
 
+# ============================ s38：M7 清壳第 3 批（「顶栏 + 内容」双 ComposeView 合并为单一 Compose 树）============================
+# 清壳口径：原壳布局只有两个 ComposeView（顶栏 wrap_content + 内容占满剩余），无任何 View 语义
+#           ⇒ 合并为 `Column { GlassTopAppBar(); Screen(Modifier.weight(1f)) }` + composeShell/attachComposeContent。
+# 判据：①每页可直起且停留 ②页面独有文案命中 ③**堆叠不变量**：顶栏贴顶 + 内容锚点在顶栏下沿之下
+#       （两棵树合并不产生重叠/裁切，是「结构改造零回归」的核心运行时证据）
+#       ④三通道（R.layout / @layout / XxxBinding）零引用 ⇒ 3 个壳布局成死资源
+#       ⑤源码已是**单棵 Compose 树**（旧双写器 initComposeHost/initComposeTopBar/initComposeList 与
+#         binding.composeTopBar / binding.recycler_view / binding.composeHost 全清 ⇒ 证明是合并而非改名）
+
+S38_PAGES = [
+    # (Activity, 附加启动参数, 页面独有文案, 顶栏标题文案, 内容锚点文案)
+    ("io.legado.app.ui.book.source.debug.BookSourceDebugActivity", [],
+     "发现", "调试源", "输入内容并开始调试"),
+    ("io.legado.app.ui.rss.source.debug.RssSourceDebugActivity", [],
+     "名称::URL", "调试源", "输入内容并开始调试"),
+    ("io.legado.app.ui.book.cache.CacheActivity", ["--el", "groupId", "0"],
+     "离线缓存", "离线缓存", ""),
+]
+
+S38_RETIRED_LAYOUTS = [
+    "activity_source_debug",
+    "activity_rss_source_debug",
+    "activity_cache_book",
+]
+
+S38_SRC_FILES = [
+    "app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt",
+    "app/src/main/java/io/legado/app/ui/rss/source/debug/RssSourceDebugActivity.kt",
+    "app/src/main/java/io/legado/app/ui/book/cache/CacheActivity.kt",
+]
+
+# 合并前遗留的「双 ComposeView」写法（换装后必须全清）
+S38_OLD_WRITERS = ["initComposeHost", "initComposeTopBar", "initComposeList",
+                   "binding.composeTopBar", "binding.recycler_view", "binding.composeHost"]
+
+
+def _s38_launch(act: str, extras: list = None) -> bool:
+    """直起页面（支持附加参数；debug 页的源 key 缺失时 VM init 为 no-op，页面仍应完整渲染）"""
+    simple = act.rsplit(".", 1)[-1]
+    extra_args = list(extras or [])
+    for _ in range(2):
+        sh("am", "start", "-n", f"{PKG}/{act}", *extra_args)
+        time.sleep(2.5)
+        if simple in current_activity():
+            return True
+        sh_su("am start -n {}/{} {}".format(PKG, act, " ".join(extra_args)))
+        time.sleep(2.5)
+        if simple in current_activity():
+            return True
+    return False
+
+
+def _s38_stack_ok(xml: str, title: str, anchor: str, win_h: int) -> bool:
+    """堆叠不变量：顶栏贴顶（top < 18% 屏高）且内容锚点在顶栏下沿之下"""
+    tb = node_bounds(xml, title, contains=True)
+    if not tb:
+        return False
+    if tb["top"] >= int(win_h * 0.18):
+        return False
+    if not anchor:
+        return True
+    cb = node_bounds(xml, anchor, contains=True)
+    return bool(cb) and cb["top"] >= tb["bottom"]
+
+
+def s38_compose_shell_merge(d) -> bool:
+    """M7 清壳第 3 批：3 页「顶栏 + 内容」双 ComposeView 合并为单一 Compose 树"""
+    print("  [s38] ===== M7 清壳第 3 批：3 页双 ComposeView 合并 =====")
+    reset_app()
+    try:
+        win_h = d.window_size()[1]
+        results = []
+        for act, extras, marker, title, anchor in S38_PAGES:
+            simple = act.rsplit(".", 1)[-1]
+            reset_app()
+            launched = _s38_launch(act, extras)
+            time.sleep(0.8)
+            xml = dump_xml(d)
+            nodes = _s35_text_nodes(xml)
+            marker_ok = marker in xml
+            stack_ok = _s38_stack_ok(xml, title, anchor, win_h)
+            stayed = simple in current_activity()
+            ca.shot(d, f"m7s38_{simple[:14].lower()}")
+            hit = bool(launched and stayed and marker_ok and stack_ok)
+            results.append(hit)
+            print(f"  [s38] {simple}: 直起={launched} 仍在页={stayed} 文本节点={nodes} "
+                  f"独有文案[{marker}]={marker_ok} 顶栏贴顶+内容在下={stack_ok} "
+                  f"→ {'PASS' if hit else 'FAIL'}")
+            d.press("back")
+            time.sleep(1.0)
+
+        # 源码断言 ①：3 个壳布局三通道（R.layout / @layout / XxxBinding）零引用 ⇒ 已成死资源
+        java_files = list(Path("app/src/main/java").rglob("*.kt"))
+        java_files += list(Path("app/src/main/java").rglob("*.java"))
+        res_xml = list(Path("app/src/main/res").rglob("*.xml"))
+        text_all = [f.read_text(encoding="utf-8", errors="ignore") for f in java_files]
+        xml_all = [f.read_text(encoding="utf-8", errors="ignore") for f in res_xml]
+
+        def camel(name: str) -> str:
+            return "".join(p[:1].upper() + p[1:] for p in re.split(r"[_\W]+", name) if p) + "Binding"
+
+        retired_ok = True
+        for name in S38_RETIRED_LAYOUTS:
+            in_code = any(f"R.layout.{name}" in t for t in text_all)
+            in_xml = any(f"@layout/{name}" in t for t in xml_all)
+            in_binding = any(camel(name) in t for t in text_all)
+            ok = not (in_code or in_xml or in_binding)
+            retired_ok = retired_ok and ok
+            print(f"  [s38] 死资源核验 {name}: R.layout={in_code} @layout={in_xml} "
+                  f"Binding={in_binding} → {'零引用' if ok else '仍被引用'}")
+
+        # 源码断言 ②：3 页已是「单棵 Compose 树」（attachComposeContent + weight(1f)，旧双写器全清）
+        src_ok = retired_ok
+        for p in S38_SRC_FILES:
+            t = Path(p).read_text(encoding="utf-8")
+            single_tree = ("attachComposeContent" in t and "composeShell" in t
+                           and "Modifier.weight(1f)" in t and "GlassTopAppBar" in t)
+            clean = ("R.layout." not in t and "viewbindingdelegate" not in t
+                     and ".setContent" not in t
+                     and not any(w in t for w in S38_OLD_WRITERS))
+            ok = single_tree and clean
+            src_ok = src_ok and ok
+            print(f"  [s38] 源码 {p.rsplit('/', 1)[-1]}: 单棵树={single_tree} 无旧双写器={clean}")
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = all(results) and src_ok and alive
+        print(f"  [s38] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} "
+              f"源码={src_ok} 进程存活={alive}")
+        return ok
+    except Exception as e:
+        print(f"  [s38] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        time.sleep(0.6)
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10191,6 +10328,7 @@ STEPS = {
     "s35": guarded(s35_compose_shell_batch),
     "s36": guarded(s36_compose_shell_batch2),
     "s37": guarded(s37_c6_fix_verify),
+    "s38": guarded(s38_compose_shell_merge),
 }
 
 
@@ -10203,7 +10341,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
