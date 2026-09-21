@@ -8004,6 +8004,433 @@ def s28_bookshelf(d) -> bool:
     return ok
 
 
+# ============================ s29：M5 10/10 第二批（F3 渐隐 / F4 卡片信息 / F5 目录任务条）============================
+# 通道：整库备份 → 播种（首本书：8 个长自定义标签 + 阅读进度 + 有更新；8 个长名分组并挂到该书）
+#       + prefs 直改（网格布局/书名/进度/未读角标/选中分组/顶栏风格）→ 两轮启动量测 → 整库 + prefs 回推
+
+S29_SRC_TAGBAR = "app/src/main/java/io/legado/app/ui/widget/RoundedTagBarView.kt"
+S29_SRC_TOPBAR = "app/src/main/java/io/legado/app/ui/widget/MainTopBarView.kt"
+S29_SRC_SCREEN = "app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfScreen.kt"
+S29_SRC_BASE = "app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt"
+S29_SRC_FRAG1 = "app/src/main/java/io/legado/app/ui/main/bookshelf/style1/BookshelfFragment1.kt"
+S29_SRC_VM = "app/src/main/java/io/legado/app/ui/main/MainViewModel.kt"
+
+# 长文案（单个 chip 宽于整条标签栏 ⇒ 必然横向溢出，且渐隐带内必然有文字可供量测）；
+# BookTagHelper.splitter = [,，;；、|/\s]+ ⇒ 标签/分组名禁空格与斜杠
+S29_TAG_BASE = "书架自定义标签样例文本用于验证横向溢出渐隐效果"
+S29_GROUP_BASE = "分组样例名称用于验证横向溢出渐隐效果"
+S29_TAGS = [f"{S29_TAG_BASE}{i}" for i in range(1, 9)]
+S29_GROUPS = [f"{S29_GROUP_BASE}{i}" for i in range(1, 9)]
+
+S29_BADGE = "更新 99+ 章"          # F4 角标（hasNew + 未读 187 章 ⇒ 计数折叠 99+）
+S29_PROGRESS_ROW = "% · 第13章"     # F4 卡下第二行（12/(200-1)≈6% ⇒ 「6% · 第13章」）
+S29_CONTINUE = "继续阅读《"          # F4 续读条（网格布局下方）
+S29_UPDATING = "正在更新"            # F5 进行中
+S29_DONE_PREFIX = "已更新，"          # F5 完成（有新章）
+S29_DONE_NONE = "目录已更新"          # F5 完成（无新章）
+S29_CANCEL = "取消"                 # 任务条取消动作
+S29_CANCELLED = "已取消（"            # F5 取消结果回执
+S29_MORE_DESC = "菜单"              # 书架顶栏「更多」（程序化创建无 id ⇒ 只能按 content-desc 定位）
+S29_UPDATE_TOC = "更新目录"
+
+
+def _s29_write_prefs(text: str) -> bool:
+    """prefs 直写（应用需已停）；用于播种与回推原文（`_prefs_edit` 的备份会自覆盖，不可用于还原）"""
+    if not text.strip():
+        return False
+    subprocess.run([ADB, "-s", HOST, "shell", f"su -c 'cat > {DEFAULT_PREFS}'"],
+                   input=text.encode("utf-8"), capture_output=True, timeout=40)
+    time.sleep(0.4)
+    back = (sh_su(f"cat {DEFAULT_PREFS}").stdout or b"").decode("utf-8", "ignore")
+    return text.strip()[:80] in back
+
+
+def _s29_mutate_prefs(text: str, style: str) -> str:
+    """播种书架渲染所需 prefs（逐键先删后插，幂等）"""
+    repl = {
+        "bookshelfLayout": ("int", "2"),             # 网格二列（F4 卡下第二行只在网格生效）
+        "showBooknameLayout": ("int", "1"),          # 显示书名（第二行挂在其下）
+        "showBookshelfReadProgress": ("boolean", "true"),
+        "showUnread": ("boolean", "true"),
+        "saveTabPosition": ("int", "0"),             # 选中首组（已置首的「全部」）
+        "bookshelfShowBooknameMigrated": ("boolean", "true"),
+        "bookGroupStyle": ("int", "0"),              # style1（分组胶囊行所在风格页）
+        "defaultTopBarStyle": ("string", style),     # default / regular
+        "topBarPackageDay": ("string", "default"),   # 保证走默认顶栏包（否则 style 键被忽略）
+        "topBarPackageNight": ("string", "default"),
+    }
+    for k, (typ, v) in repl.items():
+        text = re.sub(r'\s*<%s name="%s"[^>]*/>' % (typ, k), "", text)
+        text = re.sub(r'\s*<%s name="%s">.*?</%s>' % (typ, k, typ), "", text, flags=re.S)
+        # ⚠️ int/boolean 必须写入 value 属性（`<int name="x">2</int>` 会被 SharedPreferences 解析丢弃）
+        ins = (f'<string name="{k}">{v}</string>' if typ == "string"
+               else f'<{typ} name="{k}" value="{v}" />')
+        text = text.replace("</map>", ins + "\n</map>")
+    return text
+
+
+def _s29_seed_groups(db: Path) -> int:
+    """播 8 个长名分组（单 bit groupId，show=1，order 排到最后）+「全部」置首（选中可预测）"""
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("update book_groups set `order`=-1000 where groupId=-1")
+        base = (con.execute("select ifnull(max(`order`),0) from book_groups").fetchone()[0] or 0) + 10
+        bits = 0
+        for i, name in enumerate(S29_GROUPS):
+            gid = 1 << (i + 1)
+            bits |= gid
+            con.execute(
+                "insert or replace into book_groups(groupId, groupName, cover, `order`, "
+                "enableRefresh, show, bookSort, onlyUpdateRead) values(?,?,null,?,1,1,-1,0)",
+                (gid, name, base + i),
+            )
+        con.commit()
+        return bits
+    finally:
+        con.close()
+
+
+def _s29_seed_book(db: Path, tag_text: str, group_bits: int):
+    """首本书播种：自定义标签（F3 标签行溢出）+ 阅读进度与更新态（F4 三项判据）。
+    返回书名（仅用于断言匹配，禁止外显）。"""
+    con = sqlite3.connect(str(db))
+    try:
+        row = con.execute("select bookUrl, name, `group` from books limit 1").fetchone()
+        if row is None:
+            return None
+        book_url, name, grp = row
+        now = int(time.time() * 1000)
+        con.execute(
+            "update books set customTag=?, durChapterIndex=12, durChapterPos=1, totalChapterNum=200, "
+            "durChapterTime=?, latestChapterTime=?, durChapterTitle=?, latestChapterTitle=?, `group`=?, "
+            # 非本地 + 可更新（upToc 会话开启前置：books.filter{ !isLocal && canUpdate }）；
+            # type & 255 去掉 local(256)/archive(512)/notShelf(1024) 并置 text(8) 位
+            "type=(type & 255) | 8, canUpdate=1 "
+            "where bookUrl=?",
+            (tag_text, now - 86400000, now, "第十二章测试", "第二百章测试",
+             int(grp or 0) | group_bits, book_url),
+        )
+        con.commit()
+        return name
+    finally:
+        con.close()
+
+
+def _s29_nodes(xml: str, prefix: str):
+    """取 text 以 prefix 开头的节点完整 bounds（text_nodes 只回 top/left，像素量测需要 bottom/right）"""
+    out = []
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        t = re.search(r'\btext="([^"]*)"', tag)
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not (t and b and t.group(1).startswith(prefix)):
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        out.append((t.group(1), x1, y1, x2, y2))
+    return out
+
+
+def _s29_zone_profile(img, band, x0: int, x1: int):
+    """区间 [x0,x1) 逐列取行带均值亮度；返回 (前1/3均值, 后1/3均值, 区间极差)。
+    渐隐 ⇒ 越靠边越被底色同化 ⇒ 后 1/3 与前 1/3 出现偏移；无内容时极差小（该区间无字形）。"""
+    top, bottom = band
+    cols = []
+    for x in range(x0, x1):
+        if x < 0 or x >= img.size[0]:
+            continue
+        s = 0
+        for y in range(top, bottom):
+            s += img.getpixel((x, y))
+        cols.append(s / (bottom - top))
+    if len(cols) < 6:
+        return None
+    k = max(1, len(cols) // 3)
+    inner = sum(cols[:k]) / k
+    outer = sum(cols[-k:]) / k
+    return round(inner, 1), round(outer, 1), round(max(cols) - min(cols), 1)
+
+
+def _s29_fade_metrics(png: Path, band, edge_x: int, zone_px: int, left_x: int):
+    """右缘渐隐量测（**差动口径**）：`delta_r` = 右侧渐隐带内 后1/3 - 前1/3 亮度；
+    `delta_l` = 左侧同宽对照带（静止态无左渐隐，`canScrollHorizontally(-1)=false`）的同口径差。
+    差动可排除"字形恰落在某侧"造成的假信号：真渐隐 ⇒ delta_r 显著且明显大于 delta_l。"""
+    from PIL import Image
+    if not band or not png.exists():
+        return None
+    img = Image.open(png).convert("L")
+    top, bottom = max(0, band[0]), band[1]
+    if bottom <= top:
+        return None
+    r = _s29_zone_profile(img, (top, bottom), max(0, edge_x - zone_px), edge_x)
+    l = _s29_zone_profile(img, (top, bottom), left_x, left_x + zone_px)
+    if not r or not l:
+        return None
+    return {"delta_r": round(r[1] - r[0], 1), "spread_r": r[2],
+            "delta_l": round(l[1] - l[0], 1), "spread_l": l[2]}
+
+
+def _s29_fade_ok(m) -> bool:
+    """渐隐成立：右侧带内确有内容（极差） + 右缘偏移显著 + 显著大于左侧对照"""
+    return bool(m and m["spread_r"] >= 20 and m["delta_r"] >= 8
+                and (m["delta_r"] - m["delta_l"]) >= 8)
+
+
+def _s29_density() -> float:
+    # ⚠️ `sh()` 内部已补 `shell` ⇒ 传 "shell" 会变成 `adb shell shell wm density`（空输出）⇒ 误落默认 2.0
+    out = (sh("wm", "density").stdout or b"").decode("utf-8", "ignore")
+    m = re.search(r"(\d+)", out)
+    return (int(m.group(1)) / 160.0) if m else 1.5
+
+
+def _s29_wait_ready(d, marker: str, timeout: float = 36.0) -> str:
+    """等待书架**加载完成**：判据 = 播种标记（标签名/分组名）出现在 dump 里。
+    仅判顶栏「更多」不够——骨架屏（ShelfGridSkeleton）阶段顶栏与底栏已渲染，但列表未落数据
+    （实测只有 4 个文本节点；全网标签行也只有「全部」一个 chip）。"""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if marker in xml and S29_MORE_DESC in xml:
+            return xml
+        time.sleep(1.2)
+    return xml
+
+
+def _s29_band(nodes):
+    return (min(n[2] for n in nodes), max(n[4] for n in nodes)) if nodes else None
+
+
+def _s29_right(nodes) -> int:
+    return max(n[3] for n in nodes) if nodes else 0
+
+
+def _s29_clip_edge(w: int, dens: float, regular: bool) -> int:
+    """标签行的内容裁剪边：页面 16dp + 栏内 3dp；regular 风格 primaryBar 右侧还有「筛选」折叠键 36dp + 6dp 间距"""
+    return w - int(round(dens * (58 if regular else 19)))
+
+
+def _s29_shot(d, name: str, tries: int = 5):
+    """截图并校验非全黑（实测：dump 有节点≠已出帧，直接截图会得到全黑图 ⇒ 像素量测恒 0）
+    返回截图路径（末次仍为黑屏也返回，交由量测侧判失败并留证）。"""
+    from PIL import Image
+    png = Path(ca.OUT_DIR) / f"{name}.png"
+    for _ in range(tries):
+        ca.shot(d, name)
+        if png.exists():
+            try:
+                im = Image.open(png).convert("L")
+                if max(im.getdata()) > 10:
+                    return png
+            except Exception:
+                pass
+        time.sleep(1.5)
+    return png
+
+
+def s29_bookshelf_batch2(d) -> bool:
+    """M5 10/10 第二批：F3 溢出渐隐 / F4 角标·卡下进度·续读条 / F5 更新目录任务条"""
+    print("  [s29] ===== 书架批次二：渐隐提示 + 卡片信息 + 目录任务条 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s29_"))
+    reset_app()
+    ok = False
+    backup = None
+    prefs_orig = None
+    m2 = _m2()
+    try:
+        # ---------- 播种：整库（分组 + 首本书状态）+ prefs ----------
+        db = m2._db_pull(workdir)
+        if db is None:
+            raise RuntimeError("db pull 失败")
+        backup = workdir / "s29_backup.db"
+        backup.write_bytes(db.read_bytes())
+        prefs_orig = (sh_su(f"cat {DEFAULT_PREFS}").stdout or b"").decode("utf-8", "ignore")
+        bits = _s29_seed_groups(db)
+        book_name = _s29_seed_book(db, ",".join(S29_TAGS), bits)
+        pushed = m2._db_push(db)
+        seeded = _s29_write_prefs(_s29_mutate_prefs(prefs_orig, "default"))
+        print(f"  [s29] 播种 库回推={pushed} prefs={seeded} 标签={len(S29_TAGS)} 分组={len(S29_GROUPS)} "
+              f"书名非空={bool(book_name)} 书名字数={len(book_name or '')}")
+        if not (pushed and seeded and book_name):
+            raise RuntimeError("播种失败")
+
+        dens = _s29_density()
+        w, _h = d.window_size()
+        zone = int(round(30 * dens))   # F3 渐隐带宽 30dp
+
+        # ---------- A：默认顶栏风格 · 网格布局（F3 标签行渐隐 + F4 三项） ----------
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        xml_a = _s29_wait_ready(d, S29_TAG_BASE)
+        png_a = _s29_shot(d, "m5s29_grid_info")
+        edge_a = _s29_clip_edge(w, dens, regular=False)     # 标签行（无折叠键）
+        tag_nodes = _s29_nodes(xml_a, S29_TAG_BASE)
+        right_a = _s29_right(tag_nodes)
+        edge_a_use = min(edge_a, right_a) if right_a else edge_a
+        left_x = int(round(dens * 19))                       # 标签行内容左边（页面 16dp + 栏内 3dp）
+        m_a = _s29_fade_metrics(png_a, _s29_band(tag_nodes), edge_a_use, zone, left_x)
+        fade_a = _s29_fade_ok(m_a)
+        print(f"  [s29] A1 标签行 chip={len(tag_nodes)} 裁剪边x={edge_a}(实测右界={right_a}) 带宽={zone}px "
+              f"量测={m_a} 渐隐={fade_a}")
+        # 诊断：顶栏风格 + 标签行内节点（定位真实行带与渐隐带内是否有内容）
+        print(f"  [s29] A0 顶栏风格 regular(折叠键「筛选」在场)={'筛选' in xml_a}")
+        if tag_nodes:
+            ylo_a, yhi_a = _s29_band(tag_nodes)[0] - 6, _s29_band(tag_nodes)[1] + 6
+            row_a = [(len(t), (a, b, c, d)) for t, a, b, c, d in _s29_nodes(xml_a, "")
+                     if b < yhi_a and d > ylo_a]
+            print(f"  [s29] A1 行带={ylo_a}-{yhi_a} 带内节点（字数,bounds）={row_a}")
+        badge_ok = S29_BADGE in xml_a
+        prog_ok = S29_PROGRESS_ROW in xml_a
+        cont_ok = S29_CONTINUE in xml_a and (book_name or "")[:6] in xml_a
+        print(f"  [s29] A2 角标「更新 N 章」={badge_ok} 卡下进度章节行={prog_ok} 续读条={cont_ok}")
+        if not (badge_ok and prog_ok and cont_ok):
+            # 诊断只输出结构计数（不回显业务文本）
+            labels = [lab for lab, *_ in text_nodes(xml_a)]
+            print(f"  [s29] A2 诊断 文本节点={len(labels)} 以「更新」开头="
+                  f"{sum(1 for x in labels if x.startswith('更新'))} 含「· 第」="
+                  f"{sum(1 for x in labels if '· 第' in x)} 含「继续阅读」="
+                  f"{sum(1 for x in labels if x.startswith('继续阅读'))}")
+
+        # ---------- C：F5 更新目录任务条（进行中·取消回执 / 完成回执） ----------
+        mb = node_bounds(xml_a, S29_MORE_DESC) or node_bounds(xml_a, "更多菜单", contains=True)
+        task_running = task_done = cancel_ok = False
+        if mb:
+            click_xy(d, mb["cx"], mb["cy"])
+            time.sleep(1.4)
+            xml_menu = dump_xml(d)
+            labs_menu = [lab for lab, *_ in text_nodes(xml_menu)]
+            if not any(v.startswith(S29_UPDATE_TOC[:3]) for v in labs_menu):
+                # 真机 tap 偶发不生效（实测同一坐标时开时不开）⇒ 重试并把每次结果留痕
+                for i in range(3):
+                    b2 = node_bounds(dump_xml(d), S29_MORE_DESC)
+                    if not b2:
+                        break
+                    click_xy(d, b2["cx"], b2["cy"])
+                    time.sleep(1.6)
+                    xml_menu = dump_xml(d)
+                    labs_menu = [lab for lab, *_ in text_nodes(xml_menu)]
+                    hit = any(v.startswith(S29_UPDATE_TOC[:3]) for v in labs_menu)
+                    print(f"  [s29] C 开菜单重试#{i + 1} 节点={len(labs_menu)} 命中={hit}")
+                    if hit:
+                        break
+            _s29_shot(d, "m5s29_menu_open")
+            print(f"  [s29] C 菜单后 节点={len(labs_menu)} 菜单项命中="
+                  f"{sum(1 for x in labs_menu if x.startswith(S29_UPDATE_TOC[:3]))} 更多键={bool(mb)}")
+            if tap_text(d, S29_UPDATE_TOC, timeout=4):
+                for _ in range(10):
+                    x = dump_xml(d)
+                    if S29_UPDATING in x:
+                        task_running = True
+                        ca.shot(d, "m5s29_task_running")
+                        break
+                    if S29_DONE_PREFIX in x or S29_DONE_NONE in x:
+                        task_done = True
+                        break
+                    time.sleep(0.3)
+                if task_running and tap_text(d, S29_CANCEL, timeout=2):
+                    t1 = time.time()
+                    while time.time() - t1 < 6:
+                        if S29_CANCELLED in dump_xml(d):
+                            cancel_ok = True
+                            break
+                        time.sleep(0.3)
+                    ca.shot(d, "m5s29_task_cancelled")
+                if not (task_running and cancel_ok):
+                    t1 = time.time()
+                    while time.time() - t1 < 8:
+                        x = dump_xml(d)
+                        if S29_DONE_PREFIX in x or S29_DONE_NONE in x:
+                            task_done = True
+                            ca.shot(d, "m5s29_task_done")
+                            break
+                        time.sleep(0.3)
+            else:
+                print("  [s29] C 菜单项「更新目录」未定位")
+            sh("input", "keyevent", "4")
+            time.sleep(0.6)
+        f5_ok = (task_running and cancel_ok) or task_done
+        print(f"  [s29] C 更多键={bool(mb)} 进行中={task_running} 取消回执={cancel_ok} "
+              f"完成回执={task_done} ⇒ F5={f5_ok}")
+
+        # ---------- D：regular 顶栏风格的"分组胶囊行"（F3 蓝图原始落点） ----------
+        reg_seeded = _s29_write_prefs(_s29_mutate_prefs(prefs_orig, "regular"))
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+        xml_b = _s29_wait_ready(d, S29_GROUP_BASE)
+        png_b = _s29_shot(d, "m5s29_group_bar")
+        edge_b = _s29_clip_edge(w, dens, regular=True)      # primaryBar 右侧被「筛选」折叠键占用
+        grp_nodes = _s29_nodes(xml_b, S29_GROUP_BASE)
+        right_b = _s29_right(grp_nodes)
+        edge_b_use = min(edge_b, right_b) if right_b else edge_b
+        m_b = _s29_fade_metrics(png_b, _s29_band(grp_nodes), edge_b_use, zone, left_x)
+        fade_b = _s29_fade_ok(m_b)
+        # 溢出证据：长名分组 chip 的内容右界贴到裁剪边（或已被裁到边）
+        overflow_b = bool(right_b and right_b >= edge_b_use - 2)
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        # 诊断：chip 行内所有文本节点的 bounds（定位真实裁剪边与渐隐带内是否有内容）
+        if grp_nodes:
+            ylo, yhi = _s29_band(grp_nodes)[0] - 6, _s29_band(grp_nodes)[1] + 6
+            row_nodes = [(len(t), (a, b, c, d)) for t, a, b, c, d in _s29_nodes(xml_b, "")
+                         if b < yhi and d > ylo]
+            print(f"  [s29] D 行带={ylo}-{yhi} 带内节点（字数,bounds）={row_nodes}")
+        print(f"  [s29] D 风格播种={reg_seeded} 分组胶囊={len(grp_nodes)} 裁剪边x={edge_b}(实测右界={right_b}) "
+              f"溢出={overflow_b} 量测={m_b} 渐隐={fade_b} 进程存活={proc_alive}")
+
+        # ---------- E：源码断言 ----------
+        src_tag = Path(S29_SRC_TAGBAR).read_text(encoding="utf-8")
+        src_topbar = Path(S29_SRC_TOPBAR).read_text(encoding="utf-8")
+        src_screen = Path(S29_SRC_SCREEN).read_text(encoding="utf-8")
+        src_base = Path(S29_SRC_BASE).read_text(encoding="utf-8")
+        src_frag1 = Path(S29_SRC_FRAG1).read_text(encoding="utf-8")
+        src_vm = Path(S29_SRC_VM).read_text(encoding="utf-8")
+        checks = [
+            ("F3 渐隐为可选扩展（默认关 ⇒ 其他调用点零改动）",
+             "private var overflowFadeEnabled = false" in src_tag
+             and "fun setOverflowFadeEnabled(enabled: Boolean)" in src_tag),
+            ("F3 收敛色取「可见底色」：透明栏底回落顶栏页面底色 + 仅确有溢出时绘制",
+             "Color.alpha(barColor) >= FADE_MIN_BAR_ALPHA -> barColor" in src_tag
+             and "TopBarConfig.resolvePageBarColorWithAlpha(context, config)" in src_tag
+             and "recyclerView.canScrollHorizontally(1)" in src_tag),
+            ("F3 主 Tab 三条标签行均已接线（含分组胶囊行）",
+             "listOf(primaryBar, selectsBar, tagsBar).forEach { it.setOverflowFadeEnabled(true) }"
+             in src_topbar),
+            ("F4 角标文案升级 + 计数折叠（防角标被封面裁切）",
+             "bookshelf_badge_update_chapters" in src_screen and "BADGE_COUNT_CAP" in src_screen),
+            ("F4 卡下第二行按阅读进度开关生效（未开始阅读保留作者行）",
+             "bookshelf_card_progress_chapter" in src_screen
+             and "showReadProgress && progress != null && progress > 0f" in src_screen),
+            ("F4 续读条取最近阅读且已开始的书（纯展示层，无新增数据链路）",
+             "private fun List<Book>.continueReadingBook()" in src_screen
+             and "bookshelf_continue_reading" in src_screen),
+            ("F5 会话仅由用户发起的 upToc 开启 + 结束态保留计数",
+             "_upTocProgress.value?.running != true && books.any { !it.isLocal && it.canUpdate }" in src_vm
+             and "finishUpTocProgress" in src_vm),
+            ("F5 取消语义（停止发起新请求 + 已完成不回滚，对齐 AD-09）",
+             "fun cancelUpToc()" in src_vm
+             and "synchronized(this) { waitUpTocBooks.clear() }" in src_vm),
+            ("F5 页内条接线（可选参数默认 Idle + 两个风格页均接线）",
+             "taskState: InlineTaskState = InlineTaskState.Idle" in src_screen
+             and "taskState = upTocTaskState" in src_frag1
+             and "initUpTocTaskBar" in src_base),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s29] 源码 {nm} = {v}")
+
+        ok = bool(fade_a and badge_ok and prog_ok and cont_ok and f5_ok and fade_b and overflow_b
+                  and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s29] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        if backup:
+            m2._db_push(Path(backup))          # 整库回推（清掉播种的分组/标签/进度）
+        if prefs_orig:
+            _s29_write_prefs(prefs_orig)       # prefs 回推原文
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -8033,6 +8460,7 @@ STEPS = {
     "s26": guarded(s26_video_player),
     "s27": guarded(s27_explore_tab),
     "s28": guarded(s28_bookshelf),
+    "s29": guarded(s29_bookshelf_batch2),
 }
 
 
@@ -8045,7 +8473,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28"]
+                "s27", "s28", "s29"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
