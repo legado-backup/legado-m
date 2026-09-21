@@ -8589,9 +8589,13 @@ def s30_paragraph_rule_edit(d) -> bool:
         src_row = Path(S30_SRC_ROW).read_text(encoding="utf-8")
         src_xml = Path(S30_SRC_XML).read_text(encoding="utf-8")
         checks = [
-            ("F62 旧「一整块 buildString + 确认框」已退役（无 take(4000) 截断）",
+            # ⚠️ 判据修正（2026-09-22，F375）：原判据用「`showComposeConfirmDialog` 不在本文件」
+            # 代理「旧调试确认框已退役」——但本页新增的**退出未保存拦截**（F155 同构）合法使用了
+            # 同一 API ⇒ 该代理失效（撞车）。改为**按用途**判定：调试结果必须走 `ParagraphRuleDebugDialog`，
+            # 且旧的「一整块 buildString + take(4000) 截断」不得残留。
+            ("F62 旧「一整块 buildString + 确认框」已退役（无 take(4000) 截断 / 调试走结构化弹窗）",
              "buildString" not in src_act and ".take(4000)" not in src_act
-             and "showComposeConfirmDialog" not in src_act),
+             and "ParagraphRuleDebugDialog(" in src_act),
             ("F62 调试结果走结构化弹窗（概要 + 日志 + 正文预览三段）",
              "ParagraphRuleDebugDialog(" in src_act
              and "CollapseSectionHeader(" in src_dlg
@@ -10443,6 +10447,118 @@ def s39_book_source_edit_required(d) -> bool:
         time.sleep(0.6)
 
 
+# ============================ s40：段落规则/自定义按键编辑「保存失败定位 + 退出未保存拦截」（F155 同构，2026-09-22）============================
+# 背景：两页共用布局 `activity_paragraph_rule_edit.xml`，原实现均：①保存校验只 `toastOnUi(...)`（不说是哪个字段空）
+#      ②`onBack = { finish() }` 直退（脚本是多行大字段 ⇒ 误触返回**静默丢失**全部输入）。
+# 判据：①源码（每页 5 项：定位件定义+两处调用 / finish 覆盖+动词式按钮 / 错误态撤下且已接线 /
+#         保存后同步内存原值 / 实体 equal 齐备）
+#      ②真机 A：新建态点顶栏「保存」⇒ **仍在本页** + 出现「必填项，不能为空」+ 错误节点 top < 50% 屏高
+#      ③真机 B：在首个字段输入后**再点保存** ⇒ 错误仍在场（校验按字段推进，未因名称已填就误放行）
+#      ④真机 C（退出拦截）：弄脏后 BACK ⇒ 弹「继续编辑 / 放弃修改」⇒ 继续编辑**仍在本页** ⇒ 再 BACK ⇒ 放弃修改**已退出**
+
+S40_PAGES = [
+    ("io.legado.app.ui.book.read.config.ParagraphRuleEditActivity",
+     "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleEditActivity.kt",
+     "app/src/main/java/io/legado/app/data/entities/ParagraphRule.kt", "saved"),
+    ("io.legado.app.ui.book.read.config.ReadMenuCustomButtonEditActivity",
+     "app/src/main/java/io/legado/app/ui/book/read/config/ReadMenuCustomButtonEditActivity.kt",
+     "app/src/main/java/io/legado/app/data/entities/ReadMenuCustomButton.kt", "saved"),
+]
+S40_ERR = "必填项，不能为空"          # R.string.source_required_hint（与书源/订阅源编辑页同源，未新增字符串）
+S40_SAVE = "保存"                     # 顶栏一级动作 contentDescription
+S40_KEEP = "继续编辑"                 # R.string.edit_continue
+S40_DISCARD = "放弃修改"              # R.string.edit_discard
+S40_TYPE = "l2probe"
+
+
+def s40_rule_editor_required_and_exit_guard(d) -> bool:
+    """段落规则 / 自定义按键编辑页：保存失败定位 + 退出未保存拦截"""
+    print("  [s40] ===== 编辑页：保存失败定位 + 退出未保存拦截 =====")
+    try:
+        win_h = d.window_size()[1]
+        results = []
+        for act, src_path, ent_path, sync_marker in S40_PAGES:
+            simple = act.rsplit(".", 1)[-1]
+            reset_app()
+            started = start_robust(act)
+            _wait_marker(d, S40_SAVE, 25)
+
+            # ---- A：空表单点保存 ⇒ 错误落在首个必填字段并滚回可见 ----
+            tapped = tap_text(d, S40_SAVE, timeout=6)
+            err_xml = _wait_marker(d, S40_ERR, 8)
+            err_a = node_bounds(err_xml, S40_ERR, contains=True)
+            stayed_a = simple in current_activity()
+            a_ok = bool(tapped and stayed_a and err_a and err_a["top"] < int(win_h * 0.5))
+            ca.shot(d, f"f155s40_{simple[:12].lower()}_a")
+            print(f"  [s40] {simple} A 保存失败定位: 点保存={tapped} 仍在页={stayed_a} "
+                  f"错误top={err_a['top'] if err_a else -1}(<{int(win_h * 0.5)}) → {'PASS' if a_ok else 'FAIL'}")
+
+            # ---- B：首个字段输入后再保存 ⇒ 错误仍在场（校验推进到脚本字段，未误放行） ----
+            boxes = _s39_field_nodes(dump_xml(d))
+            typed = False
+            if boxes:
+                click_xy(d, boxes[0]["cx"], boxes[0]["cy"])
+                typed = type_unicode(d, S40_TYPE)
+            time.sleep(0.6)
+            tap_text(d, S40_SAVE, timeout=6)
+            err_xml_b = _wait_marker(d, S40_ERR, 8)
+            err_b = node_bounds(err_xml_b, S40_ERR, contains=True)
+            stayed_b = simple in current_activity()
+            b_ok = bool(typed and err_b and stayed_b)
+            print(f"  [s40] {simple} B 校验推进: 输入={typed} 错误仍在场={bool(err_b)} "
+                  f"仍在页={stayed_b} → {'PASS' if b_ok else 'FAIL'}")
+
+            # ---- C：退出未保存拦截（弄脏后 BACK） ----
+            d.press("back")
+            dlg = _s31_wait_any(d, (S40_KEEP, S40_DISCARD), 10)
+            dlg_ok = S40_KEEP in dlg and S40_DISCARD in dlg
+            ca.shot(d, f"f155s40_{simple[:12].lower()}_c")
+            if tap_text(d, S40_KEEP, timeout=4):
+                time.sleep(1.0)
+            keep_ok = simple in current_activity()
+            d.press("back")
+            _s31_wait_any(d, (S40_KEEP, S40_DISCARD), 10)
+            if tap_text(d, S40_DISCARD, timeout=4):
+                time.sleep(1.5)
+            discard_ok = simple not in current_activity()
+            c_ok = bool(dlg_ok and keep_ok and discard_ok)
+            print(f"  [s40] {simple} C 退出拦截: 弹窗={dlg_ok} 继续编辑仍在本页={keep_ok} "
+                  f"放弃修改已退出={discard_ok} → {'PASS' if c_ok else 'FAIL'}")
+
+            # ---- 源码断言（每页 5 项） ----
+            t = Path(src_path).read_text(encoding="utf-8")
+            ent = Path(ent_path).read_text(encoding="utf-8")
+            src = {
+                "定位件定义+两处调用": ("private fun locateRequiredField(" in t
+                                 and 'locateRequiredField("name")' in t
+                                 and 'locateRequiredField("script")' in t),
+                "finish 覆盖+动词式按钮": ("override fun finish()" in t
+                                  and "R.string.edit_continue" in t
+                                  and "R.string.edit_discard" in t),
+                "错误态撤下已接线": ("private fun bindRequiredErrorClear(" in t
+                             and "bindRequiredErrorClear()" in t),
+                "保存后同步内存原值": f"= {sync_marker}" in t,
+                "DB 基线分离(粘贴不移动基线)": ("private var dbSnapshot" in t
+                                    and "dbSnapshot = " in t
+                                    and "equal(dbSnapshot)" in t),
+                "实体 equal 齐备": "fun equal(" in ent,
+            }
+            for k, v in src.items():
+                print(f"  [s40] {simple} 源码 {k} = {v}")
+            results.append(bool(a_ok and b_ok and c_ok and all(src.values())))
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = all(results) and alive
+        print(f"  [s40] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} 进程存活={alive}")
+        return ok
+    except Exception as e:
+        print(f"  [s40] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        time.sleep(0.6)
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10483,6 +10599,7 @@ STEPS = {
     "s37": guarded(s37_c6_fix_verify),
     "s38": guarded(s38_compose_shell_merge),
     "s39": guarded(s39_book_source_edit_required),
+    "s40": guarded(s40_rule_editor_required_and_exit_guard),
 }
 
 
@@ -10495,7 +10612,8 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39",
+                "s40"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
