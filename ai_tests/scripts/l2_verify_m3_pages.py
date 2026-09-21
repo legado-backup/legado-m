@@ -7101,9 +7101,10 @@ S23_SRC_SELBAR = "app/src/main/java/io/legado/app/ui/widget/SelectActionBar.kt"
 S23_SRC_POPUP = "app/src/main/java/io/legado/app/ui/widget/ModernActionPopup.kt"
 
 
-def _s23_seed(workdir: Path) -> bool:
-    """自建 2 本书（**不依赖既有行**）：按 `pragma table_info(books)` 给「NOT NULL 且无默认值」的列按类型补值，
-    其余列一律省略以吃表默认值/接受 NULL。列名统一加反引号（`group` 是保留字）。"""
+def _books_upsert(workdir: Path, rows: list) -> bool:
+    """通用书目播种（M5 s23/s24 共用）：按 `pragma table_info(books)` 给「NOT NULL 且无默认值」的列
+    按类型补值，其余列一律省略（吃表默认值 / 接受 NULL）；列名统一加反引号（`group` 是保留字）。
+    ⇒ 不依赖「库内已有行可克隆」（早期 `select * limit 1` 在空库上直接失败）。"""
     m2 = _m2()
     db = m2._db_pull(workdir)
     if db is None:
@@ -7113,13 +7114,7 @@ def _s23_seed(workdir: Path) -> bool:
         cols = con.execute("pragma table_info(books)").fetchall()  # (cid,name,type,notnull,dflt,pk)
         if not cols:
             return False
-
-        def build(book_url: str, name: str, order: int):
-            explicit = {
-                "bookUrl": book_url, "name": name, "author": "L2", "origin": "l2seed://shelf",
-                "originName": "L2校验源", "type": 8, "group": 0, "order": order,
-                "latestChapterTitle": "第1章", "totalChapterNum": 1,
-            }
+        for explicit in rows:
             row = dict(explicit)
             for _cid, cname, ctype, notnull, dflt, pk in cols:
                 if cname in row or pk:
@@ -7134,13 +7129,6 @@ def _s23_seed(workdir: Path) -> bool:
                         row[cname] = b""
                     else:
                         row[cname] = ""
-            return row
-
-        for url, name, order in (
-            ("l2seed://shelf/a", S23_BOOK_A, 0),
-            ("l2seed://shelf/b", S23_BOOK_B, 1),
-        ):
-            row = build(url, name, order)
             keys = list(row.keys())
             con.execute(
                 f"insert or replace into books ({','.join('`' + k + '`' for k in keys)})"
@@ -7151,6 +7139,22 @@ def _s23_seed(workdir: Path) -> bool:
     finally:
         con.close()
     return m2._db_push(db)
+
+
+def _s23_seed(workdir: Path) -> bool:
+    """本页用 2 本书（order 0/1）——行可见性判据只看行数，故仅需存在且有基本字段"""
+    return _books_upsert(workdir, [
+        {
+            "bookUrl": "l2seed://shelf/a", "name": S23_BOOK_A, "author": "L2",
+            "origin": "l2seed://shelf", "originName": "L2校验源", "type": 8,
+            "group": 0, "order": 0, "latestChapterTitle": "第1章", "totalChapterNum": 1,
+        },
+        {
+            "bookUrl": "l2seed://shelf/b", "name": S23_BOOK_B, "author": "L2",
+            "origin": "l2seed://shelf", "originName": "L2校验源", "type": 8,
+            "group": 0, "order": 1, "latestChapterTitle": "第1章", "totalChapterNum": 1,
+        },
+    ])
 
 
 def _s23_set_sort(workdir: Path, value: int) -> bool:
@@ -7277,6 +7281,166 @@ def s23_bookshelf_manage(d) -> bool:
     return ok
 
 
+# ============================ M5 s24：书籍信息（F56 简介折叠 / F57 追更直达 / 弹窗族收口） ============================
+
+ACT_BOOK_INFO = "io.legado.app.ui.book.info.BookInfoComposeActivity"
+S24_BOOK_URL = "l2seed://info/a"
+S24_BOOK_NAME = "L2信息页样本"
+S24_ORIGIN = "l2seed://info"
+S24_ORIGIN_NAME = "L2校验源"
+S24_INTRO = "L2 长简介占位段落，用于触发折叠。" * 12
+S24_LATEST = "第100章 大结局"
+S24_EXPAND = "展开全文 ▾"        # book_info_intro_expand
+S24_COLLAPSE = "收起 ▴"          # book_info_intro_collapse
+S24_NEW_BADGE = "新 20 章"       # book_info_new_chapters_badge（100 章 - 1 - 已读 79 = 20）
+S24_DEL_TITLE = "是否确认删除？"  # sure_del
+S24_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/info/BookInfoComposeActivity.kt"
+S24_SRC_CONFIRM = "app/src/main/java/io/legado/app/ui/widget/compose/AppComposeDialogs.kt"
+
+
+def _chapters_upsert(workdir: Path, book_url: str, titles: list) -> bool:
+    """章节目录播种（M5 s24 用）：F57「新 N 章」徽标依赖 `chapterCount`（**来自 chapters 表**，
+    不是 book.totalChapterNum）⇒ 不播章节就永远算不出新章数。同样按 pragma 补 NOT NULL 列。"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("delete from chapters where bookUrl = ?", (book_url,))
+        cols = con.execute("pragma table_info(chapters)").fetchall()
+        if not cols:
+            return False
+        for index, title in enumerate(titles):
+            row = {"url": f"{book_url}/{index}", "title": title, "bookUrl": book_url,
+                   "index": index, "isVolume": 0, "isVip": 0, "isPay": 0}
+            for _cid, cname, ctype, notnull, dflt, pk in cols:
+                if cname in row or pk:
+                    continue
+                if notnull and dflt is None:
+                    up = (ctype or "").upper()
+                    row[cname] = 0 if "INT" in up else ""
+            keys = list(row.keys())
+            con.execute(
+                f"insert or replace into chapters ({','.join('`' + k + '`' for k in keys)})"
+                f" values ({','.join('?' * len(keys))})",
+                [row[k] for k in keys]
+            )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s24_seed(workdir: Path) -> bool:
+    """一本「可追更的已读中」样本：100 章（**章节目录必须真播**）/ 已读至第 80 章（index 79）/ 有长简介"""
+    if not _books_upsert(workdir, [{
+        "bookUrl": S24_BOOK_URL, "name": S24_BOOK_NAME, "author": "L2作者",
+        "origin": S24_ORIGIN, "originName": S24_ORIGIN_NAME, "type": 8,
+        "group": 0, "order": 0, "intro": S24_INTRO,
+        # ⚠️ tocUrl 必须非空：`BookInfoViewModel.upBook` 在 `tocUrl.isEmpty() && !isLocal` 时走
+        # **联网取目录**（本机无书源 ⇒ 目录恒空、F57 徽标恒不出现），非空才读 `bookChapterDao` 的库内目录
+        "tocUrl": "l2seed://info/toc",
+        "latestChapterTitle": S24_LATEST, "totalChapterNum": 100,
+        "durChapterIndex": 79, "durChapterTitle": "第80章 中段", "durChapterPos": 0,
+        "durChapterTime": int(time.time() * 1000),
+    }]):
+        return False
+    titles = [f"第{i + 1}章" for i in range(100)]
+    titles[79] = "第80章 中段"
+    titles[99] = S24_LATEST
+    return _chapters_upsert(workdir, S24_BOOK_URL, titles)
+
+
+def _s24_proc_alive() -> bool:
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def s24_book_info(d) -> bool:
+    """M5：book/info（F56 简介折叠/展开 · F57 最新章可点 + 新 N 章徽标 · 弹窗族收口：删除确认走共享确认框）"""
+    print("  [s24] ===== 书籍信息 简介折叠 + 追更直达 + 删除确认 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s24_"))
+    reset_app()
+    ok = False
+    try:
+        if not _s24_seed(workdir):
+            print("  [s24] 书目播种失败")
+            return False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_BOOK_INFO}",
+           "--es", "name", S24_BOOK_NAME, "--es", "author", "L2作者",
+           "--es", "bookUrl", S24_BOOK_URL, "--es", "origin", S24_ORIGIN,
+           "--es", "originName", S24_ORIGIN_NAME)
+        time.sleep(3.5)
+        landed = "BookInfoComposeActivity" in current_activity()
+        proc_alive = _s24_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s24_book_info")
+        page_ok = S24_BOOK_NAME in xml
+        # F56：长简介默认折叠 ⇒ 出现「展开全文」
+        collapsed = S24_EXPAND in xml
+        print(f"  [s24] A 落地={landed} 进程存活={proc_alive} 书名在场={page_ok} 简介折叠={collapsed}")
+        if not page_ok:
+            print(f"  [s24] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # F57：最新章标题 + 「新 20 章」徽标（100 - 1 - 79）
+        latest_ok = S24_LATEST in xml
+        badge_ok = S24_NEW_BADGE in xml
+        print(f"  [s24] B 最新章标题={latest_ok} 新章徽标={badge_ok}")
+
+        # F56 交互：点「展开全文」⇒ 出现「收起」
+        expand_ok = False
+        eb = node_bounds(xml, S24_EXPAND, contains=True)
+        if eb:
+            click_xy(d, eb["cx"], eb["cy"])
+            time.sleep(1.5)
+            xml_b = dump_xml(d)
+            ca.shot(d, "m5s24_intro_expanded")
+            expand_ok = (S24_COLLAPSE in xml_b)
+        print(f"  [s24] C 展开键定位={bool(eb)} 展开后出现收起={expand_ok}")
+
+        # 弹窗族收口：删除书籍确认改走共享确认框（文案不变），点开即验、BACK 取消不落盘
+        del_shown = False
+        db = node_bounds(xml_b, "删除书籍", contains=True)
+        if db:
+            click_xy(d, db["cx"], db["cy"])
+            time.sleep(1.5)
+            xml_c = dump_xml(d)
+            ca.shot(d, "m5s24_delete_confirm")
+            del_shown = S24_DEL_TITLE in xml_c
+            sh("input", "keyevent", "4")
+            time.sleep(1.2)
+        print(f"  [s24] D 删除键定位={bool(db)} 确认框出现={del_shown}")
+
+        # 源码断言（弹窗族收口：Compose 页不再有弹框 DSL；共享确认框支持可选勾选项）
+        src_act = Path(S24_SRC_ACT).read_text(encoding="utf-8")
+        src_confirm = Path(S24_SRC_CONFIRM).read_text(encoding="utf-8")
+        checks = [
+            ("Compose 页删除确认走共享确认框（含可选勾选项）",
+             "showComposeConfirmDialog(" in src_act and "checkboxLabel" in src_act),
+            ("Compose 页已无弹框 DSL 残留",
+             ("alert(" not in src_act) and ("AlertDialog" not in src_act)),
+            ("确认框组件支持 header 无关的可选勾选项",
+             "ARG_CHECKBOX_LABEL" in src_confirm and "checkboxLabel: String? = null" in src_confirm),
+            ("既有调用点零改动（默认不渲染勾选项）",
+             "checkboxLabel: CharSequence? = null" in
+             Path("app/src/main/java/io/legado/app/ui/widget/compose/ComposeDialogAdapters.kt")
+             .read_text(encoding="utf-8")),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s24] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and page_ok and collapsed and latest_ok and badge_ok
+                  and expand_ok and del_shown and src_ok)
+    except Exception as e:
+        print(f"  [s24] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7301,6 +7465,7 @@ STEPS = {
     "s21": guarded(s21_ai_chat),
     "s22": guarded(s22_code_edit),
     "s23": guarded(s23_bookshelf_manage),
+    "s24": guarded(s24_book_info),
 }
 
 
@@ -7312,7 +7477,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
