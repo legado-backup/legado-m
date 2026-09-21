@@ -8453,6 +8453,9 @@ S30_CHIPS = ["短行合并", "去广告行", "缩进清理", "空模板骨架"]
 S30_CHIP_MERGE = S30_CHIPS[0]      # 点按注入用（短行合并模板）
 S30_SCRIPT_MARK = "MIN_LEN"        # 短行合并模板独有 token（判"已注入"，不看整段文本）
 S30_DEBUG_DESC = "调试"             # 顶栏 action contentDescription（MenuActionIcon 取 action.title）
+# 顶栏动作分级（2026-09-22）：一级图标只留核心工作流，其余下沉溢出菜单
+S30_TOP_PRIMARY = ["编辑内容", "保存", "调试"]        # alwaysShow=true
+S30_TOP_SUNK = ["拷贝规则", "粘贴规则", "帮助"]        # 已下沉 ⇒ 溢出菜单未展开时不在 dump 中
 S30_STATUS_OK = "处理成功"
 S30_STATUS_FAIL = "处理失败"
 S30_PARAS = "段落数"
@@ -8579,8 +8582,14 @@ def s30_paragraph_rule_edit(d) -> bool:
             else:
                 print("  [s30] B 章节选择弹窗未定位")
         proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        # 顶栏动作分级（2026-09-22）：一级 = 编辑内容 / 保存 / 调试；拷贝/粘贴/帮助已下沉 ⇒
+        # 溢出菜单未展开时这三项不应出现在 dump 中（`node_bounds` 精确匹配 text / content-desc）
+        top_primary = [k for k in S30_TOP_PRIMARY if node_bounds(xml_b, k)]
+        top_sunk = [k for k in S30_TOP_SUNK if node_bounds(xml_b, k)]
+        grading_ok = len(top_primary) == len(S30_TOP_PRIMARY) and not top_sunk
         print(f"  [s30] B 阅读页直起={read_ok} 调试键定位={bool(dbg)} 弹窗={dialog_ok} 状态行={status_ok} "
-              f"三段命中={metric_hits}/3 前→后指标={arrow_ok} 进程存活={proc_alive}")
+              f"三段命中={metric_hits}/3 前→后指标={arrow_ok} 顶栏一级={top_primary} "
+              f"已下沉残留={top_sunk} 分级正确={grading_ok} 进程存活={proc_alive}")
 
         # ---------- C：源码断言 ----------
         src_act = Path(S30_SRC_ACT).read_text(encoding="utf-8")
@@ -8616,13 +8625,17 @@ def s30_paragraph_rule_edit(d) -> bool:
              and src_act.count("function process(ctx)") >= 4),
             ("F63 共享件只做可选扩展（不新造胶囊视觉，复用 AppFilterChip）",
              "fun EmptyFieldTemplateRow(" in src_row and "AppFilterChip(" in src_row),
+            # 2026-09-22 顶栏动作分级（登记 F376）
+            ("顶栏动作分级：一级图标只留「编辑内容 / 保存 / 调试」共 3 个 alwaysShow",
+             src_act.count("alwaysShow = true") == 3),
         ]
         src_ok = all(v for _, v in checks)
         for nm, v in checks:
             print(f"  [s30] 源码 {nm} = {v}")
 
         ok = bool(seeded and title_ok and chip_hits >= 4 and injected and chips_gone
-                  and dialog_ok and status_ok and metric_hits >= 3 and arrow_ok and proc_alive and src_ok)
+                  and dialog_ok and status_ok and metric_hits >= 3 and arrow_ok and grading_ok
+                  and proc_alive and src_ok)
     except Exception as e:
         print(f"  [s30] 异常终止: {type(e).__name__}: {e}")
     finally:
@@ -8652,6 +8665,7 @@ S31_SCRIPT = 'function run(){ return "%s"; }' % S31_PROBE
 S31_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/read/config/ReadMenuCustomButtonEditActivity.kt"
 S31_SRC_XML = "app/src/main/res/layout/activity_paragraph_rule_edit.xml"
 S31_SRC_PARA = "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleEditActivity.kt"
+S31_SRC_MENU = "app/src/main/java/io/legado/app/ui/widget/components/AppDropdownMenu.kt"
 
 S31_ADV_HEADER = "登录与高级配置"   # F345 组头标题
 S31_COOKIE_LABEL = "CookieJar"      # 高级组内的复选行（可见性/勾选态的判据节点）
@@ -8660,11 +8674,38 @@ S31_STATUS_OK = "运行成功"
 S31_STATUS_FAIL = "运行失败"
 S31_RETURN_TYPE = "返回类型"
 S31_DIFF_MARK = "CookieJar："       # F344 字段级 before→after 摘要行
-S31_COPY_DESC = "拷贝规则"          # 顶栏 action contentDescription（R.string.copy_rule）
-S31_PASTE_DESC = "粘贴规则"
+S31_COPY_DESC = "拷贝规则"          # R.string.copy_rule（2026-09-22 起为**溢出菜单项**文案）
+S31_PASTE_DESC = "粘贴规则"         # R.string.paste_rule（同上，已下沉溢出）
 S31_PASTE_TITLE_MARK = "粘贴将覆盖"
 S31_PASTE_CONFIRM = "覆盖"
 S31_PASTE_CANCEL = "取消"
+# 顶栏动作分级（2026-09-22）：一级图标只留核心工作流，其余下沉溢出菜单
+S31_TOP_PRIMARY = ["编辑内容", "保存"]           # alwaysShow=true（edit_content / action_save）
+S31_TOP_SUNK = ["拷贝规则", "粘贴规则", "帮助"]   # 已下沉 ⇒ 溢出菜单未展开时不在 dump 中
+
+
+def _s31_overflow_click(d, label: str, tries: int = 3) -> bool:
+    """点开顶栏溢出 ⋮ 再点其中的菜单项（顶栏动作分级后「拷贝规则 / 粘贴规则 / 帮助」已下沉）。
+
+    溢出 ⋮ 的 contentDescription 为 null（`MenuActionIcon` 只给一级动作配 desc）⇒ 只能按位置取
+    （复用 `_s32_top_right_icon`）。弹层点击偶发不生效（F339）⇒ 每轮重新定位 ⋮ 并带判据重试。
+    """
+    for _ in range(tries):
+        ov = _s32_top_right_icon(dump_xml(d))
+        if not ov:
+            time.sleep(1.0)
+            continue
+        click_xy(d, ov["cx"], ov["cy"])
+        time.sleep(1.3)
+        b = node_bounds(dump_xml(d), label)
+        if b:
+            click_xy(d, b["cx"], b["cy"])
+            time.sleep(1.2)
+            return True
+        # 未命中：点空白处收菜单（BACK 会触发本页「退出未保存拦截」）
+        d.click(0.5, 0.95)
+        time.sleep(0.8)
+    return False
 
 
 def _s31_start_edit(btn_id: int = 0) -> bool:
@@ -8795,7 +8836,13 @@ def s31_read_menu_custom_button_edit(d) -> bool:
         edit_seeded = _s31_start_edit(S31_BTN_ID)
         xml_b0 = _wait_marker(d, S31_COOKIE_LABEL, 25)
         auto_expand_ok = S31_COOKIE_LABEL in xml_b0
-        print(f"  [s31] B 已配置按键直起={edit_seeded} 自动展开={auto_expand_ok}")
+        # 顶栏动作分级（2026-09-22）：一级 = 编辑内容 / 保存；拷贝/粘贴/帮助已下沉 ⇒ 溢出菜单
+        # 未展开时这三项不应出现在 dump 中（`node_bounds` 精确匹配 text / content-desc）
+        top_primary = [k for k in S31_TOP_PRIMARY if node_bounds(xml_b0, k)]
+        top_sunk = [k for k in S31_TOP_SUNK if node_bounds(xml_b0, k)]
+        grading_ok = len(top_primary) == len(S31_TOP_PRIMARY) and not top_sunk
+        print(f"  [s31] B 已配置按键直起={edit_seeded} 自动展开={auto_expand_ok} "
+              f"顶栏一级={top_primary} 已下沉残留={top_sunk} 分级正确={grading_ok}")
         # 运行前置：阅读页令 ReadBook.book 就绪（阅读页在顶会顶掉后续 am start ⇒ BACK 回栈，F341）
         read_ok = start_robust(S31_ACT_READ)
         time.sleep(5.0)
@@ -8834,11 +8881,8 @@ def s31_read_menu_custom_button_edit(d) -> bool:
             time.sleep(2.0)
 
         # ---------- C：F344 粘贴差异预览（复制 → 改动 → 粘贴 → 取消不覆盖 / 覆盖才写入） ----------
-        xml_c = dump_xml(d)
-        copy_b = node_bounds(xml_c, S31_COPY_DESC)
-        if copy_b:
-            click_xy(d, copy_b["cx"], copy_b["cy"])
-            time.sleep(1.5)
+        # 2026-09-22 顶栏动作分级：拷贝/粘贴已下沉溢出 ⇒ 先开 ⋮ 再点菜单项
+        copy_b = _s31_overflow_click(d, S31_COPY_DESC)
         xml_c = dump_xml(d)
         cb = node_bounds(xml_c, S31_COOKIE_LABEL)
         before_checked = _s31_checked(xml_c, S31_COOKIE_LABEL) if cb else None
@@ -8852,10 +8896,8 @@ def s31_read_menu_custom_button_edit(d) -> bool:
         cancel_kept = False
         applied = False
         for attempt in range(3):
-            paste_b = node_bounds(dump_xml(d), S31_PASTE_DESC)
-            if not paste_b:
+            if not _s31_overflow_click(d, S31_PASTE_DESC):
                 break
-            click_xy(d, paste_b["cx"], paste_b["cy"])
             xml_d = _wait_marker(d, S31_PASTE_TITLE_MARK, 15)
             dialog_ok = S31_PASTE_TITLE_MARK in xml_d
             diff_line_ok = S31_DIFF_MARK in xml_d
@@ -8873,9 +8915,7 @@ def s31_read_menu_custom_button_edit(d) -> bool:
                 break
             time.sleep(1.0)
         # 覆盖分支：确认后才写入（回到复制时的取值）
-        paste_b = node_bounds(dump_xml(d), S31_PASTE_DESC)
-        if paste_b:
-            click_xy(d, paste_b["cx"], paste_b["cy"])
+        if _s31_overflow_click(d, S31_PASTE_DESC):
             xml_e = _wait_marker(d, S31_PASTE_TITLE_MARK, 15)
             confirm_b = node_bounds(xml_e, S31_PASTE_CONFIRM)
             if confirm_b:
@@ -8890,6 +8930,7 @@ def s31_read_menu_custom_button_edit(d) -> bool:
         src_act = Path(S31_SRC_ACT).read_text(encoding="utf-8")
         src_xml = Path(S31_SRC_XML).read_text(encoding="utf-8")
         src_para = Path(S31_SRC_PARA).read_text(encoding="utf-8")
+        src_menu = Path(S31_SRC_MENU).read_text(encoding="utf-8")
         checks = [
             ("F343 复用阅读页同一套执行实现（同一绑定/同一正文取材，无自建第二条执行链）",
              "ReadMenuCustomButtonExecutor.execute(" in src_act
@@ -8915,6 +8956,11 @@ def s31_read_menu_custom_button_edit(d) -> bool:
              src_xml.index("til_name") < src_xml.index("til_login_url") < src_xml.index("til_script")
              and src_xml.index("til_script") < src_xml.index("cv_login_advanced")
              and "cvLoginAdvanced" not in src_para and "cvScriptTest" not in src_para),
+            # 2026-09-22 顶栏动作分级（登记 F376）
+            ("顶栏动作分级：一级图标只留「编辑内容 / 保存」共 2 个 alwaysShow",
+             src_act.count("alwaysShow = true") == 2),
+            ("溢出菜单透传 MenuAction.enabled（下沉后禁用态不失效）",
+             "enabled = action.enabled" in src_menu),
         ]
         src_ok = all(v for _, v in checks)
         for nm, v in checks:
@@ -8922,9 +8968,9 @@ def s31_read_menu_custom_button_edit(d) -> bool:
 
         proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
         ok = bool(seeded and header_ok and run_btn_ok and collapsed_ok and expanded_ok
-                  and auto_expand_ok and read_ok and run_clicked and status_ok and run_success
-                  and probe_ok and type_ok and dialog_ok and diff_line_ok and cancel_kept
-                  and applied and proc_alive and src_ok)
+                  and auto_expand_ok and grading_ok and read_ok and run_clicked and status_ok
+                  and run_success and probe_ok and type_ok and dialog_ok and diff_line_ok
+                  and cancel_kept and applied and proc_alive and src_ok)
     except Exception as e:
         print(f"  [s31] 异常终止: {type(e).__name__}: {e}")
     finally:
