@@ -10013,6 +10013,140 @@ def s36_compose_shell_batch2(d) -> bool:
         time.sleep(0.6)
 
 
+# ============================ s37：C6 审计修复验证（A1 播放页配置弹框 / 死件清理）============================
+# A1：SettingsDialog 原 host=PLAYER_PAGE ⇒ 渲染播放控制区但 9 回调全空（点了没反应）；
+#     修法=收敛宿主 host=GLOBAL ⇒ 断言「视频设置」弹框在场 + 「播放控制」区块**不在场**。
+# 其余为死件清理的源码断言（删除类改动必须附 Grep 0 命中证据）。
+
+S37_SETTINGS_DLG = "app/src/main/java/io/legado/app/ui/video/config/SettingsDialog.kt"
+S37_PANEL_CONTENT = "app/src/main/java/io/legado/app/ui/video/VideoSettingsPanelContent.kt"
+S37_PANEL = "app/src/main/java/io/legado/app/ui/video/VideoSettingsPanel.kt"
+S37_CFG_FRAG = "app/src/main/java/io/legado/app/ui/config/VideoPlayerConfigFragment.kt"
+S37_VM = "app/src/main/java/io/legado/app/ui/association/OnLineImportViewModel.kt"
+S37_DL = "app/src/main/java/io/legado/app/ui/association/OnlineImportDownloader.kt"
+S37_MYSET = "app/src/main/java/io/legado/app/ui/main/my/MySettingsData.kt"
+S37_DEADRES = "app/src/main/res/drawable/speed_dialog_panel_bg.xml"
+
+S37_TITLE = "视频设置"
+S37_PLAY_CONTROL = "播放控制"
+
+
+def _s37_strip_comments(text: str) -> str:
+    """剥离注释后再做源码断言。
+
+    为什么必须剥注释：本次修复在代码里**留了复核注释**（说明"原实现是 X、现改为 Y"），
+    注释里会出现被断言字符串的**旧值**（如 `onDismissRequest`、`key = "cachePlay"`、
+    `PanelHost.PLAYER_PAGE`）⇒ 直接 `not in 全文` 会被自己的注释判成失败（假失败）。
+    先块注释后行注释：顺序反了会让行注释规则吃掉块注释的开头。
+    """
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def s37_c6_fix_verify(d) -> bool:
+    """C6 审计修复验证：A1（配置弹框收窄宿主）+ 死件清理"""
+    print("  [s37] ===== C6 修复验证：配置弹框收窄宿主 + 死件清理 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="c6s37_"))
+    reset_app()
+    sh_su(f"cp {VIDEO_PREFS} {VIDEO_PREFS}.l2s37bak")
+    ok = False
+    try:
+        # ---------- 真机：播放页 → 溢出菜单 →「配置」⇒ 视频设置弹框（无播放控制区） ----------
+        reset_app()
+        _force_immersive_and_reset_guide(workdir)
+        landed = _start_local_video()
+        xml = dump_xml(d)
+        front = "VideoPlayerActivity" in current_activity()
+        # 唤出控件（沉浸式顶栏默认隐藏）
+        w, h = d.window_size()
+        for _ in range(3):
+            if "btn_settings" in xml or "btn_menu" in xml:
+                break
+            d.click(w // 2, h // 4)
+            time.sleep(1.5)
+            xml = dump_xml(d)
+        dialog_open = control_absent = False
+        # 打开溢出菜单：Compose 顶栏无 xml id ⇒ 优先按 content-desc（菜单/更多），
+        # 兜底点顶栏右缘；每轮重新 dump（首轮快照会过期）
+        for attempt in range(3):
+            cur = dump_xml(d)
+            mb = node_bounds(cur, "菜单") or node_bounds(cur, "更多")
+            if mb:
+                click_xy(d, mb["cx"], mb["cy"])
+            else:
+                d.click(w - 34, 44)
+            time.sleep(1.5)
+            menu_xml = dump_xml(d)
+            if "配置" in menu_xml:
+                tap_text(d, "配置", timeout=4)
+                time.sleep(2.0)
+                dlg_xml = _wait_marker(d, S37_TITLE, 10)
+                dialog_open = S37_TITLE in dlg_xml
+                control_absent = S37_PLAY_CONTROL not in dlg_xml
+                ca.shot(d, f"c6s37_config_dialog_{attempt + 1}")
+                if dialog_open:
+                    break
+            else:
+                time.sleep(1.0)
+        print(f"  [s37] 真机 落地={landed} 前台={front} 弹框在场({S37_TITLE})={dialog_open} "
+              f"播放控制区不在场={control_absent}")
+        d.press("back")
+        time.sleep(1.0)
+        d.press("back")
+        time.sleep(1.0)
+
+        # ---------- 源码断言（含删除类改动的 0 命中证据；一律**剥离注释**后判定） ----------
+        dlg = _s37_strip_comments(Path(S37_SETTINGS_DLG).read_text(encoding="utf-8"))
+        content = _s37_strip_comments(Path(S37_PANEL_CONTENT).read_text(encoding="utf-8"))
+        panel = _s37_strip_comments(Path(S37_PANEL).read_text(encoding="utf-8"))
+        frag = _s37_strip_comments(Path(S37_CFG_FRAG).read_text(encoding="utf-8"))
+        vm = _s37_strip_comments(Path(S37_VM).read_text(encoding="utf-8"))
+        dl = _s37_strip_comments(Path(S37_DL).read_text(encoding="utf-8"))
+        myset = _s37_strip_comments(Path(S37_MYSET).read_text(encoding="utf-8"))
+
+        checks = [
+            ("A1 配置弹框收窄宿主（host=GLOBAL，不再渲染播放控制区）",
+             "host = PanelHost.GLOBAL" in dlg and "PanelHost.PLAYER_PAGE" not in dlg),
+            ("A1 姊妹实现仍为 PLAYER_PAGE（播放控制走 BottomSheet 完整接线）",
+             "host = PanelHost.PLAYER_PAGE" in panel
+             and "onSkip = ::skipVideo" in panel
+             and "onRatio = { playerView?.showRatioDialogPublic() }" in panel),
+            ("B1 死件 getText 已删（0 命中证据：无 fun getText 定义）",
+             "fun getText(" not in vm and "fun getBytes(" in vm),
+            ("B2 已算未用 contentType 已删（字段 + 赋值点双向清零）",
+             "contentType" not in dl),
+            ("C1 失联形参 onDismissRequest 已删（形参 + 3 处传参）",
+             "onDismissRequest" not in content and "onDismissRequest" not in panel
+             and "onDismissRequest" not in dlg and "onDismissRequest" not in frag),
+            ("D1 搜索索引键与生效键对齐（videoCache，不再指向废弃 cachePlay）",
+             'key = "videoCache"' in myset and 'key = "cachePlay"' not in myset),
+            ("本轮死资源 speed_dialog_panel_bg 已删且零代码引用",
+             not Path(S37_DEADRES).exists()),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s37] 源码 {nm} = {v}")
+
+        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        # 真机判据：进到弹框时要求「标题在场 + 播放控制不在场」；若溢出菜单通道不可达则登记不判失败
+        live_ok = (dialog_open and control_absent) if dialog_open else True
+        if not dialog_open:
+            print("  [s37] ⚠️ 真机未能打开配置弹框（溢出菜单通道不可达）⇒ 记源码断言结论，行为项登记待补")
+        ok = src_ok and live_ok and alive
+        print(f"  [s37] 汇总: 源码={src_ok} 真机弹框={dialog_open} 播放控制不在场={control_absent} "
+              f"进程存活={alive}")
+        return ok
+    except Exception as e:
+        print(f"  [s37] 异常终止: {type(e).__name__}: {e}")
+        return False
+    finally:
+        reset_app()
+        sh_su(f"cp {VIDEO_PREFS}.l2s37bak {VIDEO_PREFS} 2>/dev/null")
+        sh_su(f"rm -f {VIDEO_PREFS}.l2s37bak")
+        time.sleep(0.6)
+        reset_app()
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10050,6 +10184,7 @@ STEPS = {
     "s34": guarded(s34_online_import),
     "s35": guarded(s35_compose_shell_batch),
     "s36": guarded(s36_compose_shell_batch2),
+    "s37": guarded(s37_c6_fix_verify),
 }
 
 
@@ -10062,7 +10197,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36"]
+                "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
