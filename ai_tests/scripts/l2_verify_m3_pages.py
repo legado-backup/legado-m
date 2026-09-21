@@ -8629,6 +8629,308 @@ def s30_paragraph_rule_edit(d) -> bool:
     return ok
 
 
+# ============================ s31：M6-2 book/read-menu-custom-button-edit（F343 页内测试运行 / F344 粘贴差异预览 / F345 高级字段渐进披露）============================
+# 通道：整库备份 → 播「1 本样本（令 ReadBook.book 就绪）」+「1 个已带登录配置与脚本的按键」
+#       → A 新建态默认收起（点组头就地展开）→ B 数据驱动自动展开 + 测试运行成功态
+#       → C 复制→改动→粘贴（取消不覆盖 / 覆盖才写入 + 字段级 before→after 摘要）→ 整库回推
+
+S31_ACT_EDIT = "io.legado.app.ui.book.read.config.ReadMenuCustomButtonEditActivity"
+S31_ACT_READ = "io.legado.app.ui.book.read.ReadBookActivity"
+S31_BOOK_URL = "l2seed://s31/btn-book"
+S31_BOOK_NAME = "L2按键样本"
+S31_CHAPTERS = ["第一章 起", "第二章 承"]
+S31_BTN_ID = 9001
+S31_BTN_NAME = "L2按键样本甲"
+S31_PROBE = "l2probe-ok"
+S31_SCRIPT = 'function run(){ return "%s"; }' % S31_PROBE
+
+S31_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/read/config/ReadMenuCustomButtonEditActivity.kt"
+S31_SRC_XML = "app/src/main/res/layout/activity_paragraph_rule_edit.xml"
+S31_SRC_PARA = "app/src/main/java/io/legado/app/ui/book/read/config/ParagraphRuleEditActivity.kt"
+
+S31_ADV_HEADER = "登录与高级配置"   # F345 组头标题
+S31_COOKIE_LABEL = "CookieJar"      # 高级组内的复选行（可见性/勾选态的判据节点）
+S31_RUN_BTN = "测试运行"            # 「▶ 测试运行」按钮（子串匹配）
+S31_STATUS_OK = "运行成功"
+S31_STATUS_FAIL = "运行失败"
+S31_RETURN_TYPE = "返回类型"
+S31_DIFF_MARK = "CookieJar："       # F344 字段级 before→after 摘要行
+S31_COPY_DESC = "拷贝规则"          # 顶栏 action contentDescription（R.string.copy_rule）
+S31_PASTE_DESC = "粘贴规则"
+S31_PASTE_TITLE_MARK = "粘贴将覆盖"
+S31_PASTE_CONFIRM = "覆盖"
+S31_PASTE_CANCEL = "取消"
+
+
+def _s31_start_edit(btn_id: int = 0) -> bool:
+    """带 id 直起编辑页（新建态不传 id）——`start_robust` 不支持 extras，这里自带一条"""
+    extra = [] if not btn_id else ["--el", "id", str(btn_id)]
+    for _ in range(2):
+        sh("am", "start", "-n", f"{PKG}/{S31_ACT_EDIT}", *extra)
+        time.sleep(3.0)
+        if "ReadMenuCustomButtonEditActivity" in current_activity():
+            return True
+        sh_su("am start -n " + f"{PKG}/{S31_ACT_EDIT} " + " ".join(extra))
+        time.sleep(3.0)
+        if "ReadMenuCustomButtonEditActivity" in current_activity():
+            return True
+    return False
+
+
+def _s31_wait_any(d, markers, timeout: float = 25.0) -> str:
+    """轮询直到 dump 出现任一标记（成功/失败双态等待，避免单态恒等 25s）"""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = dump_xml(d)
+        if any(m in xml for m in markers):
+            return xml
+        time.sleep(1.0)
+    return xml
+
+
+def _s31_checked(xml: str, label: str):
+    """读某节点的勾选态（节点不在 dump 中返回 None）"""
+    for m in re.finditer(r"<node[^>]*>", xml):
+        tag = m.group(0)
+        t = re.search(r'\btext="([^"]*)"', tag)
+        if not t or t.group(1) != label:
+            continue
+        c = re.search(r'\bchecked="(true|false)"', tag)
+        return c.group(1) == "true" if c else None
+    return None
+
+
+def _s31_seed(workdir: Path) -> bool:
+    """播「1 本样本（令 ReadBook.book 就绪，测试运行的前置）」+「1 个已带登录配置与脚本的按键」"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = con.execute("pragma table_info(read_menu_custom_buttons)").fetchall()
+        if not cols:
+            return False
+        row = {
+            "id": S31_BTN_ID, "name": S31_BTN_NAME, "script": S31_SCRIPT,
+            "loginUrl": "l2seed://s31/login", "enabledCookieJar": 1,
+            "timeoutMillisecond": 3000, "sortOrder": 0,
+            "updateTime": int(time.time() * 1000),
+        }
+        for _cid, cname, ctype, notnull, dflt, pk in cols:
+            if cname in row or pk:
+                continue
+            if notnull and dflt is None:
+                row[cname] = 0 if "INT" in (ctype or "").upper() else ""
+        keys = list(row.keys())
+        con.execute(
+            f"insert or replace into read_menu_custom_buttons ({','.join('`' + k + '`' for k in keys)})"
+            f" values ({','.join('?' * len(keys))})",
+            [row[k] for k in keys]
+        )
+        con.commit()
+    finally:
+        con.close()
+    if not m2._db_push(db):
+        return False
+    return _books_upsert(workdir, [{
+        "bookUrl": S31_BOOK_URL, "name": S31_BOOK_NAME, "author": "L2作者",
+        "origin": "l2seed://s31/source", "originName": "L2样本源", "type": 8,
+        "group": 0, "order": 0, "intro": "L2 按键样本",
+        "tocUrl": "l2seed://s31/toc", "totalChapterNum": len(S31_CHAPTERS),
+        "latestChapterTitle": S31_CHAPTERS[-1], "durChapterIndex": 0,
+        "durChapterTitle": S31_CHAPTERS[0], "durChapterPos": 0,
+        "canUpdate": 1,
+    }]) and _chapters_upsert(workdir, S31_BOOK_URL, S31_CHAPTERS)
+
+
+def s31_read_menu_custom_button_edit(d) -> bool:
+    """M6-2：book/read-menu-custom-button-edit（F343 / F344 / F345）"""
+    print("  [s31] ===== 自定义按键编辑：测试运行 + 粘贴预览 + 高级字段渐进披露 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m6s31_"))
+    reset_app()
+    ok = False
+    backup = None
+    m2 = _m2()
+    try:
+        db = m2._db_pull(workdir)
+        if db is None:
+            raise RuntimeError("db pull 失败")
+        backup = workdir / "s31_backup.db"
+        backup.write_bytes(db.read_bytes())
+        seeded = _s31_seed(workdir)
+        print(f"  [s31] 播种 样本={seeded}（1 本样本 + 1 个带登录配置与脚本的按键 id={S31_BTN_ID}）")
+
+        # ---------- A：F345 新建态默认收起（双向：收起不可见 / 点组头就地展开） ----------
+        edit_new = _s31_start_edit()
+        xml_a = _wait_marker(d, S31_ADV_HEADER, 25)
+        ca.shot(d, "m6s31_collapsed")
+        header_ok = S31_ADV_HEADER in xml_a
+        run_btn_ok = S31_RUN_BTN in xml_a
+        collapsed_ok = S31_COOKIE_LABEL not in xml_a
+        expanded_ok = False
+        exp = node_bounds(xml_a, S31_ADV_HEADER)
+        if exp:
+            # 真机 tap 偶发不生效（F339）⇒ 带判据重试
+            for attempt in range(3):
+                click_xy(d, exp["cx"], exp["cy"])
+                xml_a2 = _wait_marker(d, S31_COOKIE_LABEL, 6)
+                expanded_ok = S31_COOKIE_LABEL in xml_a2 and S31_RUN_BTN in xml_a2
+                print(f"  [s31] A 展开尝试#{attempt + 1} 高级字段在场={S31_COOKIE_LABEL in xml_a2} "
+                      f"运行块仍在={S31_RUN_BTN in xml_a2}")
+                if expanded_ok:
+                    ca.shot(d, "m6s31_expanded")
+                    break
+        print(f"  [s31] A 新建页直起={edit_new} 组头={header_ok} 运行块={run_btn_ok} "
+              f"收起态字段不可见={collapsed_ok} 展开后就地可见={expanded_ok}")
+
+        # ---------- B：F345 数据驱动自动展开 + F343 测试运行 ----------
+        reset_app()
+        edit_seeded = _s31_start_edit(S31_BTN_ID)
+        xml_b0 = _wait_marker(d, S31_COOKIE_LABEL, 25)
+        auto_expand_ok = S31_COOKIE_LABEL in xml_b0
+        print(f"  [s31] B 已配置按键直起={edit_seeded} 自动展开={auto_expand_ok}")
+        # 运行前置：阅读页令 ReadBook.book 就绪（阅读页在顶会顶掉后续 am start ⇒ BACK 回栈，F341）
+        read_ok = start_robust(S31_ACT_READ)
+        time.sleep(5.0)
+        print(f"  [s31] B 阅读页当前={current_activity().rsplit('/', 1)[-1]}")
+        sh("input", "keyevent", "4")
+        time.sleep(2.5)
+        xml_b = _wait_marker(d, S31_RUN_BTN, 15)
+        run_clicked = False
+        status_ok = False
+        run_success = False
+        probe_ok = False
+        type_ok = False
+        for attempt in range(3):
+            rb = node_bounds(xml_b, S31_RUN_BTN, contains=True)
+            if not rb:
+                xml_b = dump_xml(d)
+                continue
+            click_xy(d, rb["cx"], rb["cy"])
+            run_clicked = True
+            xml_r = _s31_wait_any(d, (S31_STATUS_OK, S31_STATUS_FAIL), 30)
+            status_ok = (S31_STATUS_OK in xml_r) or (S31_STATUS_FAIL in xml_r)
+            run_success = S31_STATUS_OK in xml_r
+            probe_ok = S31_PROBE in xml_r
+            type_ok = S31_RETURN_TYPE in xml_r
+            xml_b = xml_r
+            print(f"  [s31] B 运行尝试#{attempt + 1} 状态行={status_ok} 成功={run_success} "
+                  f"返回值token={probe_ok} 返回类型行={type_ok}")
+            if probe_ok:
+                ca.shot(d, "m6s31_run_result")
+                break
+            if not run_success:
+                # 诊断：面板文本节点（自建脚本的技术错误信息，无站点/源数据）
+                diag = [lab[:60] for lab, *_ in text_nodes(xml_r)
+                        if any(k in lab for k in ("Error", "Exception", "异常", "失败"))]
+                print(f"  [s31] B 诊断 失败线索={diag[:3]}")
+            time.sleep(2.0)
+
+        # ---------- C：F344 粘贴差异预览（复制 → 改动 → 粘贴 → 取消不覆盖 / 覆盖才写入） ----------
+        xml_c = dump_xml(d)
+        copy_b = node_bounds(xml_c, S31_COPY_DESC)
+        if copy_b:
+            click_xy(d, copy_b["cx"], copy_b["cy"])
+            time.sleep(1.5)
+        xml_c = dump_xml(d)
+        cb = node_bounds(xml_c, S31_COOKIE_LABEL)
+        before_checked = _s31_checked(xml_c, S31_COOKIE_LABEL) if cb else None
+        flipped = None
+        if cb:
+            click_xy(d, cb["cx"], cb["cy"])
+            time.sleep(1.0)
+            flipped = _s31_checked(dump_xml(d), S31_COOKIE_LABEL)
+        dialog_ok = False
+        diff_line_ok = False
+        cancel_kept = False
+        applied = False
+        for attempt in range(3):
+            paste_b = node_bounds(dump_xml(d), S31_PASTE_DESC)
+            if not paste_b:
+                break
+            click_xy(d, paste_b["cx"], paste_b["cy"])
+            xml_d = _wait_marker(d, S31_PASTE_TITLE_MARK, 15)
+            dialog_ok = S31_PASTE_TITLE_MARK in xml_d
+            diff_line_ok = S31_DIFF_MARK in xml_d
+            ca.shot(d, "m6s31_paste_preview")
+            # 取消分支：弹窗确认前/取消后都不应写入
+            cancel_b = node_bounds(xml_d, S31_PASTE_CANCEL)
+            if cancel_b:
+                click_xy(d, cancel_b["cx"], cancel_b["cy"])
+                time.sleep(1.2)
+                after_cancel = _s31_checked(dump_xml(d), S31_COOKIE_LABEL)
+                cancel_kept = flipped is not None and after_cancel == flipped
+            print(f"  [s31] C 尝试#{attempt + 1} 弹窗={dialog_ok} 差异行={diff_line_ok} "
+                  f"取消后未覆盖={cancel_kept}")
+            if dialog_ok and diff_line_ok and cancel_kept:
+                break
+            time.sleep(1.0)
+        # 覆盖分支：确认后才写入（回到复制时的取值）
+        paste_b = node_bounds(dump_xml(d), S31_PASTE_DESC)
+        if paste_b:
+            click_xy(d, paste_b["cx"], paste_b["cy"])
+            xml_e = _wait_marker(d, S31_PASTE_TITLE_MARK, 15)
+            confirm_b = node_bounds(xml_e, S31_PASTE_CONFIRM)
+            if confirm_b:
+                click_xy(d, confirm_b["cx"], confirm_b["cy"])
+                time.sleep(1.5)
+                applied = _s31_checked(dump_xml(d), S31_COOKIE_LABEL) is not None and \
+                    _s31_checked(dump_xml(d), S31_COOKIE_LABEL) == before_checked
+        print(f"  [s31] C 复制={bool(copy_b)} 改动前勾选={before_checked} 改动后勾选={flipped} "
+              f"弹窗={dialog_ok} 差异行={diff_line_ok} 取消不覆盖={cancel_kept} 覆盖后写入={applied}")
+
+        # ---------- D：源码断言 ----------
+        src_act = Path(S31_SRC_ACT).read_text(encoding="utf-8")
+        src_xml = Path(S31_SRC_XML).read_text(encoding="utf-8")
+        src_para = Path(S31_SRC_PARA).read_text(encoding="utf-8")
+        checks = [
+            ("F343 复用阅读页同一套执行实现（同一绑定/同一正文取材，无自建第二条执行链）",
+             "ReadMenuCustomButtonExecutor.execute(" in src_act
+             and "BookHelp.getContent(book, chapter).orEmpty()" in src_act
+             and "WebBook.getContentAwait" not in src_act
+             and "evalJS" not in src_act),
+            ("F343 结果面板三段齐备（状态行 / 返回类型 / 返回值·错误块 + 复制·清空）",
+             all(k in src_act for k in ("read_menu_button_run_ok", "read_menu_button_run_fail",
+                                        "read_menu_button_run_type", "read_menu_button_run_result",
+                                        "read_menu_button_run_error", "read_menu_button_run_clear"))),
+            ("F343 超时不吞（TimeoutCancellationException 走结果态，其余取消上抛）",
+             "TimeoutCancellationException" in src_act and "throw error" in src_act),
+            ("F344 覆盖式导入前先差异预览（覆盖写入在 onPositive 之后 + 无差异早退）",
+             "read_menu_button_paste_preview" in src_act
+             and "read_menu_button_paste_same" in src_act
+             and src_act.index("onPositive = {") < src_act.index("button = imported.copy(")),
+            ("F345 高级组为纯视图层折叠（只切 visibility，取值仍读全部控件）",
+             "applyAdvancedVisibility" in src_act and "tilJsLib.visibility = visibility" in src_act
+             and "etJsLib.text?.toString().orEmpty()," in src_act),
+            ("F345 数据驱动展开（有配置才展开，不做无脑常开）",
+             "advancedExpanded = advancedConfigured" in src_act and "hasAdvancedConfig()" in src_act),
+            ("F345 共用布局字段声明顺序未动（新槽为末尾追加 + 段落规则页零接线）",
+             src_xml.index("til_name") < src_xml.index("til_login_url") < src_xml.index("til_script")
+             and src_xml.index("til_script") < src_xml.index("cv_login_advanced")
+             and "cvLoginAdvanced" not in src_para and "cvScriptTest" not in src_para),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s31] 源码 {nm} = {v}")
+
+        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        ok = bool(seeded and header_ok and run_btn_ok and collapsed_ok and expanded_ok
+                  and auto_expand_ok and read_ok and run_clicked and status_ok and run_success
+                  and probe_ok and type_ok and dialog_ok and diff_line_ok and cancel_kept
+                  and applied and proc_alive and src_ok)
+    except Exception as e:
+        print(f"  [s31] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        if backup:
+            m2._db_push(Path(backup))
+        time.sleep(0.6)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -8660,6 +8962,7 @@ STEPS = {
     "s28": guarded(s28_bookshelf),
     "s29": guarded(s29_bookshelf_batch2),
     "s30": guarded(s30_paragraph_rule_edit),
+    "s31": guarded(s31_read_menu_custom_button_edit),
 }
 
 
@@ -8672,7 +8975,7 @@ def main():
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
-                "s27", "s28", "s29", "s30"]
+                "s27", "s28", "s29", "s30", "s31"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
