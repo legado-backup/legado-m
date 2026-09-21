@@ -6989,6 +6989,103 @@ def s21_ai_chat(d) -> bool:
     return ok
 
 
+# ============================ M5 s22：代码编辑器（F196 脏态显示 / F197 只读显性化） ============================
+
+ACT_CODE_EDIT = "io.legado.app.ui.code.CodeEditActivity"
+S22_UNSAVED = "未保存"                            # code_edit_unsaved
+S22_READONLY_BAR = "只读模式：查看源码内容，编辑不会保存"  # code_edit_readonly_bar
+S22_READONLY_BADGE = "只读"                        # code_edit_readonly_badge
+S22_TITLE = "l2codesample"
+# ⚠️ `sh()` 不做引号包装 ⇒ 含空格的 extra 值会被拆成多个参数（首轮实测 text 只剩 "l2"、title 丢失）
+S22_TEXT = "l2lineone"
+S22_TYPED = "l2x"
+S22_SRC = "app/src/main/java/io/legado/app/ui/code/CodeEditActivity.kt"
+
+
+def _s22_proc_alive() -> bool:
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def _s22_editor_label(xml: str) -> str:
+    """取编辑区当前 a11y 文本（排除顶栏标题，两者都以 l2 开头）"""
+    for lab, _top, _left, _cx, _cy in text_nodes(xml):
+        if lab.startswith("l2") and lab != S22_TITLE:
+            return lab
+    return ""
+
+
+def s22_code_edit(d) -> bool:
+    """M5：code/code-edit（F196 未保存状态可视化 / F197 只读模式显性化）
+    只读分支需 `CacheManager` 内存缓存（不可外部播种）⇒ 真机只覆盖可写分支，只读为源码断言 + 登记缺口。"""
+    print("  [s22] ===== 代码编辑器 脏态显示 + 只读显性化 =====")
+    reset_app()
+    ok = False
+    try:
+        sh("am", "start", "-n", f"{PKG}/{ACT_CODE_EDIT}",
+           "--es", "text", S22_TEXT, "--es", "title", S22_TITLE)
+        time.sleep(3.0)
+        landed = "CodeEditActivity" in current_activity()
+        proc_alive = _s22_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s22_code_edit_clean")
+        # A：可写模式初始为干净态（标题在场、无「未保存」、无只读条/徽章）
+        title_ok = S22_TITLE in xml
+        unsaved_before = S22_UNSAVED in xml
+        readonly_absent = (S22_READONLY_BAR not in xml) and (S22_READONLY_BADGE not in xml)
+        print(f"  [s22] A 落地={landed} 进程存活={proc_alive} 标题在场={title_ok} "
+              f"初始未保存标记={unsaved_before} 只读痕迹已排除={readonly_absent}")
+        if not title_ok:
+            print(f"  [s22] A 诊断（短文本）= {text_nodes(xml)[:14]}")
+
+        # B：敲入字符 ⇒ 出现「未保存」（脏态可视化）
+        unsaved_after = False
+        # sora 编辑器在 a11y 树中可能只暴露部分文本 ⇒ 用子串匹配定位编辑区
+        editor_bounds = node_bounds(xml, S22_TEXT, contains=True)
+        if editor_bounds:
+            click_xy(d, editor_bounds["cx"], editor_bounds["cy"])
+            time.sleep(1.0)
+            sh("input", "text", S22_TYPED)
+            time.sleep(1.5)
+            xml_b = dump_xml(d)
+            # sora 编辑器是自绘 View：`input text` 可能不落地 ⇒ 用 uiautomator2 的 IME 通道兜底
+            if S22_TYPED not in _s22_editor_label(xml_b):
+                try:
+                    d.send_keys(S22_TYPED)
+                except Exception as e:
+                    print(f"  [s22] B send_keys 兜底异常: {type(e).__name__}: {e}")
+                time.sleep(1.5)
+                xml_b = dump_xml(d)
+            ca.shot(d, "m5s22_code_edit_dirty")
+            unsaved_after = S22_UNSAVED in xml_b
+            print(f"  [s22] B 输入后编辑区文本={_s22_editor_label(xml_b)!r}")
+        print(f"  [s22] B 编辑器定位={bool(editor_bounds)} 输入后未保存标记={unsaved_after}")
+
+        # C：源码断言（F196 脏态接线 / F197 只读条与徽章）
+        src = Path(S22_SRC).read_text(encoding="utf-8")
+        checks = [
+            ("F196 脏态跟踪接编辑器内容变更事件",
+             "ContentChangeEvent" in src and "dirtyState" in src),
+            ("F196 脏态状态行（secondRow，subtitle 会被固定栏高裁掉）",
+             "code_edit_unsaved" in src and "secondRow" in src),
+            ("F197 只读警示条",
+             "code_edit_readonly_bar" in src and "secondRow" in src),
+            ("F197 只读徽章替代保存键",
+             "code_edit_readonly_badge" in src),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s22] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and title_ok and not unsaved_before and readonly_absent
+                  and unsaved_after and src_ok)
+    except Exception as e:
+        print(f"  [s22] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7011,6 +7108,7 @@ STEPS = {
     "s19": guarded(s19_ai_provider_manage),
     "s20": guarded(s20_ai_world_book_manage),
     "s21": guarded(s21_ai_chat),
+    "s22": guarded(s22_code_edit),
 }
 
 
@@ -7022,7 +7120,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
