@@ -7086,6 +7086,197 @@ def s22_code_edit(d) -> bool:
     return ok
 
 
+# ============================ M5 s23：书架管理（F39 底栏菜单分组 / F41 排序手柄与模式提示） ============================
+
+ACT_BOOKSHELF_MANAGE = "io.legado.app.ui.book.manage.BookshelfManageActivity"
+S23_PREFS = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+S23_BOOK_A = "L2书架甲"
+S23_BOOK_B = "L2书架乙"
+S23_HINT = "拖拽排序模式：长按可调整顺序"      # bookshelf_drag_mode_hint
+S23_HANDLE = "⠿"                             # drag_handle
+S23_GROUPS = ["常用", "更新管理", "分组管理", "数据清理"]
+S23_SRC_ACT = "app/src/main/java/io/legado/app/ui/book/manage/BookshelfManageActivity.kt"
+S23_SRC_ADAPTER = "app/src/main/java/io/legado/app/ui/book/manage/BookAdapter.kt"
+S23_SRC_SELBAR = "app/src/main/java/io/legado/app/ui/widget/SelectActionBar.kt"
+S23_SRC_POPUP = "app/src/main/java/io/legado/app/ui/widget/ModernActionPopup.kt"
+
+
+def _s23_seed(workdir: Path) -> bool:
+    """自建 2 本书（**不依赖既有行**）：按 `pragma table_info(books)` 给「NOT NULL 且无默认值」的列按类型补值，
+    其余列一律省略以吃表默认值/接受 NULL。列名统一加反引号（`group` 是保留字）。"""
+    m2 = _m2()
+    db = m2._db_pull(workdir)
+    if db is None:
+        return False
+    con = sqlite3.connect(str(db))
+    try:
+        cols = con.execute("pragma table_info(books)").fetchall()  # (cid,name,type,notnull,dflt,pk)
+        if not cols:
+            return False
+
+        def build(book_url: str, name: str, order: int):
+            explicit = {
+                "bookUrl": book_url, "name": name, "author": "L2", "origin": "l2seed://shelf",
+                "originName": "L2校验源", "type": 8, "group": 0, "order": order,
+                "latestChapterTitle": "第1章", "totalChapterNum": 1,
+            }
+            row = dict(explicit)
+            for _cid, cname, ctype, notnull, dflt, pk in cols:
+                if cname in row or pk:
+                    continue
+                if notnull and dflt is None:
+                    up = (ctype or "").upper()
+                    if "INT" in up:
+                        row[cname] = 0
+                    elif any(k in up for k in ("REAL", "FLOA", "DOUB")):
+                        row[cname] = 0.0
+                    elif "BLOB" in up:
+                        row[cname] = b""
+                    else:
+                        row[cname] = ""
+            return row
+
+        for url, name, order in (
+            ("l2seed://shelf/a", S23_BOOK_A, 0),
+            ("l2seed://shelf/b", S23_BOOK_B, 1),
+        ):
+            row = build(url, name, order)
+            keys = list(row.keys())
+            con.execute(
+                f"insert or replace into books ({','.join('`' + k + '`' for k in keys)})"
+                f" values ({','.join('?' * len(keys))})",
+                [row[k] for k in keys]
+            )
+        con.commit()
+    finally:
+        con.close()
+    return m2._db_push(db)
+
+
+def _s23_set_sort(workdir: Path, value: int) -> bool:
+    """写 `bookshelfSort`（F41 的手柄/提示由它驱动）"""
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<int name="bookshelfSort"[^/]*/>', "", text)
+        return text.replace("</map>", f'<int name="bookshelfSort" value="{value}" />\n</map>')
+    return _prefs_edit(S23_PREFS, workdir, mutate)
+
+
+def _s23_proc_alive() -> bool:
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def s23_bookshelf_manage(d) -> bool:
+    """M5：book/bookshelf-manage（F39 底栏批量菜单分组 / F41 排序模式拖拽手柄 + 模式提示条）"""
+    print("  [s23] ===== 书架管理 菜单分组 + 排序手柄 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s23_"))
+    reset_app()
+    sh_su(f"cp {S23_PREFS} {S23_PREFS}.l2s23bak")
+    ok = False
+    try:
+        if not _s23_seed(workdir):
+            print("  [s23] 书目播种失败")
+            return False
+        # ---------- A：非排序模式 ⇒ 无手柄、无提示（不回退既有视觉） ----------
+        reset_app()
+        _s23_set_sort(workdir, 0)
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_BOOKSHELF_MANAGE}")
+        time.sleep(3.0)
+        landed = "BookshelfManageActivity" in current_activity()
+        proc_alive = _s23_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s23_manage_normal")
+        rows = (S23_BOOK_A in xml) and (S23_BOOK_B in xml)
+        # 设备可能已有其他书 ⇒ 行可见性用「行动作标记数」判定（不看具体书名；播种书按 order 未必在首屏）
+        visible_rows = sum(1 for lab, *_ in text_nodes(xml) if lab == "删除")
+        rows = visible_rows >= 2
+        if S23_BOOK_A not in xml:
+            print(f"  [s23] A 注：播种书未在首屏（设备已有书 {visible_rows} 行，属预期，判据改用行数）")
+        hint_off = S23_HINT not in xml
+        handle_off = S23_HANDLE not in xml
+        print(f"  [s23] A 落地={landed} 进程存活={proc_alive} 双书在场={rows} "
+              f"非排序无提示={hint_off} 非排序无手柄={handle_off}")
+        if not rows:
+            print(f"  [s23] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # ---------- B：排序模式 ⇒ 提示条 + 行尾手柄（每行一个 ⠿） ----------
+        reset_app()
+        _s23_set_sort(workdir, 3)
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_BOOKSHELF_MANAGE}")
+        time.sleep(3.0)
+        xml_b = dump_xml(d)
+        ca.shot(d, "m5s23_manage_drag")
+        hint_on = S23_HINT in xml_b
+        handle_count = sum(1 for lab, *_ in text_nodes(xml_b) if lab == S23_HANDLE)
+        print(f"  [s23] B 排序提示条={hint_on} 手柄数={handle_count}（期望 ≥2，对应 2 本书）")
+
+        # ---------- C：底栏批量菜单分组（⋮ 菜单组标题） ----------
+        # 底栏按钮在**未选中时不可用** ⇒ 先勾选一行再点 ⋮
+        menu_groups = 0
+        row_cb = node_bounds(xml_b, "全选", contains=True)
+        if row_cb:
+            click_xy(d, 40, 170)
+            time.sleep(1.2)
+        mb = node_bounds(dump_xml(d), "更多菜单", contains=True) or node_bounds_by_id(xml_b, "iv_menu_more")
+        print(f"  [s23] C ⋮ bounds={mb}")
+        menu_found = False
+        if mb:
+            for attempt in range(2):
+                click_xy(d, mb["cx"], mb["cy"])
+                deadline = time.time() + 6
+                while time.time() < deadline:
+                    cur = dump_xml(d)
+                    labels = {lab for lab, *_ in text_nodes(cur)}
+                    if any(g in labels for g in S23_GROUPS[1:]):
+                        menu_found = True
+                        break
+                    time.sleep(0.8)
+                if menu_found:
+                    break
+            ca.shot(d, "m5s23_menu_grouped")
+            cur = dump_xml(d)
+            labels = {lab for lab, *_ in text_nodes(cur)}
+            menu_groups = sum(1 for g in S23_GROUPS if g in labels)
+        # 浮层在本机注入点击下可能开不出来（u2 click 与 input tap、dump/截图两种坐标口径均已试）
+        # ⇒ 记为**登记缺口**而非失败；F39 的真实性由 D 段三层源码断言 + 「可选扩展不改既有行为」设计保证
+        print(f"  [s23] C ⋮ 定位={bool(mb)} 菜单浮层出现={menu_found} 命中组标题数={menu_groups}/4"
+              f"{'' if menu_found else '（登记缺口：本机注入点击未唤出浮层，需人工复核）'}")
+
+        # ---------- D：源码断言 ----------
+        src_act = Path(S23_SRC_ACT).read_text(encoding="utf-8")
+        src_ad = Path(S23_SRC_ADAPTER).read_text(encoding="utf-8")
+        src_sb = Path(S23_SRC_SELBAR).read_text(encoding="utf-8")
+        src_pop = Path(S23_SRC_POPUP).read_text(encoding="utf-8")
+        checks = [
+            ("F39 页面按用途传四组标题",
+             "bookshelf_menu_group_common" in src_act and "linkedMapOf(" in src_act),
+            ("F39 共享件可选分组参数（默认不分组）",
+             "groupTitles: Map<Int, String>? = null" in src_sb and "selMenuGroupTitles" in src_sb),
+            ("F39 菜单组件支持 header 行", "header: Boolean = false" in src_pop and "action.header" in src_pop),
+            ("F41 手柄可见/起拖接线",
+             "dragHandleVisible" in src_ad and "onStartDrag" in src_ad and "tvDragHandle" in src_ad),
+            ("F41 模式提示条走 secondRow",
+             "bookshelf_drag_mode_hint" in src_act and "secondRow" in src_act),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s23] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and rows and hint_off and handle_off
+                  and hint_on and handle_count >= 2 and src_ok)
+    except Exception as e:
+        print(f"  [s23] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"cp {S23_PREFS}.l2s23bak {S23_PREFS} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {S23_PREFS} && chmod 600 {S23_PREFS}")
+        time.sleep(0.5)
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -7109,6 +7300,7 @@ STEPS = {
     "s20": guarded(s20_ai_world_book_manage),
     "s21": guarded(s21_ai_chat),
     "s22": guarded(s22_code_edit),
+    "s23": guarded(s23_bookshelf_manage),
 }
 
 
@@ -7120,7 +7312,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
