@@ -6714,6 +6714,173 @@ def s19_ai_provider_manage(d) -> bool:
     return ok
 
 
+# ============================ M5 s20：世界书管理（P0 删除确认 / F93 / F92） ============================
+
+ACT_AI_WORLD_BOOK = "io.legado.app.ui.config.AiWorldBookManageActivity"
+S20_PREFS = f"/data/data/{PKG}/shared_prefs/{PKG}_preferences.xml"
+S20_BOOK_A = "L2worldAlpha"
+S20_BOOK_B = "L2worldBeta"
+S20_ENTRY_TITLE = "L2entryOne"
+S20_SEARCH_HINT = "搜索世界书、条目、关键词"
+S20_EMPTY_TITLE = "没有匹配的世界书"
+S20_EMPTY_CLEAR = "清除搜索"
+S20_DELETE = "删除"
+S20_CANCEL = "取消"
+S20_CONFIRM_BODY = "条条目也会一起删除"   # ai_world_book_delete_confirm 片段
+S20_QUERY = "zzzq"
+S20_SRC = "app/src/main/java/io/legado/app/ui/main/ai/compose/AiWorldBookManageScreen.kt"
+
+
+def _s20_proc_alive() -> bool:
+    r = sh("ps", "-A", timeout=20)
+    return PKG.encode() in (r.stdout or b"")
+
+
+def _s20_bounds_by_top(xml: str, label: str, want_max: bool):
+    """按 top 取最上/最下的同名节点：确认弹窗按钮在页面内容之下（弹窗居中），
+    页面卡片动作在顶部 ⇒ 「弹窗里的删除」= top 最大者，「页面卡片的删除」= top 最小者。"""
+    cands = [n for n in text_nodes(xml) if n[0] == label]
+    if not cands:
+        return None
+    n = max(cands, key=lambda t: t[1]) if want_max else min(cands, key=lambda t: t[1])
+    return {"cx": n[3], "cy": n[4], "top": n[1]}
+
+
+def _s20_seed(workdir: Path) -> bool:
+    """播种两本世界书（甲含 1 条条目 / 乙 0 条）。前置：应用已停。"""
+    entry = (
+        '{"id":"l2e1","title":"%s","name":"%s","content":"l2 content","keys":[],'
+        '"keywords":[],"secondaryKeys":[],"excludeKeys":[],"regexEnabled":false,'
+        '"useRegex":false,"caseSensitive":false,"enabled":true,"constant":false,'
+        '"constantActive":false,"priority":50,"position":"after_system_prompt",'
+        '"injectDepth":4,"role":"user","scanDepth":8,"maxMatches":1,"order":0}'
+    ) % (S20_ENTRY_TITLE, S20_ENTRY_TITLE)
+    book = (
+        '{"id":"%s","name":"%s","description":"l2 desc","version":1,"type":"lorebook",'
+        '"scope":"global","bookKey":"","enabled":true,"bindingVersion":1,"maxEntries":12,'
+        '"bindings":[],"order":%d,"entries":[%s]}'
+    )
+    books = "[%s,%s]" % (
+        book % ("l2wb1", S20_BOOK_A, 0, entry),
+        book % ("l2wb2", S20_BOOK_B, 1, ""),
+    )
+    esc = books.replace('"', "&quot;")
+
+    def mutate(text: str) -> str:
+        text = re.sub(r'\s*<[a-z]+ name="aiWorldBookList"[^>]*>[^<]*</[a-z]+>', "", text)
+        text = re.sub(r'\s*<[a-z]+ name="aiWorldBookList"[^/]*/>', "", text)
+        inject = '<string name="aiWorldBookList">%s</string>\n' % esc
+        return text.replace("</map>", inject + "</map>")
+
+    return _prefs_edit(S20_PREFS, workdir, mutate)
+
+
+def s20_ai_world_book_manage(d) -> bool:
+    """M5：config/ai-world-book-manage（P0 删除确认 / F93 搜索空结果闭环 / F92 条目编辑器分组）"""
+    print("  [s20] ===== 世界书管理 删除确认 + 搜索空结果 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s20_"))
+    reset_app()
+    sh_su(f"cp {S20_PREFS} {S20_PREFS}.l2s20bak")
+    ok = False
+    try:
+        if not _s20_seed(workdir):
+            print("  [s20] 偏好播种失败")
+            return False
+        reset_app()
+        sh("am", "start", "-n", f"{PKG}/{ACT_AI_WORLD_BOOK}")
+        time.sleep(2.5)
+        landed = "AiWorldBookManageActivity" in current_activity()
+        proc_alive = _s20_proc_alive()
+        xml = dump_xml(d)
+        ca.shot(d, "m5s20_world_book")
+        both_books = S20_BOOK_A in xml and S20_BOOK_B in xml
+        print(f"  [s20] A 落地={landed} 进程存活={proc_alive} 双世界书在场={both_books}")
+        if not both_books:
+            print(f"  [s20] A 诊断（短文本）= {text_nodes(xml)[:16]}")
+
+        # ---------- B：删除必须先确认；取消不得删数据（P0） ----------
+        dialog_shown = cancelled = False
+        db = _s20_bounds_by_top(xml, S20_DELETE, want_max=False)
+        if db:
+            click_xy(d, db["cx"], db["cy"])
+            time.sleep(1.5)
+            xml_dlg = dump_xml(d)
+            ca.shot(d, "m5s20_delete_confirm")
+            dialog_shown = (S20_CONFIRM_BODY in xml_dlg) and (S20_CANCEL in xml_dlg) \
+                and (S20_BOOK_A in xml_dlg)
+            cb = node_bounds(xml_dlg, S20_CANCEL)
+            if cb:
+                click_xy(d, cb["cx"], cb["cy"])
+                time.sleep(1.5)
+                xml_cancel = dump_xml(d)
+                ca.shot(d, "m5s20_delete_cancelled")
+                cancelled = (S20_BOOK_A in xml_cancel) and (S20_CONFIRM_BODY not in xml_cancel)
+        print(f"  [s20] B 删除键定位={bool(db)} 确认弹窗={dialog_shown} 取消后数据仍在={cancelled}")
+
+        # ---------- C：确认删除才真正落盘 ----------
+        deleted = False
+        db2 = _s20_bounds_by_top(dump_xml(d), S20_DELETE, want_max=False)
+        if db2:
+            click_xy(d, db2["cx"], db2["cy"])
+            time.sleep(1.5)
+            xml_dlg2 = dump_xml(d)
+            db3 = _s20_bounds_by_top(xml_dlg2, S20_DELETE, want_max=True)
+            if db3:
+                click_xy(d, db3["cx"], db3["cy"])
+                time.sleep(2.0)
+                xml_del = dump_xml(d)
+                ca.shot(d, "m5s20_deleted")
+                deleted = (S20_BOOK_A not in xml_del) and (S20_BOOK_B in xml_del)
+        print(f"  [s20] C 确认后甲已删除且乙仍在={deleted}")
+
+        # ---------- D：搜索不命中 ⇒ 空结果卡；清除搜索回归 ----------
+        xml_now = dump_xml(d)
+        sb = node_bounds(xml_now, S20_SEARCH_HINT, contains=True)
+        empty_ok = restored = False
+        if sb:
+            click_xy(d, sb["cx"], sb["cy"])
+            time.sleep(1.0)
+            sh("input", "text", S20_QUERY)
+            time.sleep(1.5)
+            xml_e = dump_xml(d)
+            ca.shot(d, "m5s20_search_empty")
+            empty_ok = (S20_EMPTY_TITLE in xml_e) and (S20_BOOK_B not in xml_e)
+            eb = node_bounds(xml_e, S20_EMPTY_CLEAR, contains=True)
+            if eb:
+                click_xy(d, eb["cx"], eb["cy"])
+                time.sleep(1.5)
+                xml_r = dump_xml(d)
+                ca.shot(d, "m5s20_search_cleared")
+                restored = (S20_BOOK_B in xml_r) and (S20_EMPTY_TITLE not in xml_r)
+        print(f"  [s20] D 搜索框定位={bool(sb)} 空结果卡={empty_ok} 清除后回归={restored}")
+
+        # ---------- E：源码断言 ----------
+        src = Path(S20_SRC).read_text(encoding="utf-8")
+        checks = [
+            ("P0 世界书删除走待确认态", "pendingDeleteBook" in src and "AppConfirmDialog(" in src),
+            ("P0 条目删除走待确认态", "pendingDeleteEntry" in src),
+            ("F93 空结果文案资源化", "ai_world_book_search_empty_title" in src),
+            ("F92 条目编辑器分组", "EntryGroupTitle(" in src),
+        ]
+        src_ok = all(v for _, v in checks)
+        for name, v in checks:
+            print(f"  [s20] 源码 {name} = {v}")
+
+        ok = bool(landed and proc_alive and both_books and dialog_shown and cancelled
+                  and deleted and empty_ok and restored and src_ok)
+    except Exception as e:
+        print(f"  [s20] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+        sh_su(f"cp {S20_PREFS}.l2s20bak {S20_PREFS} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {S20_PREFS} && chmod 600 {S20_PREFS}")
+        time.sleep(0.5)
+        r = sh_su(f"cat {S20_PREFS}")
+        print(f"  [s20] 偏好还原={S20_BOOK_A not in (r.stdout or b'').decode('utf-8', errors='ignore')}")
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -6734,6 +6901,7 @@ STEPS = {
     "s17": guarded(s17_book_search_and_cert),
     "s18": guarded(s18_rss_read_page),
     "s19": guarded(s19_ai_provider_manage),
+    "s20": guarded(s20_ai_world_book_manage),
 }
 
 
@@ -6745,7 +6913,7 @@ def main():
     since = ca.device_now()
     scen = (args.scenario or "all").strip()
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
-                "s14", "s15", "s16", "s17", "s18", "s19"]
+                "s14", "s15", "s16", "s17", "s18", "s19", "s20"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     for sid in targets:
