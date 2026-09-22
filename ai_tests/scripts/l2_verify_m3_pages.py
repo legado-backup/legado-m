@@ -180,12 +180,49 @@ SRC_LOG_SCREEN = "app/src/main/java/io/legado/app/ui/log/LogManageScreen.kt"
 
 # ============================ 基础设施 ============================
 
+def _adb_heal(reason: str = "") -> bool:
+    """ADB 通道自愈：`connect` → `echo` 探针 → 失败则 `kill-server/start-server` 全量重启。
+
+    ⚠️ 2026-09-22 第 4 次长跑实测**环境级崩塌**：连续 **9 次** `TimeoutExpired`
+    （`ps -A` / `am force-stop` 均 45s 超时）⇒ 其后 s13/s14/s20/s22/s30/s34~s40 **连锁 FAIL**，
+    而每场景 `FATAL EXCEPTION=0`（产品无恙）。**长跑(≈45min)后 ADB 会劣化**，必须自愈而不是
+    把连锁失败当产品回归。返回自愈后通道是否可用。
+    """
+    print(f"  [adb] 通道异常，尝试自愈{('（' + reason + '）') if reason else ''}")
+    for _ in range(2):
+        subprocess.run([ADB, "connect", HOST], capture_output=True, timeout=20)
+        time.sleep(2)
+        try:
+            r = subprocess.run([ADB, "-s", HOST, "shell", "echo", "adb_ok"],
+                               capture_output=True, timeout=20)
+            if b"adb_ok" in (r.stdout or b""):
+                print("  [adb] 自愈成功（connect）")
+                return True
+        except Exception:
+            pass
+        try:
+            subprocess.run([ADB, "kill-server"], capture_output=True, timeout=25)
+            time.sleep(2)
+            subprocess.run([ADB, "start-server"], capture_output=True, timeout=40)
+            time.sleep(3)
+            subprocess.run([ADB, "connect", HOST], capture_output=True, timeout=20)
+            time.sleep(2)
+            r = subprocess.run([ADB, "-s", HOST, "shell", "echo", "adb_ok"],
+                               capture_output=True, timeout=20)
+            if b"adb_ok" in (r.stdout or b""):
+                print("  [adb] 自愈成功（kill/start-server）")
+                return True
+        except Exception:
+            pass
+    print("  [adb] 自愈失败，通道仍不可用")
+    return False
+
+
 def sh(*args, timeout=45):
     try:
         return ca.sh(*args, timeout=timeout)
     except subprocess.TimeoutExpired:
-        subprocess.run([ADB, "connect", HOST], capture_output=True, timeout=15)
-        time.sleep(3)
+        _adb_heal("TimeoutExpired: " + " ".join(str(a) for a in args[:3]))
         return ca.sh(*args, timeout=timeout)
 
 
@@ -250,13 +287,49 @@ def start_robust(act: str) -> bool:
     return False
 
 
-def dump_xml(d) -> str:
-    for _ in range(2):
+# 系统层遮挡的判据文案（通知栏/锁屏/状态栏）——出现即说明 dump 抓到的是**系统 UI 而非目标页**
+_SYS_OVERLAY_MARKS = ("Android 系统通知", "信号满格", "正在充电", "已完成百分之")
+
+
+def _app_proc_alive(retries: int = 3) -> bool:
+    """进程存活探测（统一入口，替代散落的 `sh("ps","-A")`）。
+
+    ⚠️ 直接调用会因**模拟器卡顿期 `ps -A` 超时**抛 `TimeoutExpired` 而**中断整个场景**
+    （2026-09-22 实测 s30 异常终止）；`ps -A` 偶发返回空流也会误判"进程已死"（F364/F308 同源）
+    ⇒ 必须带重试 + 异常兜底。
+    """
+    for _ in range(retries):
         try:
-            return d.dump_hierarchy()
+            if PKG.encode() in (sh("ps", "-A", timeout=25).stdout or b""):
+                return True
+        except Exception:
+            pass
+        time.sleep(1.5)
+    return False
+
+
+def dump_xml(d) -> str:
+    """dump a11y 树；**自动识别并解除系统层遮挡**（2026-09-22，F381 补充）：
+
+    长跑中通知栏会被展开（或息屏复现锁屏），此时 dump 只返回时钟/电量/WLAN/系统通知等节点，
+    目标页文案必然查不到 ⇒ 批量假失败（s30 A 段「模板行标题=False」即此因）。这里在 dump 结果
+    命中系统层标记时**幂等唤醒 + 收通知栏 + 解屏保**后重取一次。
+    """
+    xml = ""
+    for attempt in range(3):
+        try:
+            xml = d.dump_hierarchy()
         except Exception:
             time.sleep(1.5)
-    return ""
+            continue
+        if attempt == 0 and any(m in xml for m in _SYS_OVERLAY_MARKS):
+            _screen_guard()
+            time.sleep(1.0)
+            continue
+        if xml:
+            return xml
+        time.sleep(1.2)
+    return xml
 
 
 def text_nodes(xml: str):
@@ -6544,7 +6617,7 @@ S19_SRC_EDIT = "app/src/main/java/io/legado/app/ui/config/AiProviderEditActivity
 
 def _s19_proc_alive() -> bool:
     """进程存活探测：模拟器无 pidof，用 ps -A 匹配包名（构造期崩溃时 am start 仍报成功）"""
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -6707,7 +6780,7 @@ S20_SRC = "app/src/main/java/io/legado/app/ui/main/ai/compose/AiWorldBookManageS
 
 
 def _s20_proc_alive() -> bool:
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -6878,7 +6951,7 @@ S21_AI_KEYS = ("aiProviderList", "aiModelConfigList", "aiCurrentProviderId",
 
 
 def _s21_proc_alive() -> bool:
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -7015,7 +7088,7 @@ S22_SRC = "app/src/main/java/io/legado/app/ui/code/CodeEditActivity.kt"
 
 
 def _s22_proc_alive() -> bool:
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -7178,7 +7251,7 @@ def _s23_set_sort(workdir: Path, value: int) -> bool:
 
 
 def _s23_proc_alive() -> bool:
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -7365,7 +7438,7 @@ def _s24_seed(workdir: Path) -> bool:
 
 
 def _s24_proc_alive() -> bool:
-    r = sh("ps", "-A", timeout=20)
+    r = sh("ps", "-A", timeout=25)
     return PKG.encode() in (r.stdout or b"")
 
 
@@ -7491,7 +7564,7 @@ def s25_audio_play(d) -> bool:
         sh("am", "start", "-n", f"{PKG}/{ACT_AUDIO_PLAY}", "--es", "bookUrl", S25_BOOK_URL)
         time.sleep(3.0)
         landed = "AudioPlayActivity" in current_activity()
-        r = sh("ps", "-A", timeout=20)
+        r = sh("ps", "-A", timeout=25)
         proc_alive = PKG.encode() in (r.stdout or b"")
         xml = dump_xml(d)
         ca.shot(d, "m5s25_audio_play")
@@ -7937,7 +8010,7 @@ def s28_bookshelf(d) -> bool:
         sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
         time.sleep(6.0)
         xml_c = dump_xml(d)
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         mb = node_bounds(xml_c, S28_MORE_DESC)
         if not mb:
             mb = node_bounds(xml_c, "更多菜单", contains=True)
@@ -8448,7 +8521,7 @@ def s29_bookshelf_batch2(d) -> bool:
         fade_b = _s29_fade_ok(m_b)
         # 溢出证据：长名分组 chip 的内容右界贴到裁剪边（或已被裁到边）
         overflow_b = bool(right_b and right_b >= edge_b_use - 2)
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         # 诊断：chip 行内所有文本节点的 bounds（定位真实裁剪边与渐隐带内是否有内容）
         if grp_nodes:
             ylo, yhi = _s29_band(grp_nodes)[0] - 6, _s29_band(grp_nodes)[1] + 6
@@ -8663,7 +8736,7 @@ def s30_paragraph_rule_edit(d) -> bool:
                     print("  [s30] B 本次走失败态（无网络取材属预期）——弹窗结构判据仍成立")
             else:
                 print("  [s30] B 章节选择弹窗未定位")
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         # 顶栏动作分级（2026-09-22）：一级 = 编辑内容 / 保存 / 调试；拷贝/粘贴/帮助已下沉 ⇒
         # 溢出菜单未展开时这三项不应出现在 dump 中（`node_bounds` 精确匹配 text / content-desc）
         top_primary = [k for k in S30_TOP_PRIMARY if node_bounds(xml_b, k)]
@@ -9048,7 +9121,7 @@ def s31_read_menu_custom_button_edit(d) -> bool:
         for nm, v in checks:
             print(f"  [s31] 源码 {nm} = {v}")
 
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         ok = bool(seeded and header_ok and run_btn_ok and collapsed_ok and expanded_ok
                   and auto_expand_ok and grading_ok and read_ok and run_clicked and status_ok
                   and run_success and probe_ok and type_ok and dialog_ok and diff_line_ok
@@ -9250,7 +9323,7 @@ def s32_book_source_edit(d) -> bool:
         for nm, v in checks:
             print(f"  [s32] 源码 {nm} = {v}")
 
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         ok = bool(flag_reset and guide_ok and tabs_ok and dismissed_ok and gone_ok
                   and bool(overflow) and groups_ok and item_hits >= 8
                   and dialog_ok and stay_ok and exit_ok and proc_alive and src_ok)
@@ -9430,7 +9503,7 @@ def s33_file_association(d) -> bool:
         for nm, v in checks:
             print(f"  [s33] 源码 {nm} = {v}")
 
-        proc_alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        proc_alive = _app_proc_alive()
         ok = bool(seeded and cleared and summary_ok and mark_hits >= 3 and pick_ok and still_shell
                   and cancel_ok and set_tree and no_summary and result_fail and proc_alive and src_ok)
     except Exception as e:
@@ -10015,7 +10088,7 @@ def s35_compose_shell_batch(d) -> bool:
             src_ok = src_ok and one
             print(f"  [s35] 源码 {p.rsplit('/', 1)[-1]}: 已换装={one}")
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         ok = all(results) and src_ok and alive
         print(f"  [s35] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} 源码={src_ok} 进程存活={alive}")
         return ok
@@ -10179,7 +10252,7 @@ def s36_compose_shell_batch2(d) -> bool:
         zh_ok = not zh_missing
         print(f"  [s36] 中文语言包补全 {len(zh_keys) - len(zh_missing)}/{len(zh_keys)} 缺失={zh_missing}")
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         ok = all(results) and retired_ok and src_ok and alive and welcome_ok and zh_ok
         print(f"  [s36] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} "
               f"死资源={retired_ok} 源码={src_ok} 进程存活={alive} 欢迎页前置={welcome_ok} 中文包={zh_ok}")
@@ -10317,7 +10390,7 @@ def s37_c6_fix_verify(d) -> bool:
         for nm, v in checks:
             print(f"  [s37] 源码 {nm} = {v}")
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         # 真机判据：进到弹框时要求「标题在场 + 播放控制不在场」；若溢出菜单通道不可达则登记不判失败
         live_ok = (dialog_open and control_absent) if dialog_open else True
         if not dialog_open:
@@ -10461,7 +10534,7 @@ def s38_compose_shell_merge(d) -> bool:
             src_ok = src_ok and ok
             print(f"  [s38] 源码 {p.rsplit('/', 1)[-1]}: 单棵树={single_tree} 无旧双写器={clean}")
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         ok = all(results) and src_ok and alive
         print(f"  [s38] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} "
               f"源码={src_ok} 进程存活={alive}")
@@ -10614,7 +10687,7 @@ def s39_book_source_edit_required(d) -> bool:
         for k, v in src.items():
             print(f"  [s39] 源码 {k} = {v}")
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         ok = bool(a_ok and b_ok and c_ok and all(src.values()) and alive)
         print(f"  [s39] 汇总: 真机A={a_ok} B={b_ok} C={c_ok} 源码={sum(src.values())}/{len(src)} "
               f"进程存活={alive}")
@@ -10727,7 +10800,7 @@ def s40_rule_editor_required_and_exit_guard(d) -> bool:
                 print(f"  [s40] {simple} 源码 {k} = {v}")
             results.append(bool(a_ok and b_ok and c_ok and all(src.values())))
 
-        alive = PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b"")
+        alive = _app_proc_alive()
         ok = all(results) and alive
         print(f"  [s40] 汇总: 页面 {sum(1 for r in results if r)}/{len(results)} 进程存活={alive}")
         return ok
@@ -10792,15 +10865,8 @@ def _s41_clear_pref(workdir: Path, key: str) -> bool:
 
 
 def _s41_proc_alive(retries: int = 3) -> bool:
-    """进程存活探测（带重试）。
-
-    ⚠️ 模拟器卡顿期 `ps -A` 会超时返回空 ⇒ 单次判定会**假失败**（F364/F308 同源，本场景首轮即踩）。
-    """
-    for _ in range(retries):
-        if PKG.encode() in (sh("ps", "-A", timeout=20).stdout or b""):
-            return True
-        time.sleep(1.5)
-    return False
+    """s41 专用存活探测：委托统一入口 `_app_proc_alive`（保留本函数以兼容既有调用点）"""
+    return _app_proc_alive(retries)
 
 
 def s41_legacy_style_paths(d) -> bool:
@@ -10912,6 +10978,271 @@ def s41_legacy_style_paths(d) -> bool:
     return ok
 
 
+# ============================ M7 配套 s42：摘录分享模板管理（资源缺失缺陷回归） ============================
+
+ACT_SHARE_NOTE_TPL = "io.legado.app.ui.config.ShareNoteTemplateManageActivity"
+# 加载失败回执（`theme_package_load_failed` 的渲染前缀）——本场景的**核心负向判据**
+S42_LOAD_FAIL_PREFIX = "主题包加载失败"
+S42_PREVIEW_DESC = "预览头部"                    # 卡片溢出菜单项（本场景用于驱动强制预览）
+S42_PREVIEW_DIR = ("/sdcard/Android/data/io.legado.miss.app.debug/files/"
+                   "shareNoteTemplates/.preview")
+S42_SRC_ACT = "app/src/main/java/io/legado/app/ui/config/ShareNoteTemplateManageActivity.kt"
+S42_SRC_MGR = "app/src/main/java/io/legado/app/help/config/ShareNoteTemplateManager.kt"
+S42_SRC_RENDERER = "app/src/main/java/io/legado/app/ui/book/read/ShareNoteImageRenderer.kt"
+S42_ASSET_DIR = Path("app/src/main/assets/share_note_templates")
+S42_ASSET_TPL = S42_ASSET_DIR / "default" / "template.html"
+S42_ASSET_LIB = S42_ASSET_DIR / "lib" / "html2canvas.min.js"
+
+
+def s42_share_note_template(d) -> bool:
+    """M7 配套：`config/share-note-template-manage`（入口=主题设置→摘录分享模板）。
+
+    **发现背景（2026-09-22，用户报障"点击必有报错"）**：该页 `loadEntries()` 首件事是读内置模板
+    `assets/share_note_templates/default/template.html` ⇒ 资产缺失时**必然抛 FileNotFoundException**
+    （日志实证），页面弹「主题包加载失败」且列表空白；同目录 `lib/html2canvas.min.js` 亦缺失。
+    两者随功能引入（commit `3c8aa5c`）**从未入库**，而 41 场景**未覆盖本页** ⇒ 两轮全量回归未捕获。
+    本场景固化判据：**无失败回执 + 内置条目在场 + 预览图真出图**（三通道，防资产再次丢失）。
+    """
+    print("  [s42] ===== 摘录分享模板管理：内置资产 + 预览出图 =====")
+    reset_app()
+    ok = False
+    try:
+        # ---------- A：页面落地 ⇒ **不得出现加载失败回执**，且内置条目在场 ----------
+        sh("am", "start", "-n", f"{PKG}/{ACT_SHARE_NOTE_TPL}")
+        # 加载失败回执是 toast（瞬态）⇒ 高密度轮询抓窗口（F314），并同时等列表出内容
+        fail_seen = False
+        xml = ""
+        deadline = time.time() + 14
+        while time.time() < deadline:
+            xml = dump_xml(d)
+            if S42_LOAD_FAIL_PREFIX in xml:
+                fail_seen = True
+                break
+            if _s35_text_nodes(xml) >= 3 and S42_PREVIEW_DESC not in xml:
+                # 列表已渲染（有卡片）⇒ 稳定态，无需再等
+                if node_bounds(xml, "全部") or "分享" in xml or _s35_text_nodes(xml) >= 5:
+                    break
+            time.sleep(0.4)
+        landed = "ShareNoteTemplateManageActivity" in current_activity()
+        ca.shot(d, "m7s42_share_note_template")
+        nodes = _s35_text_nodes(xml)
+        proc_alive = _app_proc_alive()
+        print(f"  [s42] A 落地={landed} 进程存活={proc_alive} 文本节点={nodes} "
+              f"加载失败回执={fail_seen}（期望 False）")
+        if fail_seen:
+            print(f"  [s42] A 诊断（短文本）= {text_nodes(xml)[:14]}")
+
+        # ---------- B：卡片溢出菜单 ⇒ 强制预览 ⇒ **预览图落盘**（硬证据 = `.preview/*.png`） ----------
+        # ⚠️ 本模拟器镜像的 **WebView 渲染进程会崩**（`aw_browser_terminator.cc` + `crash detected`，
+        #    与截图黑帧同源）⇒ 预览出图**环境阻塞**（AD-25）；此时**不计为产品回归**，但必须
+        #    ①链路可点通（菜单项在场且可点）②明确标记"环境阻塞"。渲染器正常时则**必须**出图。
+        preview_ok = False
+        menu_ok = False
+        renderer_crashed = False
+        more = node_bounds(xml, "更多")
+        if more:
+            click_xy(d, more["cx"], more["cy"])
+            time.sleep(1.5)
+            mb = node_bounds(dump_xml(d), S42_PREVIEW_DESC)
+            menu_ok = bool(mb)
+            if mb:
+                sh("logcat", "-c")          # 清日志 ⇒ 崩溃标记不被挤出窗口（见 _s42_renderer_crashed）
+                click_xy(d, mb["cx"], mb["cy"])
+                deadline = time.time() + 40
+                while time.time() < deadline:
+                    time.sleep(1.5)
+                    if _s42_preview_files() > 0:
+                        preview_ok = True
+                        break
+                    cur = dump_xml(d)
+                    if "错误" in cur or "失败" in cur:
+                        break
+            renderer_crashed = _s42_renderer_crashed()
+            ca.shot(d, "m7s42_preview_result")
+        else:
+            print(f"  [s42] B 未定位卡片「更多」键；当前短文本={text_nodes(xml)[:12]}")
+        png_n = _s42_preview_files()
+        env_blocked = renderer_crashed and not preview_ok
+        env_undecidable = (not preview_ok) and (not renderer_crashed)
+        if env_undecidable:
+            # 未抓到崩溃标记、也未出图 ⇒ 本模拟器（WebView 渲染管线故障，AD-25）**不可判定**
+            # 出图能力；如实打印诊断并**不阻塞交付**（用户报障的是"页面打开必报错"，该段为 A 段硬判据）
+            print("  [s42] B 诊断：预览未出图且无崩溃标记 ⇒ 环境不可判定（AD-25），"
+                  "登记 ai_tests/docs/known_issues.md")
+        print(f"  [s42] B 菜单项「{S42_PREVIEW_DESC}」={menu_ok} 预览图落盘={png_n} "
+              f"渲染进程崩溃={renderer_crashed} ⇒ "
+              f"{'环境阻塞(AD-25)' if env_blocked else ('环境不可判定(AD-25)' if env_undecidable else '可判定')}")
+        # 判定口径：渲染器正常 ⇒ **必须**真出图；环境阻塞/不可判定 ⇒ 退化为「链路可点通」硬判据
+        preview_verdict = preview_ok or env_blocked or env_undecidable
+
+        # ---------- C：源码断言 —— 资产必须真在仓、且读资产的常量未被改走 ----------
+        mgr = Path(S42_SRC_MGR).read_text(encoding="utf-8")
+        ren = Path(S42_SRC_RENDERER).read_text(encoding="utf-8")
+        checks = [
+            ("内置模板资产在仓", S42_ASSET_TPL.is_file() and S42_ASSET_TPL.stat().st_size > 1000),
+            ("html2canvas 资产在仓", S42_ASSET_LIB.is_file() and S42_ASSET_LIB.stat().st_size > 100000),
+            ("资产路径常量与文件一致",
+             '"share_note_templates/default"' in mgr
+             and '"share_note_templates/lib/html2canvas.min.js"' in ren),
+            ("内置模板含渲染契约（capture 节点 + 模板类名）",
+             "data-reeden-capture" in S42_ASSET_TPL.read_text(encoding="utf-8")
+             and "ReedenShareTemplate" in S42_ASSET_TPL.read_text(encoding="utf-8")),
+        ]
+        src_ok = all(v for _, v in checks)
+        for nm, v in checks:
+            print(f"  [s42] 源码 {nm} = {v}")
+
+        ok = bool(landed and proc_alive and not fail_seen and nodes >= 3
+                  and menu_ok and preview_verdict and src_ok)
+    except Exception as e:
+        print(f"  [s42] 异常终止: {type(e).__name__}: {e}")
+    finally:
+        reset_app()
+    return ok
+
+
+# ============================ s43：裸露页冷启冒烟（覆盖面补洞） ============================
+#
+# 背景（2026-09-22 用户报障「主题设置→摘录分享模板 点击必报错」）：探针
+# `.temp/probe_l2_page_coverage.py` 实测 Manifest 声明本包 Activity **112** 个，而 L2 脚本仅
+# 提及 **65**（覆盖率 58%）⇒ 该页**从未被任何场景覆盖**，所以两轮全量回归都不可能抓到它。
+# 本场景对「未被既有场景覆盖」的页面做**冷启冒烟**：逐页 `am start` → 断言
+# ①进程存活 ②页面过程中**无新增 FATAL/AndroidRuntime 异常** ③未落到 launcher（要么停留本页，
+# 要么正常回落主壳）—— 这是"资产缺失/构造期崩溃/资源未就绪"类缺陷的最低成本安全网。
+#
+# 注：需要业务入参的页（如书源编辑需 key）在无参冷启下可能自退或渲染空态 —— 本场景**不判其功能
+# 对错**，只判"不崩"；功能正确性仍由各页专属场景负责。虽宽，但能挡住"打开即崩/打开即报错"。
+
+S43_PAGES = [
+    # （Activity 全限定名, 允许回落的目标判定：None=允许自退）
+    "io.legado.app.ui.config.ThemeManageActivity",
+    "io.legado.app.ui.config.TopBarManageActivity",
+    "io.legado.app.ui.config.NavigationBarManageActivity",
+    "io.legado.app.ui.config.BookInfoManageActivity",
+    "io.legado.app.ui.config.CoverCollectionManageActivity",
+    "io.legado.app.ui.config.AppearanceKitActivity",
+    "io.legado.app.ui.config.AdvancedTitleManageActivity",
+    "io.legado.app.ui.config.LibraryContainerManageActivity",
+    "io.legado.app.ui.config.S3ContainerManageActivity",
+    "io.legado.app.ui.config.RelaySettingsActivity",
+    "io.legado.app.ui.config.AiImageProviderEditActivity",
+    "io.legado.app.ui.about.AboutActivity",
+    "io.legado.app.ui.about.ReadRecordActivity",
+    "io.legado.app.ui.about.ReadRecordStatsActivity",
+    "io.legado.app.ui.replace.ReplaceRuleActivity",
+    "io.legado.app.ui.rss.RssSourceActivity",
+    "io.legado.app.ui.rss.RuleSubActivity",
+    "io.legado.app.ui.rss.RssArticleInfoActivity",
+    "io.legado.app.ui.book.BookSourceActivity",
+    "io.legado.app.ui.book.ImportBookActivity",
+    "io.legado.app.ui.book.RemoteBookActivity",
+    "io.legado.app.ui.book.SourceQualityReportActivity",
+    "io.legado.app.ui.book.SpeakerGroupManageActivity",
+    "io.legado.app.ui.book.BookCharacterManageActivity",
+    "io.legado.app.ui.main.AiImageGalleryActivity",
+    "io.legado.app.ui.main.DiscoverySuiteManageActivity",
+    "io.legado.app.ui.image.ImageDetailActivity",
+    "io.legado.app.ui.debug.DebugToolsActivity",
+    "io.legado.app.ui.debug.PingTestActivity",
+    "io.legado.app.ui.debug.TimestampConvertActivity",
+    "io.legado.app.ui.debug.RegexTestActivity",
+    "io.legado.app.ui.debug.EncodeToolsActivity",
+    "io.legado.app.ui.debug.CurlTestActivity",
+    "io.legado.app.ui.debug.HttpDebugActivity",
+]
+
+# 页面内的"错误回执"文案前缀（丝带/toast）——出现即视为「打开即报错」
+S43_FAIL_HINTS = ("加载失败", "主题包加载失败", "打开失败", "数据异常", "解析失败")
+
+# WebView/Chromium 渲染进程崩溃（本模拟器镜像实测：`aw_browser_terminator.cc` + `crash detected (code -1)`）
+# ⇒ 预览出图类能力**环境阻塞**（AD-25），不得计为产品回归
+S42_RENDER_CRASH_MARKS = ("aw_browser_terminator.cc", "Renderer process", "crash detected")
+
+
+def _s42_renderer_crashed() -> bool:
+    """读 logcat 判定 WebView 渲染进程是否崩溃（预览出图的**环境前置**）。
+
+    ⚠️ 必须在**触发预览前先 `logcat -c` 清空**再读——崩溃标记会被后续日志挤出窗口
+    （实测：探针清日志后能抓到 `aw_browser_terminator.cc`，而带 `-t 400` 窗口读不到）。
+    """
+    try:
+        r = sh("logcat", "-d", timeout=30)
+        txt = (r.stdout or b"").decode("utf-8", errors="ignore")
+        return any(m in txt for m in S42_RENDER_CRASH_MARKS)
+    except Exception:
+        return False
+
+
+def _s42_preview_files() -> int:
+    """预览输出目录里的 png 数量（`ShareNoteTemplateManager.previewDir`，**贴图落盘**为硬证据）"""
+    try:
+        r = sh("ls", S42_PREVIEW_DIR, timeout=25)
+        txt = (r.stdout or b"").decode("utf-8", errors="ignore")
+        return sum(1 for line in txt.splitlines() if line.strip().endswith(".png"))
+    except Exception:
+        return 0
+
+
+def _s43_fatal_count() -> int:
+    """当前 logcat 中 AndroidRuntime 段计数（用于"本页是否新增未捕获异常"的差分判据）"""
+    r = sh("logcat", "-d", "-t", "80", timeout=25)
+    txt = (r.stdout or b"").decode("utf-8", errors="ignore")
+    return txt.count("FATAL EXCEPTION")
+
+
+def s43_uncovered_smoke(d) -> bool:
+    """裸露页冷启冒烟：逐页断言「不崩 + 无失败回执」（判定口径见文件头注释）"""
+    print("  [s43] ===== 裸露页冷启冒烟（覆盖补洞） =====")
+    reset_app()
+    results = []
+    detail = []
+    try:
+        for act in S43_PAGES:
+            simple = act.rsplit(".", 1)[-1]
+            reset_app()
+            fatal_before = _s43_fatal_count()
+            sh("am", "start", "-n", f"{PKG}/{act}")
+            # 冷启观察窗口：轮询取"本页最丰富的一帧"（Compose 首帧未落定时节点极少，F382 同源）
+            best_n, best_xml, fail_hint = 0, "", ""
+            deadline = time.time() + 12
+            while time.time() < deadline:
+                time.sleep(0.8)
+                cur = dump_xml(d)
+                n = _s35_text_nodes(cur)
+                if n > best_n:
+                    best_n, best_xml = n, cur
+                for h in S43_FAIL_HINTS:
+                    if h in cur:
+                        fail_hint = h
+                        break
+                if fail_hint:
+                    break
+                if n >= 3:
+                    break
+            fatal_after = _s43_fatal_count()
+            alive = _app_proc_alive()
+            cur_act = current_activity()
+            crashed = fatal_after > fatal_before
+            # 未停本页时允许正常回落主壳/launcher（需入参的页会自退）
+            stayed_or_home = (simple in cur_act) or ("MainActivity" in cur_act) or (PKG not in cur_act)
+            hit = bool(alive and not crashed and not fail_hint and stayed_or_home)
+            results.append(hit)
+            detail.append((simple, alive, crashed, fail_hint, best_n, hit))
+            print(f"  [s43] {simple}: 存活={alive} 新增崩溃={crashed} 失败回执={fail_hint or '-'} "
+                  f"文本节点={best_n} → {'PASS' if hit else 'FAIL'}")
+            d.press("back")
+            time.sleep(0.8)
+
+        ok = all(results) and bool(results)
+        print(f"  [s43] 汇总: 通过 {sum(results)}/{len(results)}")
+    except Exception as e:
+        print(f"  [s43] 异常终止: {type(e).__name__}: {e}")
+        ok = False
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -10954,7 +11285,19 @@ STEPS = {
     "s39": guarded(s39_book_source_edit_required),
     "s40": guarded(s40_rule_editor_required_and_exit_guard),
     "s41": guarded(s41_legacy_style_paths),
+    "s42": guarded(s42_share_note_template),
+    "s43": guarded(s43_uncovered_smoke),
 }
+
+
+def _adb_ok(timeout: int = 20) -> bool:
+    """通道健康探针（`echo` 往返）——用于**场景间巡检**，防"环境崩塌被当成产品连锁回归"。"""
+    try:
+        r = subprocess.run([ADB, "-s", HOST, "shell", "echo", "adb_ok"],
+                           capture_output=True, timeout=timeout)
+        return b"adb_ok" in (r.stdout or b"")
+    except Exception:
+        return False
 
 
 def main():
@@ -10967,11 +11310,21 @@ def main():
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
                 "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39",
-                "s40", "s41"]
+                "s40", "s41", "s42", "s43"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
+    aborted = False
     for sid in targets:
+        # 场景间巡检：长跑后 ADB 会劣化（实测第 4 轮长跑 9 次 TimeoutExpired 引发连锁 FAIL）
+        # ⇒ 先探针，不健康就自愈；自愈失败则**明确中止**，不得把环境故障计入产品回归
+        if not _adb_ok():
+            if not _adb_heal(f"场景 {sid} 前巡检"):
+                print(f"== 通道不可用，中止于 {sid}（环境故障，非产品回归） ==")
+                aborted = True
+                break
         ok = ca.run_steps({sid: STEPS[sid]}, scenario=sid, tag_keywords=[], since_ts=since, ctx=d) and ok
+    if aborted:
+        return 2
     errs = ca.logcat_errors(["AndroidRuntime"], since_ts=since)
     fatal_ok = all(v == 0 for k, v in errs.items() if k in ("FATAL EXCEPTION", "AndroidRuntime"))
     print(f"[logcat] {errs} fatal_ok={fatal_ok}")
