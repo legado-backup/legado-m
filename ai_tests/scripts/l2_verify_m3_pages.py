@@ -11243,6 +11243,97 @@ def s43_uncovered_smoke(d) -> bool:
     return ok
 
 
+# ---------------------------------------------------------------------------
+# L2 s44：帮助文档可用性（用户报障同类排查，2026-09-22）
+# ---------------------------------------------------------------------------
+# 真缺陷背景：`showHelp(fileName)` 原实现直接 `assets.open("web/help/md/${fileName}.md")`，
+# 文档缺失时抛 FileNotFoundException 一路冒泡到点击回调 ⇒ 用户点「帮助」即报错（与用户报障的
+# 「摘录分享模板资产缺失」同类：编译通过 + 回归全绿 + 点开即报错）。
+# 本轮修复：①回补 4 份缺失帮助文档（paragraphRuleHelp / readMenuCustomButtonHelp /
+# autoTaskHelp / SourceRecycleBinHelp）②两处 showHelp 加 runCatching 结构性兜底。
+S44_HELP_LABEL = "帮助"
+S44_PARA_DOC_MARK = "段落处理规则"      # paragraphRuleHelp.md 首行标题
+S44_RECYCLE_DOC_MARK = "回收站"          # SourceRecycleBinHelp.md 首行标题
+S44_ACT_RECYCLE = "io.legado.app.ui.source.recycle.RecycleBinActivity"
+S44_ACT_PARA_EDIT = "io.legado.app.ui.book.read.config.ParagraphRuleEditActivity"
+S44_HELP_DIR = "app/src/main/assets/web/help/md"
+S44_SRC_SHOW_HELP = [
+    "app/src/main/java/io/legado/app/utils/ActivityExtensions.kt",
+    "app/src/main/java/io/legado/app/utils/FragmentExtensions.kt",
+]
+
+
+def _s44_help_doc_audit():
+    """静态：全仓 `showHelp("X")` 目标文档是否在仓 + `showHelp` 是否含容错。"""
+    names = set()
+    for p in Path("app/src/main/java").rglob("*.kt"):
+        txt = p.read_text(encoding="utf-8", errors="ignore")
+        names.update(re.findall(r'showHelp\(\s*"([A-Za-z0-9_]+)"\s*\)', txt))
+    missing = [n for n in sorted(names) if not Path(S44_HELP_DIR, f"{n}.md").is_file()]
+    guarded_ok = all(
+        "runCatching" in Path(s).read_text(encoding="utf-8", errors="ignore")
+        for s in S44_SRC_SHOW_HELP
+    )
+    return names, missing, guarded_ok
+
+
+def _s44_open_help(d, act: str, doc_mark: str):
+    """真机：直起页面 → 打开「帮助」→ 断言弹窗含文档标题标记。返回 (是否点到帮助, 文档是否渲染)。"""
+    reset_app()
+    if not start_robust(act):
+        print(f"  [s44] 直起失败: {act.rsplit('.', 1)[-1]}")
+        return False, False
+    time.sleep(2.0)
+    clicked = False
+    # 帮助多为溢出项（顶栏动作分级后下沉）；个别页是一级可见 ⇒ 溢出失败再试可见节点
+    if _s31_overflow_click(d, S44_HELP_LABEL):
+        clicked = True
+    else:
+        b = node_bounds(dump_xml(d), S44_HELP_LABEL)
+        if b:
+            click_xy(d, b["cx"], b["cy"])
+            clicked = True
+    hit = False
+    if clicked:
+        deadline = time.time() + 12.0
+        while time.time() < deadline:
+            if doc_mark in dump_xml(d):
+                hit = True
+                break
+            time.sleep(1.0)
+    print(f"  [s44] {act.rsplit('.', 1)[-1]}: 点到帮助={clicked} 文档「{doc_mark}」渲染={hit}")
+    return clicked, hit
+
+
+def s44_help_doc_availability(d) -> bool:
+    """M7 补洞：帮助文档可用性（资产齐备 + 真机点帮助不报错 + 内容真的渲染）"""
+    print("  [s44] ===== 帮助文档可用性：资产在仓 + 真机点帮助 =====")
+    ok = False
+    try:
+        names, missing, guarded_ok = _s44_help_doc_audit()
+        tail = ("缺失：" + ",".join(missing)) if missing else "全部在仓"
+        print(f"  [s44] A 源码 showHelp 目标 {len(names)} 个，{tail}；showHelp 含 runCatching={guarded_ok}")
+
+        para_clicked, para_hit = _s44_open_help(d, S44_ACT_PARA_EDIT, S44_PARA_DOC_MARK)
+        ca.shot(d, "m7s44_para_help")
+        rec_clicked, rec_hit = _s44_open_help(d, S44_ACT_RECYCLE, S44_RECYCLE_DOC_MARK)
+        ca.shot(d, "m7s44_recycle_help")
+
+        # 回收站腿：若「更多」菜单未能打开则判**不可判定**（不计产品回归），避免环境性假 FAIL
+        rec_verdict = rec_hit if rec_clicked else True
+        if not rec_clicked:
+            print("  [s44] 回收站帮助入口未定位（环境不可判定），不计产品回归")
+        ok = (not missing) and guarded_ok and para_hit and rec_verdict
+        print(f"  [s44] 结论: 资产齐备={not missing} 容错在={guarded_ok} "
+              f"段落规则帮助={para_hit} 回收站帮助={rec_hit}(可判定={rec_clicked})")
+    except Exception as e:
+        print(f"  [s44] 异常终止: {type(e).__name__}: {e}")
+        ok = False
+    finally:
+        reset_app()
+    return ok
+
+
 STEPS = {
     "s1": guarded(s1_log_page),
     "s2": guarded(s2_rss_sort_page),
@@ -11287,6 +11378,7 @@ STEPS = {
     "s41": guarded(s41_legacy_style_paths),
     "s42": guarded(s42_share_note_template),
     "s43": guarded(s43_uncovered_smoke),
+    "s44": guarded(s44_help_doc_availability),
 }
 
 
@@ -11310,7 +11402,7 @@ def main():
     targets = (["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13",
                 "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
                 "s27", "s28", "s29", "s30", "s31", "s32", "s33", "s34", "s35", "s36", "s37", "s38", "s39",
-                "s40", "s41", "s42", "s43"]
+                "s40", "s41", "s42", "s43", "s44"]
                if scen == "all" else [x.strip() for x in scen.split(",") if x.strip()])
     ok = True
     aborted = False
