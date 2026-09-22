@@ -417,7 +417,7 @@ def s1_log_page(d) -> bool:
     if not start_robust(ACT_LOG):
         print(f"  [s1] 未进入日志页（栈顶={current_activity()}）")
         return False
-    xml0 = dump_xml(d)
+    xml0 = _dump_until_ready(d, marker=S_LOG_TITLE, min_nodes=1)
     landed = S_LOG_TITLE in xml0
     print(f"  [s1] 日志页落地={landed} / 栈顶={current_activity()}")
     if not landed:
@@ -5068,8 +5068,16 @@ def s14_rss_search_and_my(d) -> bool:
         # 输入帮助区只在「输入变化」时展开（空 key 启动只聚焦不出历史）⇒ 必须真打一个字
         typed = type_search(d, "l") if a4_landed else False
         time.sleep(2.0)
-        hist_xml = dump_xml(d)
-        hist_b = node_bounds(hist_xml, S14_HISTORY_WORD)
+        # ⚠️ 2026-09-22（F382 同源）：搜索历史面板是**异步挂载**的，输入后立刻 dump 会落空
+        #    ⇒ 限次重取（历史词命中即止）
+        hist_xml = ""
+        hist_b = None
+        for _ in range(5):
+            hist_xml = dump_xml(d)
+            hist_b = node_bounds(hist_xml, S14_HISTORY_WORD)
+            if hist_b:
+                break
+            time.sleep(1.2)
         dlg_seen = False
         kept_after_no = False
         gone_after_yes = False
@@ -5100,18 +5108,13 @@ def s14_rss_search_and_my(d) -> bool:
         # ---------- B1：我的页头部资产概览（F26） ----------
         reset_app()
         sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
-        time.sleep(6.0)
-        main_xml = dump_xml(d)
+        # ⚠️ 2026-09-22（F382 同源）：主壳起步是**骨架屏**，固定 6s 后 dump 仍只拿到灰块占位
+        #    （截图 `m4s14_my_profile_header.png` 实证：六行灰卡 + 底栏已渲染但 `bottom_navigation_view`
+        #    未进树）⇒ 必须**等到就绪**（底栏容器命中）再定位
+        main_xml, nav_container = _main_shell_nav(d)
         # 底栏为**纯图标模式**（labelVisibilityMode 走 icon-only）⇒ 「我的」二字不进 a11y 树，
         # 只能按容器几何点第 4 格（4 Tab：书架/发现/订阅/我的）
-        nav_container = node_bounds_by_id(main_xml, "bottom_navigation_view")
-        nav_b = None
-        if nav_container:
-            w4 = nav_container["right"] - nav_container["left"]
-            nav_b = {
-                "cx": nav_container["left"] + w4 * 7 // 8,
-                "cy": (nav_container["top"] + nav_container["bottom"]) // 2,
-            }
+        nav_b = _main_nav_tab(nav_container, 3)
         if nav_b:
             click_xy(d, nav_b["cx"], nav_b["cy"])
             time.sleep(4.0)
@@ -7778,17 +7781,10 @@ def s27_explore_tab(d) -> bool:
         seeded = _s27_seed_suite(workdir)
         reset_app()
         sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
-        time.sleep(6.0)
-        main_xml = dump_xml(d)
+        # 等主壳就绪（骨架屏阶段底栏容器未进 a11y 树，见 `_main_shell_nav` 说明）
+        main_xml, nav_container = _main_shell_nav(d)
         # 底栏 icon-only ⇒ 「发现」二字不进 a11y 树，按容器几何点第 2 格（4 Tab：书架/发现/订阅/我的）
-        nav_container = node_bounds_by_id(main_xml, "bottom_navigation_view")
-        nav_b = None
-        if nav_container:
-            w4 = nav_container["right"] - nav_container["left"]
-            nav_b = {
-                "cx": nav_container["left"] + w4 * 3 // 8,
-                "cy": (nav_container["top"] + nav_container["bottom"]) // 2,
-            }
+        nav_b = _main_nav_tab(nav_container, 1)
         if nav_b:
             click_xy(d, nav_b["cx"], nav_b["cy"])
             time.sleep(4.5)
@@ -9921,6 +9917,34 @@ def _dump_until_ready(d, marker: str = "", min_nodes: int = 3,
         time.sleep(gap)
         xml = dump_xml(d)
     return xml
+
+
+def _main_shell_nav(d, tries: int = 8, gap: float = 1.5):
+    """等主壳**底栏容器**进树后返回 (xml, nav_container)。
+
+    主壳起步是**骨架屏**：灰块占位阶段底栏已渲染，但 `bottom_navigation_view` 尚未进 a11y 树
+    ⇒ 固定 `sleep` + 单次 dump 会拿不到容器（s14 B1「底栏定位=False」、s27 同型）。返回
+    `nav_container=None` 时由调用方打印诊断并判失败，**不静默降级**。
+    """
+    xml, box = "", None
+    for _ in range(tries):
+        time.sleep(gap)
+        xml = dump_xml(d)
+        box = node_bounds_by_id(xml, "bottom_navigation_view")
+        if box:
+            break
+    return xml, box
+
+
+def _main_nav_tab(box, index: int, total: int = 4):
+    """按容器几何算第 `index`（从 0 起）个 Tab 的中心点（底栏 icon-only ⇒ 文案不进 a11y 树）"""
+    if not box:
+        return None
+    w = box["right"] - box["left"]
+    return {
+        "cx": box["left"] + w * (2 * index + 1) // (2 * total),
+        "cy": (box["top"] + box["bottom"]) // 2,
+    }
 
 
 def _s35_launch(act: str) -> bool:
