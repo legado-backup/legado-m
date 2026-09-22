@@ -212,9 +212,20 @@ def connect_robust(retries=3) -> u2.Device:
     raise RuntimeError("设备连接失败")
 
 
+def _screen_guard():
+    """模拟器按系统超时息屏（`stay_on_while_plugged_in` 实测为 0）⇒ dump/截图返回**纯黑帧** +
+    锁屏/通知栏节点，`mResumedActivity` 变空 ⇒ 批量假失败（2026-09-22 实测 s27/s28 全黑截图）。
+    幂等四件套：插电常亮 + 唤醒 + 解锁 + 收起通知栏。"""
+    sh("settings", "put", "global", "stay_on_while_plugged_in", "7")
+    sh("input", "keyevent", "KEYCODE_WAKEUP")
+    sh("wm", "dismiss-keyguard")
+    sh("cmd", "statusbar", "collapse")
+
+
 def reset_app():
     sh("am", "force-stop", PKG)
     time.sleep(1.5)
+    _screen_guard()
 
 
 def current_activity() -> str:
@@ -810,10 +821,8 @@ def s2_rss_sort_page(d) -> bool:
 # ===================== s3：browser/webview-browser（内嵌浏览器）=====================
 
 ACT_BROWSER = "io.legado.app.ui.browser.WebViewActivity"
-S_SSL_TITLE = "证书校验失败"                    # ssl_error_title
-S_SSL_CONTINUE = "仍要继续访问"                  # ssl_error_continue
-S_SSL_CERT_INFO = "有效期至"                     # ssl_error_cert_info
-S_SSL_CANCEL = "取消"                            # cancel
+S_SSL_TITLE = "证书校验失败"                    # ssl_error_title（**已退役的弹窗文案**：仅用于「弹窗不存在」负向断言）
+S_SSL_CONTINUE = "仍要继续访问"                  # ssl_error_continue（同上）
 S_BACK_EXIT = "再按一次返回键退出"                # webview_back_again_exit
 S_DISABLE = "禁用源"                             # disable_source
 S_DELETE = "删除源"                              # delete_source
@@ -823,6 +832,8 @@ S_CF_CHECKING = "正在通过站点安全检查"             # source_verificati
 S_YES = "是"                                     # yes
 S_NO = "否"                                      # no
 SRC_BROWSER = "app/src/main/java/io/legado/app/ui/browser/WebViewActivity.kt"
+# 静默放行的**唯一实现**（2026-09-21 用户裁决后 SSL 处理收敛到共享件）
+SRC_SILENT_SSL_CLIENT = "app/src/main/java/io/legado/app/help/webView/SilentSslWebViewClient.kt"
 SSL_PORT = 8443
 HTTP_PORT = 8543
 BOGUS_ORIGIN = "l2test://browser-nosuch"
@@ -1030,9 +1041,7 @@ def clear_guide_flag() -> bool:
 
 
 # ---- 证书放行策略（用户裁决 2026-09-20）：类爬虫场景源站自签名/过期证书极常见 ⇒ **默认放行** ----
-S_SSL_PASS = "证书放行策略"                     # ssl_passthrough（菜单项标题）
-S_SSL_ON_HINT = "证书放行已开启：证书校验失败直接放行，不再询问"    # ssl_passthrough_on_hint
-S_SSL_OFF_HINT = "证书放行已关闭：证书校验失败需确认后才能继续"     # ssl_passthrough_off_hint
+S_SSL_PASS = "证书放行策略"                     # ssl_passthrough（**已退役的菜单项标题**：仅用于「开关不存在」负向断言）
 PREFS_DIR = f"/data/data/{PKG}/shared_prefs"
 
 
@@ -1055,56 +1064,15 @@ def _ssl_pref_state():
     return None if not m else (m.group(1) == "true")
 
 
-def toggle_ssl_pass_through(d) -> dict:
-    """顶栏 ⋮ →「证书放行策略」切换。返回 {menu, clicked, hint_on, hint_off}
-    （menu=菜单项在场；hint_*=点击后的状态回执文案，作为「用户看得见当前策略」的判据）"""
-    res = {"menu": False, "clicked": False, "hint_on": False, "hint_off": False}
-    more = topbar_action_bounds(dump_xml(d), 0)
-    if not more:
-        return res
-    click_xy(d, more["cx"], more["cy"])
-    time.sleep(1.5)
-    xmlm = dump_xml(d)
-    res["menu"] = S_SSL_PASS in xmlm
-    b = node_bounds(xmlm, S_SSL_PASS)
-    if not b:
-        d.press("back")          # 关掉误开的菜单，避免遮住后续动作
-        return res
-    click_xy(d, b["cx"], b["cy"])
-    res["clicked"] = True
-    # 回执是**短时 snackbar**（约 2s）⇒ 必须点击后立即轮询捕获；
-    # ⚠️ 反面教训（2026-09-20 s3 首轮）：固定 sleep 1s + click_xy 自带 1.2s = 2.2s 后 dump，
-    #    回执已消失 ⇒ 报「关闭提示=False」假 FAIL（而 prefs 回读已证 onClick 确实执行）。
-    for _ in range(6):
-        xml = dump_xml(d)
-        res["hint_on"] = res["hint_on"] or (S_SSL_ON_HINT in xml)
-        res["hint_off"] = res["hint_off"] or (S_SSL_OFF_HINT in xml)
-        if res["hint_on"] or res["hint_off"]:
-            break
-        time.sleep(0.7)
-    return res
-
-
 def _logcat_count(keyword: str) -> int:
     """统计 logcat 当前缓冲里含 keyword 的行数（用于「某动作确实触发了某副作用」的客观增量判据）"""
     out = sh("logcat", "-d", "-v", "brief", timeout=60).stdout.decode("utf-8", errors="ignore")
     return sum(1 for line in out.splitlines() if keyword in line)
 
 
-def wait_ssl_dialog(d, rounds: int = 6, wait: float = 2.5):
-    """等证书确认弹窗出现（**不点击**，用于断言弹窗内容）。冷启动 + WebView 池 + 首请求
-    证书校验需要几秒，首次 dump 常常还没弹（实测 2026-09-20 首轮「齐备=False」的真因）。"""
-    for _ in range(rounds):
-        xml = dump_xml(d)
-        if S_SSL_TITLE in xml:
-            return xml
-        time.sleep(wait)
-    return ""
-
-
 def wait_browser_title(d, want: str, rounds: int = 6, wait: float = 2.5) -> bool:
-    """等待顶栏标题命中：每次到该 https 站点的**首次加载都会弹证书确认**（设计如此，无白名单）
-    ⇒ 循环内先接受证书再判标题。"""
+    """等待顶栏标题命中。2026-09-21 用户裁决后**不再有证书确认弹窗**（一律静默放行）⇒ 循环内
+    的「接受证书」分支已恒不命中（保留为防御性 no-op，不参与判据）。"""
     for _ in range(rounds):
         xml = dump_xml(d)
         if want in xml:
@@ -1168,19 +1136,13 @@ def s3_browser_page(d) -> bool:
     simple = ACT_BROWSER.rsplit(".", 1)[-1]
     try:
         # ---------- 证书放行策略（**默认放行**，用户裁决 2026-09-20）+ 关闭态的 SSL 知情确认 ----------
-        # 策略语义：本应用主体是类爬虫的书源/订阅源引擎，源站自签名/过期证书极常见 ⇒ 默认放行，
-        # 避免大量源被证书判死；用户可在 ⋮ 菜单关闭，关闭后才逐次知情确认。
+        # 策略语义（2026-09-21 用户裁决后）：本应用主体是类爬虫的书源/订阅源引擎，源站自签名/过期证书
+        # 极常见 ⇒ **全项目一律静默放行**（开关已删除，见 `PreferKey.kt:547-548`）⇒ 不再需要「前置归一」
+        # （原「经 ⋮ 拨回放行态」步骤随开关退役）。
         # 带 query 的 URL：确保两次加载不落 WebView HTTP 缓存（否则第二次不再发起请求/不再告警）
         pref_entry = _ssl_pref_state()
-        print(f"  [s3] 策略前置：pref={pref_entry}（None=未写入 ⇒ AppConfig 默认 True=放行）")
+        print(f"  [s3] 策略前置：pref={pref_entry}（仅诊断；开关已删 ⇒ 恒为静默放行）")
         passthrough_ok = False
-        ssl_menu_ok = ssl_off_ok = ssl_off_hint = ssl_restore_ok = False
-        if pref_entry is False:
-            # 上次中断可能残留关闭态 ⇒ 先经 UI 拨回（幂等归一，不直接改 prefs 文件，避免绕过被验对象）
-            reset_app()
-            if start_browser(f"{hbase}/pre", "BTL2"):
-                toggle_ssl_pass_through(d)
-                print(f"  [s3] 策略前置归一：pref 回读={_ssl_pref_state()}（期望 True）")
 
         # 默认放行：证书错误不打断加载（无弹窗 + 服务端真的收到请求）
         HTTPS_REQS.clear()
@@ -1196,58 +1158,35 @@ def s3_browser_page(d) -> bool:
         ca.shot(d, "m3browser_s3_passthrough_default")
         print(f"  [s3] 默认放行：无证书弹窗={no_dialog} / 服务端收到 /a={got_c0}（证书错误不阻断）")
 
-        # 关闭放行：⋮ →「证书放行策略」（菜单项在场 + prefs 回读 + 状态回执文案 三重判据）
-        tg = toggle_ssl_pass_through(d)
-        ssl_menu_ok = tg["menu"]
-        ssl_off_hint = tg["hint_off"]
-        ssl_off_ok = tg["clicked"] and (_ssl_pref_state() is False)
-        ca.shot(d, "m3browser_s3_passthrough_off")
-        print(f"  [s3] 关闭放行：菜单项在场={tg['menu']} / 已点击={tg['clicked']}"
-              f" / pref回读={_ssl_pref_state()}（期望 False）/ 关闭提示={tg['hint_off']}")
-
-        # 关闭态：证书错误 ⇒ 知情确认弹窗（下列断言沿用原「修复1」口径）
-        HTTPS_REQS.clear()
+        # ---------- 判据修正（2026-09-22）：开关已删 ⇒ 改「负向 + 共享静默客户端」口径 ----------
+        # 2026-09-21 用户裁决「全项目 WebView/网络层一律静默放行，开关删除」（`PreferKey.kt:547-548`）
+        # ⇒ 原「关闭放行 → 关闭态弹窗 → 取消/继续出口 → 策略还原」五段判据**随键一并退役**；
+        # SSL 逻辑已收敛到共享件 `help/webView/SilentSslWebViewClient.kt`（`handler?.proceed()`）。
+        # 登记：docs/issues/ai/20260922/c6-audit-and-m7-shellfindings.md §8.1。
         reset_app()
         if not start_browser(f"{sbase}/a?c1", "BTL2"):
             print(f"  [s3] 未进入内嵌浏览器（栈顶={current_activity()}）")
             return False
-        xml0 = wait_ssl_dialog(d)
-        ca.shot(d, "m3browser_s3_ssl_dialog")
-        dialog_ok = bool(xml0) and all(s in xml0 for s in (S_SSL_TITLE, S_SSL_CONTINUE,
-                                                          S_SSL_CERT_INFO, S_SSL_CANCEL))
-        fg_btn, ssl_danger = _danger_foreground(d, xml0 or dump_xml(d), S_SSL_CONTINUE)
-        print(f"  [s3] 修复1 弹窗：标题/继续/证书摘要/取消 齐备={dialog_ok}"
-              f" / 主按钮前景={fg_btn} danger={ssl_danger}")
+        time.sleep(4.0)
+        xml_off = dump_xml(d)
+        ssl_menu_absent = S_SSL_PASS not in xml_off
+        # ⚠️ pref 回读**不作判据**：设备上可能残留历史遗留键（旧版本/旧测试写入），
+        #    而「键已删」的权威证据是**源码零引用**（见下方 must_absent）⇒ 此处仅诊断输出。
+        print(f"  [s3] 开关已删（负向）：⋮ 无「{S_SSL_PASS}」={ssl_menu_absent}"
+              f" / pref 回读={_ssl_pref_state()}（仅诊断：遗留键不影响功能）")
 
-        # 出口①取消 ⇒ 服务端零请求（默认拒绝真的生效，不是「先放行再提示」）
+        # 开关不存在 ⇒ 证书错误**仍然**直接放行（无确认弹窗 + 服务端真的收到请求）
         HTTPS_REQS.clear()
-        cancelled = tap_text(d, S_SSL_CANCEL)
-        time.sleep(3.0)
-        got_a_after_cancel = any(p.startswith("/a") for p in HTTPS_REQS)
-        reject_ok = cancelled and not got_a_after_cancel
-        print(f"  [s3] 修复1 取消出口：点击={cancelled} / 服务端收到 /a={got_a_after_cancel}"
-              f"（期望 False）")
-
-        # 出口②继续 ⇒ 服务端收到请求 + 顶栏标题变为网页 title（页面真的加载）
         reset_app()
-        proceed_ok = False
-        if start_browser(f"{sbase}/a?p1", "BTL2"):
-            if wait_ssl_dialog(d):
-                b = node_bounds(dump_xml(d), S_SSL_CONTINUE)
-                if b:
-                    click_xy(d, b["cx"], b["cy"])
-                    time.sleep(3.5)
-                    got_a = any(p.startswith("/a") for p in HTTPS_REQS)
-                    loaded = "BT-A-L2" in dump_xml(d)
-                    proceed_ok = got_a and loaded
-                    print(f"  [s3] 修复1 继续出口：服务端收到 /a={got_a}"
-                          f" / 顶栏标题=网页 title={loaded}")
-
-        # 出口③还原：把策略拨回默认放行（收尾不留关闭态，避免影响真实使用）
-        tg2 = toggle_ssl_pass_through(d)
-        ssl_restore_ok = tg2["clicked"] and tg2["hint_on"] and (_ssl_pref_state() is True)
-        print(f"  [s3] 策略还原：已点击={tg2['clicked']} / 开启提示={tg2['hint_on']}"
-              f" / pref回读={_ssl_pref_state()}（期望 True）")
+        if not start_browser(f"{sbase}/a?c2", "BTL2"):
+            print(f"  [s3] 未进入内嵌浏览器（栈顶={current_activity()}）")
+            return False
+        time.sleep(4.0)
+        xml1 = dump_xml(d)
+        no_dialog2 = (S_SSL_TITLE not in xml1) and (S_SSL_CONTINUE not in xml1)
+        got_c2 = any(p.startswith("/a") for p in HTTPS_REQS)
+        silent_ok = no_dialog2 and got_c2
+        print(f"  [s3] 一律静默放行：无证书弹窗={no_dialog2} / 服务端收到 /a={got_c2}")
 
         # ---------- F214-a：返回语义（本环境 canGoBack 恒 false ⇒ 落栈顶二次确认分支） ----------
         # ⚠️ 环境限制（实测 2026-09-20，MEmu + Chrome WebView 116.0.5845.173）：
@@ -1430,35 +1369,41 @@ def s3_browser_page(d) -> bool:
         # ---------- 源码断言（真机不可达/需并存的分支口径） ----------
         src = Path(SRC_BROWSER).read_text(encoding="utf-8") if Path(SRC_BROWSER).exists() else ""
         must_have = (
-            "handler ?: return",                    # handler 空值保护
-            "onPositive = { handler.proceed() }",
-            "onNegative = { handler.cancel() }",
-            "onDismissAction = { handler.cancel() }",
             "if (currentWebView.canGoBack())",      # 可回退判定用标准 API
             "currentWebView.goBack()",              # 一按一页（单步）
             "targetUrl == BLANK_HTML",              # BLANK_HTML 终止保留
             "now - lastBackPressedTime < BACK_EXIT_INTERVAL",  # 栈顶二次确认
             "buildMenuActions(AppUiTokens.danger)",
             "tint = danger",
-            "if (AppConfig.sslCertPassThrough)",    # 放行策略开关生效点（默认放行）
-            "PreferKey.sslCertPassThrough",         # 策略持久化 key
-            "R.string.ssl_passthrough",             # 菜单项与状态回执
             "guidePrefs.edit().putBoolean(KEY_VERIFICATION_GUIDE_SHOWN, true)",  # 显示即记忆
         )
         must_absent = (
             "goBackOrForward",                      # 合并步进启发式已删
-            "handler?.proceed()",                   # 无条件放行已删
+            "handler?.proceed()",                   # 页内无条件放行已删（收敛到 SilentSslWebViewClient）
             "currentTitle != item.title",           # URL/标题计步启发式已删
+            # 2026-09-21 用户裁决「一律静默放行，开关删除」⇒ 下列 7 项随键与确认弹窗一并退役
+            # （登记 docs/issues/ai/20260922/c6-audit-and-m7-shellfindings.md §8.1）
+            "handler ?: return",
+            "onPositive = { handler.proceed() }",
+            "onNegative = { handler.cancel() }",
+            "onDismissAction = { handler.cancel() }",
+            "if (AppConfig.sslCertPassThrough)",
+            "PreferKey.sslCertPassThrough",
+            "R.string.ssl_passthrough",
         )
+        # 正向：静默放行已收敛到共享件（单一实现，禁页内自建第二条 SSL 处理链）
+        _ssl_path = Path(SRC_SILENT_SSL_CLIENT)
+        src_ssl = _ssl_path.read_text(encoding="utf-8") if _ssl_path.exists() else ""
+        silent_client_ok = "handler?.proceed()" in src_ssl
         missing = [k for k in must_have if k not in src]
         leftovers = [k for k in must_absent if k in src]
-        code_ok = not missing and not leftovers
+        code_ok = not missing and not leftovers and silent_client_ok
         print(f"  [s3] 源码断言：必备 {len(must_have) - len(missing)}/{len(must_have)}"
               f" / 应删尽删 {len(must_absent) - len(leftovers)}/{len(must_absent)}"
+              f" / 共享静默客户端={silent_client_ok}"
               f" / 缺失={missing} 残留={leftovers}")
 
-        ok = bool(passthrough_ok and ssl_menu_ok and ssl_off_ok and ssl_off_hint and ssl_restore_ok
-                  and dialog_ok and ssl_danger and reject_ok and proceed_ok and nav_ok
+        ok = bool(passthrough_ok and ssl_menu_absent and silent_ok and nav_ok
                   and predictable_ok and guide_first and guide_twice and cf_ok
                   and menu_ok and danger_ok and confirm_ok and cancel_ok and exec_ok
                   and bogus_absent and code_ok)
@@ -1471,15 +1416,7 @@ def s3_browser_page(d) -> bool:
             print(f"  [s3] 兜底回滚异常: {type(e).__name__}")
         # 引导条记忆位是本次测试造出来的新文件 ⇒ 删除还原，避免影响真实使用
         clear_guide_flag()
-        # 证书放行策略兜底还原：中断残留关闭态会让后续源/订阅源被证书拦住（best-effort）
-        try:
-            if _ssl_pref_state() is False:
-                reset_app()
-                if start_browser(f"{hbase}/restore", "BTL2"):
-                    toggle_ssl_pass_through(d)
-                print(f"  [s3] 策略兜底还原：pref 回读={_ssl_pref_state()}（期望 True/None）")
-        except Exception as e:
-            print(f"  [s3] 策略兜底还原异常: {type(e).__name__}")
+        # 证书放行策略兜底还原已退役（开关删除 ⇒ 恒为静默放行，无「残留关闭态」可还原）
         for p in (ssl_port, http_port):
             if p:
                 release_reverse(p)
@@ -2159,11 +2096,8 @@ def s6_login_page(d) -> bool:
         return False
     print(f"  [s6] 通道就绪：合成源 2 个 + 自签名 HTTPS :{ssl_port} + adb reverse")
     try:
-        # 前置归一：策略须处默认「放行」态（上次中断残留关闭态会让「默认放行」断言假失败）
-        if _ssl_pref_state() is False:
-            if _login_start(SEED_LOGIN_WEB):
-                toggle_ssl_pass_through(d)
-            print(f"  [s6] 策略前置归一：pref={_ssl_pref_state()}（期望 True/None）")
+        # 策略前置归一已退役（开关删除 ⇒ 恒为静默放行）
+        print(f"  [s6] 策略前置：pref={_ssl_pref_state()}（仅诊断）")
         # ---------- A) WebViewLoginFragment：默认放行 + 完成登录文案按钮 ----------
         HTTPS_REQS.clear()
         if not _login_start(SEED_LOGIN_WEB):
@@ -2179,31 +2113,25 @@ def s6_login_page(d) -> bool:
         print(f"  [s6] 默认态：顶栏「{S_FINISH_LOGIN}」在场={entry_ok}"
               f" / 无证书弹窗={no_dialog} / 服务端收到 /login={got_login}（默认放行）")
 
-        # ---------- A2) 登录页同样可切换策略（默认放行 → 关闭 ⇒ 弹确认） ----------
+        # ---------- A2) 判据修正（2026-09-22）：开关已删 ⇒ 改「负向 + 仍然静默放行」口径 ----------
+        # 2026-09-21 用户裁决「全项目 WebView/网络层一律静默放行，开关删除」（`PreferKey.kt:547-548`）
+        # ⇒ 原「切换关闭 → 关闭态弹窗 → 取消后零请求 → 策略还原」四段判据随键退役
+        # （登记 docs/issues/ai/20260922/c6-audit-and-m7-shellfindings.md §8.1）
         pref_before = _ssl_pref_state()
-        tg = toggle_ssl_pass_through(d)
-        off_ok = tg["clicked"] and tg["hint_off"] and (_ssl_pref_state() is False)
+        ssl_menu_absent = S_SSL_PASS not in xmlA
         ca.shot(d, "m3login_s6_strategy_off")
-        print(f"  [s6] 策略切换：菜单项={tg['menu']} 已点击={tg['clicked']}"
-              f" pref {pref_before}→{_ssl_pref_state()} 关闭提示={tg['hint_off']}")
+        # ⚠️ pref 回读仅诊断（设备可能残留历史遗留键）；「键已删」权威证据 = 源码零引用（见下方 frag_absent）
+        print(f"  [s6] 开关已删（负向）：⋮ 无「{S_SSL_PASS}」={ssl_menu_absent}"
+              f" / pref 回读={pref_before}（仅诊断）")
+        # 开关不存在 ⇒ 再次进入登录页仍直接放行（无确认弹窗 + 服务端收到请求）
         HTTPS_REQS.clear()
-        dialog_ok = cancel_ok = False
+        silent_ok = False
         if _login_start(SEED_LOGIN_WEB):
-            xmld = wait_ssl_dialog(d)
-            dialog_ok = bool(xmld) and all(s in xmld for s in (S_SSL_TITLE, S_SSL_CONTINUE,
-                                                              S_SSL_CERT_INFO, S_SSL_CANCEL))
-            ca.shot(d, "m3login_s6_ssl_dialog")
-            if dialog_ok:
-                HTTPS_REQS.clear()
-                cancel_ok = tap_text(d, S_SSL_CANCEL)
-                time.sleep(2.5)
-                cancel_ok = cancel_ok and not any(p.startswith("/login") for p in HTTPS_REQS)
-            print(f"  [s6] 关闭态：弹窗齐备={dialog_ok} / 取消后零请求={cancel_ok}")
-        # 还原放行（收尾不留关闭态）
-        tg2 = toggle_ssl_pass_through(d)
-        restore_ok = tg2["clicked"] and tg2["hint_on"] and (_ssl_pref_state() is not False)
-        print(f"  [s6] 策略还原：已点击={tg2['clicked']} 开启提示={tg2['hint_on']}"
-              f" pref={_ssl_pref_state()}（期望 True/None）")
+            xmld = dump_xml(d)
+            no_dialog2 = (S_SSL_TITLE not in xmld) and (S_SSL_CONTINUE not in xmld)
+            got_login2 = any(p.startswith("/login") for p in HTTPS_REQS)
+            silent_ok = no_dialog2 and got_login2
+            print(f"  [s6] 一律静默放行：无证书弹窗={no_dialog2} / 服务端收到 /login={got_login2}")
 
         # ---------- B) SourceLoginDialog：错误卡 / 密码可见 / 删除登录头确认 ----------
         reset_app()
@@ -2233,7 +2161,16 @@ def s6_login_page(d) -> bool:
 
         # 优化4：OK ⇒ 确定性失败（loginUrl 为必抛 JS）⇒ 错误卡（不关窗 + 完整报错 + 复制/重试）
         err_ok = retry_ok = False
-        b_ok = node_bounds(dump_xml(d), S_OK)
+        # ⚠️ 定位「确认」键必须重试：Compose 弹窗在 dump 里会**漏拍**（实测 2026-09-22 两轮全量均
+        #    未定位到，而截图 `m3login_s6_pwd_visible.png` 明确显示紫色「确认」按钮在场）⇒ 限次重取
+        b_ok = None
+        for _ in range(5):
+            b_ok = node_bounds(dump_xml(d), S_OK)
+            if b_ok:
+                break
+            time.sleep(1.0)
+        if not b_ok:
+            print(f"  [s6] 未定位弹窗「{S_OK}」键；当前短文本={text_nodes(dump_xml(d))[:14]}")
         if b_ok:
             click_xy(d, b_ok["cx"], b_ok["cy"])
             seen_running = False
@@ -2296,23 +2233,31 @@ def s6_login_page(d) -> bool:
         # ---------- 源码断言（双文件） ----------
         frag = _src_text(SRC_LOGIN_FRAG)
         dlg = _src_text(SRC_LOGIN_DIALOG)
-        frag_must = ("if (AppConfig.sslCertPassThrough)", "PreferKey.sslCertPassThrough",
-                     "R.string.finish_login", "R.string.ssl_passthrough",
-                     "onPositive = { handler.proceed() }", "onNegative = { handler.cancel() }")
+        # 2026-09-22 判据修正：`sslCertPassThrough` 相关 4 项随键与确认弹窗退役 ⇒ 移入 must_absent
+        frag_must = ("R.string.finish_login",)
         dlg_must = ("R.string.del_login_header_confirm", "R.string.del_login_header",
                     "R.string.logging_in", "R.string.login_error", "R.string.copy_error_detail",
                     "R.string.password_show", "R.string.password_hide",
                     "catch (e: CancellationException)",     # 取消不得误报为登录失败
                     "e.stackTraceToString()",               # 错误卡正文=完整堆栈
                     "enabled = !loginRunning", "loading = loginRunning")
+        frag_absent = ("if (AppConfig.sslCertPassThrough)", "PreferKey.sslCertPassThrough",
+                       "R.string.ssl_passthrough",
+                       "onPositive = { handler.proceed() }", "onNegative = { handler.cancel() }")
         frag_missing = [k for k in frag_must if k not in frag]
+        frag_left = [k for k in frag_absent if k in frag]
         dlg_missing = [k for k in dlg_must if k not in dlg]
-        code_ok = not frag_missing and not dlg_missing
+        _ssl_path = Path(SRC_SILENT_SSL_CLIENT)
+        src_ssl = _ssl_path.read_text(encoding="utf-8") if _ssl_path.exists() else ""
+        silent_client_ok = "handler?.proceed()" in src_ssl
+        code_ok = not frag_missing and not frag_left and not dlg_missing and silent_client_ok
         print(f"  [s6] 源码断言：fragment {len(frag_must) - len(frag_missing)}/{len(frag_must)}"
+              f" / fragment 应删尽删 {len(frag_absent) - len(frag_left)}/{len(frag_absent)}"
               f" / dialog {len(dlg_must) - len(dlg_missing)}/{len(dlg_must)}"
-              f" / 缺失={frag_missing + dlg_missing}")
+              f" / 共享静默客户端={silent_client_ok}"
+              f" / 缺失={frag_missing + dlg_missing} 残留={frag_left}")
 
-        ok = all([entry_ok, passthrough_ok, off_ok, dialog_ok, cancel_ok, restore_ok,
+        ok = all([entry_ok, passthrough_ok, ssl_menu_absent, silent_ok,
                   rows_ok, eye_ok, err_ok, retry_ok, del_menu_ok, del_confirm_ok,
                   del_cancel_ok, code_ok])
         print(f"  [s6] 小计: {'PASS' if ok else 'FAIL'}")
@@ -2326,14 +2271,7 @@ def s6_login_page(d) -> bool:
             print(f"  [s6] 数据库快照回滚={m2._db_push(db_snap)}")
         except Exception as e:
             print(f"  [s6] 兜底回滚异常: {type(e).__name__}")
-        try:
-            if _ssl_pref_state() is False:      # 策略兜底还原（放行是产品默认态）
-                reset_app()
-                if _login_start(SEED_LOGIN_WEB):
-                    toggle_ssl_pass_through(d)
-                print(f"  [s6] 策略兜底还原：pref={_ssl_pref_state()}（期望 True/None）")
-        except Exception as e:
-            print(f"  [s6] 策略兜底还原异常: {type(e).__name__}")
+        # 策略兜底还原已退役（开关删除 ⇒ 恒为静默放行）
         for p in (ssl_port, http_port):
             if p:
                 release_reverse(p)
@@ -2546,8 +2484,18 @@ SRC_VIDEO_STRINGS = "app/src/main/res/values/strings_video_dual_layout.xml"
 GUIDE_KEY = "videoGestureGuideShown"
 
 
+def _norm_xml(s: str) -> str:
+    """prefs 回读比对口径：忽略空白差异（XML 头/缩进/换行），只比语义内容"""
+    return re.sub(r"\s+", "", s)
+
+
 def _prefs_edit(remote: str, workdir: Path, mutate) -> bool:
-    """拉取远端 prefs → 就地改 XML → 推回（应用需已停）。零 UI 依赖的确定性通道"""
+    """拉取远端 prefs → 就地改 XML → 推回（应用需已停）。零 UI 依赖的确定性通道。
+
+    ⚠️ 回读校验口径修正（2026-09-22）：旧实现用 `text.strip()[:60] in 回读`——前 60 字符恒为
+    XML 声明头（新旧内容完全一致）⇒ **恒 True 的假校验**，写回静默失败无法被发现（实测 s33
+    A 段「清 treeUri」实际未清，导致首导摘要卡分支永不进入）。现改为**归一化全文比对**。
+    """
     local = workdir / Path(remote).name
     r = sh_su(f"cat {remote}")
     raw = r.stdout or b""
@@ -2557,11 +2505,17 @@ def _prefs_edit(remote: str, workdir: Path, mutate) -> bool:
     text = mutate(raw.decode("utf-8", errors="ignore"))
     local.write_text(text, encoding="utf-8")
     sh_su(f"cp {remote} {remote}.bak_l2s10")
-    subprocess.run([ADB, "-s", HOST, "shell", f"su -c 'cat > {remote}'"],
-                   input=text.encode("utf-8"), capture_output=True, timeout=40)
-    time.sleep(0.5)
-    verify = sh_su(f"cat {remote}")
-    return text.strip()[:60] in (verify.stdout or b"").decode("utf-8", errors="ignore")
+    # 写回 + 复验，不一致则重试一次（应用/服务进程存活期的内存态 flush 会覆盖写入，见 §8.8）
+    for _ in range(2):
+        subprocess.run([ADB, "-s", HOST, "shell", f"su -c 'cat > {remote}'"],
+                       input=text.encode("utf-8"), capture_output=True, timeout=40)
+        time.sleep(0.5)
+        verify = sh_su(f"cat {remote}")
+        got = (verify.stdout or b"").decode("utf-8", errors="ignore")
+        if _norm_xml(got) == _norm_xml(text):
+            return True
+        time.sleep(0.6)
+    return False
 
 
 def _force_immersive_and_reset_guide(workdir: Path) -> bool:
@@ -3229,7 +3183,10 @@ S_PARA_EMPTY_GUIDE = "点下方「添加」创建第一条规则"  # paragraph_r
 S_PARA_EMPTY = "暂无段落规则"         # paragraph_rule_empty
 S_PARA_IMPORTING = "正在导入规则…"    # paragraph_rule_importing
 S_PARA_IMPORT_ONLINE = "网络导入"     # import_on_line（真值「网络导入」，非「在线导入」——实测踩坑）
-S_OK = "确定"                        # ok 在**对话框按钮**上的渲染真值（实测；取消键=「取消」）
+S_DLG_OK = "确定"                     # ok 在**对话框按钮**上的渲染真值（实测；取消键=「取消」）
+# ⚠️ 原名 `S_OK` 与 s6 登录表单弹窗的 `S_OK = "确认"`（L1990）**同名撞车**：模块级后赋值覆盖前赋值
+#    ⇒ s6 实际拿到「确定」，`node_bounds` 恒失败、错误卡/重试两段静默不执行（2026-09-22 假 FAIL）。
+#    探针 `.temp/probe_l2_const_collision.py` 复核：全脚本仅此 1 处「同名值不同」覆盖。
 S_CANCEL = "取消"                    # cancel
 
 SRC_AI_USAGE = "app/src/main/java/io/legado/app/ui/book/read/config/AiReadAloudUsageRecordActivity.kt"
@@ -3541,7 +3498,7 @@ def s9_usage_and_para_rule_page(d) -> bool:
             typed = type_search(d, IMPORT_URL)
             print(f"  [s9] F52 URL 输入={typed}")
             if typed:
-                tap_text(d, S_OK)
+                tap_text(d, S_DLG_OK)
                 for _ in range(10):
                     time.sleep(0.6)
                     if S_PARA_IMPORTING in dump_xml(d):
@@ -4717,8 +4674,12 @@ def s13_settings_search_and_replace_edit(d) -> bool:
         src_rep = _src_text(SRC_REPLACE_EDIT)
         src_col = _src_text(SRC_COLLAPSE_HEADER)
         checks = [
-            ("settings-search: 命中高亮", "private fun highlightMatches(" in src_set
-             and "FontWeight.SemiBold" in src_set),
+            # 判据修正（2026-09-22）：`highlightMatches` 已**单源收口**到 `HighlightText.kt`
+            # （s14 的「highlightMatches 已单源收口」断言已记录该改造）⇒ 本页不再含私有实现，
+            # 原断言「`private fun highlightMatches(` 在本页」必然假失败。
+            ("settings-search: 命中高亮（单源收口到 HighlightText）",
+             "highlightMatches(" in src_set
+             and "FontWeight.SemiBold" in _src_text(SRC_HIGHLIGHT_TEXT)),
             ("settings-search: 子项计数徽章", "matchedSubItemCount > 1" in src_set
              and "settings_search_sub_item_count" in src_set),
             ("settings-search: 精确命中置顶", "private fun pinExactTitleMatches(" in src_set
@@ -6612,8 +6573,10 @@ def _s19_seed(workdir: Path) -> bool:
 
 
 def _s19_prefs_restored() -> bool:
-    r = sh_su(f"cat {S19_PREFS}")
-    return S19_PROVIDER_A not in (r.stdout or b"").decode("utf-8", errors="ignore")
+    """还原判据（2026-09-22 加强）：三个播种键的**任一标识**残留即判未还原。
+    旧口径只查供应商名 A，漏检 id/模型 ⇒ 无法暴露「写回未生效」。"""
+    got = (sh_su(f"cat {S19_PREFS}").stdout or b"").decode("utf-8", errors="ignore")
+    return not any(x in got for x in (S19_PROVIDER_A, S19_PROVIDER_B, S19_MODEL_ID))
 
 
 def s19_ai_provider_manage(d) -> bool:
@@ -6707,9 +6670,17 @@ def s19_ai_provider_manage(d) -> bool:
         print(f"  [s19] 异常终止: {type(e).__name__}: {e}")
     finally:
         reset_app()
-        sh_su(f"cp {S19_PREFS}.l2s19bak {S19_PREFS} && "
-              f"chown $(stat -c %u /data/data/{PKG}) {S19_PREFS} && chmod 600 {S19_PREFS}")
-        time.sleep(0.5)
+        # 还原实测会失败（2026-09-22 本轮 `偏好还原=False`，且把 l2p1 残留给后续 s21）⇒
+        # 单次重试 + 失败诊断输出；重试前再次 force-stop，避免应用存活时把内存态刷回文件。
+        for attempt in range(2):
+            r = sh_su(f"cp {S19_PREFS}.l2s19bak {S19_PREFS} && "
+                      f"chown $(stat -c %u /data/data/{PKG}) {S19_PREFS} && chmod 600 {S19_PREFS}")
+            time.sleep(0.8)
+            if _s19_prefs_restored():
+                break
+            print(f"  [s19] 还原失败(第{attempt + 1}次) rc={r.returncode} "
+                  f"err={(r.stderr or b'')[:120].decode('utf-8', errors='ignore')}")
+            reset_app()
         print(f"  [s19] 偏好还原={_s19_prefs_restored()}")
         reset_app()
     return ok
@@ -6895,6 +6866,12 @@ S21_SUGGESTIONS = ["概括我正在读的这本书", "解释一下这段内容�
 S21_INPUT = "l2hello"
 S21_SRC_SCREEN = "app/src/main/java/io/legado/app/ui/main/ai/compose/AiChatScreen.kt"
 S21_SRC_ACT = "app/src/main/java/io/legado/app/ui/main/ai/AiChatActivity.kt"
+S21_PREFS = DEFAULT_PREFS
+# 前置剥离面（两类）：
+# ① 配置键 —— s19 播种的供应商/模型/当前供应商（决定「未配置服务商」守卫是否触发）
+# ② 历史键 —— 聊天会话列表/当前会话（决定是否渲染**空态**；`AppConfig.aiChatSessionList` 走 prefs）
+S21_AI_KEYS = ("aiProviderList", "aiModelConfigList", "aiCurrentProviderId",
+               "aiChatSessionList", "aiCurrentChatSessionId")
 
 
 def _s21_proc_alive() -> bool:
@@ -6902,12 +6879,34 @@ def _s21_proc_alive() -> bool:
     return PKG.encode() in (r.stdout or b"")
 
 
+def _s21_strip_ai_prefs(workdir: Path) -> bool:
+    """F11/F10 前置：本场景判据依赖两个「空」前置 —— ①**未配置服务商**（`AppConfig.aiCurrentProvider`
+    的 `baseUrl` 为空）②**聊天历史为空**（否则不渲染空态、示例与角色卡入口一并消失）。
+
+    ⚠️ 场景耦合缺陷（2026-09-22）：s19 会向默认 prefs 播种 AI 供应商（`l2p1`/`l2p2`），其 `finally`
+    还原实测失败（本轮 `偏好还原=False`）⇒ 顺序执行时 s21 恒收到已配置态，B/C 两段假失败；
+    同时上一轮跑出的**会话历史**（`aiChatSessionList`）跨轮残留，使空态段也失效。
+    现**显式剥离两类键**，使 s21 与执行顺序解耦；收尾按备份原样还原。前置：应用已停。
+    """
+    def mutate(text: str) -> str:
+        for k in S21_AI_KEYS:
+            text = re.sub(r'\s*<[a-z]+ name="%s">.*?</[a-z]+>' % k, "", text, flags=re.S)
+            text = re.sub(r'\s*<[a-z]+ name="%s"[^>]*/>' % k, "", text)
+        return text
+    return _prefs_edit(S21_PREFS, workdir, mutate)
+
+
 def s21_ai_chat(d) -> bool:
     """M5：main/ai-chat（F10 空态首启引导 / F11 配置缺失可操作闭环）"""
     print("  [s21] ===== AI 对话 空态引导 + 配置缺失闭环 =====")
+    workdir = Path(tempfile.mkdtemp(prefix="m5s21_"))
     reset_app()
+    sh_su(f"cp {S21_PREFS} {S21_PREFS}.l2s21bak")
     ok = False
     try:
+        stripped = _s21_strip_ai_prefs(workdir)
+        reset_app()
+        print(f"  [s21] 前置 剥离 AI 偏好={stripped}")
         sh("am", "start", "-n", f"{PKG}/{ACT_AI_CHAT}")
         time.sleep(3.0)
         landed = "AiChatActivity" in current_activity()
@@ -6986,6 +6985,15 @@ def s21_ai_chat(d) -> bool:
     except Exception as e:
         print(f"  [s21] 异常终止: {type(e).__name__}: {e}")
     finally:
+        reset_app()
+        sh_su(f"cp {S21_PREFS}.l2s21bak {S21_PREFS} && "
+              f"chown $(stat -c %u /data/data/{PKG}) {S21_PREFS} && chmod 600 {S21_PREFS}")
+        time.sleep(0.5)
+        r = sh_su(f"cat {S21_PREFS}")
+        got = (r.stdout or b"").decode("utf-8", errors="ignore")
+        rb = sh_su(f"cat {S21_PREFS}.l2s21bak")
+        bak = (rb.stdout or b"").decode("utf-8", errors="ignore")
+        print(f"  [s21] 偏好还原={_norm_xml(got) == _norm_xml(bak)}")
         reset_app()
     return ok
 
@@ -8035,6 +8043,25 @@ S29_MORE_DESC = "菜单"              # 书架顶栏「更多」（程序化创�
 S29_UPDATE_TOC = "更新目录"
 
 
+def _s29_seed_prefs_stable(prefs_orig: str, tries: int = 3) -> bool:
+    """播种书架渲染 prefs 并**确认其存活**：写后停应用复验，不一致则重写（最多 `tries` 轮）。
+
+    ⚠️ 竞态实测（2026-09-22）：同一脚本两次运行，A 段一次命中标签行（`chip=2`、顶栏无「筛选」），
+    一次退化为分组行（`chip=0`、顶栏回退 regular 带「筛选」）⇒ 播种内容被**应用/服务进程的
+    prefs 内存态 flush 覆盖**（写后 `cat` 复验通过，但启动时已不是我们的值）。故写后必须
+    **先停应用再复验**，把竞态窗口关掉。
+    """
+    want = _s29_mutate_prefs(prefs_orig, "default")
+    for _ in range(tries):
+        if not _s29_write_prefs(want):
+            continue
+        reset_app()                       # 停应用，排除内存态 flush
+        cur = (sh_su(f"cat {DEFAULT_PREFS}").stdout or b"").decode("utf-8", "ignore")
+        if _norm_xml(cur) == _norm_xml(want):
+            return True
+    return False
+
+
 def _s29_write_prefs(text: str) -> bool:
     """prefs 直写（应用需已停）；用于播种与回推原文（`_prefs_edit` 的备份会自覆盖，不可用于还原）"""
     if not text.strip():
@@ -8043,7 +8070,9 @@ def _s29_write_prefs(text: str) -> bool:
                    input=text.encode("utf-8"), capture_output=True, timeout=40)
     time.sleep(0.4)
     back = (sh_su(f"cat {DEFAULT_PREFS}").stdout or b"").decode("utf-8", "ignore")
-    return text.strip()[:80] in back
+    # 回读校验口径修正（2026-09-22）：旧实现 `text.strip()[:80] in back`——前 80 字符恒为 XML
+    # 声明头（新旧一致）⇒ 恒 True 的假校验（同 `_prefs_edit` 缺陷）。改归一化全文比对。
+    return _norm_xml(back) == _norm_xml(text)
 
 
 def _s29_mutate_prefs(text: str, style: str) -> str:
@@ -8059,6 +8088,28 @@ def _s29_mutate_prefs(text: str, style: str) -> str:
         "defaultTopBarStyle": ("string", style),     # default / regular
         "topBarPackageDay": ("string", "default"),   # 保证走默认顶栏包（否则 style 键被忽略）
         "topBarPackageNight": ("string", "default"),
+        # 🔴 必播（2026-09-22 定位）：`App.kt:127-142` 在 **`themeMode` 为空**时按「首装预设」分支
+        #    强制 `putString(defaultTopBarStyle, STYLE_REGULAR)` ⇒ 会把上面播的 `default` 顶掉，
+        #    A 段顶栏回退 regular（出现「筛选」折叠键）、标签行退化为分组行 ⇒ `chip=0` 假 FAIL。
+        #    播 `themeMode="0"`（= `AppConfig.themeMode` 的默认值，日间）使 `presetMode=false`，
+        #    跳过该分支（实测：不播时两轮全量回归 A 段均 chip=0 且「筛选」在场）。
+        "themeMode": ("string", "0"),
+        # 🔴 必播（2026-09-22 二次定位）：`MainLayoutPresetConfig.currentPreset()` 决定顶栏样式——
+        #    `defaultTopBarStyle()` 先读本键，读不到就**按 preset 回退**（regular ⇒ `STYLE_REGULAR`）；
+        #    且 `AppearanceKitManager` 启动期会调 `MainLayoutPresetConfig.apply()` **按 preset 重写
+        #    `defaultTopBarStyle`** ⇒ 设备 preset 若为 regular，播的 `default` 必被顶掉，顶栏走
+        #    regular 包（只有「分组胶囊行」没有「标签行」）⇒ A 段标签行恒不出现。
+        "mainLayoutPreset": ("string", "default"),
+        # 🔴 必播（2026-09-22 三次定位，探针 `.temp/probe_s29_style_override.py` 实证）：
+        #    启动一次主壳后 `defaultTopBarStyle`/`mainLayoutPreset` 会被**产品主动改写回 regular**
+        #    ——`AppearanceKitManager.applyBinding:641` 的
+        #    `resolvedPreset = binding.preset?.takeIf{…} ?: PRESET_REGULAR`：设备当前外观套件无
+        #    `preset` ⇒ **每次启动强制 regular**，顶栏只渲染「分组胶囊行」，**没有「标签行」**
+        #    （探针实测：播 default 后启动一次，两键均变回 regular；`themeMode` 保持）。
+        #    故必须把**当前外观套件**指到内建 `builtin_floating`（其 `preset = PRESET_DEFAULT`）
+        #    ⇒ 启动期 apply 会写回 `defaultTopBarStyle = default`，A 段标签行才可渲染。
+        "currentAppearanceKitId": ("string", "builtin_floating"),
+        "floatingBottomBarHideSearch": ("boolean", "true"),
     }
     for k, (typ, v) in repl.items():
         text = re.sub(r'\s*<%s name="%s"[^>]*/>' % (typ, k), "", text)
@@ -8183,17 +8234,31 @@ def _s29_density() -> float:
     return (int(m.group(1)) / 160.0) if m else 1.5
 
 
-def _s29_wait_ready(d, marker: str, timeout: float = 36.0) -> str:
+def _s29_wait_ready(d, marker, timeout: float = 36.0) -> str:
     """等待书架**加载完成**：判据 = 播种标记（标签名/分组名）出现在 dump 里。
     仅判顶栏「更多」不够——骨架屏（ShelfGridSkeleton）阶段顶栏与底栏已渲染，但列表未落数据
-    （实测只有 4 个文本节点；全网标签行也只有「全部」一个 chip）。"""
-    deadline = time.time() + timeout
+    （实测只有 4 个文本节点；全网标签行也只有「全部」一个 chip）。
+
+    `marker` 可为 str 或 str 元组（元组=任一命中即算就绪，用于 A 段「标签行/分组胶囊行」二选一）。
+
+    ⚠️ 2026-09-22 加固：实测同一脚本多次运行会偶发「等满 36s 仍只有 4 个文本节点」
+    （应用未出帧 / 模拟器卡顿）⇒ 超时后**强制停应用再启动一次**重取（第二轮超时减半）。
+    """
+    marks = (marker,) if isinstance(marker, str) else tuple(marker)
     xml = ""
-    while time.time() < deadline:
-        xml = dump_xml(d)
-        if marker in xml and S29_MORE_DESC in xml:
-            return xml
-        time.sleep(1.2)
+    for attempt in range(2):
+        deadline = time.time() + (timeout if attempt == 0 else timeout / 2)
+        while time.time() < deadline:
+            xml = dump_xml(d)
+            if any(m in xml for m in marks) and S29_MORE_DESC in xml:
+                return xml
+            time.sleep(1.2)
+        if attempt == 0:
+            print(f"  [s29] 等就绪超时（文本节点={len(text_nodes(xml))} / 顶栏「{S29_MORE_DESC}」="
+                  f"{S29_MORE_DESC in xml}）⇒ 重启一次重取")
+            reset_app()
+            sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
+            time.sleep(3.0)
     return xml
 
 
@@ -8211,8 +8276,12 @@ def _s29_clip_edge(w: int, dens: float, regular: bool) -> int:
 
 
 def _s29_shot(d, name: str, tries: int = 5):
-    """截图并校验非全黑（实测：dump 有节点≠已出帧，直接截图会得到全黑图 ⇒ 像素量测恒 0）
-    返回截图路径（末次仍为黑屏也返回，交由量测侧判失败并留证）。"""
+    """截图并校验**已出帧**（实测：dump 有节点≠已出帧，直接截图会得到全黑图 ⇒ 像素量测恒 0）
+    返回截图路径（末次仍不合格也返回，交由量测侧判失败并留证）。
+
+    ⚠️ 2026-09-22 加固：只判「非全黑」不够——页面**仍在加载**时会截到**纯底色空页**
+    （`max-min ≈ 0`），此时行带量测恒 `delta=0/spread=0` ⇒ 假 FAIL。故同时要求**有对比度**。
+    """
     from PIL import Image
     png = Path(ca.OUT_DIR) / f"{name}.png"
     for _ in range(tries):
@@ -8220,7 +8289,9 @@ def _s29_shot(d, name: str, tries: int = 5):
         if png.exists():
             try:
                 im = Image.open(png).convert("L")
-                if max(im.getdata()) > 10:
+                data = im.getdata()
+                lo, hi = min(data), max(data)
+                if hi > 10 and (hi - lo) > 40:
                     return png
             except Exception:
                 pass
@@ -8248,7 +8319,7 @@ def s29_bookshelf_batch2(d) -> bool:
         bits = _s29_seed_groups(db)
         book_name = _s29_seed_book(db, ",".join(S29_TAGS), bits)
         pushed = m2._db_push(db)
-        seeded = _s29_write_prefs(_s29_mutate_prefs(prefs_orig, "default"))
+        seeded = _s29_seed_prefs_stable(prefs_orig)
         print(f"  [s29] 播种 库回推={pushed} prefs={seeded} 标签={len(S29_TAGS)} 分组={len(S29_GROUPS)} "
               f"书名非空={bool(book_name)} 书名字数={len(book_name or '')}")
         if not (pushed and seeded and book_name):
@@ -8261,19 +8332,34 @@ def s29_bookshelf_batch2(d) -> bool:
         # ---------- A：默认顶栏风格 · 网格布局（F3 标签行渐隐 + F4 三项） ----------
         reset_app()
         sh("am", "start", "-n", f"{PKG}/{ACT_MAIN}")
-        xml_a = _s29_wait_ready(d, S29_TAG_BASE)
+        xml_a = _s29_wait_ready(d, (S29_TAG_BASE, S29_GROUP_BASE))
         png_a = _s29_shot(d, "m5s29_grid_info")
-        edge_a = _s29_clip_edge(w, dens, regular=False)     # 标签行（无折叠键）
-        tag_nodes = _s29_nodes(xml_a, S29_TAG_BASE)
+        # A 段目标行 = **实际渲染的 chip 行**（F3 的落点随顶栏包而变）：
+        #   · default 顶栏包 → 「标签行」（无右侧折叠键，裁剪边 = w-19dp）
+        #   · regular 顶栏包 → 「分组胶囊行」（右侧被「筛选」折叠键占用，裁剪边 = w-58dp）
+        # 产品启动期会把顶栏样式改写回 regular（`AppearanceKitManager.applyBinding:641` 在外观套件
+        # 无 preset 时兜底 `PRESET_REGULAR`），测试只能**间接**影响该状态（`_s29_mutate_prefs` 已把
+        # 当前套件指到 `builtin_floating`，但实测仍会摇摆）⇒ 按实际行取标记/裁剪边，并打印命中行，
+        # **不静默降级**（F3 的渐隐断言本身仍是硬判据）。
+        if _s29_nodes(xml_a, S29_TAG_BASE):
+            row_name, row_marker, reg = "标签行", S29_TAG_BASE, False
+        else:
+            row_name, row_marker, reg = "分组胶囊行", S29_GROUP_BASE, True
+        edge_a = _s29_clip_edge(w, dens, regular=reg)
+        tag_nodes = _s29_nodes(xml_a, row_marker)
         right_a = _s29_right(tag_nodes)
         edge_a_use = min(edge_a, right_a) if right_a else edge_a
         left_x = int(round(dens * 19))                       # 标签行内容左边（页面 16dp + 栏内 3dp）
         m_a = _s29_fade_metrics(png_a, _s29_band(tag_nodes), edge_a_use, zone, left_x)
         fade_a = _s29_fade_ok(m_a)
-        print(f"  [s29] A1 标签行 chip={len(tag_nodes)} 裁剪边x={edge_a}(实测右界={right_a}) 带宽={zone}px "
+        print(f"  [s29] A1 {row_name} chip={len(tag_nodes)} 裁剪边x={edge_a}(实测右界={right_a}) 带宽={zone}px "
               f"量测={m_a} 渐隐={fade_a}")
+        if not tag_nodes:
+            print(f"  [s29] A1 诊断：chip 行未命中（文本节点={len(text_nodes(xml_a))}"
+                  f" / 顶栏「{S29_MORE_DESC}」={S29_MORE_DESC in xml_a}"
+                  f" / 顶栏「筛选」={'筛选' in xml_a}）")
         # 诊断：顶栏风格 + 标签行内节点（定位真实行带与渐隐带内是否有内容）
-        print(f"  [s29] A0 顶栏风格 regular(折叠键「筛选」在场)={'筛选' in xml_a}")
+        print(f"  [s29] A0 实际行={row_name}（顶栏「筛选」在场={'筛选' in xml_a} ⇒ regular 包）")
         if tag_nodes:
             ylo_a, yhi_a = _s29_band(tag_nodes)[0] - 6, _s29_band(tag_nodes)[1] + 6
             row_a = [(len(t), (a, b, c, d)) for t, a, b, c, d in _s29_nodes(xml_a, "")
@@ -9224,8 +9310,14 @@ def _s33_seed() -> bool:
 
 
 def _s33_tree_uri(workdir: Path, value: str) -> bool:
-    """写/清 `defaultBookTreeUri`（AppConfig 走默认 prefs）：A 段清空=首导、B 段置值=老用户零打断"""
+    """写/清 `defaultBookTreeUri`（AppConfig 走默认 prefs）：A 段清空=首导、B 段置值=老用户零打断。
+
+    ⚠️ 清理口径修正（2026-09-22）：旧实现只匹配**自闭合**形式 `<string name="..." />`，
+    而本键写入用**配对标签**形式 ⇒ 正则恒不命中、清理恒为 no-op，B 段置的值跨轮残留 ⇒
+    A 段首导分支永不进入（实测 s33 A「摘要卡=False」）。现两种形式一并清理。
+    """
     def mutate(text: str) -> str:
+        text = re.sub(r'\s*<string name="defaultBookTreeUri">.*?</string>', "", text, flags=re.S)
         text = re.sub(r'\s*<string name="defaultBookTreeUri"[^>]*/>', "", text)
         if not value:
             return text
@@ -9813,6 +9905,24 @@ def _s35_text_nodes(xml: str) -> int:
     return n
 
 
+def _dump_until_ready(d, marker: str = "", min_nodes: int = 3,
+                      tries: int = 5, gap: float = 1.5) -> str:
+    """页面启动后**首次 dump 可能只拿到 1~2 个文本节点**（Compose 首帧未落定 / 模拟器渲染延迟）
+    ⇒ 标记文案未命中或文本节点不足时重试。
+
+    实测（2026-09-22 全量回归）：s35 `BookshelfTagManageActivity`（节点=1）与 s38
+    `RssSourceDebugActivity`（节点=1）报「独有标题=False」假 FAIL，而**同刻截图渲染完整**
+    （顶栏/表单/空态齐备）⇒ 属 dump 时序问题，非页面缺陷。
+    """
+    xml = dump_xml(d)
+    for _ in range(tries):
+        if _s35_text_nodes(xml) >= min_nodes and (not marker or marker in xml):
+            break
+        time.sleep(gap)
+        xml = dump_xml(d)
+    return xml
+
+
 def _s35_launch(act: str) -> bool:
     simple = act.rsplit(".", 1)[-1]
     for _ in range(2):
@@ -9837,7 +9947,7 @@ def s35_compose_shell_batch(d) -> bool:
             simple = act.rsplit(".", 1)[-1]
             reset_app()
             launched = _s35_launch(act)
-            xml = dump_xml(d)
+            xml = _dump_until_ready(d, marker=marker, min_nodes=3)
             nodes = _s35_text_nodes(xml)
             marker_ok = (marker in xml) if marker else True
             stayed = simple in current_activity()
@@ -10280,7 +10390,7 @@ def s38_compose_shell_merge(d) -> bool:
             reset_app()
             launched = _s38_launch(act, extras)
             time.sleep(0.8)
-            xml = dump_xml(d)
+            xml = _dump_until_ready(d, marker=marker, min_nodes=1)
             nodes = _s35_text_nodes(xml)
             marker_ok = marker in xml
             stack_ok = _s38_stack_ok(xml, title, anchor, win_h)
