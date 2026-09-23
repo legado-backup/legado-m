@@ -100,4 +100,46 @@ class ThemeTokenSingleSourceTest {
         assertTrue("GroupHeader 应走 palette 面 token", text.contains("AppUiTokens.settingPalette()"))
         assertTrue("计数徽标底应取 chip 面 token", text.contains("tabBackgroundColor"))
     }
+
+    /** R28：组件层 M3 派生键（surfaceVariant / surface / outline）必须收口到面 token。 */
+    @Test
+    fun componentLayer_convergedOffM3DerivedKeys() {
+        val metric = code("ui/widget/components/MetricGrid.kt")
+        assertTrue("MetricGrid 底应走 tabBackgroundColor", metric.contains("tabBackgroundColor"))
+        assertFalse("MetricGrid 不得再用 surfaceVariant", metric.contains("colorScheme.surfaceVariant"))
+
+        val skeleton = code("ui/widget/components/ShelfGridSkeleton.kt")
+        assertTrue("骨架屏底应走 tabBackgroundColor", skeleton.contains("tabBackgroundColor"))
+        assertFalse("骨架屏不得再用 surfaceVariant", skeleton.contains("colorScheme.surfaceVariant"))
+
+        val scrollbar = code("ui/widget/components/VerticalScrollbar.kt")
+        assertTrue("滚动条应走面 token", scrollbar.contains("tabBackgroundColor") && scrollbar.contains("dividerColor"))
+        assertFalse("滚动条不得再用 surface/outline 派生键",
+            scrollbar.contains("colorScheme.surface") || scrollbar.contains("colorScheme.outline"))
+    }
+
+    /** R31：取色器预设色上的对勾字色必须走对比度兜底单源。 */
+    @Test
+    fun colorPickerSheet_usesContrastSingleSource() {
+        val text = code("ui/widget/components/ColorPickerSheet.kt")
+        assertTrue("对勾字色应走 contrastOn 单源", text.contains("contrastOn("))
+        assertFalse("不得再自建 isColorLight 黑白推导", text.contains("ColorUtils.isColorLight(preset)"))
+    }
+
+    /**
+     * R28：分隔线/描边必须走面 token `dividerColor`，不得用 M3 派生键 `outlineVariant`
+     * （= `outline.copy(alpha)`，由 B7 收口时实测发现的**规则缺口**，已补入机读禁用集）。
+     */
+    @Test
+    fun dividersUseDividerTokenNotOutlineVariant() {
+        for (rel in listOf(
+            "ui/widget/components/ColorPickerSheet.kt",
+            "ui/widget/components/HighlightStyleSheet.kt",
+            "ui/widget/components/AppMenuSheet.kt"
+        )) {
+            val t = code(rel)
+            assertFalse("$rel 不得再用 outlineVariant", t.contains("outlineVariant"))
+            assertTrue("$rel 分隔线/描边应走 dividerColor", t.contains("dividerColor"))
+        }
+    }
 }
