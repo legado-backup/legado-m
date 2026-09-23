@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -NoProfile -File \"$env:TRAE_PROJECT_DIR\\.trae\\hooks\\trae_hook_gate.ps1\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -NoProfile -File \"$env:TRAE_PROJECT_DIR\\.trae\\hooks\\trae_hook_gate.ps1\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -NoProfile -File \"$env:TRAE_PROJECT_DIR\\.trae\\hooks\\trae_hook_gate.ps1\"",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "matcher": "RunCommand|Shell|Bash|BashCommand",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -NoProfile -File \"$env:TRAE_PROJECT_DIR\\.trae\\hooks\\trae_hook_gate.ps1\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "loop_limit": 1,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -NoProfile -File \"$env:TRAE_PROJECT_DIR\\.trae\\hooks\\trae_hook_gate.ps1\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ]
+  }
+}
