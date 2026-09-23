@@ -54,26 +54,29 @@ class BookshelfUnreadEmphasisTest {
     }
 
     /**
-     * 接线不变量：**所有真实书架渲染路径**必须共用同一决策函数（口径分裂 ⇒ 同开关下表现不一致），
+     * 接线不变量：**真实渲染路径**必须共用同一决策函数（口径分裂 ⇒ 同开关下表现不一致），
      * 且配置默认值必须为 **false**（新装/升级渲染零变化）。
      *
-     * ⚠ 实测教训（2026-09-24）：`compose/BookshelfComposeItems.BookshelfGridItem` 在 App 内**零调用**
+     * ⚠ 实测教训（2026-09-24）：`compose/BookshelfComposeItems.BookshelfGridItem` 与
+     * `compose/BookshelfComposeList.BookshelfListItem` 在 App 内**零调用**
      * （设备实际渲染的是 `BookshelfScreen.kt` 的 `BookGridItem` / 列表行）——只改前者会得到
-     * 「代码改了、真机无变化」的假通过。故此处把**真实路径**（`BookshelfScreen.kt`）钉为必检项。
+     * 「代码改了、真机无变化」的假通过（真机 L2 增量 0 自证）。故：
+     * ① 真实路径 `BookshelfScreen.kt` 的两处调用**钉为必检项**；
+     * ② **不允许**把零调用文件当作接线证据（此处不再要求它们含接线，避免"看着接了三处"的错觉）。
      */
     @Test
-    fun r16_wiring_allLivePathsShareSingleDecision_andDefaultOff() {
+    fun r16_wiring_onlyOnLivePath_andDefaultOff() {
         val live = code("ui/main/bookshelf/BookshelfScreen.kt")
         assertEquals(
             "真实渲染路径 BookshelfScreen 必须有两处（网格卡 + 列表行）调用统一决策函数",
             2,
             Regex("BookshelfUnreadEmphasis\\.titleColor\\(").findAll(live).count()
         )
-
-        val grid = code("ui/main/bookshelf/compose/BookshelfComposeItems.kt")
-        val list = code("ui/main/bookshelf/compose/BookshelfComposeList.kt")
-        assertTrue("网格布局文件亦应调用统一决策函数", grid.contains("BookshelfUnreadEmphasis.titleColor("))
-        assertTrue("列表布局文件亦应调用统一决策函数", list.contains("BookshelfUnreadEmphasis.titleColor("))
+        assertEquals(
+            "决策函数必须按「开关 + 未读数」调用（不得只传死值）",
+            2,
+            Regex("enabled = AppConfig\\.bookshelfUnreadEmphasis").findAll(live).count()
+        )
 
         val appConfig = code("help/config/AppConfig.kt")
         assertTrue(
