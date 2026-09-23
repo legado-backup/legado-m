@@ -80,4 +80,14 @@ class PreferKeyUniquenessTest {
             autoApply != firstInstall
         )
     }
+
+    /** B4 新增键登记（R18 书源查询短时缓存开关）。未登记即编译不过，此处固化取值防改名漏改。 */
+    @Test
+    fun b4SourceQueryCacheKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("sourceQueryCacheEnabled", pairs["sourceQueryCacheEnabled"])
+    }
 }
