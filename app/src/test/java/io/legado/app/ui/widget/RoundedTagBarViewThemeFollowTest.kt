@@ -61,4 +61,25 @@ class RoundedTagBarViewThemeFollowTest {
     fun contrastFallback_stillSingleSource() {
         assertTrue("对比度兜底必须仍走单源 contrastOnColor", sourceCode().contains("contrastOnColor("))
     }
+
+    /**
+     * 解析**优先级**不变量（2026-09-24 用户复现澄清后固化）。
+     *
+     * 顶栏包是「顶栏样式」的更具体用户设置 ⇒ 其字面色优先；主题面 token 仅在顶栏包**未声明**该面时参与。
+     * ⚠ 主题列表切换主题**不会**切换顶栏包（`topBarPackageNight` 不变），故「顶栏包钉了标签色时
+     * 切主题不变色」是**预期交互**（已在 `ui-standards/color.md` §三 第 5 条登记）；
+     * 需要「标签随主题配套变化」应改用套件应用。此断言用于防止后续把顺序再翻回去（来回横跳）。
+     */
+    @Test
+    fun precedence_packageLiteralBeforeThemeToken() {
+        val code = sourceCode()
+        val packageAt = code.indexOf("val tagBarColor = config.tagBarColor")
+        val themeTokenAt = code.indexOf("context.themeColorOrNull(PreferKey.themeTabBackgroundColor)")
+        assertTrue("未定位到顶栏包字面色解析", packageAt >= 0)
+        assertTrue("未定位到主题面 token 解析", themeTokenAt >= 0)
+        assertTrue(
+            "顶栏包字面色必须先于主题面 token（更具体的用户设置优先）",
+            packageAt < themeTokenAt
+        )
+    }
 }
