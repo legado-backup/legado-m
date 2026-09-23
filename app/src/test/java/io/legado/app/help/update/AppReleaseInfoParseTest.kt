@@ -7,9 +7,9 @@ import org.junit.Test
 /**
  * 应用内检查更新资产解析回归测试（app-update-variant-fix）。
  *
- * 回归背景：发布脚本资产命名（legado_miss_app_debug_/legado_miss_app_/legado_legacy_app_）
+ * 回归背景：发布脚本资产命名（legado_miss_app_debug_/legado_miss_app_）
  * 与旧解析逻辑（认 "release" 子串 + split("_")[2].dropLast(2)）不匹配，导致：
- * 三包全解析为 OFFICIAL（测试包永远无更新）、versionName 解析出 "a"（正式包误更新成测试包）。
+ * 两包全解析为 OFFICIAL（测试包永远无更新）、versionName 解析出 "a"（正式包误更新成测试包）。
  * 断言数据取自真实 release 3.26.090820 的资产名。
  */
 class AppReleaseInfoParseTest {
@@ -26,12 +26,6 @@ class AppReleaseInfoParseTest {
     fun `新命名 正式包 asset 映射为 OFFICIAL`() {
         val variant = resolveAppVariant("legado_miss_app_3.26.090820.apk", preRelease = false)
         assertEquals(AppVariant.OFFICIAL, variant)
-    }
-
-    @Test
-    fun `新命名 共存包 asset 映射为 BETA_RELEASEA`() {
-        val variant = resolveAppVariant("legado_legacy_app_3.26.090820.apk", preRelease = false)
-        assertEquals(AppVariant.BETA_RELEASEA, variant)
     }
 
     // === 旧命名（legado-E 风格滚动 beta）兼容 ===
@@ -65,10 +59,6 @@ class AppReleaseInfoParseTest {
         assertEquals(
             "3.26.090820",
             AppReleaseInfo.parseVersionName("legado_miss_app_3.26.090820.apk")
-        )
-        assertEquals(
-            "3.26.090820",
-            AppReleaseInfo.parseVersionName("legado_legacy_app_3.26.090820.apk")
         )
     }
 
