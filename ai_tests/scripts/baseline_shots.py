@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """baseline_shots.py — UI 组件渲染基线截图（ui-subpage-optimization A2.1.1）
 
-⚠️ **B7 实证（2026-09-23）：accent 矩阵在当前主题架构下已失效（静默 no-op）**
-    本脚本按 `PreferKey.cPrimary/cAccent`（SP 键 `colorPrimary`/`colorAccent`）注入 accent 色系，
-    但**当前版本的有效主题色由 `themeConfig.json` / 外观套件（`currentAppearanceKitId`）决定**，
-    启动时会把套件/配置值回写 SP ⇒ 注入被覆盖。实测：clear kit 后 day/default vs day/purple
-    两张截图**显著变化像素仅 0.00%~0.10%**（均值为 0.5/255，绝大部分只是状态栏时钟差异）
-    ⇒ 「自定义主题色」态实际未生效。**要验证主题色跟随必须走 App 内设置路径**
-    （我的 → 主题设置 → 主题色，或写入 themeConfig.json），本脚本矩阵仅对
-    `themeMode`（明暗）与页面可达性有效。已同步：B7 tasks §0.5.10 与项目记忆。
+⚠️ **B7 实证（2026-09-23）：accent 矩阵可能被「活动主题包/外观套件」整体覆盖（静默 no-op）**
+    本脚本按 `PreferKey.cPrimary/cAccent`（SP 键 `colorPrimary`/`colorAccent`）注入 accent 色系；
+    但**当 `durThemeName`/`durThemeNameNight` 指向一个「主题包」或 `currentAppearanceKitId` 非空时，
+    颜色由该包/套件提供并覆盖颜色键** ⇒ 注入无声失效。实测（模拟器当前态）：
+      · `durThemeName=晨雨磨砂玻璃`（主题包，设置页标「已应用」）+ `currentAppearanceKitId=kit_dark_purple`
+        ⇒ day/default vs day/purple 全图**显著变化像素仅 0.00%~0.10%**（均值 0.5/255，多为状态栏时钟）；
+      · 切到内置主题（设置页点「内置日间主题」→ `durThemeName=内置日间主题`）后再注入，方为有效四态。
+    **正确用法**：跑矩阵前先确保「无主题包、无外观套件」（点内置主题，或让本脚本清 `currentAppearanceKitId`
+    —— 已实现），否则 T2「自定义主题色」态是假的。
+    补充：`files/themeConfig.json` 是**历史资产**（`App.kt` AD-03 注释：资产已移除、改读代码内置配置），
+    不要以它作为当前配色真值来判断注入是否生效。
+    本脚本矩阵对 `themeMode`（明暗）与页面可达性恒有效。
 
 目的：为 A2.2「组件收敛」（确认弹框 4→1 入口、卡片 3 套划界）与 A3「主题链收敛」
 提供**改动前对照基线**。覆盖 = 四族代表页面 × 明暗 × accent 三色系。
@@ -62,9 +66,33 @@ K_DAY_PRIMARY = ("colorPrimary", "int")
 K_DAY_ACCENT = ("colorAccent", "int")
 K_NIGHT_PRIMARY = ("colorPrimaryNight", "int")
 K_NIGHT_ACCENT = ("colorAccentNight", "int")
-PREF_KEYS = (K_THEME_MODE, K_KIT, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
+PREF_KEYS = (K_THEME_MODE, K_KIT, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT,
+             # B7 增补（2026-09-23）：**面 token 键**（B7 收口后芯片/标签/条带/搜索框一律取这些键）
+             # —— 不注入它们，T2「自定义主题色」态就测不到芯片类变化（实测：仅注入 primary/accent 时
+             # 只有顶栏变化 2.24%，芯片区变化 ≤0.10%）。均为 getPrefString 十六进制 ⇒ string。
+             ("themeCardColor", "string"), ("themeCardColorNight", "string"),
+             ("themeMutedColor", "string"), ("themeMutedColorNight", "string"),
+             ("themeSearchFieldBackgroundColor", "string"), ("themeSearchFieldBackgroundColorNight", "string"),
+             ("themeTabBackgroundColor", "string"), ("themeTabBackgroundColorNight", "string"),
+             ("themeShelfColor", "string"), ("themeShelfColorNight", "string"))
 KIND_OF = {key: kind for key, kind in PREF_KEYS}
 COLOR_KEYS = (K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
+
+# 面 token 键（顺序：card / muted / searchField / tab / shelf）
+SURFACE_KEYS = ("themeCardColor", "themeMutedColor", "themeSearchFieldBackgroundColor",
+                "themeTabBackgroundColor", "themeShelfColor")
+SURFACE_KEYS_NIGHT = tuple(k + "Night" for k in SURFACE_KEYS)
+# 每个 accent 的面 token 配色（与 primary/accent 同色系，便于肉眼与像素双重判定）
+SURFACES: dict[str, dict[str, tuple[str, ...]]] = {
+    "purple": {
+        "day": ("#F3E5F5", "#E7D9F0", "#EDE2F5", "#DFC9EE", "#F1E8F6"),
+        "night": ("#2A2138", "#3A2E4E", "#2E2540", "#43335C", "#241C31"),
+    },
+    "teal": {
+        "day": ("#E0F2F1", "#CFEAE7", "#D7EFEA", "#B2DFDB", "#E6F4F2"),
+        "night": ("#10302C", "#14403A", "#123531", "#1A4C44", "#0F2C28"),
+    },
+}
 
 # 四族代表页面（Activity 类名经 AndroidManifest 核实存在）
 # ⚠️ 必须用**全限定类名**：`am start -n <applicationId>/.ui.X` 的相对形式会以 applicationId 为基准解析
@@ -227,6 +255,7 @@ def apply_matrix_prefs(theme: str, accent: str, snapshot: dict[str, str]) -> boo
     # 清空后本矩阵只由颜色键决定，四态对比才有意义（收尾 restore_prefs 会还原用户的套件）。
     xml = set_pref(xml, K_KIT[0], "", K_KIT[1])
     preset = ACCENTS[accent]
+    surf = SURFACES.get(accent, {})
     if preset:
         values = {
             K_DAY_PRIMARY: preset["day"][0],
@@ -236,10 +265,19 @@ def apply_matrix_prefs(theme: str, accent: str, snapshot: dict[str, str]) -> boo
         }
         for (key, kind), hex_color in values.items():
             xml = set_pref(xml, key, str(hex_to_argb_int(hex_color)), kind)
+        # B7：面 token 键注入（芯片/标签/条带/搜索框/书架底）—— B7 收口后这些键是取色主战场，
+        # 不注入则 T2 态测不到芯片变化（注入 primary/accent 只影响顶栏）。
+        for key, hex_color in zip(SURFACE_KEYS, surf["day"]):
+            xml = set_pref(xml, key, hex_color, KIND_OF[key])
+        for key, hex_color in zip(SURFACE_KEYS_NIGHT, surf["night"]):
+            xml = set_pref(xml, key, hex_color, KIND_OF[key])
     else:
-        # default 色系 = 沿用现有配色：只还原**颜色键**，不得回写 themeMode
+        # default 色系 = 沿用现有配色：还原**颜色键 + 面 token 键**，不得回写 themeMode
         # （否则会把本函数刚设置的明暗值覆盖回快照值，导致明暗矩阵静默失效）
-        for key, kind in COLOR_KEYS:
+        restore_keys = tuple(COLOR_KEYS) + tuple(
+            (k, KIND_OF[k]) for k in (SURFACE_KEYS + SURFACE_KEYS_NIGHT)
+        )
+        for key, kind in restore_keys:
             val = snapshot.get(key)
             if val is not None:
                 xml = set_pref(xml, key, val, kind)
