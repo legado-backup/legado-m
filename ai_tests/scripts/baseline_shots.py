@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """baseline_shots.py — UI 组件渲染基线截图（ui-subpage-optimization A2.1.1）
 
+⚠️ **B7 实证（2026-09-23）：accent 矩阵在当前主题架构下已失效（静默 no-op）**
+    本脚本按 `PreferKey.cPrimary/cAccent`（SP 键 `colorPrimary`/`colorAccent`）注入 accent 色系，
+    但**当前版本的有效主题色由 `themeConfig.json` / 外观套件（`currentAppearanceKitId`）决定**，
+    启动时会把套件/配置值回写 SP ⇒ 注入被覆盖。实测：clear kit 后 day/default vs day/purple
+    两张截图**显著变化像素仅 0.00%~0.10%**（均值为 0.5/255，绝大部分只是状态栏时钟差异）
+    ⇒ 「自定义主题色」态实际未生效。**要验证主题色跟随必须走 App 内设置路径**
+    （我的 → 主题设置 → 主题色，或写入 themeConfig.json），本脚本矩阵仅对
+    `themeMode`（明暗）与页面可达性有效。已同步：B7 tasks §0.5.10 与项目记忆。
+
 目的：为 A2.2「组件收敛」（确认弹框 4→1 入口、卡片 3 套划界）与 A3「主题链收敛」
 提供**改动前对照基线**。覆盖 = 四族代表页面 × 明暗 × accent 三色系。
 
@@ -45,11 +54,15 @@ TMP_REMOTE = "/data/local/tmp/prefs_baseline.xml"
 # ⚠️ 类型口径（源码核实）：`themeMode` 走 `getPrefString`（值 "0"跟随系统/"1"日/"2"夜/"3"墨水屏）→ **string**；
 #    四个颜色键走 `getPrefInt`（ARGB int）→ **int**。类型写错会静默回落默认值。
 K_THEME_MODE = ("themeMode", "string")
+# ⚠️ B7 实测新增（2026-09-23）：`currentAppearanceKitId` 非空时**外观套件会覆盖 colorPrimary/colorAccent**
+# ⇒ 直写颜色键的 accent 矩阵会「静默失效」（截图与 default 像素级相同，diff≈0.5/255）。
+# 故必须纳入快照/还原，并在注入前清空（见 apply_matrix_prefs）。
+K_KIT = ("currentAppearanceKitId", "string")
 K_DAY_PRIMARY = ("colorPrimary", "int")
 K_DAY_ACCENT = ("colorAccent", "int")
 K_NIGHT_PRIMARY = ("colorPrimaryNight", "int")
 K_NIGHT_ACCENT = ("colorAccentNight", "int")
-PREF_KEYS = (K_THEME_MODE, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
+PREF_KEYS = (K_THEME_MODE, K_KIT, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
 KIND_OF = {key: kind for key, kind in PREF_KEYS}
 COLOR_KEYS = (K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
 
@@ -73,6 +86,31 @@ ROUTES: dict[str, dict[str, str]] = {
         "family": "弹框族（主题管理，可触发确认弹框）",
         "activity": "io.legado.app.ui.config.ThemeManageActivity",
     },
+    # ---- B7 主题一致性四态验证增补（2026-09-23，专覆盖本次收口的标签/芯片/徽标/切换条）----
+    "download": {
+        "family": "下载管理（RoundedTagBarView 标签栏 + R29 宿主刷新）",
+        "activity": "io.legado.app.ui.download.DownloadManageActivity",
+    },
+    "tabbar": {
+        "family": "阅读菜单按键管理（共享 tab_bar 双段切换条·既有正确实现对照）",
+        "activity": "io.legado.app.ui.book.read.config.ReadMenuButtonManageActivity",
+    },
+    "tabbar_bgm": {
+        "family": "朗读配乐管理（共享 tab_bar·R30 修复点：段底改主题派生）",
+        "activity": "io.legado.app.ui.book.read.config.ReadAloudBgmManageActivity",
+    },
+    "search": {
+        "family": "搜索页（AppFilterChip 面 token 收口）",
+        "activity": "io.legado.app.ui.book.search.SearchActivity",
+    },
+    "import": {
+        "family": "本地导入（TagChip 面 token 收口）",
+        "activity": "io.legado.app.ui.book.import.local.ImportBookActivity",
+    },
+    "shelf_tag": {
+        "family": "书架标签管理（分组 chip 面 token 收口）",
+        "activity": "io.legado.app.ui.main.bookshelf.BookshelfTagManageActivity",
+    },
 }
 
 # accent 色系矩阵：日/夜各 (primary, accent) 十六进制；default = 不改写 prefs（沿用现有）
@@ -84,7 +122,7 @@ ACCENTS: dict[str, dict[str, tuple[str, str]]] = {
 THEME_MODE = {"day": "1", "night": "2"}
 
 
-def adb(*args: str, timeout: int = 30, binary: bool = False):
+def adb(*args: str, timeout: int = 120, binary: bool = False):
     return subprocess.run(
         [ADB_PATH, "-s", MEMU_ADB_HOST, *args],
         capture_output=True, timeout=timeout,
@@ -184,6 +222,10 @@ def apply_matrix_prefs(theme: str, accent: str, snapshot: dict[str, str]) -> boo
     """按 (明暗, accent) 改写 prefs；返回是否成功。"""
     xml = read_prefs()
     xml = set_pref(xml, K_THEME_MODE[0], str(THEME_MODE[theme]), K_THEME_MODE[1])
+    # B7 实测（2026-09-23）：**必须清空活动外观套件** —— 套件激活时会覆盖 colorPrimary/colorAccent，
+    # 导致 accent 矩阵「写了不生效」（实测 default vs purple 截图 diff≈0.5/255，属静默失效）。
+    # 清空后本矩阵只由颜色键决定，四态对比才有意义（收尾 restore_prefs 会还原用户的套件）。
+    xml = set_pref(xml, K_KIT[0], "", K_KIT[1])
     preset = ACCENTS[accent]
     if preset:
         values = {
