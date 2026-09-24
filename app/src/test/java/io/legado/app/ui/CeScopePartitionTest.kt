@@ -75,6 +75,7 @@ class CeScopePartitionTest {
      */
     private val retiredByCe = setOf(
         "activity_rss_search", // CE 5.2 首项（2026-09-24）
+        "activity_book_search", // CE 5.2 第 2 页（2026-09-24）
     )
 
     private fun buckets() = listOf(
