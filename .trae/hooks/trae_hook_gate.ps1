@@ -298,7 +298,7 @@ try {
         elseif ($cmd -match 'SKIP_GATES\s*=\s*1|--force-skip') { $violation = '禁止用 SKIP_GATES / --force-skip 跳过门禁（确需跳过必须三处留痕并经用户确认）' }
         elseif ($cmd -match 'git\s+clean\s+-[a-zA-Z]*f[a-zA-Z]*x') { $violation = '禁止 git clean -fdx（-x 会删除被 gitignore 的文件，含签名证书）' }
         elseif ($cmd -match '(rm|Remove-Item).*(-Recurse).*(\.git/hooks|\.git\\hooks)') { $violation = '禁止删除 git hooks（绕卡点反模式）' }
-        elseif ($cmd -match 'git\s+push.*(--force|-f)\b' -and $cmd -match 'master|main') { $violation = '禁止强推 master/main' }
+        elseif ($cmd -match 'git\s+push\b[^;|&]*\s(-f|--force)\b' -and $cmd -match 'master|main') { $violation = '禁止强推 master/main' }
         if ($violation) {
           $reason = @"
 【PreToolUse 拦截】$violation
