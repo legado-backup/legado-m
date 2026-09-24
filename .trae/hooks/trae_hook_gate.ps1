@@ -30,6 +30,52 @@ function Read-Text($p) {
   return $null
 }
 
+# ---- H7：运行时日志治理（参数化 + 默认值）-----------------------------------
+# H7.2：invocations.log **默认关闭**（原实现每次 Hook 调用都追加一行 ⇒ 长期膨胀且含路径信息）；
+#       排障时设 TRAE_HOOK_DEBUG=1 开启；写前受 MAX_LOG_BYTES 轮转保护（超限保留尾部 256 KiB）。
+$MaxLogBytes = if ($env:MAX_LOG_BYTES) { [int]$env:MAX_LOG_BYTES } else { 1048576 }  # 1 MiB
+$LogKeepBytes = 262144                                                              # 超限保留尾部 256 KiB
+# H7.3：`*.code_changed` 状态文件按会话累积 ⇒ 启动时清理过期项（保留最近 N 个会话）
+$MaxCodeChanged = if ($env:MAX_CODE_CHANGED) { [int]$env:MAX_CODE_CHANGED } else { 20 }
+
+function Write-RotatingLog($path, $line) {
+  # 追加一行并做**尾部保留式轮转**（超限时只留最后 $LogKeepBytes 字节）⇒ 有界、不会无限增长
+  try {
+    Add-Content -Path $path -Value $line -Encoding UTF8
+    $fi = Get-Item $path -ErrorAction SilentlyContinue
+    if ($fi -and $fi.Length -gt $MaxLogBytes) {
+      $all = [IO.File]::ReadAllBytes($path)
+      $take = [Math]::Min($LogKeepBytes, $all.Length)
+      $keep = New-Object byte[] $take
+      [Array]::Copy($all, $all.Length - $take, $keep, 0, $take)
+      [IO.File]::WriteAllBytes($path, $keep)
+    }
+  } catch { }
+}
+
+function Write-DecisionLog($stateDir, $evtName, $sid, $codeChanged, $gateRan, $decision, $reason) {
+  # H6.2：Hook 决策结构化留痕（event / sid / codeChanged / gateRan / decision / reason）
+  # 用于回答「卡点当时为什么放行/拦截」——纯文字表述无法事后审计。
+  try {
+    $line = "{0} | event={1} | sid={2} | codeChanged={3} | gateRan={4} | decision={5} | reason={6}" -f `
+      (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $evtName, $sid, $codeChanged, $gateRan, $decision, $reason
+    Write-RotatingLog (Join-Path $stateDir 'decisions.log') $line
+  } catch { }
+}
+
+function Clear-StaleCodeChanged($stateDir) {
+  # H7.3：只保留最近 $MaxCodeChanged 个会话的 `*.code_changed`（按最后写时间倒序）
+  try {
+    $files = @(Get-ChildItem -Path $stateDir -Filter '*.code_changed' -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending)
+    if ($files.Count -gt $MaxCodeChanged) {
+      $files | Select-Object -Skip $MaxCodeChanged | ForEach-Object {
+        Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+      }
+    }
+  } catch { }
+}
+
 function Load-ThemeRules($proj) {
   # fallback（仅在配置缺失时使用，保持 fail-open）
   $fallback = @{
@@ -65,22 +111,25 @@ try {
     $task = [Console]::In.ReadToEndAsync()
     if ($task.Wait(1500)) { $raw = $task.Result }
   } catch { $raw = '' }
-  # 诊断日志（临时，确认 Trae 是否真的调用 Hook 以及工具名口径；验证后清理）
-  try {
-    $logDir = Join-Path $proj '.trae\.hook-state'
-    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
-    $logEvent = ''
-    $logTool = ''
-    if ($raw) {
-      try {
-        $p1 = $raw | ConvertFrom-Json
-        $logEvent = [string]$p1.hook_event_name
-        if ($p1.tool_name) { $logTool = [string]$p1.tool_name }
-        if ($p1.llm_tool_name) { $logTool = $logTool + '/' + [string]$p1.llm_tool_name }
-      } catch { }
-    }
-    Add-Content -Path (Join-Path $logDir 'invocations.log') -Value ("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | event=$logEvent | tool=$logTool | rawLen=$($raw.Length)") -Encoding UTF8
-  } catch { }
+  # H7.2：invocations.log **默认关闭**（原实现每次 Hook 调用都写一行 ⇒ 长期膨胀；排障才需要）
+  # 需排障时设 TRAE_HOOK_DEBUG=1 开启，且写入受 MAX_LOG_BYTES 轮转保护（尾部保留 256 KiB）。
+  if ($env:TRAE_HOOK_DEBUG -eq '1') {
+    try {
+      $logDir = Join-Path $proj '.trae\.hook-state'
+      if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+      $logEvent = ''
+      $logTool = ''
+      if ($raw) {
+        try {
+          $p1 = $raw | ConvertFrom-Json
+          $logEvent = [string]$p1.hook_event_name
+          if ($p1.tool_name) { $logTool = [string]$p1.tool_name }
+          if ($p1.llm_tool_name) { $logTool = $logTool + '/' + [string]$p1.llm_tool_name }
+        } catch { }
+      }
+      Write-RotatingLog (Join-Path $logDir 'invocations.log') ("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | event=$logEvent | tool=$logTool | rawLen=$($raw.Length)")
+    } catch { }
+  }
   if (-not $raw -or $raw.Trim().Length -eq 0) { exit 0 }
   $evt = $null
   if ($raw -and $raw.Trim().Length -gt 0) { $evt = $raw | ConvertFrom-Json }
@@ -101,6 +150,8 @@ try {
   switch ($name) {
 
     'SessionStart' {
+      # H7.3：新会话启动即清理过期 `*.code_changed`（保留最近 $MaxCodeChanged 个会话，默认 20）
+      Clear-StaleCodeChanged $stateDir
       $ctx = ''
       try {
         $ctxFile = Join-Path $proj 'ai_tests\config\gate_rules\session_context.md'
@@ -158,12 +209,10 @@ try {
         $rel = ([string]$path).Replace('\', '/')
         $rel = $rel -replace '^.*?(?=(app|modules)/)', ''
         $rel = $rel -replace '^[\\/]+', ''
-        # 诊断日志（临时，定位 PreToolUse 未拦截原因；修复验证后清理）
-        try {
-          $keys = ''
-          if ($ti) { $keys = ($ti.PSObject.Properties.Name -join ',') }
-          Add-Content -Path (Join-Path $proj '.trae\.hook-state\pretooluse.log') -Value ("$(Get-Date -Format 'HH:mm:ss') | tool=$tool | keys=$keys | path=$path | rel=$rel | bodyLen=$($body.Length)") -Encoding UTF8
-        } catch { }
+        # H7.1：原此处写临时诊断日志（`.hook-state/` 下的一次性排查文件）。
+        # 其唯一 ④ 留证（2026-09-23 15:12 真实拦截行）已**先迁移**到 `.hook-state/decisions.log`
+        # 的 [hook-evidence] 段（GB-6：先迁移后删除），随后删除该写入代码与该日志文件。
+        # 决策留痕改由 Write-DecisionLog 承担（结构化字段，见下）。
         # 记录「本轮改过代码」，供 Stop 判定（纯文档任务不应被 Stop 阻断）
         if ($rel -match '^(app|modules)/.*\.(kt|java|xml)$') {
           Set-Content -Path (Join-Path $stateDir ("$sid.code_changed")) -Value (Get-Date -Format o) -Encoding UTF8
@@ -197,6 +246,7 @@ try {
   3) 确需保留（媒体画布 / 视频控制层 / 封面打底）⇒ 登记到 $allowRel（含理由/归属设置项/批准人）。
 自检命令：ai_tests\venv\Scripts\python.exe ai_tests/scripts/audit_theme_token_violation.py --files $rel
 "@
+              Write-DecisionLog $stateDir 'PreToolUse' $sid $null $null 'deny' "取色违规: $rel"
               Out-Json @{ hookSpecificOutput = @{ hookEventName = 'PreToolUse'; permissionDecision = 'deny'; permissionDecisionReason = $reason } }
             }
           }
@@ -209,6 +259,7 @@ try {
 依据 database-migration-safety.md：version 递增必须配套迁移与**覆盖安装**验证（全新安装不能替代）。
 请确认：①已写/改迁移逻辑 ②已准备覆盖安装测试 ③已加载 database-migration-safety.md。
 "@
+          Write-DecisionLog $stateDir 'PreToolUse' $sid $null $null 'ask' "数据库版本变更: $rel"
           Out-Json @{ hookSpecificOutput = @{ hookEventName = 'PreToolUse'; permissionDecision = 'ask'; permissionDecisionReason = $reason } }
         }
 
@@ -254,6 +305,7 @@ try {
 依据：docs/project-rules/process-gate-architecture.md §四（禁止绕卡点）。
 如确需执行，请先向用户说明理由并获得确认；跳过门禁的唯一通道是 SKIP_GATES=1 且必须在 commit message 与项目记忆留痕。
 "@
+          Write-DecisionLog $stateDir 'PreToolUse' $sid $null $null 'deny' "绕卡点命令: $violation"
           Out-Json @{ hookSpecificOutput = @{ hookEventName = 'PreToolUse'; permissionDecision = 'deny'; permissionDecisionReason = $reason } }
         }
       }
@@ -279,23 +331,34 @@ try {
 请按门禁输出修复（取色走面 token / 补调刷新钩子 / 补写测试 / 同步规范漂移），或确需保留时登记豁免。
 修复后重跑：ai_tests\venv\Scripts\python.exe ai_tests/scripts/run_gates.py --stage commit
 "@
+        Write-DecisionLog $stateDir 'PostToolUse' $sid (Test-Path (Join-Path $stateDir ("$sid.code_changed"))) (Test-Path $gateMarker) 'block' '门禁命令输出含失败特征'
         Out-Json @{ decision = 'block'; reason = $reason }
       }
     }
 
     'Stop' {
-      $msg = ''
-      if ($evt -and $evt.last_assistant_message) { $msg = [string]$evt.last_assistant_message }
-      $claim = $msg -match '已完成|已修复|已清零|已落地|验收通过|ALL PASS|全部通过|交付'
+      # H6.1（判据结构化）：改为**状态机**判据 —— `*.code_changed` ∧ ¬`*.gate_ran` ⇒ 阻断。
+      # 原实现依赖对 last_assistant_message 的**措辞词表**（已完成/已修复/已交付…）判断
+      # 「是否声明完成」，两侧都不可靠：①换词即绕过（「搞定了」不含词表词 ⇒ 放行）
+      # ②误伤（回复里引用规范原文含这些词、或纯文档任务也被拦）。状态文件是**客观证据**：
+      # code_changed 只在本轮真的写过 app/ 或 modules/ 源码时由 PreToolUse 落盘；
+      # gate_ran 由 PostToolUse 观察到门禁命令成功执行时落盘。
       $codeChanged = Test-Path (Join-Path $stateDir ("$sid.code_changed"))
-      if ($claim -and $codeChanged -and -not (Test-Path $gateMarker)) {
+      $gateRan = Test-Path $gateMarker
+      if ($codeChanged -and -not $gateRan) {
         $reason = @"
-【Stop 阻断：声明完成但本轮未跑门禁】
+【Stop 阻断：本轮改过代码但未跑门禁】
+判据（H6.1）：存在 `$sid.code_changed` 且无 `$sid.gate_ran` ⇒ 阻断。
 请先运行并附退出码证据（testing-iron-rule.md / theme-consistency-iron-rule.md §二 K2）：
   ai_tests\venv\Scripts\python.exe ai_tests/scripts/run_gates.py --stage commit
-如本任务确不涉及代码变更（纯文档/纯分析），请在回复中显式说明"本轮无代码变更，门禁不适用"，以便放行。
+说明：本轮若确无代码变更，则不会被本条拦下（无 code_changed 标记即放行），无需人工声明。
 "@
+        Write-DecisionLog $stateDir 'Stop' $sid $codeChanged $gateRan 'block' 'code_changed 且未跑门禁'
         Out-Json @{ decision = 'block'; reason = $reason }
+      } else {
+        # 放行也必须留痕（H6.2 验证标准：实测一次 Stop 后日志新增 1 行且字段齐全）
+        $why = if ($codeChanged) { '已跑门禁' } else { '本轮无代码变更' }
+        Write-DecisionLog $stateDir 'Stop' $sid $codeChanged $gateRan 'allow' $why
       }
     }
   }
