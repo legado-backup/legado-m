@@ -1,5 +1,6 @@
 package io.legado.app.ui
 
+import io.legado.app.testkit.SourceFileProbe
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,13 +18,7 @@ import org.junit.Test
  */
 class CeScopePartitionTest {
 
-    private fun layoutDir(): File =
-        listOf(
-            File("src/main/res/layout"),
-            File("../app/src/main/res/layout"),
-            File("app/src/main/res/layout"),
-        ).firstOrNull { it.isDirectory }
-            ?: throw AssertionError("未找到 res/layout（工作目录=${File(".").absolutePath}）")
+    private fun layoutDir(): File = SourceFileProbe.layoutDir()
 
     /** 实测口径：`activity_*` + `fragment_*` 布局（`layout-land` 变体不计）。 */
     private fun actualPages(): Set<String> =
