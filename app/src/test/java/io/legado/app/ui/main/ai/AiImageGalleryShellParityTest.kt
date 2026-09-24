@@ -1,6 +1,6 @@
 package io.legado.app.ui.main.ai
 
-import java.io.File
+import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,14 +15,7 @@ import org.junit.Test
  */
 class AiImageGalleryShellParityTest {
 
-    private fun code(relFromMainJava: String): String {
-        val rel = "src/main/java/io/legado/app/$relFromMainJava"
-        val file = listOf(File(rel), File("../app/$rel"), File("app/$rel")).firstOrNull { it.isFile }
-            ?: throw AssertionError("未找到源文件（工作目录=${File(".").absolutePath}）：$rel")
-        return file.readLines()
-            .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
-            .joinToString("\n")
-    }
+    private fun code(relFromMainJava: String): String = SourceFileProbe.sourceText(relFromMainJava)
 
     private val page = "ui/main/ai/AiImageGalleryActivity.kt"
 

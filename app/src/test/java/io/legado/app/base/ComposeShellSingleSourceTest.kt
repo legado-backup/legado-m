@@ -1,5 +1,6 @@
 package io.legado.app.base
 
+import io.legado.app.testkit.SourceFileProbe
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,16 +20,10 @@ import org.junit.Test
  */
 class ComposeShellSingleSourceTest {
 
-    private fun mainJavaRoot(): File =
-        listOf(File("src/main/java"), File("../app/src/main/java"), File("app/src/main/java"))
-            .firstOrNull { it.isDirectory }
-            ?: throw AssertionError("未找到 main 源根（工作目录=${File(".").absolutePath}）")
+    private fun mainJavaRoot(): File = SourceFileProbe.mainJavaRoot()
 
-    /** 剥掉行注释与 KDoc 星号行，避免注释里的写法制造假阳/假阴。 */
-    private fun stripped(f: File): String =
-        f.readLines()
-            .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
-            .joinToString("\n")
+    /** 剥掉行注释与 KDoc 星号行（单源口径，见 [SourceFileProbe.stripComments]）。 */
+    private fun stripped(f: File): String = SourceFileProbe.stripComments(f.readText())
 
     private fun consumers(): List<File> =
         mainJavaRoot().walkTopDown()
