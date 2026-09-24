@@ -66,6 +66,17 @@ class CeScopePartitionTest {
     /** 专向 spec 2（`read-record-header-unify` / `book-info-modern-compose`）。 */
     private val dedicatedSpecs = setOf("activity_read_record", "activity_book_info")
 
+    /**
+     * **CE 已完成并退役 XML 的页**（CE 5.2 逐页推进时在此**显式登记**）。
+     *
+     * 为什么必须登记而非放宽断言：CE 的目标就是让页面 XML 退役 ⇒ 「实测布局集」会持续变小；
+     * 若把断言改成「子集」就失去闭合意义（任何页都能静默消失）。登记制保证：
+     * ①每个退役页仍归属某个桶；②退役必须是有意识的一步（未登记即 FAIL）；③不重复计入。
+     */
+    private val retiredByCe = setOf(
+        "activity_rss_search", // CE 5.2 首项（2026-09-24）
+    )
+
     private fun buckets() = listOf(
         "CE-a" to ceA, "CE-b" to ceB, "技术硬例外保留" to reserved,
         "主 Tab" to mainTabs, "主壳" to mainShell, "专向 spec" to dedicatedSpecs,
@@ -91,10 +102,21 @@ class CeScopePartitionTest {
     fun partitionCoversAllActualPages() {
         val actual = actualPages()
         val mapped = buckets().flatMap { it.second }.toSet()
-        assertEquals("实测页面数应为 45（activity_* 37 + fragment_* 8）", 45, actual.size)
-        val missing = actual - mapped
-        val extra = mapped - actual
+        assertEquals("六个桶的并集必须是 45（activity_* 37 + fragment_* 8）", 45, mapped.size)
+        assertTrue(
+            "退役页必须仍归属某个桶（否则是「静默消失」）：${retiredByCe - mapped}",
+            mapped.containsAll(retiredByCe)
+        )
+        assertTrue(
+            "退役页不得同时仍存在于 res/layout（删了 XML 才算退役）：${actual intersect retiredByCe}",
+            (actual intersect retiredByCe).isEmpty()
+        )
+        // 实测布局 = 45 桶全集 − 已退役
+        val expectedActual = mapped - retiredByCe
+        val missing = expectedActual - actual
+        val extra = actual - mapped
         assertTrue("以下实测布局未落入任何桶：$missing", missing.isEmpty())
         assertTrue("以下桶内页名在实测布局中不存在（蓝图失实）：$extra", extra.isEmpty())
+        assertEquals("实测布局数应等于 45 − 已退役数", expectedActual.size, actual.size)
     }
 }
