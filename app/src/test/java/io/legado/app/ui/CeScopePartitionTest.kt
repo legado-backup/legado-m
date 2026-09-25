@@ -91,6 +91,8 @@ class CeScopePartitionTest {
         "activity_explore_show", // CE-b 第 5 项（2026-09-25）：发现分类页（顶栏 + DynamicFrameLayout 内 ComposeView 列表）
         "activity_qrcode_capture", // CE-b 第 6 项（2026-09-25）：扫码页（Fragment 预览容器 + Compose 顶栏/覆盖层）
         "activity_arrange_book", // CE-b 第 7 项（2026-09-25）：书架管理页（顶栏 + FastScrollRecyclerView + 批量底栏）
+        "activity_rss_artivles", // CE-b 第 8 项（2026-09-25）：RSS 分类页（顶栏 + tabs_container + ViewPager）
+        "activity_rss_favorites", // CE-b 第 9 项（2026-09-25）：订阅收藏页（顶栏 + TabLayout + ViewPager + 空态）
     )
 
     private fun buckets() = listOf(
