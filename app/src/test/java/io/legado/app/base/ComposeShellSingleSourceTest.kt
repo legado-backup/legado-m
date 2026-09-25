@@ -49,6 +49,20 @@ class ComposeShellSingleSourceTest {
         "io/legado/app/ui/replace/edit/ReplaceEditActivity.kt",
     )
 
+    /**
+     * **同文件附属页例外（显式登记，非放宽判据）**：宿主文件内还定义了**与该页骨架无关**的
+     * `ComposeDialogFragment`（弹框是独立窗口，其 `onCreateView` 必须自建 `ComposeView().setContent` ⇒
+     * 不属 `composeShell` 单源可覆盖的范围）。
+     *
+     * 登记绑定条件（缺一即应删掉本条例外）：
+     *  ①该文件的**宿主类**仍必须走 `attachComposeContent` 单源；
+     *  ②文件内确实还有 `ComposeView(` 与 `ComposeDialogFragment()`（即例外理由仍然成立）。
+     */
+    private val sameFileComposeDialogExceptions = setOf(
+        // 同文件顶层 `SourceGroupFilterDialog`（分组筛选弹框，独立窗口）
+        "io/legado/app/ui/book/source/manage/BookSourceActivity.kt",
+    )
+
     private fun rel(f: File): String =
         f.relativeTo(mainJavaRoot()).path.replace('\\', '/')
 
@@ -64,6 +78,7 @@ class ComposeShellSingleSourceTest {
             val s = stripped(f)
             s.contains("ComposeView(") || s.contains("ViewCompositionStrategy")
         }.filterNot { rel(it) in interleavedSlotExceptions }
+            .filterNot { rel(it) in sameFileComposeDialogExceptions }
             .map { rel(it) }
         assertEquals(
             "以下 composeShell 消费页仍在手写 ComposeView 装配（应统一走 attachComposeContent 单源）：$bad",
@@ -80,6 +95,21 @@ class ComposeShellSingleSourceTest {
             assertTrue("例外汇总登记了不存在的页面：$rel", f.isFile)
             assertTrue("$rel 已不再手写 ComposeView ⇒ 应删除该例外登记", stripped(f).contains("ComposeView("))
             assertTrue("$rel 例外不允许绕过主骨架单源", stripped(f).contains("attachComposeContent {"))
+        }
+    }
+
+    @Test
+    fun sameFileComposeDialogExceptionsAreStillReal() {
+        sameFileComposeDialogExceptions.forEach { rel ->
+            val f = File(mainJavaRoot(), rel)
+            assertTrue("例外汇总登记了不存在的页面：$rel", f.isFile)
+            val s = stripped(f)
+            assertTrue("$rel 已不再手写 ComposeView ⇒ 应删除该例外登记", s.contains("ComposeView("))
+            assertTrue(
+                "$rel 的同文件附属页必须是 Compose 弹框（否则例外理由不成立）",
+                s.contains("ComposeDialogFragment()")
+            )
+            assertTrue("$rel 宿主骨架不允许绕过单源", s.contains("attachComposeContent {"))
         }
     }
 
