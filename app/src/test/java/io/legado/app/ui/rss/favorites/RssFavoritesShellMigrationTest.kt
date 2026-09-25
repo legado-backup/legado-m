@@ -59,6 +59,23 @@ class RssFavoritesShellMigrationTest {
             s.contains("binding.emptyOverlay") || s.contains("binding.tabLayout") || s.contains("binding.viewPager")
         )
         assertFalse("原 initEmptyState 必须已并入页内渲染", s.contains("private fun initEmptyState("))
+        // 程序化 ViewPager 必须显式赋 id：FragmentStatePagerAdapter.startUpdate 要求 container 有 view id
+        assertTrue("ViewPager 必须显式赋 R.id.view_pager", s.contains("id = R.id.view_pager"))
+    }
+
+    @Test
+    fun sharedArticleListShellIsSingleSource() {
+        // CE-b：fragment_rss_articles 由两个 Fragment 共用（本页列表 Fragment + 文章列表 Fragment）
+        // ⇒ 装配下沉到共享基类单源，本页只继承，不再持有任何 ViewBinding
+        val frag = SourceFileProbe.sourceText("ui/rss/favorites/RssFavoritesFragment.kt")
+        assertTrue(
+            "收藏列表 Fragment 必须继承共享基类",
+            frag.contains(": RssArticlesShellFragment<RssFavoritesViewModel>()")
+        )
+        assertFalse("不得再走 viewBinding 委托", frag.contains("viewBinding("))
+        assertFalse("不得再引用已退役布局", frag.contains("FragmentRssArticlesBinding"))
+        assertFalse("不得再直接引用 XML 时代节点", frag.contains("binding.recyclerView") || frag.contains("binding.refreshLayout"))
+        assertTrue("必须继续装配 recycler（layoutManager/adapter）与 refreshLayout", frag.contains("recyclerView.adapter = adapter"))
     }
 
     @Test
