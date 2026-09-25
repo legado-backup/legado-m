@@ -97,7 +97,7 @@ SURFACES: dict[str, dict[str, tuple[str, ...]]] = {
 # 四族代表页面（Activity 类名经 AndroidManifest 核实存在）
 # ⚠️ 必须用**全限定类名**：`am start -n <applicationId>/.ui.X` 的相对形式会以 applicationId 为基准解析
 #    成 `io.legado.miss.app.debug.ui.X`（不存在）；Java 包名恒为 `io.legado.app`，不受 applicationIdSuffix 影响。
-ROUTES: dict[str, dict[str, str]] = {
+ROUTES: dict[str, dict] = {
     "topbar": {
         "family": "顶栏族（GlassTopAppBar 管理族分支）",
         "activity": "io.legado.app.ui.book.source.manage.BookSourceActivity",
@@ -138,6 +138,50 @@ ROUTES: dict[str, dict[str, str]] = {
     "shelf_tag": {
         "family": "书架标签管理（分组 chip 面 token 收口）",
         "activity": "io.legado.app.ui.main.bookshelf.BookshelfTagManageActivity",
+    },
+    # ---- 顶栏包 §0.5 ROUTES 补齐（2026-09-25）：主 Tab 族（层 1 顶栏）四态验收前置 ----
+    # 主 Tab 3 页（书架/订阅/发现）走 MainActivity 的 `targetPage` extra（`MainActivity.kt:199-202/605-627`）；
+    # 「我的」无 extra ⇒ 必须「启动主壳后点击底部导航到达」⇒ 调用时补 `--tap my:desc=我的`。
+    # ⚠️ 这 4 条的**前台 Activity 恒为 MainActivity**（Tab 是 Fragment），故用 `expect` 指定等待目标。
+    "bookshelf": {
+        "family": "主 Tab·书架（层 1 顶栏 + 内容区，随 CG 保留）",
+        "activity": "io.legado.app.ui.main.MainActivity",
+        "extras": ["--es", "targetPage", "bookshelf"],
+        "expect": "MainActivity",
+    },
+    "rss": {
+        "family": "主 Tab·订阅（层 1 顶栏 + 内容区，随 CG 保留）",
+        "activity": "io.legado.app.ui.main.MainActivity",
+        "extras": ["--es", "targetPage", "rss"],
+        "expect": "MainActivity",
+    },
+    "discovery": {
+        "family": "主 Tab·发现（层 1 顶栏 + 内容区，随 CG 保留）",
+        "activity": "io.legado.app.ui.main.MainActivity",
+        "extras": ["--es", "targetPage", "discovery"],
+        "expect": "MainActivity",
+    },
+    "my": {
+        "family": "主 Tab·我的（层 1 顶栏；**无 extra** ⇒ 需 `--tap my:desc=我的` 点击到达）",
+        "activity": "io.legado.app.ui.main.MainActivity",
+        "expect": "MainActivity",
+    },
+    # ---- 顶栏包 §0.5：4 个真锚点宿主（MainTopBarView@title_bar）——直接 am start 即可到达 ----
+    "anchor_theme": {
+        "family": "真锚点·主题管理（14 页共用布局，顶栏包 §4.2 单独一批）",
+        "activity": "io.legado.app.ui.config.ThemeManageActivity",
+    },
+    "anchor_book_source_edit": {
+        "family": "真锚点·书源编辑（顶栏包 §4.x）",
+        "activity": "io.legado.app.ui.book.source.edit.BookSourceEditActivity",
+    },
+    "anchor_paragraph_rule_edit": {
+        "family": "真锚点·段落规则编辑（顶栏包 §4.x）",
+        "activity": "io.legado.app.ui.book.read.config.ParagraphRuleEditActivity",
+    },
+    "anchor_cover_collection": {
+        "family": "真锚点·封面图集管理（CE-b 已完成，锚点由本包 §4.1 一并落地）",
+        "activity": "io.legado.app.ui.config.CoverCollectionManageActivity",
     },
 }
 
@@ -312,9 +356,13 @@ def restore_prefs(snapshot: dict[str, str]) -> None:
         print(f"!! prefs 还原失败（需人工检查）：{e}")
 
 
-def launch(activity: str) -> bool:
-    """启动目标 Activity（严格判定：必须出现 `Starting:` 且无 Error/does not exist）。"""
-    r = adb("shell", "am", "start", "-n", f"{PACKAGE}/{activity}")
+def launch(activity: str, extras: list[str] | None = None) -> bool:
+    """启动目标 Activity（严格判定：必须出现 `Starting:` 且无 Error/does not exist）。
+
+    `extras` 为 `am start` 的附加参数（如 `["--es","targetPage","bookshelf"]`），
+    顶栏包 §0.5 的主 Tab 路由依赖它（`MainActivity` 的 `targetPage` extra）。
+    """
+    r = adb("shell", "am", "start", "-n", f"{PACKAGE}/{activity}", *(extras or []))
     out = (r.stdout or "").strip()
     if "Starting:" not in out or "Error" in out or "does not exist" in out:
         print(f"  !! am start 失败：{out[:160]}")
@@ -479,7 +527,8 @@ def main() -> int:
 
     print(f"[矩阵] 页 {pages} × 明暗 {themes} × accent {accents} = {len(pages) * len(themes) * len(accents)} 张")
     for p in pages:
-        print(f"  - {p}: {ROUTES[p]['family']} → {ROUTES[p]['activity']}")
+        extra_txt = " ".join(ROUTES[p].get("extras") or [])
+        print(f"  - {p}: {ROUTES[p]['family']} → {ROUTES[p]['activity']}{(' ' + extra_txt) if extra_txt else ''}")
     if args.dry_run:
         return 0
 
@@ -513,11 +562,13 @@ def main() -> int:
                     fails.append(f"{theme}/{accent}:prefs")
                     continue
                 for page in pages:
-                    activity = ROUTES[page]["activity"]
-                    if not launch(activity):
+                    route = ROUTES[page]
+                    activity = route["activity"]
+                    if not launch(activity, route.get("extras")):
                         fails.append(f"{theme}/{accent}/{page}:启动失败")
                         continue
-                    if not wait_foreground(activity):
+                    # 主 Tab 族的 Tab 是 Fragment ⇒ 前台恒为 MainActivity，用 `expect` 指定等待目标
+                    if not wait_foreground(route.get("expect") or activity):
                         fails.append(f"{theme}/{accent}/{page}:未到前台（可能截到桌面）")
                         continue
                     # 启动后回读：检测「进程启动时被回写覆盖 prefs」类静默失败
