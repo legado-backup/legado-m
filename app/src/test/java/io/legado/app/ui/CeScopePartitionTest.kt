@@ -100,6 +100,7 @@ class CeScopePartitionTest {
         "activity_replace_rule", // CE-b 第 14 项（2026-09-25）：替换规则管理页（死壳 + 旧 SelectActionBar 死代码清除）
         "activity_s3_container_manage", // CE-b 第 15 项（2026-09-25）：S3/书库容器管理页（2 个宿主共用清壳布局）
         "activity_about", // CE-b 第 16 项（2026-09-25）：关于页（顶栏搬入页内 + Fragment 容器由组合托管）
+        "activity_cover_collection_manage", // CE-b 第 17 项（2026-09-25）：封面图集管理页（顶栏搬入页内 + 清除残留死按钮）
     )
 
     private fun buckets() = listOf(
