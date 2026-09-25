@@ -47,6 +47,28 @@ class RssArtivlesShellMigrationTest {
                 Regex("""private val viewPager\s*:\s*ViewPager\s+by lazy""").containsMatchIn(s)
         )
         assertFalse("不得再引用 XML 时代节点", s.contains("binding.tabsContainer") || s.contains("binding.viewPager"))
+        // 程序化 ViewPager 必须显式赋 id：FragmentStatePagerAdapter.startUpdate 要求 container 有 view id
+        assertTrue("ViewPager 必须显式赋 R.id.view_pager", s.contains("id = R.id.view_pager"))
+    }
+
+    @Test
+    fun sharedArticleListShellIsSingleSource() {
+        // CE-b：fragment_rss_articles 由两个 Fragment 共用 ⇒ 装配下沉共享基类单源
+        val base = SourceFileProbe.sourceText("ui/rss/article/RssArticlesShellFragment.kt")
+        val frag = SourceFileProbe.sourceText("ui/rss/article/RssArticlesFragment.kt")
+        assertTrue("基类必须是 VMBaseFragment<VM>(0)（无 XML）", base.contains("VMBaseFragment<VM>(0)"))
+        assertTrue("基类必须 override onCreateView 提供合成壳", base.contains("override fun onCreateView("))
+        assertTrue("基类必须走 attachComposeContent 单源挂载", base.contains("root.attachComposeContent {"))
+        assertTrue("SwipeRefreshLayout 必须以 AndroidView 托管", base.contains("factory = { refreshLayout }"))
+        assertTrue("两个 View 必须显式赋 id", base.contains("id = R.id.refresh_layout") && base.contains("id = R.id.recycler_view"))
+        assertTrue("recycler 必须复刻 clipToPadding=false", base.contains("clipToPadding = false"))
+        assertTrue("宿主必须继承共享基类", frag.contains(": RssArticlesShellFragment<RssArticlesViewModel>()"))
+        assertFalse("宿主不得再走 viewBinding 委托", frag.contains("viewBinding("))
+        assertFalse("宿主不得再引用已退役布局", frag.contains("FragmentRssArticlesBinding"))
+        assertFalse(
+            "fragment_rss_articles.xml 应已退役（CE-b）",
+            File(SourceFileProbe.layoutDir(), "fragment_rss_articles.xml").exists()
+        )
     }
 
     @Test
