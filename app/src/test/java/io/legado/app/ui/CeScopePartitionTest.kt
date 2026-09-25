@@ -101,6 +101,9 @@ class CeScopePartitionTest {
         "activity_s3_container_manage", // CE-b 第 15 项（2026-09-25）：S3/书库容器管理页（2 个宿主共用清壳布局）
         "activity_about", // CE-b 第 16 项（2026-09-25）：关于页（顶栏搬入页内 + Fragment 容器由组合托管）
         "activity_cover_collection_manage", // CE-b 第 17 项（2026-09-25）：封面图集管理页（顶栏搬入页内 + 清除残留死按钮）
+        "activity_paragraph_rule_edit", // CE-a #11（2026-09-26）：段落规则编辑页（**2 个宿主共用布局**：
+        // ParagraphRuleEditActivity + ReadMenuCustomButtonEditActivity）⇒ 字段区整体程序化重建
+        // （ParagraphRuleEditShellViews 单源装配）+ 顶栏搬入页内
     )
 
     private fun buckets() = listOf(
