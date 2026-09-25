@@ -81,6 +81,7 @@ class CeScopePartitionTest {
         "activity_image_detail", // CE 5.2 第 5 页（2026-09-25）
         "activity_rss_source_edit", // CE 5.2 第 6 页（2026-09-25）
         "activity_replace_edit", // CE 5.2 第 7 页（2026-09-25）
+        "activity_code_edit", // CE 5.2 第 8 页（2026-09-25）
     )
 
     private fun buckets() = listOf(
