@@ -55,7 +55,10 @@ class TopBarNavIconContractTest {
             "默认返回（Material ArrowBack）必须被识别并归一（引用相等判定）",
             s.contains("navIcon !== Icons.AutoMirrored.Filled.ArrowBack")
         )
-        assertTrue("归一后必须渲染项目资产 ic_back", s.contains("painterResource(R.drawable.ic_back)"))
+        assertTrue(
+            "归一后必须渲染项目资产——顶栏包 §1.1 起改为**契约取值** `TopBarConfig.Icons.navBack`（禁写死 R.drawable）",
+            s.contains("painterResource(TopBarConfig.Icons.navBack)")
+        )
         assertFalse(
             "不得在分支内直接硬写 ic_back（会重新退回「忽略 navIcon」的旧实现）",
             s.contains("painter = painterResource(R.drawable.ic_back),\n                                    contentDescription = null,\n                                    modifier = Modifier.size(actionIcon.dp)")
@@ -74,6 +77,18 @@ class TopBarNavIconContractTest {
         assertTrue(
             "归一理由必须留注释（否则后人会「简化」掉这一步而破坏资产统一）",
             SourceFileProbe.rawText(page).contains("违反「顶栏图标资产统一")
+        )
+    }
+
+    @Test
+    fun defaultBackAssetComesFromContractNotHardcode() {
+        // 顶栏包 §1.1（2026-09-25）：Compose 顶栏的返回位资产改由契约取值；
+        // 若后人「简化」回 R.drawable 字面量，换资产时会漏改（本包归一化的前提是资产单源）。
+        val s = src()
+        assertTrue("必须引用契约资产", s.contains("TopBarConfig.Icons.navBack"))
+        assertFalse(
+            "代码内不得再出现 R.drawable.* 图标硬编码（注释里的历史写法已被 stripComments 剥离）",
+            s.contains("R.drawable.")
         )
     }
 
