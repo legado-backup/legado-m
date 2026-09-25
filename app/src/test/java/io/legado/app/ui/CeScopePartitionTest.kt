@@ -104,6 +104,8 @@ class CeScopePartitionTest {
         "activity_paragraph_rule_edit", // CE-a #11（2026-09-26）：段落规则编辑页（**2 个宿主共用布局**：
         // ParagraphRuleEditActivity + ReadMenuCustomButtonEditActivity）⇒ 字段区整体程序化重建
         // （ParagraphRuleEditShellViews 单源装配）+ 顶栏搬入页内
+        "activity_book_source_edit", // CE-a #12（2026-09-26）：书源编辑页（顶栏锚点）⇒
+        // 六段结构程序化重建（BookSourceEditShellViews 单源装配）+ 顶栏搬入页内
     )
 
     private fun buckets() = listOf(
