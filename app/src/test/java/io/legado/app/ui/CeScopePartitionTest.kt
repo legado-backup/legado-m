@@ -99,6 +99,7 @@ class CeScopePartitionTest {
         "activity_rss_source", // CE-b 第 13 项（2026-09-25）：订阅源管理页（死壳 ⇒ 合成壳单源装配）
         "activity_replace_rule", // CE-b 第 14 项（2026-09-25）：替换规则管理页（死壳 + 旧 SelectActionBar 死代码清除）
         "activity_s3_container_manage", // CE-b 第 15 项（2026-09-25）：S3/书库容器管理页（2 个宿主共用清壳布局）
+        "activity_about", // CE-b 第 16 项（2026-09-25）：关于页（顶栏搬入页内 + Fragment 容器由组合托管）
     )
 
     private fun buckets() = listOf(
