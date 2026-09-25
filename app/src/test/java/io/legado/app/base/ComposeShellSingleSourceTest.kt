@@ -31,6 +31,27 @@ class ComposeShellSingleSourceTest {
             .filter { stripped(it).contains("composeShell(this)") }
             .toList()
 
+    /**
+     * **例外汇总（显式登记，非放宽判据）**：允许「在 View 内核内部原位承载 Compose 段落」的页面。
+     *
+     * 登记理由（`ui/replace/edit/ReplaceEditActivity.kt`，CE 5.2 第 7 页）：该页字段区是 **View 内核**
+     * （`NoChildScrollNestedScrollView` 对 `requestChildFocus` 有特化，是键盘/焦点联动的既有口径，
+     * 不得换成 Compose 滚动）；而 F64 高级组头与 F69 样本区两个 Compose 段落**语义上夹在字段之间**
+     * （位置即渐进披露的分组归属），既不能上移也不能下移 ⇒ 原地 `ComposeView` 是唯一 interop 通道。
+     *
+     * 登记绑定条件（缺一即应删掉本条例外）：
+     *  ①页面主骨架仍必须走 `attachComposeContent`（同类的单源断言）；
+     *  ②`ComposeView` 构造点必须收敛到**单一工厂** `composeSlot()`，由
+     *    `ReplaceEditShellMigrationTest.composeViewOnlyInSanctionedSlotFactory` 二次锁定；
+     *  ③`setContent` 合成策略与旧 XML 口径一致（不自行 `setViewCompositionStrategy`）。
+     */
+    private val interleavedSlotExceptions = setOf(
+        "io/legado/app/ui/replace/edit/ReplaceEditActivity.kt",
+    )
+
+    private fun rel(f: File): String =
+        f.relativeTo(mainJavaRoot()).path.replace('\\', '/')
+
     @Test
     fun consumersExist() {
         val n = consumers().size
@@ -42,12 +63,24 @@ class ComposeShellSingleSourceTest {
         val bad = consumers().filter { f ->
             val s = stripped(f)
             s.contains("ComposeView(") || s.contains("ViewCompositionStrategy")
-        }.map { it.relativeTo(mainJavaRoot()).path }
+        }.filterNot { rel(it) in interleavedSlotExceptions }
+            .map { rel(it) }
         assertEquals(
             "以下 composeShell 消费页仍在手写 ComposeView 装配（应统一走 attachComposeContent 单源）：$bad",
             emptyList<String>(),
             bad
         )
+    }
+
+    /** 例外汇总不得变成「无人复核的白名单」：条目必须真实存在且确有 `ComposeView(`（否则应删除）。 */
+    @Test
+    fun registeredExceptionsAreStillReal() {
+        interleavedSlotExceptions.forEach { rel ->
+            val f = File(mainJavaRoot(), rel)
+            assertTrue("例外汇总登记了不存在的页面：$rel", f.isFile)
+            assertTrue("$rel 已不再手写 ComposeView ⇒ 应删除该例外登记", stripped(f).contains("ComposeView("))
+            assertTrue("$rel 例外不允许绕过主骨架单源", stripped(f).contains("attachComposeContent {"))
+        }
     }
 
     @Test
