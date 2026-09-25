@@ -86,6 +86,7 @@ class CeScopePartitionTest {
         "activity_image_crop", // CE 5.2 第 10 页（2026-09-25）
         "activity_rule_sub", // CE-b 首项（2026-09-25）：XML 已是死壳（宿主运行时手拼 ComposeView）⇒ 改单源承载
         "activity_import_book", // CE-b 第 2 项（2026-09-25）：ComposeView 壳 + SelectActionBar 底栏 ⇒ 基类单源装配
+        "activity_rss_read", // CE-b 第 3 项（2026-09-25）：WebView 页（顶栏+网页区+进度条+全屏容器）
     )
 
     private fun buckets() = listOf(
