@@ -47,6 +47,17 @@ object SourceFileProbe {
         "app/src/main/java/io/legado/app/$relFromMainJava",
     ).readText()
 
+    /** `res/values/<name>`（如 `dimens.xml`）原始文本（同上三候选路径回退）。 */
+    fun resValuesRawText(name: String): String = firstFile(
+        "src/main/res/values/$name",
+        "../app/src/main/res/values/$name",
+        "app/src/main/res/values/$name",
+    ).readText()
+
+    /** `res/values/<name>` 并剥掉 XML 注释（`<!-- -->` 单行形式）。 */
+    fun resValuesText(name: String): String =
+        resValuesRawText(name).lines().filterNot { it.trimStart().startsWith("<!--") }.joinToString("\n")
+
     /** 剥掉行注释与 KDoc 星号行（结构不变量测试的强制口径）。 */
     fun stripComments(text: String): String = text.lines()
         .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
