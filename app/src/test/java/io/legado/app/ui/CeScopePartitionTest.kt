@@ -94,6 +94,11 @@ class CeScopePartitionTest {
         "activity_rss_artivles", // CE-b 第 8 项（2026-09-25）：RSS 分类页（顶栏 + tabs_container + ViewPager）
         "activity_rss_favorites", // CE-b 第 9 项（2026-09-25）：订阅收藏页（顶栏 + TabLayout + ViewPager + 空态）
         "fragment_rss_articles", // CE-b 第 10 项（2026-09-25）：文章/收藏列表（共享合成壳基类 + SwipeRefreshLayout + RecyclerViewAtPager2）
+        "activity_translucence", // CE-b 第 11 项（2026-09-25）：透明壳页（5 个宿主共用 ⇒ 共享装配单源 + 程序化笔宽入口）
+        "activity_book_source", // CE-b 第 12 项（2026-09-25）：书源管理页（死壳 ⇒ 合成壳单源装配）
+        "activity_rss_source", // CE-b 第 13 项（2026-09-25）：订阅源管理页（死壳 ⇒ 合成壳单源装配）
+        "activity_replace_rule", // CE-b 第 14 项（2026-09-25）：替换规则管理页（死壳 + 旧 SelectActionBar 死代码清除）
+        "activity_s3_container_manage", // CE-b 第 15 项（2026-09-25）：S3/书库容器管理页（2 个宿主共用清壳布局）
     )
 
     private fun buckets() = listOf(
