@@ -84,6 +84,7 @@ class CeScopePartitionTest {
         "activity_code_edit", // CE 5.2 第 8 页（2026-09-25）
         "activity_image_gallery", // CE 5.2 第 9 页（2026-09-25）
         "activity_image_crop", // CE 5.2 第 10 页（2026-09-25）
+        "activity_rule_sub", // CE-b 首项（2026-09-25）：XML 已是死壳（宿主运行时手拼 ComposeView）⇒ 改单源承载
     )
 
     private fun buckets() = listOf(
