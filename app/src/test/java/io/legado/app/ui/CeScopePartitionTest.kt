@@ -88,6 +88,9 @@ class CeScopePartitionTest {
         "activity_import_book", // CE-b 第 2 项（2026-09-25）：ComposeView 壳 + SelectActionBar 底栏 ⇒ 基类单源装配
         "activity_rss_read", // CE-b 第 3 项（2026-09-25）：WebView 页（顶栏+网页区+进度条+全屏容器）
         "fragment_web_view_login", // CE-b 第 4 项（2026-09-25）：Fragment 侧 WebView 登录页（布局 id 传 0 + onCreateView 合成壳）
+        "activity_explore_show", // CE-b 第 5 项（2026-09-25）：发现分类页（顶栏 + DynamicFrameLayout 内 ComposeView 列表）
+        "activity_qrcode_capture", // CE-b 第 6 项（2026-09-25）：扫码页（Fragment 预览容器 + Compose 顶栏/覆盖层）
+        "activity_arrange_book", // CE-b 第 7 项（2026-09-25）：书架管理页（顶栏 + FastScrollRecyclerView + 批量底栏）
     )
 
     private fun buckets() = listOf(
