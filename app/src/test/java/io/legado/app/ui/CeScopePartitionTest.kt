@@ -106,6 +106,10 @@ class CeScopePartitionTest {
         // （ParagraphRuleEditShellViews 单源装配）+ 顶栏搬入页内
         "activity_book_source_edit", // CE-a #12（2026-09-26）：书源编辑页（顶栏锚点）⇒
         // 六段结构程序化重建（BookSourceEditShellViews 单源装配）+ 顶栏搬入页内
+        "activity_theme_manage", // CE-a #8（2026-09-26）：**14 个管理页共用布局**（本批最后一项）⇒
+        // 内容区程序化重建（ThemeManageShellViews 单源装配：tab_bar/btn_day/btn_night/tv_summary/
+        // recycler_view/btn_add）+ 顶栏搬入页内；10 页内容整体迁 Compose、4 页为真消费者（运行时要改
+        // 布局内节点并动态插栏，故保留 View 内核）；一并修复 ReadMenuButtonManageActivity 顶栏缺失缺陷
     )
 
     private fun buckets() = listOf(
