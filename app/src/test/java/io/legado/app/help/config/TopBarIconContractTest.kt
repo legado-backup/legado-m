@@ -28,6 +28,8 @@ class TopBarIconContractTest {
         "filterToggle" to "ic_expand_more",
         "titleArrow" to "ic_arrow_drop_down",
         "navBack" to "ic_back",
+        // 2026-09-26 §3.2 补齐：选择态关闭位（原写死在管理族动作槽 AppManagementScaffold）
+        "close" to "ic_baseline_close",
     )
 
     @Test
@@ -50,9 +52,38 @@ class TopBarIconContractTest {
             "View 侧不得再出现图标类 R.drawable.ic_* 硬编码（应走 TopBarConfig.Icons.*）",
             Regex("R\\.drawable\\.ic_").containsMatchIn(code)
         )
-        keys.filter { it.first != "navBack" }.forEach { (key, _) ->
+        // navBack / close 属 Compose 侧语义（返回位归一 / 管理族选择态关闭位）⇒ View 侧不引用
+        keys.filter { it.first != "navBack" && it.first != "close" }.forEach { (key, _) ->
             assertTrue("View 侧必须引用 TopBarConfig.Icons.$key", code.contains("TopBarConfig.Icons.$key"))
         }
+    }
+
+    /**
+     * 顶栏包 §3.2（2026-09-26）：契约消费面从「两侧实现」扩到**顶栏实现文件全集合** ——
+     * 主 Tab 实现 / Compose 顶栏 / 顶栏动作槽 / 管理族动作槽，任一文件写死图标资产即失败
+     * （同口径机检门禁 20 `ai_tests/scripts/audit_topbar_hardcode.py`）。
+     */
+    @Test
+    fun implementationFilesHaveNoIconHardcode() {
+        val impls = listOf(
+            "ui/widget/MainTopBarView.kt",
+            "ui/widget/components/GlassTopAppBar.kt",
+            "ui/widget/components/AppMenuSheet.kt",
+            "ui/widget/compose/AppManagementScaffold.kt",
+        )
+        impls.forEach { rel ->
+            val code = SourceFileProbe.sourceText(rel)
+            assertFalse(
+                "$rel 不得写死图标资产 R.drawable.ic_*（应走 TopBarConfig.Icons.*）",
+                Regex("R\\.drawable\\.ic_").containsMatchIn(code)
+            )
+        }
+        val family = SourceFileProbe.sourceText("ui/widget/compose/AppManagementScaffold.kt")
+        assertTrue("管理族兜底图标须取契约值", family.contains("TopBarConfig.Icons.more"))
+        assertTrue("管理族搜索位图标须取契约值", family.contains("TopBarConfig.Icons.search"))
+        assertTrue("管理族选择态关闭位须取契约值", family.contains("TopBarConfig.Icons.close"))
+        val sheet = SourceFileProbe.sourceText("ui/widget/components/AppMenuSheet.kt")
+        assertTrue("顶栏动作槽溢出图标须取契约值", sheet.contains("TopBarConfig.Icons.more"))
     }
 
     @Test

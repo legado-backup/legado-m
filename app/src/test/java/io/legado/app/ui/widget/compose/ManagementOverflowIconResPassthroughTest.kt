@@ -2,6 +2,7 @@ package io.legado.app.ui.widget.compose
 
 import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,12 +87,26 @@ class ManagementOverflowIconResPassthroughTest {
     }
 
     @Test
+    fun scaffoldActionAssetsComeFromContract() {
+        // 顶栏包 §3.2（2026-09-26）：管理族动作槽的兜底图标 / 搜索位 / 选择态关闭位原写死
+        // `R.drawable.ic_*` ⇒ 一并收口到 `TopBarConfig.Icons`（同口径机检门禁 20 阻断回流）。
+        val s = SourceFileProbe.sourceText(scaffold)
+        assertTrue("兜底图标须取契约值", s.contains("TopBarConfig.Icons.more"))
+        assertTrue("搜索位图标须取契约值", s.contains("TopBarConfig.Icons.search"))
+        assertTrue("选择态关闭位须取契约值", s.contains("TopBarConfig.Icons.close"))
+        assertFalse(
+            "不得再写死图标资产 R.drawable.ic_*",
+            Regex("R\\.drawable\\.ic_").containsMatchIn(s)
+        )
+    }
+
+    @Test
     fun firstLevelIconPathUntouched() {
         // 回归对照：一级路径（icon 优先 / fallback iconRes）本来就正确，本批不得改它
         val s = SourceFileProbe.sourceText(scaffold)
         assertTrue(
-            "一级路径必须仍保留「fallback ic_more_vert」兜底口径",
-            s.contains("action.iconRes ?: R.drawable.ic_more_vert")
+            "一级路径必须仍保留「iconRes 为空时兜底 more 图标」口径；顶栏包 §3.2 起兜底值改取契约",
+            s.contains("action.iconRes ?: TopBarConfig.Icons.more")
         )
     }
 }

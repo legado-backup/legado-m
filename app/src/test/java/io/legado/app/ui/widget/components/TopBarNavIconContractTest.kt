@@ -93,6 +93,18 @@ class TopBarNavIconContractTest {
     }
 
     @Test
+    fun topBarActionRowAssetsComeFromContract() {
+        // 顶栏包 §3.2（2026-09-26）：同目录顶栏动作槽 `AppMenuSheet.kt` 的溢出菜单图标原写死
+        // `R.drawable.ic_more_vert` ⇒ 收口到契约（同口径机检门禁 20 会阻断回流）。
+        val sheet = SourceFileProbe.sourceText("ui/widget/components/AppMenuSheet.kt")
+        assertTrue("溢出图标须取契约值 TopBarConfig.Icons.more", sheet.contains("TopBarConfig.Icons.more"))
+        assertFalse(
+            "不得再写死图标资产 R.drawable.ic_*",
+            Regex("R\\.drawable\\.ic_").containsMatchIn(sheet)
+        )
+    }
+
+    @Test
     fun repoNavIconSitesKeepAssetBaseline() {
         val iconSites = mutableListOf<String>()
         SourceFileProbe.mainJavaRoot().walkTopDown()
