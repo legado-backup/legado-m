@@ -57,12 +57,8 @@ class SearchContentShellMigrationTest {
             s.contains("AndroidView(") && s.contains("RefreshProgressBar(ctx)")
         )
         assertTrue(
-            "结果列表（FastScrollRecyclerView + View 版 adapter）必须以 AndroidView 原样托管",
-            s.contains("createResultList(") && s.contains("FastScrollRecyclerView(context)")
-        )
-        assertTrue(
-            "程序化构造的列表必须显式赋 id（FastScroller.setLayoutParams 以 view id 定位宿主，缺 id 即崩）",
-            s.contains("id = R.id.recycler_view")
+            "结果列表已随 CF 6.2 换装为 Compose 单源（LazyColumn + 快速滚动件），不再以 View 内核托管",
+            s.contains("SearchContentResultList(") && s.contains("ComposeLazyListFastScroller(")
         )
         assertTrue(
             "底部 48dp 信息条必须以 AndroidView 程序化构造（保住 middle 省略/长按提示/波纹底几何）",
@@ -119,7 +115,6 @@ class SearchContentShellMigrationTest {
         listOf(
             "override fun onActivityCreated(",
             "private fun initComposeContent(",
-            "private fun createResultList(",
             "private fun createStopFab(",
             "private fun createSearchInfoBar(",
             "private fun createNavArrow(",
@@ -136,8 +131,7 @@ class SearchContentShellMigrationTest {
             "private fun renderProgress(",
             "private fun renderCoverage(",
             "private fun updateDistribution(",
-            "override fun openSearchResult(",
-            "override fun durChapterIndex(",
+            "private fun openSearchResult(",
         ).forEach { marker ->
             assertTrue("换装不得删改宿主逻辑：缺少 `$marker`", s.contains(marker))
         }
@@ -166,7 +160,8 @@ class SearchContentShellMigrationTest {
         assertTrue("有跳过才提「未缓存边界」的口径必须保留", s.contains("if (skipped > 0)"))
         // F77：命中分布 ≥2 章才给「按章直达」入口 + 按章首条定位
         assertTrue("命中分布入口阈值口径必须保留", s.contains("hitDistribution.size >= 2"))
-        assertTrue("按章直达必须定位到该章首条命中", s.contains("scrollToPositionWithOffset"))
+        // CF 6.2：列表换 Compose 后定位改由 `scrollRequest` + 组合内 `LaunchedEffect` 消费
+        assertTrue("按章直达必须定位到该章首条命中", s.contains("scrollRequest = hit.firstIndex"))
         // 搜索可中断
         assertTrue("停止 FAB 必须能取消搜索任务", s.contains("searchJob?.cancel()"))
         // 线程口径：原借 View.post 回主线程改由 runOnUiThread 承担（列表/文案均须主线程）
@@ -175,7 +170,7 @@ class SearchContentShellMigrationTest {
         assertTrue("信息条高度口径必须保留", s.contains("48.dpToPx()"))
         assertTrue("箭头宽度口径必须保留", s.contains("36.dpToPx()"))
         assertTrue("信息条文本必须保留 middle 省略", s.contains("TextUtils.TruncateAt.MIDDLE"))
-        // 组合挂载晚于 initData ⇒ 定位请求必须可回放
-        assertTrue("列表未挂载时的定位请求必须有回放点", s.contains("pendingScrollPosition"))
+        // 组合挂载晚于 initData ⇒ 定位请求必须可回放（CF 6.2：由 `pendingScrollPosition` 改为 `scrollRequest`）
+        assertTrue("列表未就位时的定位请求必须有回放点", s.contains("scrollRequest"))
     }
 }
