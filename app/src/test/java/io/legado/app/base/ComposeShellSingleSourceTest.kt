@@ -61,6 +61,9 @@ class ComposeShellSingleSourceTest {
     private val sameFileComposeDialogExceptions = setOf(
         // 同文件顶层 `SourceGroupFilterDialog`（分组筛选弹框，独立窗口）
         "io/legado/app/ui/book/source/manage/BookSourceActivity.kt",
+        // 同文件两个 Compose 弹框（`NavigationBarEditDialog` / `NavigationBarItemsDialog`，独立窗口）；
+        // 宿主本体已随 CE-a #8 改为 composeShell + attachComposeContent 单源
+        "io/legado/app/ui/config/NavigationBarManageActivity.kt",
     )
 
     private fun rel(f: File): String =
