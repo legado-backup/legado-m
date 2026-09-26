@@ -21,13 +21,18 @@ class ManagementOverflowIconResPassthroughTest {
     private val packageComponents = "ui/widget/compose/AppPackageManageComponents.kt"
     private val scaffold = "ui/widget/compose/AppManagementScaffold.kt"
 
-    /** `MenuAction → AppManagementMenuAction` 转换点全仓实测量（2026-09-25 复核）。 */
+    /**
+     * `MenuAction → AppManagementMenuAction` 转换点全仓实测量（2026-09-26 复核：新增
+     * `AutoTaskScreen` —— 行收敛第二批把该页自绘顶栏/溢出菜单换成 `AppManagementScaffold`，
+     * 因而新出现一处转换点，已按本测试要求同步核对图标双源透传）。
+     */
     private val transformSites = listOf(
         "ui/dict/rule/DictRuleScreen.kt",
         "ui/book/toc/rule/TxtTocRuleScreen.kt",
         "ui/book/storage/StorageManageScreen.kt",
         "ui/highlight/HighlightRuleScreen.kt",
         "ui/download/DownloadManageScreen.kt",
+        "ui/autoTask/AutoTaskScreen.kt",
     )
 
     private fun mainJavaFiles(): List<Pair<String, String>> {
