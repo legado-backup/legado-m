@@ -64,7 +64,11 @@ class CfItemHostCoverageTest {
         val sources = candidateSources()
         assertTrue("候选源文件异常（${sources.size}）—— 扫描根或过滤口径可能失效", sources.size >= 20)
         val items = itemLayouts()
-        assertEquals("在用 item 布局数应为 35（38 − CA′ 已删 2 真死件 − CF 6.2 首项 item_font）", 35, items.size)
+        assertEquals(
+            "在用 item 布局数应为 31（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
+                "item_change_source、item_chapter_list、item_image_article、item_source_folder_grid）",
+            31, items.size
+        )
         val orphans = items.filter { hostsOf(it, sources).isEmpty() }
         assertTrue(
             "以下 item 布局**无任何宿主**（属真死件，应走死件清理而非 CF）：$orphans",
@@ -75,9 +79,18 @@ class CfItemHostCoverageTest {
     @Test
     fun deadItemsAreGone() {
         val items = itemLayouts().toSet()
-        // CA′ 1.0 已删的两件真死件（三通道零引用）+ CF 6.2 首项随宿主 Compose 化退役的 item_font；
+        // CA′ 1.0 已删的两件真死件（三通道零引用）+ CF 6.2 随宿主退役的 item_font
+        // 与「宿主 Adapter 早已被 Compose 列表取代、实例从未创建」的 4 件：
+        //   item_change_source（ChangeBook/ChangeChapterSourceAdapter 双死件）
+        //   item_chapter_list（ChangeChapterTocAdapter）
+        //   item_image_article（ImageArticlePagerAdapter）
+        //   item_source_folder_grid（SourceFolderAdapter 的 RecyclerAdapter 部分）
         // 断言它们不再存在，防「回退」或误生成
-        listOf("item_cache_chapter", "item_cover", "item_font").forEach { dead ->
+        listOf(
+            "item_cache_chapter", "item_cover", "item_font",
+            "item_change_source", "item_chapter_list",
+            "item_image_article", "item_source_folder_grid"
+        ).forEach { dead ->
             assertTrue("$dead 应已删除（零引用真死件 / CF 6.2 已退役）", dead !in items)
         }
     }
@@ -91,7 +104,7 @@ class CfItemHostCoverageTest {
             .toSet()
         assertEquals(
             "Adapter 宿主数应与 `CF-宿主列表清单.md` 登记的实测值一致（映射漂移即 FAIL）",
-            25, adapters.size
+            19, adapters.size
         )
     }
 
