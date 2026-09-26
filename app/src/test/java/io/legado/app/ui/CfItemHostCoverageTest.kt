@@ -65,9 +65,10 @@ class CfItemHostCoverageTest {
         assertTrue("候选源文件异常（${sources.size}）—— 扫描根或过滤口径可能失效", sources.size >= 20)
         val items = itemLayouts()
         assertEquals(
-            "在用 item 布局数应为 31（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
-                "item_change_source、item_chapter_list、item_image_article、item_source_folder_grid）",
-            31, items.size
+            "在用 item 布局数应为 30（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
+                "item_change_source、item_chapter_list、item_image_article、item_source_folder_grid、" +
+                "item_text）",
+            30, items.size
         )
         val orphans = items.filter { hostsOf(it, sources).isEmpty() }
         assertTrue(
@@ -89,7 +90,8 @@ class CfItemHostCoverageTest {
         listOf(
             "item_cache_chapter", "item_cover", "item_font",
             "item_change_source", "item_chapter_list",
-            "item_image_article", "item_source_folder_grid"
+            "item_image_article", "item_source_folder_grid",
+            "item_text"
         ).forEach { dead ->
             assertTrue("$dead 应已删除（零引用真死件 / CF 6.2 已退役）", dead !in items)
         }
