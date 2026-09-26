@@ -1,6 +1,8 @@
 package io.legado.app.help
 
+import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -175,5 +177,20 @@ class ImageSourceOptionsTest {
             style?.let { put("style", it) }
         }
         return ParsedImageSource("https://a/b.png", options)
+    }
+
+    // ---------- 3.3.3：data URI 解码收口到宽容解码单源 ----------
+
+    @Test
+    fun dataUriBase64UsesSharedTolerantDecoder() {
+        val code = SourceFileProbe.sourceText("help/GlideImageGetter.kt")
+        assertTrue(
+            "base64 分支必须走 DataUrlUtils 单源宽容解码",
+            code.contains("decodeTolerantBase64(payload)")
+        )
+        assertFalse(
+            "不得残留本文件自带的严格 Base64 解码",
+            code.contains("kotlin.io.encoding.Base64")
+        )
     }
 }
