@@ -35,6 +35,21 @@ class SettingsSelectableRowConvergenceTest {
     }
 
     @Test
+    fun alignsWithSourceManageBaselineRow() {
+        // 第二批（2026-09-26）：与书源管理基线行（`BookSourceScreen`）逐字对齐——同为 `minHeight` 行高
+        // 且**不叠面板纹理图**（`drawPanelImage = false`，书源/订阅源/替换规则同口径）；
+        // 行节距不得在薄壳内写死（真实行距 = minHeight + Card 内边距 8×2 + 外边距 4×2 + 项间距 8 = 88dp，
+        // 且随字体缩放变化 ⇒ 必须由消费页 `measuredRowPitchPx` 实测）
+        val c = code()
+        assertTrue("行高须经 minHeight 透传给共享行（与基线同高）", c.contains("minHeight = rowHeight"))
+        assertTrue("须与书源管理同口径：不叠面板纹理图", c.contains("drawPanelImage = false"))
+        assertFalse(
+            "薄壳内不得写死行节距（64/72/88dp 都会与实际行距失配）",
+            Regex("\\b(64|72|88)\\.dp\\.toPx\\(\\)").containsMatchIn(c)
+        )
+    }
+
+    @Test
     fun carriesNoOwnPixelsOrColors() {
         val c = code()
         assertFalse("薄壳不得自带行高（固定 height 会再次制造「不同行」）", c.contains(".height(72.dp)"))

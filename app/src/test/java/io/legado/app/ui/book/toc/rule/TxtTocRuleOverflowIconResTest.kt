@@ -25,11 +25,20 @@ class TxtTocRuleOverflowIconResTest {
     }
 
     @Test
-    fun listRowPitchMatchesSharedRow() {
-        // 行组件收敛（2026-09-26）：行改由 `AppManagementListRow` 单源渲染 ⇒ 拖动换算节拍须同步为 64dp
-        // （minHeight 56dp + Card 垂直外边距 4dp×2），否则拖拽换序会错位
+    fun listUsesSharedContainerAndRow() {
+        // 2026-09-26 收敛：列表容器 → AppManagementLazyColumn（项间距/快速滚动条/导航栏内边距单源），
+        // 行间自绘分隔线移除（卡片行间距改由容器承载，与书源管理一致）
         val code = SourceFileProbe.sourceText("ui/book/toc/rule/TxtTocRuleScreen.kt")
-        assertTrue("拖动节拍须与共享行距一致（64dp）", code.contains("64.dp.toPx()"))
-        assertFalse("不得残留旧 72dp 行距节拍", code.contains("72.dp.toPx()"))
+        assertTrue("应走管理族列表容器", code.contains("AppManagementLazyColumn("))
+        assertFalse("不得再由页内自绘分隔线", code.contains("HorizontalDivider"))
+    }
+
+    @Test
+    fun dragPitchIsMeasuredNotHardcoded() {
+        // 拖拽行节拍必须实测（真实行高 = minHeight + Card 内外边距 + 项间距，且随字体缩放变化），
+        // 硬编码 dp 会失配 ⇒ 换序错位（2026-09-26 实测：旧写死 64dp ≠ 真实 88dp）
+        val code = SourceFileProbe.sourceText("ui/book/toc/rule/TxtTocRuleScreen.kt")
+        assertTrue("须从 layoutInfo 实测行节拍", code.contains("measuredRowPitchPx("))
+        assertFalse("不得再写死 64dp/72dp 行节拍", code.contains("64.dp.toPx()") || code.contains("72.dp.toPx()"))
     }
 }
