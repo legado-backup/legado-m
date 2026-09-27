@@ -75,7 +75,12 @@ class RssFavoritesShellMigrationTest {
         assertFalse("不得再走 viewBinding 委托", frag.contains("viewBinding("))
         assertFalse("不得再引用已退役布局", frag.contains("FragmentRssArticlesBinding"))
         assertFalse("不得再直接引用 XML 时代节点", frag.contains("binding.recyclerView") || frag.contains("binding.refreshLayout"))
-        assertTrue("必须继续装配 recycler（layoutManager/adapter）与 refreshLayout", frag.contains("recyclerView.adapter = adapter"))
+        // CF 6.2：原 RecyclerView + RssFavoritesAdapter 已换装 Compose 列表（行复用文章列表样式 0 单源）
+        assertTrue(
+            "列表必须走共享基类的 Compose 装配入口",
+            frag.contains("installComposeList {") && frag.contains("RssStarComposeList(")
+        )
+        assertFalse("不得再持有 View 侧 Adapter", frag.contains("RssFavoritesAdapter"))
     }
 
     @Test
