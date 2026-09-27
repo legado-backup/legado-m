@@ -32,6 +32,17 @@ class ThemeConfigChainTest {
     }
     private val topBarConfig by lazy { read("src/main/java/io/legado/app/help/config/TopBarConfig.kt") }
 
+    /**
+     * W7 8.2 / REQ-30：文章级离线预取属性须落在 `AppConfig` 且**默认关闭**（不改变既有行为）。
+     */
+    @Test
+    fun imageArticlePrefetchDefaultsOff() {
+        assertTrue(
+            "AppConfig 须暴露 `imageArticlePrefetch` 且默认 false",
+            appConfig.contains("getPrefBoolean(PreferKey.imageArticlePrefetch, false)")
+        )
+    }
+
     @Test
     fun removedSearchToggleLeavesNoDanglingConfig() {
         assertFalse("AppConfig 仍暴露已删属性", appConfig.contains("var floatingBottomBarHideSearch"))
