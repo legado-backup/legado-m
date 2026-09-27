@@ -26,6 +26,17 @@ class ConfigUiConsistencyTest {
         read("src/main/java/io/legado/app/ui/config/NavigationBarManageActivity.kt")
     }
 
+    /**
+     * W7 8.2 / REQ-30：文章级离线预取开关须在「其他设置」页接线（与 W5 音量键开关同族同形）。
+     */
+    @Test
+    fun imageArticlePrefetchSwitchIsWiredInOtherConfig() {
+        assertTrue(
+            "OtherConfigFragment 须登记 `imageArticlePrefetch` 开关（否则设置项根本不存在）",
+            otherConfig.contains("key = PreferKey.imageArticlePrefetch")
+        )
+    }
+
     @Test
     fun bothBackupFailureBranchesHaveNonNullFallback() {
         val pattern = """e.localizedMessage?.takeIf { it.isNotBlank() } ?: "未知错误""""

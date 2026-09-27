@@ -105,4 +105,19 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("sniffRaceEnabled", pairs["sniffRaceEnabled"])
     }
+
+    /**
+     * W7 8.2 / REQ-30：文章级离线预取开关登记。
+     *
+     * 该键被 `AppConfig.imageArticlePrefetch` 与 `pref_config_other.xml` **双处消费**
+     * （后者供设置搜索收录）⇒ 改名漏改会造成「设置无效」的静默失联（编译期无提示）。
+     */
+    @Test
+    fun w7ImageArticlePrefetchKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("imageArticlePrefetch", pairs["imageArticlePrefetch"])
+    }
 }
