@@ -153,4 +153,43 @@ class RssVideoRouteTest {
                 .containsMatchIn(block)
         )
     }
+
+    /**
+     * 2026-09-28 补充（**按链路穷举**）：历史记录 与 收藏页 两条入口也必须补齐文章列表上下文。
+     *
+     * 背景：`rssArticles.size > 1` 是播放器侧文章模式的唯一判据（`VideoFragment.isArticleMode`
+     * 与 `VideoPlayerActivity` 的 hasPrev/hasNext）。此前只补齐了「列表点击」与「阅读页自动路由」，
+     * 历史记录（只带 `record`，无列表）与收藏页（只带单篇 star）从这两个入口进入播放器时
+     * 沉浸式上下滑 与 传统式上一部下一部**仍失效**——这正是用户第二次报障的可能路径。
+     */
+    @Test
+    fun historyAndFavoriteRoutesAlsoResolveArticleList() {
+        assertTrue(
+            "须存在统一的文章列表补齐入口（三条入口共用同一口径）",
+            readRss.contains("private suspend fun resolveVideoArticles(")
+        )
+        assertTrue(
+            "补齐口径须与列表页一致（同源 + 同分类查询）",
+            readRss.contains("getListByOriginSort(rssArticle.origin, rssArticle.sort)")
+        )
+        assertTrue(
+            "查不到或未含本篇时须把本篇补入并置首（保证播放器按 link 命中）",
+            readRss.contains("list.add(0, rssArticle)")
+        )
+        // 历史记录入口（只带 record）：type==2 分支必须补齐
+        assertTrue(
+            "历史记录视频分支须补齐列表上下文",
+            readRss.contains("resolveVideoArticles(article, null)")
+        )
+        // Fragment 重载（收藏页 / 单篇搜索结果）：上下文不完整时必须补齐
+        assertTrue(
+            "收藏页/单篇入口须补齐列表上下文",
+            readRss.contains("resolveVideoArticles(rssArticle, rssArticles)")
+        )
+        assertEquals(
+            "播放页启动须收敛到两个私有 helper（否则入口各写一遍必然漂移）",
+            2,
+            Regex("""startActivity<VideoPlayerActivity>""").findAll(readRss).count()
+        )
+    }
 }
