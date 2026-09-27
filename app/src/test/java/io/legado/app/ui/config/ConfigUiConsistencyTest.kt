@@ -44,8 +44,8 @@ class ConfigUiConsistencyTest {
             otherConfig.contains("key = PreferKey.floatingBottomBarHideSearch")
         )
         assertFalse(
-            "底栏包管理页仍残留已删配置行",
-            navBarManage.contains("hideSearchInFloatingStyle")
+            "底栏包管理页仍残留已删配置行（断言赋值而非词面：注释里会提到它为何被删）",
+            navBarManage.contains("config.hideSearchInFloatingStyle =")
         )
     }
 

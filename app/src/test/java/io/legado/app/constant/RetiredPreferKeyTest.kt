@@ -40,6 +40,15 @@ class RetiredPreferKeyTest {
     }
 
     @Test
+    fun rssAutoVideoKeyNameIsFixedByDesign() {
+        // design §9.2#2 明确「键名必须为 rssAutoVideoToPlayer，禁止改键名」⇒ 防重命名漂移
+        assertTrue(
+            "键名须严格为 rssAutoVideoToPlayer",
+            preferKey.contains("""const val rssAutoVideoToPlayer = "rssAutoVideoToPlayer"""")
+        )
+    }
+
+    @Test
     fun ignorePrefKeysIsAStringArrayOnKeyIsNotIgnorePath() {
         // 结构不变量：忽略清单必须是 keyIsNotIgnore 的首条判定（顺序对才生效）
         val body = backupConfig.substringAfter("fun keyIsNotIgnore")

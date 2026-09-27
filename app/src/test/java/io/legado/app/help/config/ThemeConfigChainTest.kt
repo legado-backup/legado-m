@@ -75,6 +75,15 @@ class ThemeConfigChainTest {
     }
 
     @Test
+    fun rssAutoVideoSwitchDefaultsToEnabled() {
+        // REQ-12：默认开启（用户装上即可受益）；键名由设计固定
+        assertTrue(
+            "AppConfig.rssAutoVideoToPlayer 须存在且默认 true",
+            appConfig.contains("getPrefBoolean(PreferKey.rssAutoVideoToPlayer, true)")
+        )
+    }
+
+    @Test
     fun bottomBarSignatureNoLongerDependsOnRemovedKey() {
         assertFalse(
             "底栏签名不得再拼入已删键（否则签名恒不变导致刷新失效）",
