@@ -10,6 +10,11 @@
       · 切到内置主题（设置页点「内置日间主题」→ `durThemeName=内置日间主题`）后再注入，方为有效四态。
     **正确用法**：跑矩阵前先确保「无主题包、无外观套件」（点内置主题，或让本脚本清 `currentAppearanceKitId`
     —— 已实现），否则 T2「自定义主题色」态是假的。
+    ✅ **2026-09-26 补齐（顶栏包 §0.5 四态矩阵第 4 态）**：本脚本现**主动管理主题包键**
+    （`durThemeName`/`durThemeNameNight` + 两个 dirName 键，均已纳入快照/还原）：
+      · accent=`package` ⇒ 显式激活主题包「暗夜紫」（`App.kt:223` 启动时保证存在）⇒ 第 4 态；
+      · 其余 accent ⇒ **显式清空主题包名** ⇒ default/purple/teal 三态不再被设备残留主题包污染。
+    ⇒ 用法：`--accents default,purple,teal,package`（四态一次跑全）。
     补充：`files/themeConfig.json` 是**历史资产**（`App.kt` AD-03 注释：资产已移除、改读代码内置配置），
     不要以它作为当前配色真值来判断注入是否生效。
     本脚本矩阵对 `themeMode`（明暗）与页面可达性恒有效。
@@ -29,6 +34,7 @@ Layoutlib 不实例化 ContentProvider → `@Preview` 渲染即崩（第四批�
     --install            先跑 quick_build_install.py 装包（否则要求已装）
     --themes  day,night  明暗矩阵（默认 day,night）
     --accents default,purple,teal   accent 色系矩阵（默认 default,purple,teal）
+                                    + `package` = 第 4 态「主题包」（激活内置「暗夜紫」包）
     --pages   topbar,list,settings,theme  四族代表页（默认全跑）
     --tap     route:desc=更多        路由追加点击（可多次；弹框/菜单族需要）
     --out     output/ui-baseline     截图落盘根目录
@@ -66,7 +72,17 @@ K_DAY_PRIMARY = ("colorPrimary", "int")
 K_DAY_ACCENT = ("colorAccent", "int")
 K_NIGHT_PRIMARY = ("colorPrimaryNight", "int")
 K_NIGHT_ACCENT = ("colorAccentNight", "int")
+# 主题包键（源码核实：PreferKey.kt:288/289 `durThemeName`/`durThemeNameNight`、:462/463 两个 dirName 键，
+# 均 getPrefString ⇒ string）。`ThemePackageManager` 用「dirName 精确匹配优先、失配回退按名称匹配」解析，
+# 故两键都要写（`ThemePackageManager.kt:332-341`）。
+K_D_THEME = ("durThemeName", "string")
+K_D_N_THEME = ("durThemeNameNight", "string")
+K_D_THEME_DIR = ("durThemeDirName", "string")
+K_D_N_THEME_DIR = ("durThemeDirNameNight", "string")
+# 主题包态所用的包名（`App.kt:223` 启动时确保内置深紫主题包存在；名称常量见 `AppearanceKitManager:43`）
+THEME_PACKAGE_NAME = "暗夜紫"
 PREF_KEYS = (K_THEME_MODE, K_KIT, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT,
+             K_D_THEME, K_D_N_THEME, K_D_THEME_DIR, K_D_N_THEME_DIR,
              # B7 增补（2026-09-23）：**面 token 键**（B7 收口后芯片/标签/条带/搜索框一律取这些键）
              # —— 不注入它们，T2「自定义主题色」态就测不到芯片类变化（实测：仅注入 primary/accent 时
              # 只有顶栏变化 2.24%，芯片区变化 ≤0.10%）。均为 getPrefString 十六进制 ⇒ string。
@@ -77,6 +93,11 @@ PREF_KEYS = (K_THEME_MODE, K_KIT, K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, 
              ("themeShelfColor", "string"), ("themeShelfColorNight", "string"))
 KIND_OF = {key: kind for key, kind in PREF_KEYS}
 COLOR_KEYS = (K_DAY_PRIMARY, K_DAY_ACCENT, K_NIGHT_PRIMARY, K_NIGHT_ACCENT)
+
+# 「主题包」态（顶栏包 §0.5 四态矩阵的第 4 态，2026-09-26 补齐）：不是颜色注入，而是**激活一个主题包**
+# ⇒ 颜色全部由该包提供（`preset=None` ⇒ 走 default 分支的颜色键还原，不影响包内配色）。
+# 用法：`--accents default,purple,teal,package`
+THEME_PACKAGE_ACCENT = "package"
 
 # 面 token 键（顺序：card / muted / searchField / tab / shelf）
 SURFACE_KEYS = ("themeCardColor", "themeMutedColor", "themeSearchFieldBackgroundColor",
@@ -190,6 +211,8 @@ ACCENTS: dict[str, dict[str, tuple[str, str]]] = {
     "default": {},
     "purple": {"day": ("#6A1B9A", "#AB47BC"), "night": ("#B39DDB", "#CE93D8")},
     "teal": {"day": ("#00695C", "#26A69A"), "night": ("#80CBC4", "#4DB6AC")},
+    # 第 4 态「主题包」：不注入颜色，改激活主题包（见 THEME_PACKAGE_ACCENT 与 apply_matrix_prefs）
+    THEME_PACKAGE_ACCENT: {},
 }
 THEME_MODE = {"day": "1", "night": "2"}
 
@@ -298,6 +321,18 @@ def apply_matrix_prefs(theme: str, accent: str, snapshot: dict[str, str]) -> boo
     # 导致 accent 矩阵「写了不生效」（实测 default vs purple 截图 diff≈0.5/255，属静默失效）。
     # 清空后本矩阵只由颜色键决定，四态对比才有意义（收尾 restore_prefs 会还原用户的套件）。
     xml = set_pref(xml, K_KIT[0], "", K_KIT[1])
+    # 顶栏包 §0.5 补齐（2026-09-26）：**主题包态支持**。
+    # 为什么必须两条分支都写：`durThemeName` 非空时颜色由该主题包整体提供（覆盖 colorPrimary/Accent
+    # 与面 token）⇒ 设备上残留的主题包会让 default/purple/teal 三个态全部「静默假态」（B7 实证：
+    # 像素差 0.00%~0.10%）。故：主题包态显式写入「暗夜紫」，其余态显式清空 ⇒ 四态互不污染。
+    if accent == THEME_PACKAGE_ACCENT:
+        xml = set_pref(xml, K_D_THEME[0], THEME_PACKAGE_NAME, K_D_THEME[1])
+        xml = set_pref(xml, K_D_N_THEME[0], THEME_PACKAGE_NAME, K_D_N_THEME[1])
+        xml = set_pref(xml, K_D_THEME_DIR[0], THEME_PACKAGE_NAME, K_D_THEME_DIR[1])
+        xml = set_pref(xml, K_D_N_THEME_DIR[0], THEME_PACKAGE_NAME, K_D_N_THEME_DIR[1])
+    else:
+        for key, kind in (K_D_THEME, K_D_N_THEME, K_D_THEME_DIR, K_D_N_THEME_DIR):
+            xml = set_pref(xml, key, "", kind)
     preset = ACCENTS[accent]
     surf = SURFACES.get(accent, {})
     if preset:
@@ -505,7 +540,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--install", action="store_true")
     ap.add_argument("--themes", default="day,night")
-    ap.add_argument("--accents", default="default,purple,teal")
+    ap.add_argument("--accents", default="default,purple,teal",
+                    help="accent 色系矩阵；追加 `package` 跑第 4 态「主题包」")
     ap.add_argument("--pages", default="topbar,list,settings,theme")
     ap.add_argument("--tap", action="append", default=[], help="route:selector，如 theme:desc=更多")
     ap.add_argument("--out", default="output/ui-baseline")
