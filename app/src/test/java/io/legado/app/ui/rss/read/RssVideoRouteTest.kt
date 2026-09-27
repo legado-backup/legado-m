@@ -99,4 +99,25 @@ class RssVideoRouteTest {
             )
         }
     }
+
+    /**
+     * W1 2.2 真机缺陷回归（2026-09-27 L2 实证）：
+     *
+     * 现象：自动路由**进了播放器但不播** —— 真机日志 `VideoPlay: rssArticle is null in startPlay`。
+     * 根因：VM 侧路由只有「单篇文章」上下文（没有列表），若原样写入 `rssArticles = null`，
+     * `VideoPlay.startPlay` 的解析式 `rssStar ?: rssRecord ?: rssArticles?.getOrNull(index)`
+     * 三项全空 ⇒ 静默 `return`（既不报错也不播）。
+     *
+     * 约定：单一写入点必须保证播放器侧**可解析到文章**（无列表时兜底为「仅含本篇」的列表）。
+     */
+    @Test
+    fun playContextMustBeResolvableByPlayer() {
+        val write = Regex("""VideoPlay\.rssArticles\s*=\s*([^\n]+)""").find(readRss)
+        assertTrue("未找到 rssArticles 赋值", write != null)
+        val rhs = write!!.groupValues[1]
+        assertTrue(
+            "rssArticles 不得裸写 null（否则播放器侧 rssArticle 解析失败 ⇒ 进了播放器不播）：实际写入「$rhs」",
+            !rhs.trim().startsWith("rssArticles") || rhs.contains("?:")
+        )
+    }
 }

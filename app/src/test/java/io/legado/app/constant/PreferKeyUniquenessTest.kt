@@ -90,4 +90,19 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("sourceQueryCacheEnabled", pairs["sourceQueryCacheEnabled"])
     }
+
+    /**
+     * W2 / REQ-14：嗅探赛马化开关登记。
+     *
+     * 为何固化「键名 == 取值」：该键是赛马的**唯一回滚点**（关闭即回落原串行链），
+     * 若被改名而消费点未同步，会出现「设置无效」的静默失联（编译期无提示）。
+     */
+    @Test
+    fun w2SniffRaceKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("sniffRaceEnabled", pairs["sniffRaceEnabled"])
+    }
 }
