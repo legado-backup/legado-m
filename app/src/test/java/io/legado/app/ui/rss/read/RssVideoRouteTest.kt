@@ -120,4 +120,37 @@ class RssVideoRouteTest {
             !rhs.trim().startsWith("rssArticles") || rhs.contains("?:")
         )
     }
+
+    /**
+     * 2026-09-27 用户报障回归（严重）：**自动路由必须携带文章列表上下文**。
+     *
+     * 现象：视频订阅源在自由布局/传统式下「沉浸式上滑下滑切上一个下一个视频」全部失效。
+     * 根因：本路由只传单篇文章 ⇒ 单一写入点内 W2 的兜底 `?: listOf(rssArticle)` 把列表
+     * 退化为 **1 篇** ⇒ 播放器侧 `VideoFragment.isArticleMode`（`size > 1`）与
+     * `VideoPlayerActivity` 的 `hasPrev/hasNext` 同时为假 ⇒ 手势与按钮双失效。
+     *
+     * 约定：命中分支必须按列表页同口径（同源 + 同分类）补齐列表，并保证**含本篇**
+     * （判定早于落库，首读文章可能尚未入库；缺了会兜底 index=0 指向别的文章）。
+     */
+    @Test
+    fun autoRouteMustCarryArticleListContextForSwipe() {
+        val detectAt = viewModel.indexOf("if (detected)")
+        assertTrue("未找到 detected 分支", detectAt > 0)
+        val startAt = viewModel.indexOf("startActivity<VideoPlayerActivity>", detectAt)
+        assertTrue("未找到检测分支内的播放器启动点", startAt > detectAt)
+        val block = viewModel.substring(detectAt, startAt)
+        assertTrue(
+            "命中分支必须补齐同源同分类文章列表（单篇会击穿 size>1 的文章模式判定）",
+            block.contains("getListByOriginSort")
+        )
+        assertTrue(
+            "必须保证列表含本篇（否则索引兜底 0 指向别的文章）",
+            block.contains("none { it.link == rssArticle.link }")
+        )
+        assertTrue(
+            "补齐后的列表须显式传入单一写入点",
+            Regex("""prepareVideoPlayContext\([\s\S]*?rssArticles\s*=\s*contextArticles""")
+                .containsMatchIn(block)
+        )
+    }
 }
