@@ -58,6 +58,7 @@ DB_REMOTE = f"/data/data/{PACKAGE}/databases/legado.db"
 TMP_REMOTE = "/data/local/tmp/l2_video_swipe.db"
 
 READ_RSS_ACT = "io.legado.app.ui.rss.read.ReadRssActivity"
+RSS_SORT_ACT = "io.legado.app.ui.rss.article.RssSortActivity"
 VIDEO_ACT = "io.legado.app.ui.video.VideoPlayerActivity"
 
 # 正文填充：长度需 > MIN_VIDEO_SCAN_LEN(200)，文本中性（不含任何站点信息）
@@ -148,8 +149,15 @@ def push_db(work: Path) -> bool:
     return int(parts[4]) == local.stat().st_size
 
 
-def seed(work: Path) -> int:
-    """种入 1 个 type=0 源 + N 篇**同源同分类**含视频文章（上下滑切换的前置条件）。"""
+def seed(work: Path, source_type: int = 0, article_style: int = 0) -> int:
+    """种入 1 个探针源 + N 篇**同源同分类**含视频文章（上下滑切换的前置条件）。
+
+    `source_type` / `article_style` 由场景决定：
+      · `0 / 0`：网页模式 —— 走 `ReadRssActivity` **自动路由**（scenario a/b）；
+      · `2 / 5`：视频源 + **自由布局**（articleStyle=5）—— 走**列表点击路径**
+        （`RssArticlesFragment.readRss` → `ReadRss` → 播放器），即**用户真机报障场景**
+        （scenario list）。该路径与自动路由是两条独立链路，必须分别回归。
+    """
     con = sqlite3.connect(work / "legado.db")
     cur = con.cursor()
     cols = cur.execute("PRAGMA table_info(rssSources)").fetchall()
@@ -168,8 +176,8 @@ def seed(work: Path) -> int:
         "sourceIcon": "",
         "enabled": 1,
         "singleUrl": 0,
-        "articleStyle": 0,
-        "type": 0,
+        "articleStyle": article_style,
+        "type": source_type,
         "ruleArticles": "",
         "ruleContent": "id.content@html",
         "sortUrl": "",
@@ -218,6 +226,24 @@ def cleanup_probe(work: Path) -> None:
 
 # ------------------------------------------------------------------ 运行与判据
 
+def tap_first_article(title: str) -> bool:
+    """在订阅文章列表中点开指定标题的条目（uiautomator 取坐标；**不回显业务文本**）。
+
+    仅用于 `scenario list`（列表点击路径）—— 该路径必须由**真实 item 点击**驱动，
+    才能覆盖 `RssArticlesFragment.readRss` 把文章列表上下文交给播放器这一链路。
+    """
+    adb("shell", "uiautomator", "dump", "/sdcard/l2sw.xml")
+    xml = adb_text("shell", "cat", "/sdcard/l2sw.xml")
+    pat = re.escape(title)
+    m = (re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*text="' + pat + '"', xml)
+         or re.search(r'text="' + pat + r'"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml))
+    if not m:
+        return False
+    l, t, r, b = (int(m.group(i)) for i in range(1, 5))
+    adb("shell", "input", "tap", str((l + r) // 2), str((t + b) // 2))
+    return True
+
+
 def resumed_activity() -> str:
     out = adb_text("shell", "dumpsys", "activity", "activities")
     for line in out.splitlines():
@@ -261,8 +287,8 @@ def swipe(direction: str, times: int = 1, duration: int = 300) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="订阅视频播放器内上下滑切换文章 真机回测")
-    ap.add_argument("--scenario", default="all", choices=["a", "b", "all"],
-                    help="a=上滑切下一篇；b=下滑回上一篇；all=两者串跑")
+    ap.add_argument("--scenario", default="all", choices=["a", "b", "list", "all"],
+                    help="a=上滑切下一篇；b=下滑回上一篇；list=**列表点击路径**（视频源+自由布局，用户真机场景）；all=a+b 串跑")
     ap.add_argument("--wait", type=float, default=6.0, help="启动阅读页后等待秒数")
     ap.add_argument("--keep-probe", action="store_true", help="保留探针数据（默认验证后清除）")
     args = ap.parse_args()
@@ -287,7 +313,9 @@ def main() -> int:
         print("[FATAL] 设备库拉取失败（run-as 不可用？）")
         srv.shutdown()
         return 2
-    if seed(work) != ARTICLE_COUNT:
+    is_list_route = args.scenario == "list"
+    if seed(work, source_type=2 if is_list_route else 0,
+            article_style=5 if is_list_route else 0) != ARTICLE_COUNT:
         print("[FATAL] 探针写入不完整")
         srv.shutdown()
         return 2
@@ -299,12 +327,25 @@ def main() -> int:
     # 从阅读页打开第 1 篇（正文含视频 ⇒ 自动转内置播放器）
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
-    adb(
-        "shell", "am", "start", "-n", f"{PACKAGE}/{READ_RSS_ACT}",
-        "--es", "origin", BASE + PROBE_PATH,
-        "--es", "link", f"{BASE}{PROBE_PATH}paper1",
-        "--es", "title", "swipe01",
-    )
+    if is_list_route:
+        # **列表点击路径**（用户真机报障场景）：视频源(type=2) + 自由布局(articleStyle=5)，
+        # 从订阅列表点第 1 篇 ⇒ `RssArticlesFragment.readRss` 把列表上下文交给播放器。
+        # 该链路与阅读页自动路由**相互独立**（前者依赖 `articles` 数据源，后者依赖 DB 补齐）。
+        adb("shell", "am", "start", "-n", f"{PACKAGE}/{RSS_SORT_ACT}",
+            "--es", "sourceUrl", BASE + PROBE_PATH, "--es", "sortUrl", "")
+        time.sleep(args.wait)
+        if not tap_first_article("swipe01"):
+            print("[FAIL] 列表未渲染出探针条目（无法定位可点坐标）")
+            if not args.keep_probe:
+                cleanup_probe(work)
+            srv.shutdown()
+            return 1
+    else:
+        # 阅读页自动路由：type=0 且正文含视频 ⇒ 自动转内置播放器
+        adb("shell", "am", "start", "-n", f"{PACKAGE}/{READ_RSS_ACT}",
+            "--es", "origin", BASE + PROBE_PATH,
+            "--es", "link", f"{BASE}{PROBE_PATH}paper1",
+            "--es", "title", "swipe01")
     time.sleep(args.wait)
 
     results: list[tuple[str, bool, str]] = []
