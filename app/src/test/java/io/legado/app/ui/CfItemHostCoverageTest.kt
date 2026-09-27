@@ -65,11 +65,11 @@ class CfItemHostCoverageTest {
         assertTrue("候选源文件异常（${sources.size}）—— 扫描根或过滤口径可能失效", sources.size >= 20)
         val items = itemLayouts()
         assertEquals(
-            "在用 item 布局数应为 23（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
+            "在用 item 布局数应为 22（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
                 "item_change_source、item_chapter_list、item_image_article、item_source_folder_grid、" +
-                "item_text、item_ai_generated_image、item_search_list、" +
+                "item_text、item_ai_generated_image、item_search_list、item_arrange_book、" +
                 "item_rss_article、item_rss_article_1~4）",
-            23, items.size
+            22, items.size
         )
         val orphans = items.filter { hostsOf(it, sources).isEmpty() }
         assertTrue(
@@ -93,6 +93,8 @@ class CfItemHostCoverageTest {
             "item_change_source", "item_chapter_list",
             "item_image_article", "item_source_folder_grid",
             "item_text", "item_ai_generated_image", "item_search_list",
+            // CF 6.2 书籍整理列表（宿主 BookshelfManageActivity 换装 Compose LazyColumn + ArrangeBookList）
+            "item_arrange_book",
             // CF 6.2 RSS 文章五样式族（宿主换装 Compose LazyColumn/LazyVerticalGrid/LazyVerticalStaggeredGrid）
             "item_rss_article", "item_rss_article_1", "item_rss_article_2",
             "item_rss_article_3", "item_rss_article_4"
@@ -110,7 +112,7 @@ class CfItemHostCoverageTest {
             .toSet()
         assertEquals(
             "Adapter 宿主数应与 `CF-宿主列表清单.md` 登记的实测值一致（映射漂移即 FAIL）",
-            12, adapters.size
+            11, adapters.size
         )
     }
 
