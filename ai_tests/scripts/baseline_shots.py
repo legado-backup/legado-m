@@ -432,27 +432,62 @@ def wait_foreground(activity: str, timeout: float = 20.0) -> bool:
     return False
 
 
+def dump_xml() -> str:
+    """取当前层级 XML：u2（atx-agent）主通道 + `uiautomator dump` 兜底。
+
+    **为什么不能只用 `uiautomator dump`**：它要等 UI 进入 idle，而主壳
+    `MainActivity` 存在常驻动画 ⇒ 实测**恒定** `ERROR: could not get idle state`
+    （2026-09-27 实证），使 `--tap` 静默失效（主 Tab「我的」无 extra，只能点击到达，
+    见 §0.5 遗留项）。u2 通道不走 idle 判定，故设为主通道。
+    """
+    for _ in range(3):
+        try:
+            xml = device().dump_hierarchy(compressed=False)
+            if xml and "<node" in xml:
+                return xml
+        except Exception as e:  # noqa: BLE001
+            print(f"  !! u2 dump 异常：{e}")
+        time.sleep(0.8)
+    r = adb("shell", "uiautomator", "dump", "/sdcard/_ui.xml")
+    if "dumped" in (r.stdout or ""):
+        return adb("exec-out", "cat", "/sdcard/_ui.xml").stdout or ""
+    print("  !! 层级获取失败（u2 与 uiautomator 两通道均不可用）")
+    return ""
+
+
 def tap_selector(selector: str) -> bool:
-    """selector 形态：desc=更多 / text=日志。走 dump_hierarchy 正则取 bounds 后坐标点击。"""
+    """selector 形态：desc=更多 / text=日志。取 bounds 后坐标点击。
+
+    匹配口径：先按 selector 指定属性精确匹配，未命中则**回退另一属性**
+    （主壳底部导航的「我的」只暴露 `content-desc`，部分旧页只有 `text`）。
+    命中后点击并等待 2.5s，让页面切换与内容渲染完成（原实现点击后立即返回，
+    调用侧的 1.5s 不足以覆盖主 Tab 切换）。
+    """
     kind, _, value = selector.partition("=")
     attr = {"desc": "content-desc", "text": "text"}.get(kind)
     if not attr:
         print(f"  !! 不支持的 selector：{selector}")
         return False
-    r = adb("shell", "uiautomator", "dump", "/sdcard/_ui.xml")
-    if "dumped" not in (r.stdout or ""):
-        return False
-    xml = adb("exec-out", "cat", "/sdcard/_ui.xml").stdout or ""
-    m = re.search(
-        rf'<node[^>]*{attr}="{re.escape(value)}"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"',
-        xml,
-    )
-    if not m:
-        print(f"  !! 未找到节点：{selector}")
-        return False
-    x1, y1, x2, y2 = (int(m.group(i)) for i in range(1, 5))
-    adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
-    return True
+    attrs = (attr, "text" if attr == "content-desc" else "content-desc")
+    # 轮询查找：宿主 Activity 已 resumed 不代表 Compose 壳已组合完成
+    # （实测启动后首帧层级里还没有底部导航节点）⇒ 12s 内反复取层级直到命中
+    deadline = time.time() + 12.0
+    while time.time() < deadline:
+        xml = dump_xml()
+        if xml:
+            for a in attrs:
+                m = re.search(
+                    rf'<node[^>]*{a}="{re.escape(value)}"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"',
+                    xml,
+                )
+                if m:
+                    x1, y1, x2, y2 = (int(m.group(i)) for i in range(1, 5))
+                    adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                    time.sleep(2.5)
+                    return True
+        time.sleep(1.0)
+    print(f"  !! 未找到节点：{selector}（12s 轮询未命中）")
+    return False
 
 
 _DEV = None
