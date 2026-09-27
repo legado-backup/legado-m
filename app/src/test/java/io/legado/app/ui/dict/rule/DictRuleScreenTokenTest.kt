@@ -30,6 +30,20 @@ class DictRuleScreenTokenTest {
     }
 
     @Test
+    fun rowHasNoInlineDeleteAndMenuDeleteIsDanger() {
+        // 2026-09-27 行组件收敛第四批：行尾控件与书源管理基线行（BookSourceScreen）对齐 =
+        // 「开关 + 编辑 + ⋮」；删除收进 ⋮ 菜单（原为行内直出垃圾桶，紧邻行首拖拽手柄 ⇒ 长按排序易误触，
+        // 见 docs/UI/book/dict-rule/interaction.md 评估 5 / OPTIMIZATION.md「行尾控件分层」P1）
+        val t = code()
+        assertFalse(
+            "行尾不得再内联直出删除（AppManagementListRow.onDelete 会渲染紧邻手柄的垃圾桶）",
+            t.contains("onDelete = { onDelete(index) }")
+        )
+        assertTrue("删除须收进行尾 ⋮ 菜单", t.contains("moreActions = listOf("))
+        assertTrue("删除菜单项须走 danger 通道", t.contains("danger = true,"))
+    }
+
+    @Test
     fun dragPitchIsMeasuredNotHardcoded() {
         // 拖拽行节拍必须实测（真实行高 = minHeight + Card 内外边距 + 项间距，且随字体缩放变化），
         // 硬编码 dp 会失配 ⇒ 换序错位（2026-09-26 实测：旧写死 64dp ≠ 真实 88dp）
