@@ -45,6 +45,17 @@ class BookSourceShellMigrationTest {
     }
 
     @Test
+    fun recycleBinEntryIsRestoredInPageMenu() {
+        // 回归修复（2026-09-27）：`3c8aa5c`（Compose 迁移）把 `onRecycleBin` 链路与
+        // `R.string.menu_recycle_bin` 一并删掉 ⇒ `RecycleBinActivity` 全仓零入口：
+        // 「其他设置 → 规则回收站」开关开了也进不去页面，误删的书源/规则无法找回。
+        // 此处钉死入口不得再丢（页面可达性由 RecycleBinScreenTokenTest 的跨文件断言兜底）。
+        val s = src()
+        assertTrue("书源管理 ⋮ 菜单须恢复回收站入口", s.contains("R.string.menu_recycle_bin"))
+        assertTrue("入口须指向 RecycleBinActivity", s.contains("startActivity<RecycleBinActivity>()"))
+    }
+
+    @Test
     fun hostLogicPreserved() {
         val s = src()
         listOf(

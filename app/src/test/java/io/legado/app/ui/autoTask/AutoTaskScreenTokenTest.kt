@@ -42,6 +42,15 @@ class AutoTaskScreenTokenTest {
     }
 
     @Test
+    fun rowMenuDeleteUsesDangerChannelNotDerivedColor() {
+        // 2026-09-27 行组件收敛第四批：三页行尾 ⋮ 菜单的删除项统一走 MenuAction.danger
+        //（原用 M3 派生色 tint 硬塞 = 违反取色铁律，且 SettingsSelectableRow 薄壳不消费 tint ⇒ 实际无色）
+        val t = code()
+        assertTrue("删除菜单项须走 danger 通道", t.contains("danger = true,"))
+        assertFalse("不得再用 M3 派生色硬塞警示色", t.contains("MaterialTheme.colorScheme.error"))
+    }
+
+    @Test
     fun dragPitchIsMeasuredNotHardcoded() {
         // 拖拽行节拍必须实测（真实行高 = minHeight + Card 内外边距 + 项间距，且随字体缩放变化），
         // 硬编码 dp 会失配 ⇒ 换序错位（2026-09-26 实测：旧写死 64dp ≠ 真实 88dp）

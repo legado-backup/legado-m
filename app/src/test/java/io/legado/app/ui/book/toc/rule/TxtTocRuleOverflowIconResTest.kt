@@ -34,6 +34,16 @@ class TxtTocRuleOverflowIconResTest {
     }
 
     @Test
+    fun itemMenuDeleteUsesDangerChannel() {
+        // 2026-09-27 行组件收敛第四批：行尾 ⋮ 菜单的删除项统一走 MenuAction.danger。
+        // 原为 `tint = Color.Unspecified` 占位——该值经 SettingsSelectableRow 薄壳转换后本就不生效
+        //（薄壳不消费 tint）⇒ 删除项一直没有警示色。
+        val code = SourceFileProbe.sourceText("ui/book/toc/rule/TxtTocRuleActivity.kt")
+        assertTrue("删除菜单项须走 danger 通道", code.contains("danger = true,"))
+        assertFalse("不得再用 Color.Unspecified 占位", code.contains("Color.Unspecified"))
+    }
+
+    @Test
     fun dragPitchIsMeasuredNotHardcoded() {
         // 拖拽行节拍必须实测（真实行高 = minHeight + Card 内外边距 + 项间距，且随字体缩放变化），
         // 硬编码 dp 会失配 ⇒ 换序错位（2026-09-26 实测：旧写死 64dp ≠ 真实 88dp）

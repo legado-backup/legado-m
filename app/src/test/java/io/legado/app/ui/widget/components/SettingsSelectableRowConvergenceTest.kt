@@ -83,6 +83,9 @@ class SettingsSelectableRowConvergenceTest {
         assertTrue("moreActions 须转为 AppManagementMenuAction", c.contains("AppManagementMenuAction("))
         assertTrue("图标 drawable 源须透传", c.contains("iconRes = action.iconRes"))
         assertTrue("图标 ImageVector 源须透传", c.contains("icon = action.icon"))
+        // 2026-09-27 第四批：危险语义同链透传（漏传 ⇒ 删除项无警示色；此前只能靠 tint 硬塞，
+        // 而薄壳不消费 tint ⇒ 实际无色）
+        assertTrue("危险语义须经 danger 同链透传", c.contains("danger = action.danger"))
     }
 
     @Test
