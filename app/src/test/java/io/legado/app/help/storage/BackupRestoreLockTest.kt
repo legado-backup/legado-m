@@ -1,5 +1,6 @@
 package io.legado.app.help.storage
 
+import java.io.File
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
@@ -17,6 +18,7 @@ import org.junit.Test
  * 1. 并发时临界区串行（备份等待恢复，而非并发清空工作目录）
  * 2. 临界区抛异常后锁被释放（不会永久占用）
  * 3. 锁不可重入 —— 嵌套申请会挂起（用超时断言，防真实死锁把测试挂死）
+ * 4. REQ-07：Web 备份（`BackupController.executeWebBackup`）已纳入同一把锁
  */
 class BackupRestoreLockTest {
 
@@ -72,5 +74,28 @@ class BackupRestoreLockTest {
             }
         }
         assertTrue("嵌套申请未按预期挂起（不可重入约束失效）", timedOut)
+    }
+
+    /**
+     * REQ-07：Web 备份纳入共享锁的接线不变量。
+     *
+     * `executeWebBackup` 依赖 `appCtx` / NanoHTTPD，纯 JVM 无法运行 ⇒ 用源码不变量锁住
+     * 「对外入口持锁 + 内部实现私有」的结构（与 `Restore`/`Backup` 同口径）。
+     */
+    @Test
+    fun webBackupEntryIsWrappedByStorageLock() {
+        val source = listOf(
+            File("src/main/java/io/legado/app/api/controller/BackupController.kt"),
+            File("../app/src/main/java/io/legado/app/api/controller/BackupController.kt"),
+            File("app/src/main/java/io/legado/app/api/controller/BackupController.kt")
+        ).first { it.isFile }.readText()
+        assertTrue(
+            "Web 备份对外入口须经 BackupRestoreLock 包裹",
+            source.contains("BackupRestoreLock.withStorageLock { executeWebBackupUnlocked() }")
+        )
+        assertTrue(
+            "未加锁实现必须私有，避免被外部绕过锁直接调用",
+            source.contains("private suspend fun executeWebBackupUnlocked()")
+        )
     }
 }

@@ -5,12 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * B2 · R8「自动任务规则纳入备份/恢复」的**三处同步**不变量。
+ * B2 · R8「自动任务规则纳入备份/恢复」的**多处同步**不变量。
  *
- * 为什么值得测（设计文档明确警示）：备份文件名在**三处独立书写**——
- * ①`BackupSelectorConfig` 条目表 ②`Backup.backupFileNames` 清单 ③`Backup` 导出分支
- * （外加 ④`Restore` 恢复分支）。任一处漏改都会造成**静默失灵**：
- * 选择器勾了但导出不写 / 清单有但恢复不导 —— 且编译期完全无感。
+ * 为什么值得测（设计文档明确警示）：备份文件名在**多处独立书写**——
+ * ①`BackupSelectorConfig` 条目表 ②`Backup` 写出分支 ③`Restore` 还原分支
+ * ④`BackupController.executeWebBackup`（Web 备份硬编码全集）。任一处漏改都会造成**静默失灵**：
+ * 选择器勾了但导出不写 / 写了但恢复不导 —— 且编译期完全无感。
+ *
+ * 2026-09-27（REQ-05 / 1.2.7 对等性修复）已删除误导性的死清单 `Backup.backupFileNames`：
+ * 它既不参与写出也不参与还原，却让读者以为「清单已覆盖」，是本类漂移的源头。故本类断言
+ * 改为直接检查 `Backup.kt` 写出分支的存在性。
  *
  * 另锁两条语义：恢复分支必须 ①按 REPLACE 幂等导入 ②**导入后立即重排**（否则「恢复了却不跑」）。
  */
@@ -33,7 +37,7 @@ class AutoTaskBackupSyncTest {
 
     @Test
     fun backupListAndExportBranchBothCoverAutoTask() {
-        assertTrue("清单 backupFileNames 须含 autoTask.json", backup.contains("\"autoTask.json\""))
+        assertTrue("Backup 写出分支须含 autoTask.json", backup.contains("\"autoTask.json\""))
         assertTrue("导出分支须按勾选写出 autoTask.json", backup.contains("selectedFiles.contains(\"autoTask.json\")"))
         assertTrue("导出内容须来自规则表", backup.contains("autoTaskRuleDao.all()"))
     }
