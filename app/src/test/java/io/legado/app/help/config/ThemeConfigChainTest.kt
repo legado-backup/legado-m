@@ -90,4 +90,17 @@ class ThemeConfigChainTest {
             navIconConfig.contains("MainLayoutPresetConfig.floatingBottomBarHideSearch()")
         )
     }
+
+    @Test
+    fun sniffRaceSwitchDefaultsToEnabled() {
+        // W2 / REQ-14：嗅探赛马化默认开启；关闭即为零回归回滚点（回落原串行链）
+        assertTrue(
+            "AppConfig.sniffRaceEnabled 须存在且默认 true",
+            appConfig.contains("getPrefBoolean(PreferKey.sniffRaceEnabled, true)")
+        )
+        assertTrue(
+            "setter 须落同一键（防读写分叉）",
+            appConfig.contains("putPrefBoolean(PreferKey.sniffRaceEnabled, value)")
+        )
+    }
 }
