@@ -596,15 +596,15 @@
 - [ ] 8.5 配对测试 + 批次验证
   - **验收命令**：§11 通用防线 1-4
 
-### 📌 §8 W7 部分完成记录（2026-09-28 · **8.1 / 8.2 已完成**；8.3 / 8.4 / 8.5 未做）
+### 📌 §8 W7 完成记录（2026-09-28 · **8.1 / 8.2 / 8.3 / 8.4 已完成**；8.5 单测+门禁已跑、双包审计待随包执行）
 
 | 项 | 状态 | 交付证据 |
 |----|------|---------|
 | 8.1 漫画长按存图/分享 | **[x]** | `ReadMangaActivity` 给 `WebtoonRecyclerView.longTapListener`（此前**全仓零赋值 = 空转**）赋值 → `showMangaPageActions()`（`showComposeActionListDialog`：保存 / 分享）；当前页取屏幕中心项（`findCenterViewPosition`）；**复用 W5 单源**（命名 `ImageFileNameBuilder` + `uniqueNameFor` 去重；分享 `ImageShareHelper`）；SAF 目录选择与图库页同口径；双 strings 5 条。提交 **`4a67d8d`**；测试 `ReadMangaLongTapSaveTest`(3) |
 | 8.2 文章级离线预取开关 | **[x]（主干）** | 新键 `imageArticlePrefetch`（**默认关**）+ `AppConfig` 属性；**挂钩点唯一**（`ImageCanvasViewModel` 紧跟 `extractImageList`，受开关门控、独立协程不阻断主链路）；口径固定：**并发 2 / 单文章 ≤200 张 / 单张失败不阻塞 / 复用既有 Glide downloadOnly**；设置入口 `OtherConfigFragment` + `pref_config_other.xml` 登记。提交 **`c0f0988`**；测试 `ImageArticlePrefetchTest`(4) + 3 个目录配对断言。⚠️ **缓存「可查可清」第 5 维未接**（`CacheManageViewModel.buildStorageBreakdown`） |
-| 8.3 加载态逐项化 | **[ ]** | **未做**（逐项预览垫底 + 逐项失败原因/重试） |
-| 8.4 `PhotoView` 收口 | **[ ]** | **未做**；**范围已缩小** —— 7.4/7.5 已裁定为技术硬例外 ⇒ `PhotoView.kt` 本体**不删**，只做「待删项零引用」双闸（`ui/widget/image/photo/` 与 3 个布局逐个评估） |
-| 8.5 配对测试 + 批次验证 | **[ ]** | **未做**（含 `audit_gson_generic_signature.py` 双包审计 + 取色门禁） |
+| 8.3 加载态逐项化 | **[x]** | 提交 **`33a3d3c`**。**不新增状态机**（`LoadState` 5 态原样，测试断言 `sealed class` 计数 = 1）：① 布局新增逐项占位 `pb_item_loading`（加载/降级期间显示 ⇒ 消除静默黑屏）；② 布局新增逐项失败层 `tv_item_error` + `btn_item_retry`，**文案复用 footer 同口径** `classifyError()` 分类（`image_load_error_{network,parse,source}`），色走语义色单源 `AppSemanticColors.Danger`；③ Adapter：`bind` 复位逐项态 → 成功（`showSsivImage` / `loadIntoPhotoView`）收起占位 → 降级链**两条 level-4 出口**统一落到「收起占位 + 逐项原因 + 原地重试」；④ `retryFromScratch()`：归零 `retryCount` + **清除该 URL 预热标记**（让第 3 级重新可用）。测试 `ImageItemLoadStateWiringTest`(6)。**附加产出《图片消费契约》** → `docs/project-rules/image-consumption-contract.md`（AD-21 / G5）。**画布域取色豁免登记** → `theme_token_allowlist.json`。⚠️ 帧耗时基线对比（`perf_gfxinfo.py` 3 次中位数）**未取**（新增视图为 `wrap_content` + 默认 `gone`，且仅在加载期可见）⇒ 如实登记为遗留 |
+| 8.4 `PhotoView` 收口 | **[x]**（**待删项 = 空集**） | **范围已缩小**（7.4/7.5 已裁定技术硬例外 ⇒ 本体不删）。逐项评估结论：**无任何候选项可删** —— `PhotoView.kt` 本体被例外①（`ImageCropActivity`）/例外②（`ImageDetailAdapter`）引用，且 `item_image_canvas.xml` 的 `photo_view` 仍作**共享元素动画载体**（`transitionName`）；`photo/` 包（`Info.kt` / `RotateGestureDetector.kt`）随本体保留；`dialog_photo_view.xml` 已 W6 7.3 换 SSIV 轨（**布局内无 PhotoView 标签**）。双闸取证：五区扫描 ⇒ 待删项空集；无删除 ⇒ Grep 残留 0；编译通过；例外已登记 `design.md §5.7.1/§5.7.2/§5.7.3`。**回归防线**：`ImagePhotoViewRetentionAuditTest`(3)（引用白名单双向锁：防扩散 + 防例外过期 + 防误删） |
+| 8.5 配对测试 + 批次验证 | **[~]** | 单测全绿、`run_gates.py --stage commit` 8/8 已跑；`audit_gson_generic_signature.py` 双包审计**待双包产出后执行**（本批未涉 Gson 模型变更） |
 
 ---
 
