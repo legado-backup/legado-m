@@ -72,6 +72,26 @@ class RssArtivlesShellMigrationTest {
     }
 
     @Test
+    fun composeListAssemblyPreservesSwipeRefreshFrameworkChildren() {
+        // 2026-09-26 实测（CF 6.2 RSS 文章列表）：`attachComposeContent` 默认会 `removeAllViews()`，
+        // 而 SwipeRefreshLayout 构造期自带下拉指示器子视图 ⇒ 被连带删除后「内容已组合但整屏空白」。
+        // 正解 = 追加 ComposeView（clearExistingChildren = false），与原 XML 把 ComposeView 声明为其子级同口径。
+        val base = SourceFileProbe.sourceText("ui/rss/article/RssArticlesShellFragment.kt")
+        assertTrue(
+            "Compose 列表必须显式声明 clearExistingChildren = false",
+            base.contains("attachComposeContent(clearExistingChildren = false)")
+        )
+        assertFalse(
+            "不得对 refreshLayout 走默认清壳（会删掉 SwipeRefreshLayout 自带子视图）",
+            base.contains("refreshLayout.attachComposeContent {")
+        )
+        assertTrue(
+            "View 路径（样式 5）必须把 recycler 挂到 refreshLayout 下",
+            base.contains("refreshLayout.addView(recyclerView)")
+        )
+    }
+
+    @Test
     fun hostLogicPreserved() {
         val s = src()
         listOf(

@@ -129,4 +129,48 @@ class ComposeShellSingleSourceTest {
             assertTrue("$rel 必须走 attachComposeContent 单源", stripped(f).contains("attachComposeContent {"))
         }
     }
+
+    /**
+     * `clearExistingChildren` 契约（2026-09-26 真机实测新增）。
+     *
+     * 背景：`SwipeRefreshLayout` 在**构造期**就把下拉指示器作为子视图加入（`refreshLayout.childCount`
+     * 实测为 2 = 指示器 + 内容），故对这类容器调用默认的 `attachComposeContent`（内部
+     * `removeAllViews()`）会连带删掉框架内部子视图 ⇒ 内容已组合但整屏空白（`RssArticlesFragment`
+     * Compose 列表首轮实测：日志 items=8 正常、节点数 21 且无列表）。正解 = 追加挂载
+     * （`clearExistingChildren = false`），与原 XML 声明 ComposeView 为其子级同口径。
+     *
+     * 本测试锁两件事：①工厂保留该参数且默认仍为「清壳」语义（默认值不得被改成 false，
+     * 否则会破坏既有清壳页的死资源判定）；②全部调用点中**仅白名单文件**可使用 `false`。
+     */
+    @Test
+    fun clearExistingChildrenContractIsExplicit() {
+        val factory = stripped(
+            File(mainJavaRoot(), "io/legado/app/base/ComposeBindingShells.kt")
+        )
+        assertTrue(
+            "工厂必须显式暴露 clearExistingChildren 且默认 true（默认清壳语义不得变）",
+            factory.contains("clearExistingChildren: Boolean = true")
+        )
+        assertTrue("默认分支必须执行 removeAllViews", factory.contains("if (clearExistingChildren) {"))
+        // 豁免白名单：宿主自带框架级子视图的容器（SwipeRefreshLayout 系），必须显式传 false
+        val allowFalse = setOf(
+            "io/legado/app/ui/rss/article/RssArticlesShellFragment.kt",
+        )
+        val offenders = mainJavaRoot().walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { stripped(it).contains("attachComposeContent(clearExistingChildren = false)") }
+            .map { rel(it) }
+            .filterNot { it in allowFalse || it == "io/legado/app/base/ComposeBindingShells.kt" }
+            .toList()
+        assertTrue(
+            "以下文件新用了 clearExistingChildren = false 但未登记白名单（须先核实其容器是否自带框架子视图）：$offenders",
+            offenders.isEmpty()
+        )
+        allowFalse.forEach { r ->
+            assertTrue(
+                "白名单登记的 $r 已不再使用 clearExistingChildren = false ⇒ 应删除该白名单条目",
+                stripped(File(mainJavaRoot(), r)).contains("attachComposeContent(clearExistingChildren = false)")
+            )
+        }
+    }
 }

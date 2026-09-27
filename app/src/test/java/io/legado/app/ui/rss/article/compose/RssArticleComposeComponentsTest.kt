@@ -1,0 +1,181 @@
+package io.legado.app.ui.rss.article.compose
+
+import io.legado.app.testkit.SourceFileProbe
+import java.io.File
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * CF 6.2 配对测试：RSS 文章五样式族的 **Compose 侧实现契约**（JVM 可跑）。
+ *
+ * 迁移的等价性风险集中在三处，本测试分别锁死：
+ * ①**五样式分派**（0/1 线性、2 两列、3 瀑布流、4 三列）——必须由 `style` 唯一决定容器与行组件；
+ * ②**封面取数单源**——列表主查询不含 `image`（base64 大图会挤爆 CursorWindow）⇒ 必须逐项单行走 DAO；
+ * ③**取色/尺寸走资源单源**——不得出现硬编码色值（本仓取色红线），文案尺寸沿用原 XML 的 dimen 数值。
+ */
+class RssArticleComposeComponentsTest {
+
+    private fun listSource(): String =
+        SourceFileProbe.sourceText("ui/rss/article/compose/RssArticlesComposeList.kt")
+
+    private fun imageSource(): String =
+        SourceFileProbe.sourceText("ui/rss/article/compose/RssArticleImage.kt")
+
+    private fun favoritesSource(): String =
+        SourceFileProbe.sourceText("ui/rss/favorites/compose/RssFavoritesComposeList.kt")
+
+    @Test
+    fun composeImplementationsExist() {
+        val root = SourceFileProbe.mainJavaRoot()
+        listOf(
+            "io/legado/app/ui/rss/article/compose/RssArticlesComposeList.kt",
+            "io/legado/app/ui/rss/article/compose/RssArticleImage.kt",
+            "io/legado/app/ui/rss/favorites/compose/RssFavoritesComposeList.kt",
+        ).forEach { rel ->
+            assertTrue("Compose 列表实现缺失：$rel", File(root, rel).isFile)
+        }
+    }
+
+    @Test
+    fun fiveStylesDispatchToDedicatedContainers() {
+        val s = listSource()
+        // 三种容器各司其职：线性 / 定列网格 / 瀑布流
+        listOf(
+            "LazyVerticalStaggeredGrid(",
+            "LazyVerticalGrid(",
+            "LazyColumn(",
+        ).forEach { marker ->
+            assertTrue("样式容器缺失：`$marker`", s.contains(marker))
+        }
+        // 五种行组件（含收藏页共用的样式 0 行）
+        listOf(
+            "fun RssArticleListRow(",
+            "private fun RssArticleBigCoverRow(",
+            "private fun RssArticleGridRow(",
+            "private fun RssArticleCardRow(",
+        ).forEach { marker ->
+            assertTrue("样式行组件缺失：`$marker`", s.contains(marker))
+        }
+        // 瀑布流预加载阈值（与原 StaggeredGrid 分支的 5 条一致）
+        assertTrue("预加载阈值单源缺失", s.contains("PRELOAD_THRESHOLD = 5"))
+    }
+
+    @Test
+    fun xmlPixelAndFontFactsArePreserved() {
+        val s = listSource()
+        listOf(
+            // 样式 0：100dp 行高 / 16dp 内边距 / 110×68 封面
+            ".height(100.dp)",
+            ".padding(16.dp)",
+            ".width(110.dp)",
+            ".height(68.dp)",
+            // 样式 1：220dp 封面 + 8dp 分隔块
+            ".height(220.dp)",
+            ".height(8.dp)",
+            // 样式 2/4：272dp / 182dp 封面（由网格行参数下发）
+            "coverHeight = 272.dp",
+            "coverHeight = 182.dp",
+            // 圆角 12dp（沿用原 app:radius）
+            "radiusDp = 12",
+            // 字号/字重逐项对齐原 XML（样式 3 的横屏变体与竖屏共用同一实现 ⇒ 字号为三元表达式，见 `layout-land`）
+            "fontSize = 16.sp",
+            "fontSize = 15.sp",
+            "fontSize = 13.sp",
+            "fontSize = 12.sp",
+            "fontSize = 11.sp",
+            "if (landscape) 16.sp else 13.sp",
+            "if (landscape) 14.sp else 11.sp",
+            "fontWeight = FontWeight.Bold",
+            "fontStyle = FontStyle.Italic",
+        ).forEach { marker ->
+            assertTrue("原 XML 的尺寸/字号事实不得丢：`$marker`", s.contains(marker))
+        }
+    }
+
+    @Test
+    fun colorsComeFromResourcesOnly() {
+        val list = listSource()
+        assertTrue("已读/未读标题色必须走资源", list.contains("colorResource(if (read) R.color.tv_text_summary else R.color.primaryText)"))
+        assertTrue("分隔线色必须走资源", list.contains("colorResource(R.color.bg_divider_line)"))
+        assertTrue("瀑布流卡底色必须走资源", list.contains("colorResource(R.color.card_bg_water)"))
+        assertTrue("瀑布流卡描边色必须走资源", list.contains("colorResource(R.color.card_border_water)"))
+        // 硬编码色值红线（本仓取色门禁口径：Compose 侧同样不得写死 0xAARRGGBB）
+        assertFalse(
+            "Compose 列表内不得硬编码色值",
+            Regex("0x[0-9A-Fa-f]{8}").containsMatchIn(list)
+        )
+    }
+
+    @Test
+    fun articleImageIsSingleSourced() {
+        val img = imageSource()
+        // 取数：逐项单行 DAO（列表主查询不含 image，见 KDoc 的 CursorWindow 2MB 说明）
+        assertTrue("必须逐项单行查 image", img.contains("appDb.rssArticleDao.getImage(origin, link)"))
+        // Glide 必须带源站选项（漏传 ⇒ 大量源取不到图）
+        assertTrue("Glide 必须带 sourceOriginOption", img.contains("OkHttpModelLoader.sourceOriginOption"))
+        // 圆角沿用项目自定义 View
+        assertTrue("圆角必须沿用 FilletImageView", img.contains("FilletImageView(") && img.contains("setCornerRadius("))
+        // 瀑布流比例缓存（20 天持久化）单源
+        assertTrue("比例缓存单源缺失", img.contains("object RssImageAspectRatioStore"))
+        assertTrue("比例必须落持久缓存", img.contains("CacheManager.put(KEY_NAME + url, aspectRatio, SAVE_TIME)"))
+        // 复用错位防护（原 holder.itemView.tag 口径）
+        assertTrue("必须防条目复用错位", img.contains("if (imageView.tag == key) return@AndroidView"))
+    }
+
+    @Test
+    fun rowHasNoRippleAndFooterReusesView() {
+        val s = listSource()
+        // 原条目根 View 无 selectableItemBackground ⇒ 保持零按下反馈
+        assertTrue("行点击必须关闭水波（indication = null）", s.contains("indication = null"))
+        // 页脚沿用 View 侧 LoadMoreView（三态 + 错误详情弹窗 + 重试）
+        assertTrue("页脚必须托管原 LoadMoreView", s.contains("factory = { loadMoreView }"))
+    }
+
+    @Test
+    fun stateHolderNormalizesOutOfRangeStyle() {
+        // 原 View 实现 `when (articleStyle) { … else -> RssArticlesAdapter }` 有回退路径；
+        // 换成「按样式 new state」后，越界值必须同样回退到线性容器，否则列表侧 `linear!!` 直接 NPE
+        // （导入的来源 JSON 可携带任意 articleStyle）。构造期 `check()` 会断言「三类容器恰有一个非空」。
+        val unknown = RssArticleListStateHolder(7)
+        assertEquals("越界样式必须归一为 0", 0, unknown.normalizedStyle)
+        assertNotNull("越界样式必须回退到线性列表容器", unknown.linear)
+        assertNull(unknown.grid)
+        assertNull(unknown.staggered)
+        // 5 种在用样式逐一的容器分派（构造期不变量亦在此被验证）
+        val expectedKind = mapOf(0 to 0, 1 to 0, 2 to 1, 3 to 2, 4 to 1)
+        expectedKind.forEach { (style, kind) ->
+            val holder = RssArticleListStateHolder(style)
+            val actual = when {
+                holder.linear != null -> 0
+                holder.grid != null -> 1
+                holder.staggered != null -> 2
+                else -> -1
+            }
+            assertEquals("样式 $style 的容器分派不符（0=线性/1=定列网格/2=瀑布流）", kind, actual)
+        }
+    }
+
+    @Test
+    fun waterfallUnknownRatioFallsBackToSquareNotUnbounded() {
+        // 2026-09-26 真机实测（cold cache）：比例未知时若「不加高度约束」，AndroidView 在瀑布流的
+        // 无界高度下会塌成极端高度，且 ImageView 拿不到尺寸 ⇒ Glide 请求永不完成、比例永远学不到。
+        // 原 View 实现的比例未知态 = WRAP_CONTENT + adjustViewBounds + 1:1 占位图（正方）⇒ 等价正方容器。
+        val s = listSource()
+        assertTrue(
+            "比例未知时必须回退正方形容器（不得无高度约束）",
+            s.contains(".aspectRatio(if (ratio > 0f) 1f / ratio else 1f)")
+        )
+    }
+
+    @Test
+    fun favoritesListReusesArticleRowSingleSource() {
+        val fav = favoritesSource()
+        assertTrue("收藏行必须复用文章样式 0 行单源", fav.contains("RssArticleListRow("))
+        assertTrue("收藏封面取数必须走收藏表", fav.contains("appDb.rssStarDao.getImage(origin, link)"))
+        assertTrue("长按删除语义必须保留", fav.contains("onLongClick = { onItemLongClick(star) }"))
+    }
+}
