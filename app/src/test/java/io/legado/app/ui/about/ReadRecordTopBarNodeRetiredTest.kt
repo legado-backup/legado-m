@@ -30,6 +30,17 @@ class ReadRecordTopBarNodeRetiredTest {
             "activity_read_record.xml 不得再声明 id/top_bar",
             xml.contains("@+id/top_bar")
         )
+        // 顶栏包 §5.2（2026-09-27）：真实节点 `TitleBar@id/title_bar` 亦整批退役 ——
+        // 两个宿主（ReadRecordActivity / ReadRecordFragment）都已改用 Compose 顶栏，
+        // 该节点在两条渲染路径上均不参与显示（原为「置 GONE / 运行时摘除」的历史占位）。
+        assertFalse(
+            "activity_read_record.xml 不得再声明遗留 View 顶栏 TitleBar",
+            xml.contains("io.legado.app.ui.widget.TitleBar")
+        )
+        assertFalse(
+            "activity_read_record.xml 不得再声明 id/title_bar",
+            xml.contains("@+id/title_bar")
+        )
     }
 
     @Test
@@ -39,9 +50,12 @@ class ReadRecordTopBarNodeRetiredTest {
             "ReadRecordActivity 不得再引用 binding.topBar（残留节点已退役）",
             src.contains("binding.topBar")
         )
-        // 既有 Compose 换装语义不变：三处 legacy 视图仍按原样隐藏
+        assertFalse(
+            "ReadRecordActivity 不得再引用已退役的 binding.titleBar",
+            src.contains("binding.titleBar")
+        )
+        // 既有 Compose 换装语义不变：legacy 列表视图照旧隐藏、Compose 宿主显式可见
         assertTrue(src.contains("binding.scrollView.visibility"))
-        assertTrue(src.contains("binding.titleBar.visibility"))
         assertTrue(src.contains("binding.composeHost.visibility"))
     }
 }

@@ -27,7 +27,12 @@ class ReadRecordFragmentTopBarWiringTest {
     @Test
     fun fragmentStillInstallsComposeTopBarAtHead() {
         val src = SourceFileProbe.sourceText("ui/main/readrecord/ReadRecordFragment.kt")
-        assertTrue("仍须摘除布局内的真实 title_bar 节点", src.contains("removeView(binding.titleBar)"))
+        // 顶栏包 §5.2（2026-09-27）：布局内遗留的 `TitleBar@id/title_bar` 已整批退役
+        // （Activity 侧原为置 GONE、Fragment 侧原为运行时摘除）⇒ 本页不再需要「先摘旧节点」
+        assertFalse(
+            "ReadRecordFragment 不得再引用已退役的 binding.titleBar",
+            src.contains("binding.titleBar")
+        )
         assertTrue(
             "Compose 顶栏仍须插入到容器头部（索引 0，带 childCount 兜底）",
             src.contains("container.addView(topBarView, 0.coerceAtMost(container.childCount))")
