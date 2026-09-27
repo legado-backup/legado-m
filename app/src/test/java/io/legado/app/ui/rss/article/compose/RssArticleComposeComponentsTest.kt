@@ -64,6 +64,29 @@ class RssArticleComposeComponentsTest {
         assertTrue("预加载阈值单源缺失", s.contains("PRELOAD_THRESHOLD = 5"))
     }
 
+    /**
+     * 2026-09-27 用户报障回归：样式 3「瀑布流」间距必须按**旧 View 实现的像素(px)口径**等价换算。
+     *
+     * 旧实现（`b2db2cc^` 的 `RssArticlesFragment` 样式 3 分支）用的是
+     * `RecyclerView.setPadding(20,0,20,0)` + `ItemDecoration(20,30,20,30)` —— 单位是 **px**。
+     * 换装 Compose 时若直接写 `40.dp / 30.dp / 60.dp`，会按屏幕密度整体放大
+     * （本机 ×1.5、普通手机 ×2.75~3）⇒ 卡片变窄、整页松散（用户体感「跟原来完全不一样」）。
+     */
+    @Test
+    fun staggeredSpacingUsesPixelEquivalentNotRawDp() {
+        val s = listSource()
+        listOf(
+            "val px40 = with(LocalDensity.current) { 40.toDp() }",
+            "val px30 = with(LocalDensity.current) { 30.toDp() }",
+            "val px60 = with(LocalDensity.current) { 60.toDp() }",
+        ).forEach { marker ->
+            assertTrue("样式 3 间距须按 px→dp 等价换算（缺失：`$marker`）", s.contains(marker))
+        }
+        assertTrue("瀑布流列间距须走 px 等价值", s.contains("Arrangement.spacedBy(px40)"))
+        assertTrue("瀑布流行间距须走 px 等价值", s.contains("verticalItemSpacing = px60"))
+        assertTrue("样式 2/4 外沿须走 px 等价值", s.contains("if (style == 2) px8 else px4"))
+    }
+
     @Test
     fun xmlPixelAndFontFactsArePreserved() {
         val s = listSource()
