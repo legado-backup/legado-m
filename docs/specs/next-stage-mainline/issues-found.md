@@ -111,6 +111,18 @@
 
 ---
 
+## IF-07（P2 · 覆盖缺口 · 非缺陷）名场面书签**漫画/图片两路径**缺运行时打标回跳复测
+
+**现象**：W8 9.3/9.4 的**文字路径**已真机端到端跑通（划词「加入名场面」→ 库页出现分组与条目 → 点击跳回 `ReadBookActivity`，见 tasks §9 记录 5 步取证）；**漫画路径**（`ReadMangaActivity` 长按菜单外的阅读菜单项）与**图片路径**（`ImageGalleryActivity` 长按图片菜单）只有静态锁定，未在真机上点过一次。
+
+**未测原因（如实）**：当前模拟器样本书集只有文字书（`回归样本读物*`/`L2*`），**没有漫画书**（`isImage`）也没有**图片订阅源**（`type=1` 的 RSS 源）⇒ 无法构造两条路径的入口场景；造数据需先导入漫画源/图片订阅源，属另一批测试准备。
+
+**当前覆盖**：`SceneBookmarkMangaEntryTest`(3) / `SceneBookmarkImageEntryTest`(2) 静态锁定（菜单项在位、`contentKind` 口径、锚点键、manga 项不得进 `mangaConfigMenuItems`）；接线方式与已验证的文字路径同源（同一 `SceneBookmarkHelper.addAndDescribe`）。
+
+**后续复核判据（4 步）**：① 导入一个漫画源（或 `isImage` 书）+ 一个图片订阅源；② 漫画页菜单点「加入名场面」→ 库页出现 `contentKind=1` 条目（锚点含 `pageIndex`）；③ 图片页长按图片 → 菜单点「加入名场面」→ 库页出现 `contentKind=2` 条目（锚点含 `imageUrl` **与** `articleLink`）；④ 各点一次条目，确认分别落到漫画页 / 图片浏览页。
+
+---
+
 ## 未覆盖项（如实登记，非缺陷）
 
 | 项 | 说明 | 当前覆盖方式 |
