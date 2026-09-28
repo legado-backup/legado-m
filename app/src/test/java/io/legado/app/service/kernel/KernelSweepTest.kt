@@ -31,6 +31,7 @@ class KernelSweepTest {
         "BookSourceKernel.kt",
         "RssSourceKernel.kt",
         "ReplaceRuleKernel.kt",
+        "BackupKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =
