@@ -653,6 +653,21 @@
 
 ---
 
+### 📌 §9 W8 部分完成记录（2026-09-28 · **9.1 已完成**；9.2-9.6 未做）
+
+- **9.1 数据层 [x]**（commit `fc20368`）：`SceneBookmark` 实体（`@Keep` + `@Parcelize` + 13 字段全默认值；`contentKind` 0=文字 / 1=漫画 / 2=图片订阅 为跳转路由依据）+ `SceneBookmarkDao`（flowAll / flowByBook / getByBook / count / insert / update / delete / deleteById / deleteByBook）+ `AppDatabase` version **111→112** + `migration_111_112`（**仅 CREATE TABLE，不 DROP 不重建**）+ `MigrationTest` 增起点 110/111 与 `migrate111To112`。
+  - **G-12 三件证据齐备**：`app/schemas/io.legado.app.data.AppDatabase/112.json` 已导出；`migration_111_112` 注册 2 处 + `MigrationTest` 引用 112；`ai_tests/config/db_migration_evidence.json` 追加 112 条目（含 **R5 五步实测**：v111 旧包 → 覆盖装 v112，user_version 111→112，四表行数全保留，`sceneBookmarks` 建表成功，IllegalStateException=0；探针落盘 `output/l2/db_probe_{pre,post}112.json`）。
+  - **测试**：`DatabaseMigration111To112Test`(4) / `SceneBookmarkEntityTest`(2) / `SceneBookmarkDaoContractTest`(4)；全量单测全绿；commit 门禁 8/8。
+  - **⚠ 踩坑（接手必读）**：①**版本号上升会让「硬编码当前版本」的旧测试假失败** —— 本轮 `DatabaseMigration110To111Test` 因断言 `version = 111` 被打红，已改为「解析版本号并断言 ≥111」；**后续每次升版本同理，勿再硬编码**。②**G-01 配对门禁不认未跟踪的新测试文件** ⇒ 新增测试必须**先 `git add` 再跑门禁**。③新建表**不要写 SQL DEFAULT**（实体侧 Kotlin 默认值已足够；写 DEFAULT 会与 Room `TableInfo` 校验失配）。
+- **9.2-9.6 未做（接手直接续做）**：
+  - **9.2** `help/book/SceneBookmarkHelper.kt` + `help/ai/AiSceneDescService.kt` —— **AI 通道 API 已探明**：`AiChatService.chatStream(messages, onPartial, onStatus, includeStructuredBlocks = false, useAllTools = false, modelConfigOverride = AppConfig.aiSummaryModelConfig): String`；**「AI 未配置」判定** = `AppConfig.aiSummaryModelConfig?.let { AppConfig.aiProviderForModel(it) } == null` ⇒ 跳过描述生成、仅存原文片段（不阻塞落库）。范式可抄 `help/ai/AiChapterSummaryService.kt`（分块/合并/落库/状态 JSON 回调）。
+  - **9.3** 三路径入口：文字 = `ReadBookActivity` 划词/阅读菜单（抄 `:1483-1510` 划线入口）；图片 = `ImageGalleryActivity` 菜单；漫画 = `res/menu/book_manga.xml` 菜单项。
+  - **9.4** 库页 `ui/scene/SceneBookmarkActivity` + `SceneBookmarkScreen`（Compose，照 `AppManagementScaffold` + `AppManagementLazyColumn` + `AppManagementListRow`）；**必须接线 `ui/main/my/MySettingsData.kt` 工具分区 + `handleSettingsRowClick`**，否则**死页面 ⇒ 本任务未完成**。
+  - **9.5** 备份四处口径（`Backup.kt` / `Restore.kt` / `BackupSelectorConfig.allItems` / `BackupController.executeWebBackup`）；**9.6** 配对测试 + §11 通用防线。
+  - **updateLog 文案**（`新增名场面书签：一键收藏精彩瞬间，AI 自动生成描述，名场面库统一回看`）**须在 9.3/9.4 落地后（功能用户可感时）再加** —— 9.1 纯数据层属「内部工程变更」，按 `version-delivery-sync` 口径**不写**（存疑默认不写）。
+
+---
+
 ## 10. 收尾 · W-Final 品类文案改造
 
 > 依赖：W1-W8 全部交付（**顺序铁律，最后做**，AD-16）
