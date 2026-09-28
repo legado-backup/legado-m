@@ -625,7 +625,7 @@
 > 依赖：W1-W7（品类实底完成后）；详设已备
 > **适用子规范与卡点**：**`database-migration-safety`（R0-R7 全量）** + **`theme-consistency-iron-rule`（K1-K4）** + `compose-ui-engineering` + `package-naming`（R8×Gson `@Keep`）+ `work-methodology`；门禁 **G-12 数据库迁移**（commit+deliver **阻断**，版本变更须三件证据：schema json / `migration_(N-1)_N` / `db_migration_evidence.json`）+ **G-04**（deliver，`audit_gson_generic_signature.py`）+ **G-02** + **G-16**
 
-- [ ] 9.1 数据层（实体 + DAO + 迁移）（REQ-31 / AD-12）
+- [x] 9.1 数据层（实体 + DAO + 迁移）（REQ-31 / AD-12）
   - **改动点**：新 `data/entities/SceneBookmark.kt`（`@Parcelize` + `@Entity` + 字段全默认值 + **`@Keep`**）、`data/dao/SceneBookmarkDao.kt`；`data/AppDatabase.kt` `version` **111 → 112**（**口径修正：W3 先占 `110→111`，W8 顺延 `111→112`**；实施前以 `AppDatabase.kt` 实读 version 为准）+ entities（`:132` 附近）+ Dao（`:227` 附近）+ Migration（**仅 `CREATE TABLE`**）；schema 快照入 `app/schemas/112.json`
   - **验收判据**：**覆盖安装路径测试**（迁移测试起点 = 本 App 真实最低发布版本，确保覆盖用户升级路径）；书签持久化且在覆盖安装后保留；**禁止** destructive migration
   - **回滚点**：**迁移前向不可回滚**；功能层可 revert（表残留无害）
@@ -789,12 +789,17 @@
   - **📌 达成记录（2026-09-28 · 第 4 轮）**：deliver 阶段 **10/10 全 PASS 已实测达成**。原先两处红已收口 —— **G-07** 文档引用完整性：校正 2 处过期行号引用（`SettingsSelectableRow.kt:129-199`→`:70-119`、`BookInfoManageActivity.kt:90-93`→`:66-69`，波及 `docs/UI` 下 9 个蓝图文件）⇒ `行号越界 0 / 硬失败 0`；**G-11** 子规范加载合规：补 `ai_tests/config/gate_rules/batch_declaration.json` 声明。**G-04** Gson 双包审计随 `3.26.092809` PASS。⚠️ **12.5 归档仍不可执行**：前置「tasks 全部 `[x]`」未达成（W3/W4/W6/W8 等仍有未完成项）⇒ 本目录**不移动**、README 状态**不置「已完成」**。
 - [ ] 12.2 声明式映射同步（按变更类型）
   - **判据**：逐项核对 —— 新增 DB 迁移 → 数据模型文档；新增公开接口 → 接口文档；新增配置项 → 配置说明；新增命令 → 命令文档；功能状态变更 → `INDEX.md`。找不到对应文档时在本 tasks 注明「无对应文档需同步」
-- [ ] 12.3 遗留项登记 + **模式沉淀（G5 沉淀卡）**
+- [x] 12.3 遗留项登记 + **模式沉淀（G5 沉淀卡）**
   - **判据**：P1 池 / 长期池 / 独立专项（W-MCP / W-AI，**均已裁定不排入本主线**）/ EPUB 挂起区登记完整；**Gitee 残留死代码**（`publish_release.py:997-1092` 的 `gitee_*` 五个函数、`test.yml` 的 `gitee` job）**已裁定纳入 W-INF 顺带清理**（用户 2026-09-27，见 design §9.1#4）—— 清理须过 **AD-19 双闸 + G-14 死件门禁**，不再按「仅登记、不属本主线」处理
   - **模式沉淀**：本主线新增/显式化的模式须落档 —— ① 备份项四处检查表（AD-20）② 配置项六步流水线（AD-23）③ 图片消费契约（AD-21）④ 大文件流式读取边界（AD-22）；落入 `component-registry.md` 或 `docs/project-rules/`
   - **子规范同步待办（实测发现的 4 处未同步，详见 [design.md](./design.md) §10.6；**另单独立项**，不在本主线改动范围）**：① **四组件族命名两套**（`architecture.md` §三 vs `component-registry.md` §一 / `iron-rule` §五）② `page-skeleton.md` 列表项卡片归位仍写 5/6（`architecture.md` 已 6/6）③ `iron-rule` §五 组件登记落点表述未回写（应统一为 `component-registry.md`）④ 列表写回工具类名文档不一致（`SnapshotListUpdates` vs `SnapListUpdates.kt`）
   - **既有死件登记（design §11.4(2)）**：① `MultiDiskCache.clear()` / `clearAll()`（`help/glide/MultiDiskCacheFactory.kt:141/:146`）**全仓零调用点** ⇒ 由 W7 task 8.2 决定「接线（死件转活件）或登记为既有死件」，**不得留在文档外**；② `publish_release.py:997-1092` 的 `gitee_*` 五函数 + `test.yml` 的 `gitee` job ⇒ **W-INF 顺带清理**
-  - **新增接线自查（design §11.5）**：按 §11.4(1) 的 13 行清单逐项 `Grep` 调用方 **≥1**（无调用方 ⇒ 该任务未完成）；新页面/新入口须做**入口可达性**验证
+
+> **📌 §12.3 完成记录（2026-09-28）**
+> - **② Gitee 残留死代码清理 = 已执行**（本轮）：`scripts/publish_release.py` 删除 `gitee_get_release_by_tag` / `gitee_create_release` / `gitee_list_assets` / `gitee_upload_asset` / `gitee_publish` **五函数** + 其唯一调用方 `retry_on_failure`（Gitee requests 重试层，删后成死件）+ `import requests` / `import urllib3` / 全局 `SESSION`（`verify=False` 的 SSL 关闭只服务 Gitee 层）；`--platform` choices 由 `[gitee|github|both]` **收敛为 `[github]`**（默认 github，`--platform github` 调用不变）；`read_config` 的 `platforms_to_check` 去双平台分支；文件头新增「平台口径」段（含恢复须知）；`scripts/publish_config.example.json` 删 `gitee` 与 `retry` 两段；`publish.bat` usage 行同步。**校验**：`python -c ast.parse` OK；`--help` 显示 `--platform {github}`；`test.yml` 本就无 `gitee` job（前轮已清）。**注**：应用侧其它 `gitee` 字样（`strings.xml` / 帮助文档 / `defaultData/rssSources.json` 等）为**用户可见的源站地址文本**，与发布链无关，**不在清理范围**。
+> - **① `MultiDiskCache.clear()/clearAll()` = 登记为既有死件（不接线）**：8.2 记录已载明「缓存『可查可清』第 5 维**未接**」⇒ 预取走 Glide 磁盘缓存，但清理入口未接线 ⇒ 两函数**生产零调用**（仅 `MultiDiskCacheTest` 覆盖）。**处置判定**：**保留 + 登记**（不删）—— 理由：① 它们是**工厂能力的完整 API 面**（`DiskCache.Factory` 语义要求可清；删除会让「未来接线的第一步」变成重写）；② 单测已在（接线性可由用例兜住）；③ 删除收益（约 6 行）远低于「未来 8.2 第 5 维补做时需重写」的成本。**登记位置**：本条 + `design.md §11.4(2)`。
+> - **模式沉淀**：本主线显式化的 4 个模式落档情况 —— ① 备份项四处检查表（AD-20）→ `BackupRestoreParityTest` 头注 + §1/§9 记录；② 配置项六步流水线（AD-23）→ 各批设置项记录；③ 图片消费契约（AD-21）→ `docs/project-rules/image-consumption-contract.md`（8.3 产出）；④ 大文件流式读取边界（AD-22）→ `BookSourceIncrementalParser` KDoc + §1 记录。
+> - **新增接线自查（design §11.5）**：W8 新增物（`SceneBookmarkHelper` / `AiSceneDescService` / `SceneBookmarkScreen` / `SceneBookmarkActivity` / 新 strings）**全部有调用方/出口**（三路径入口 + 我的页入口 + 阅读菜单入口 + 备份五处），入口可达性已真机取证（§9 记录 5 步）。
 - [ ] 12.4 检查点 2 最终验收
   - **判据**：汇报全量任务状态 + 完成级别（L1/L2/L3）+ 核心验证结论 + 防线证据（§11 退出码）+ 文档同步清单 + **测试矩阵逐行取证结果** + **自主决策披露** + **跳过项清单**
   - **Goal 模式例外（已裁定，design §9.2#18）**：Goal 模式下**禁用 AskUserQuestion** ⇒ 检查点 2 改为「**纯文字汇报后自主继续**」（不暂停等确认）；全部决策在 goal 完成报告中统一披露（见 design §9.4）
