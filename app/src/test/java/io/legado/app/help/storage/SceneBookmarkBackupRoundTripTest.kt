@@ -32,7 +32,9 @@ class SceneBookmarkBackupRoundTripTest {
         val selector = read("src/main/java/io/legado/app/help/storage/BackupSelectorConfig.kt")
         val backup = read("src/main/java/io/legado/app/help/storage/Backup.kt")
         val restore = read("src/main/java/io/legado/app/help/storage/Restore.kt")
-        val webBackup = read("src/main/java/io/legado/app/api/controller/BackupController.kt")
+        // 一期 §2.3.3：备份业务下沉内核 ⇒ ④ 处须在两文件中任一命中
+        val webBackup = read("src/main/java/io/legado/app/api/controller/BackupController.kt") +
+            "\n" + read("src/main/java/io/legado/app/service/kernel/BackupKernel.kt")
 
         assertTrue("① 选择器缺条目", selector.contains("BackupItem(\"sceneBookmark\", \"$fileName\""))
         assertTrue("② 备份侧未写出", backup.contains("if (selectedFiles.contains(\"$fileName\"))"))

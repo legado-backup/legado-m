@@ -13,10 +13,16 @@ import org.junit.Test
 class BackupControllerRssReadRecordTest {
 
     private val controller by lazy {
+        // 一期 §2.3.3：备份业务已下沉到内核 ⇒ 断言须同时覆盖两处源码
         listOf(
             File("src/main/java/io/legado/app/api/controller/BackupController.kt"),
             File("../app/src/main/java/io/legado/app/api/controller/BackupController.kt"),
             File("app/src/main/java/io/legado/app/api/controller/BackupController.kt")
+        ).first { it.isFile }.readText() +
+            "\n" + listOf(
+            File("src/main/java/io/legado/app/service/kernel/BackupKernel.kt"),
+            File("../app/src/main/java/io/legado/app/service/kernel/BackupKernel.kt"),
+            File("app/src/main/java/io/legado/app/service/kernel/BackupKernel.kt")
         ).first { it.isFile }.readText()
     }
 
