@@ -342,7 +342,7 @@
 - **修复**：`ReadRss` 抽出统一补齐入口 `resolveVideoArticles(article, given)`（口径与列表页 `flowByOriginSort`、阅读页 `getListByOriginSort` 一致：**同源 + 同分类**；查不到或未含本篇则**本篇补入并置首**），两个 `type==2` 分支收敛到 `startVideoFromActivity` / `startVideoFromFragment` 两个 helper。**列表路径（`size > 1`）保持同步启动**（不引入查库延迟），仅上下文缺失时异步补齐
 - **回归用例**：`RssVideoRouteTest.historyAndFavoriteRoutesAlsoResolveArticleList`（补齐入口与口径 / 本篇补入置首 / 两处调用点 / 启动点收敛为 2 helper）
 - **验证**：全量单测 1648/0/5；`run_gates.py --stage commit` 8/8
-- **遗留**：③④ 的真机取证未取（需先产生阅读记录 / 收藏文章）
+- **真机取证（2026-09-28 补取 · 已通过）**：③ 阅读历史（订阅⋮→历史记录→点条目）与 ④ 收藏页（订阅⋮→收藏夹→点条目）**均自动路由到 `VideoPlayerActivity` 且上滑产生 `switchToArticle idx=0` / `idx=1`**，无 FATAL ⇒ 两条链路的列表上下文补齐**真机确认生效**（判据日志同 IF-03）
 - **登记**：`issues-found.md` IF-04
 
 ---
