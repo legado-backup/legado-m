@@ -23,6 +23,23 @@ class ApiContextTest {
     private fun thrownOf(block: () -> Unit): Throwable? = runCatching { block() }.exceptionOrNull()
 
     @Test
+    fun level_carriesTokenLevelForAudit() {
+        // 一期 3.7：审计要回答"这次调用是谁的权限" ⇒ 级别必须随请求上下文传下去；
+        // 未显式传入（老调用点 / 未鉴权路径）须安全回落 NONE，而不是 null 崩溃。
+        assertEquals(
+            "未传入级别须回落 NONE",
+            io.legado.app.web.TokenManager.Level.NONE,
+            ctx().level
+        )
+        assertEquals(
+            "传入级别须原样承载",
+            io.legado.app.web.TokenManager.Level.MANAGE,
+            ApiContext(Method.POST, "/__probe__", emptyMap(), null, emptyMap(),
+                io.legado.app.web.TokenManager.Level.MANAGE).level
+        )
+    }
+
+    @Test
     fun param_returnsFirstValue_orNull() {
         assertEquals("v", ctx(mapOf("a" to listOf("v", "w"))).param("a"))
         assertNull("缺失参数取值须返回 null（非抛异常）", ctx().param("a"))

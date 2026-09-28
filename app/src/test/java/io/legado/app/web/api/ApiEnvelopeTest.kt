@@ -42,6 +42,19 @@ class ApiEnvelopeTest {
     }
 
     @Test
+    fun statusOkIsTheAuditSuccessCriterion() = runBlocking {
+        // 一期 3.7：审计的 success 判据是 `response.status == Response.Status.OK`（非 OK 即记失败）。
+        // 本用例把判据两端钉住：正常信封 = OK；异常信封 ≠ OK。改判据会让审计成败列静默反转。
+        val ok = ApiEnvelope.dispatch(route { ReturnData().setData("ok") }, ctx())
+        assertSame("正常信封须为 OK", NanoHTTPD.Response.Status.OK, ok.status)
+        val failed = ApiEnvelope.dispatch(route { throw IllegalStateException("boom") }, ctx())
+        assertFalse(
+            "异常信封不得被判为成功",
+            failed.status == NanoHTTPD.Response.Status.OK
+        )
+    }
+
+    @Test
     fun explicitCode_mapsToSameHttpStatus() = runBlocking {
         // code 与 HTTP 状态码严格一致（REQ-1-301）
         val resp = ApiEnvelope.dispatch(route { ReturnData().setErrorMsg("no").setCode(404) }, ctx())
