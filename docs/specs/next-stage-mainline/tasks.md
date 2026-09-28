@@ -347,6 +347,18 @@
 
 ---
 
+### 🔴 §3 追加修复：IF-05（**用户真机报障 · 静默失效**）书源编辑页六 Tab 编辑项全部不显示（2026-09-28）
+
+- **发现方式**：用户真机报障（安装 `3.26.092800` 后）——「书源编辑页面，基本、搜索、发现等下面的编辑项全部没有了」
+- **根因**：`f7ac81e`（CE-a #12，2026-09-26）退役 `activity_book_source_edit.xml`、改 `BookSourceEditShellViews` **程序化重建**时**丢失旧 XML 的 `app:layoutManager="...LinearLayoutManager"` 永久兜底**；宿主 `initView()` 仅在 `adapter.editEntityMaxLine < 999` 分支装配，而 `AppConfig.sourceEditMaxLine` 默认 `Int.MAX_VALUE`（≥999）⇒ **分支永不成立** ⇒ `RecyclerView` 无布局管理器 ⇒ 六个 Tab 的编辑项**全部不渲染**（无异常 / 无日志 ⇒ 编译通过 + 既有文本型契约单测全绿仍逃逸）
+- **修复**（commit `7d8b59d`）：`initView()` 改为**无条件**装配 layoutManager，条件仅用于选择变体（行数少 → `NoChildScrollLinearLayoutManager`；否则 → `LinearLayoutManager`）—— 等价旧 XML 的永久兜底
+- **回归防线**：① `BookSourceEditShellMigrationTest.recyclerViewAlwaysGetsLayoutManager`（TDD 先红：`AssertionError@:109`）② **通用防线** `ProgrammaticRecyclerViewLayoutManagerGuardTest`（全量扫描程序化 `RecyclerView`：非壳自行装配 / 壳由登记宿主装配 / 登记表不过期）③ **G-18 反例库 R-007**
+- **同类排查**：带 `app:layoutManager` 的退役 XML 仅 **4 处**（另 3 处已纯 Compose，无 RecyclerView）；全局程序化 `RecyclerView` **5 处**，除本页外**均已装配** ⇒ **唯一缺陷页 = 书源编辑页**
+- **验证**：全量单测全绿；`run_gates.py --stage commit` 8/8；真机（模拟器 1600×900）截图确认「基本」「搜索」两 Tab 编辑项恢复、无崩溃；随 **`3.26.092809`** 双包发布（Gson 双包审计 PASS）
+- **沉淀**：`issues-found.md` IF-05 + 反思；`global-thinking-checklist.md` 新增 **G5**（XML 退役必须附属性全量对照表 + 同构页差异比对 + 永久兜底不得由条件赋值替代）
+
+---
+
 ## 4. W3 · 音频 P0
 
 > 依赖：无（可与视频线交错）
@@ -604,7 +616,7 @@
 | 8.2 文章级离线预取开关 | **[x]（主干）** | 新键 `imageArticlePrefetch`（**默认关**）+ `AppConfig` 属性；**挂钩点唯一**（`ImageCanvasViewModel` 紧跟 `extractImageList`，受开关门控、独立协程不阻断主链路）；口径固定：**并发 2 / 单文章 ≤200 张 / 单张失败不阻塞 / 复用既有 Glide downloadOnly**；设置入口 `OtherConfigFragment` + `pref_config_other.xml` 登记。提交 **`c0f0988`**；测试 `ImageArticlePrefetchTest`(4) + 3 个目录配对断言。⚠️ **缓存「可查可清」第 5 维未接**（`CacheManageViewModel.buildStorageBreakdown`） |
 | 8.3 加载态逐项化 | **[x]** | 提交 **`33a3d3c`**。**不新增状态机**（`LoadState` 5 态原样，测试断言 `sealed class` 计数 = 1）：① 布局新增逐项占位 `pb_item_loading`（加载/降级期间显示 ⇒ 消除静默黑屏）；② 布局新增逐项失败层 `tv_item_error` + `btn_item_retry`，**文案复用 footer 同口径** `classifyError()` 分类（`image_load_error_{network,parse,source}`），色走语义色单源 `AppSemanticColors.Danger`；③ Adapter：`bind` 复位逐项态 → 成功（`showSsivImage` / `loadIntoPhotoView`）收起占位 → 降级链**两条 level-4 出口**统一落到「收起占位 + 逐项原因 + 原地重试」；④ `retryFromScratch()`：归零 `retryCount` + **清除该 URL 预热标记**（让第 3 级重新可用）。测试 `ImageItemLoadStateWiringTest`(6)。**附加产出《图片消费契约》** → `docs/project-rules/image-consumption-contract.md`（AD-21 / G5）。**画布域取色豁免登记** → `theme_token_allowlist.json`。⚠️ 帧耗时基线对比（`perf_gfxinfo.py` 3 次中位数）**未取**（新增视图为 `wrap_content` + 默认 `gone`，且仅在加载期可见）⇒ 如实登记为遗留 |
 | 8.4 `PhotoView` 收口 | **[x]**（**待删项 = 空集**） | **范围已缩小**（7.4/7.5 已裁定技术硬例外 ⇒ 本体不删）。逐项评估结论：**无任何候选项可删** —— `PhotoView.kt` 本体被例外①（`ImageCropActivity`）/例外②（`ImageDetailAdapter`）引用，且 `item_image_canvas.xml` 的 `photo_view` 仍作**共享元素动画载体**（`transitionName`）；`photo/` 包（`Info.kt` / `RotateGestureDetector.kt`）随本体保留；`dialog_photo_view.xml` 已 W6 7.3 换 SSIV 轨（**布局内无 PhotoView 标签**）。双闸取证：五区扫描 ⇒ 待删项空集；无删除 ⇒ Grep 残留 0；编译通过；例外已登记 `design.md §5.7.1/§5.7.2/§5.7.3`。**回归防线**：`ImagePhotoViewRetentionAuditTest`(3)（引用白名单双向锁：防扩散 + 防例外过期 + 防误删） |
-| 8.5 配对测试 + 批次验证 | **[~]** | 单测全绿、`run_gates.py --stage commit` 8/8 已跑；`audit_gson_generic_signature.py` 双包审计**待双包产出后执行**（本批未涉 Gson 模型变更） |
+| 8.5 配对测试 + 批次验证 | **[x]** | 单测全绿、`run_gates.py --stage commit` 8/8；`audit_gson_generic_signature.py` **双包审计已随 `3.26.092809` 执行**：测试包 / 正式包均 `[GATE OK] 白名单内 7 个 Gson 集合字段全部保留泛型签名`（exit 0） |
 
 ---
 
@@ -737,6 +749,7 @@
   - **判据**：deliver 阶段 10 条 **全 PASS**（**G-04** Gson 签名 / **G-07** 文档引用完整性（非阻断）/ **G-08** 全量单测 / **G-10** 临时日志 / **G-11** 子规范加载 / **G-12** 迁移 / **G-14** 死件 / **G-15** 元门禁 / **G-17** 漂移 / **G-19** 独立抽查）—— **缺项不得归档**
   - **🗝 测试矩阵逐行取证（新增，与 §11.6 联动）**：对照 [design.md](./design.md) **§8.3 REQ↔测试矩阵** 逐行核对 —— 每条 REQ 须填「**用例文件路径 + 用例名 + 层次（L0/L1/L2/L3）**」；**无证据的行 = 未完成**，该 REQ 不得勾选 `[x]`；§8.3 显式登记的 4 条「无单测」项（REQ-01/03/06/27）须附**替代判据证据**（CI 产包记录 / G-07 结果 / G-04 结果 / G-14 结果）
   - **附加**：`docs/specs/INDEX.md` 状态流转；`migration-registry.md` 登记进度；`component-registry.md` 登记新增组件（W8 库页 / W7 菜单）
+  - **📌 达成记录（2026-09-28 · 第 4 轮）**：deliver 阶段 **10/10 全 PASS 已实测达成**。原先两处红已收口 —— **G-07** 文档引用完整性：校正 2 处过期行号引用（`SettingsSelectableRow.kt:129-199`→`:70-119`、`BookInfoManageActivity.kt:90-93`→`:66-69`，波及 `docs/UI` 下 9 个蓝图文件）⇒ `行号越界 0 / 硬失败 0`；**G-11** 子规范加载合规：补 `ai_tests/config/gate_rules/batch_declaration.json` 声明。**G-04** Gson 双包审计随 `3.26.092809` PASS。⚠️ **12.5 归档仍不可执行**：前置「tasks 全部 `[x]`」未达成（W3/W4/W6/W8 等仍有未完成项）⇒ 本目录**不移动**、README 状态**不置「已完成」**。
 - [ ] 12.2 声明式映射同步（按变更类型）
   - **判据**：逐项核对 —— 新增 DB 迁移 → 数据模型文档；新增公开接口 → 接口文档；新增配置项 → 配置说明；新增命令 → 命令文档；功能状态变更 → `INDEX.md`。找不到对应文档时在本 tasks 注明「无对应文档需同步」
 - [ ] 12.3 遗留项登记 + **模式沉淀（G5 沉淀卡）**
