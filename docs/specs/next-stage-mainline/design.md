@@ -1636,8 +1636,8 @@ flowchart LR
 
 | 死件 | 证据 | 处置 |
 |------|------|------|
-| `MultiDiskCache.clear()`（`MultiDiskCacheFactory.kt:141`）与 `clearAll()`（`:146`）**全仓零调用点**；亦无 `Glide.clearDiskCache()` 调用 | 现存仅**内存**清理：`App.kt:328` / `ReadMangaActivity.kt:465` / `ImageGalleryActivity.kt:602`（均 `clearMemory()`） | **本主线可选接线**：W7「可清」若走 Glide 磁盘 ⇒ 调 `clear()/clearAll()`（**死件转活件**）；若不接线 ⇒ 登记为既有死件（G-14 报告），**不得留在文档外** |
-| `publish_release.py:997-1092` 的 `gitee_*` 五函数 + `test.yml` 的 `gitee` job | 双平台发布已作废 | **W-INF 顺带清理**（tasks 12.3） |
+| `MultiDiskCache.clear()`（`MultiDiskCacheFactory.kt:141`）与 `clearAll()`（`:146`）**全仓零调用点**；亦无 `Glide.clearDiskCache()` 调用 | 现存仅**内存**清理：`App.kt:328` / `ReadMangaActivity.kt:465` / `ImageGalleryActivity.kt:602`（均 `clearMemory()`） | **✅ 处置已裁定（2026-09-28，tasks 12.3）：保留 + 登记为既有死件**（不接线、不删除）。理由：8.2「缓存可查可清第 5 维」未接（见 §8 记录），两函数属 `DiskCache.Factory` 完整 API 面，单测已覆盖；删除收益（≈6 行）低于未来补做成本 |
+| `publish_release.py:997-1092` 的 `gitee_*` 五函数 + `test.yml` 的 `gitee` job | 双平台发布已作废 | **✅ 已清理（2026-09-28，tasks 12.3）**：五函数 + 其唯一调用方 `retry_on_failure` + `requests`/`urllib3`/`SESSION` 全删；`--platform` 收敛为 `{github}`；example config 与 `publish.bat` 同步。`test.yml` 前轮已无 `gitee` job |
 
 **(3) 改造类「不得留悬空」**
 - `BaseReadAloudService.kt:809` 注释残片 ⇒ **删除**（tasks 4.2）
