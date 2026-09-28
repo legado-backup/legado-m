@@ -47,6 +47,31 @@ class ControllerKernelDelegationTest {
         }
     }
 
+    /**
+     * 源门面必须**真的接上**导入校验链（2.2.2 / 2.3.1 / REQ-1-306·311），
+     * 且 `data` 必须保持"成功数组"形状。
+     *
+     * 后者的依据是实测：老 vue 页 `ToolBar.vue:112-129` 用 `Array.isArray(data.data)` 守卫并以
+     * `总数 - data.length` 计失败数 ⇒ 一旦把 `data` 改成对象，整块成功提示会被静默吞掉（前端零报错）。
+     */
+    @Test
+    fun sourceControllers_applyImportValidation_andKeepDataAsArray() {
+        val book = code("BookSourceController.kt")
+        val rss = code("RssSourceController.kt")
+        listOf(book, rss).forEach { src ->
+            assertTrue("单条保存前必须调用 Kernel 的 skipReason", src.contains("skipReason("))
+            assertTrue("批量保存必须走 parseAndValidate", src.contains("parseAndValidate("))
+        }
+        assertTrue(
+            "书源批量保存的 data 必须仍是成功数组",
+            book.contains("setData(runBlocking { BookSourceKernel.saveSources("),
+        )
+        assertTrue(
+            "订阅源批量保存的 data 必须仍是成功数组",
+            rss.contains("setData(runBlocking { RssSourceKernel.saveSources("),
+        )
+    }
+
     @Test
     fun noControllerTouchesDatabaseDirectly() {
         pairs.forEach { (file, _) ->
