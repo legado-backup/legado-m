@@ -120,4 +120,19 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("imageArticlePrefetch", pairs["imageArticlePrefetch"])
     }
+
+    /**
+     * W8 9.2 / REQ-32：名场面 AI 描述开关登记。
+     *
+     * 该键被 `AppConfig.aiSceneDescEnabled`、`AiSceneDescService.isAvailable()` 与设置页切换项
+     * **三处消费** ⇒ 改名漏改会造成「打标仍走 AI / 设置无效」的静默失联（编译期无提示）。
+     */
+    @Test
+    fun w8SceneDescKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("aiSceneDescEnabled", pairs["aiSceneDescEnabled"])
+    }
 }

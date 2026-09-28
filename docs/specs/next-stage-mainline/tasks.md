@@ -629,7 +629,7 @@
   - **改动点**：新 `data/entities/SceneBookmark.kt`（`@Parcelize` + `@Entity` + 字段全默认值 + **`@Keep`**）、`data/dao/SceneBookmarkDao.kt`；`data/AppDatabase.kt` `version` **111 → 112**（**口径修正：W3 先占 `110→111`，W8 顺延 `111→112`**；实施前以 `AppDatabase.kt` 实读 version 为准）+ entities（`:132` 附近）+ Dao（`:227` 附近）+ Migration（**仅 `CREATE TABLE`**）；schema 快照入 `app/schemas/112.json`
   - **验收判据**：**覆盖安装路径测试**（迁移测试起点 = 本 App 真实最低发布版本，确保覆盖用户升级路径）；书签持久化且在覆盖安装后保留；**禁止** destructive migration
   - **回滚点**：**迁移前向不可回滚**；功能层可 revert（表残留无害）
-- [ ] 9.2 业务与 AI 描述（REQ-32）
+- [x] 9.2 业务与 AI 描述（REQ-32）
   - **改动点**：新 `help/book/SceneBookmarkHelper.kt`（创建/查询/按书聚合）+ `help/ai/AiSceneDescService.kt`（描述生成）；复用 `help/ai/`（**36** 文件，`AiChatService.kt` 1868 行）与划线范式 `ReadBookActivity.kt:1483-1510`
   - **降级判定点（给值）**：生成描述前判「**AI provider 配置为空**」（无可用 provider / 模型未配置）⇒ **跳过描述生成，仅存原文片段**（书签主体照常落库），并给非阻塞提示；配置就绪后可在库页手动补生成
   - **验收判据**：可创建/查询/按书聚合；**无 AI 配置时降级**（仅存原文片段，不阻塞）
@@ -653,18 +653,22 @@
 
 ---
 
-### 📌 §9 W8 部分完成记录（2026-09-28 · **9.1 已完成**；9.2-9.6 未做）
+### 📌 §9 W8 部分完成记录（2026-09-28 · **9.1 / 9.2 已完成**；9.3-9.6 未做）
 
 - **9.1 数据层 [x]**（commit `fc20368`）：`SceneBookmark` 实体（`@Keep` + `@Parcelize` + 13 字段全默认值；`contentKind` 0=文字 / 1=漫画 / 2=图片订阅 为跳转路由依据）+ `SceneBookmarkDao`（flowAll / flowByBook / getByBook / count / insert / update / delete / deleteById / deleteByBook）+ `AppDatabase` version **111→112** + `migration_111_112`（**仅 CREATE TABLE，不 DROP 不重建**）+ `MigrationTest` 增起点 110/111 与 `migrate111To112`。
   - **G-12 三件证据齐备**：`app/schemas/io.legado.app.data.AppDatabase/112.json` 已导出；`migration_111_112` 注册 2 处 + `MigrationTest` 引用 112；`ai_tests/config/db_migration_evidence.json` 追加 112 条目（含 **R5 五步实测**：v111 旧包 → 覆盖装 v112，user_version 111→112，四表行数全保留，`sceneBookmarks` 建表成功，IllegalStateException=0；探针落盘 `output/l2/db_probe_{pre,post}112.json`）。
   - **测试**：`DatabaseMigration111To112Test`(4) / `SceneBookmarkEntityTest`(2) / `SceneBookmarkDaoContractTest`(4)；全量单测全绿；commit 门禁 8/8。
   - **⚠ 踩坑（接手必读）**：①**版本号上升会让「硬编码当前版本」的旧测试假失败** —— 本轮 `DatabaseMigration110To111Test` 因断言 `version = 111` 被打红，已改为「解析版本号并断言 ≥111」；**后续每次升版本同理，勿再硬编码**。②**G-01 配对门禁不认未跟踪的新测试文件** ⇒ 新增测试必须**先 `git add` 再跑门禁**。③新建表**不要写 SQL DEFAULT**（实体侧 Kotlin 默认值已足够；写 DEFAULT 会与 Room `TableInfo` 校验失配）。
-- **9.2-9.6 未做（接手直接续做）**：
-  - **9.2** `help/book/SceneBookmarkHelper.kt` + `help/ai/AiSceneDescService.kt` —— **AI 通道 API 已探明**：`AiChatService.chatStream(messages, onPartial, onStatus, includeStructuredBlocks = false, useAllTools = false, modelConfigOverride = AppConfig.aiSummaryModelConfig): String`；**「AI 未配置」判定** = `AppConfig.aiSummaryModelConfig?.let { AppConfig.aiProviderForModel(it) } == null` ⇒ 跳过描述生成、仅存原文片段（不阻塞落库）。范式可抄 `help/ai/AiChapterSummaryService.kt`（分块/合并/落库/状态 JSON 回调）。
+- **9.2 业务与 AI 描述 [x]**（commit `0a1e5c5` 待补）：`help/book/SceneBookmarkHelper.kt`（锚点三构造 `textAnchor/mangaAnchor/imageAnchor` + 三读回 `chapterPosOf/pageIndexOf/imageUrlOf`；`add` / `addAndDescribe` / `describe` / `delete` / `deleteByBook`；`flowAll/flowByBook/count`；**纯函数 `groupByBook`**（书序取首次出现序、组内按 `chapterIndex, time`）+ `tagsToJson/tagsFromJson`）+ `help/ai/AiSceneDescService.kt`（提示词内置输出契约 `{"desc":≤30字,"tags":[3个]}`；`parse` 容错 ```json 围栏/前后说明；`sanitizeDesc` 折叠空白并截断 30 字；`isAvailable()`=开关开 && 场景模型已配置 && 供应商存在；`generate()` 30s 超时 + 异常全兜底 → 永不抛；取消异常继续抛出）。
+  - **新增开关**：`PreferKey.aiSceneDescEnabled` + `AppConfig.aiSceneDescEnabled`（默认**开**）+ 设置页 `AiConfigFragment`「名场面智能描述」切换项（**防死配置**：三处消费 = AppConfig 读写、`AiSceneDescService.isAvailable()`、设置页切换）。
+  - **降级链实测口径**：未配置 AI / 开关关闭 ⇒ `isAvailable()=false` ⇒ 跳过生成，`desc` 落 `手写备注 > 原文片段 > 章节名 > 书名`（不阻塞落库）；超时/解析失败 ⇒ 同口径截断降级，tags 置空。
+  - **测试（32 用例全绿）**：`AiSceneDescServiceTest`(9) / `SceneBookmarkHelperTest`(9) / `AppConfigSceneDescSwitchTest`(3) / `AiConfigFragmentSceneDescSwitchTest`(3) / `PreferKeyUniquenessTest` 增 `w8SceneDescKeyRegistered`(总数 8)。门禁：**G-01 PAIR-FILE×2 + PAIR-DIR×3 全配对**；commit 门禁 8/8。
+  - **踩坑（接手必读）**：G-01 对 `PreferKey`/`AppConfig`/`AiConfigFragment` 这类「非独立文件名」改动走 **PAIR-DIR** 判定 ⇒ 必须在其**同包测试目录**留下测试变更（本次新增 `help/ai`、`help/book`、`help/config`、`ui/config` 四处 + 改 `constant` 既有测试）。
+- **9.3-9.6 未做（接手直接续做）**：
   - **9.3** 三路径入口：文字 = `ReadBookActivity` 划词/阅读菜单（抄 `:1483-1510` 划线入口）；图片 = `ImageGalleryActivity` 菜单；漫画 = `res/menu/book_manga.xml` 菜单项。
   - **9.4** 库页 `ui/scene/SceneBookmarkActivity` + `SceneBookmarkScreen`（Compose，照 `AppManagementScaffold` + `AppManagementLazyColumn` + `AppManagementListRow`）；**必须接线 `ui/main/my/MySettingsData.kt` 工具分区 + `handleSettingsRowClick`**，否则**死页面 ⇒ 本任务未完成**。
   - **9.5** 备份四处口径（`Backup.kt` / `Restore.kt` / `BackupSelectorConfig.allItems` / `BackupController.executeWebBackup`）；**9.6** 配对测试 + §11 通用防线。
-  - **updateLog 文案**（`新增名场面书签：一键收藏精彩瞬间，AI 自动生成描述，名场面库统一回看`）**须在 9.3/9.4 落地后（功能用户可感时）再加** —— 9.1 纯数据层属「内部工程变更」，按 `version-delivery-sync` 口径**不写**（存疑默认不写）。
+  - **updateLog 文案**（`新增名场面书签：一键收藏精彩瞬间，AI 自动生成描述，名场面库统一回看`）**须在 9.3/9.4 落地后（功能用户可感时）再加** —— 9.1/9.2 属「数据层 + 业务层」，按 `version-delivery-sync` 口径**不写**（存疑默认不写）；9.2 新增的设置开关同样随 9.3/9.4 一并登记。
 
 ---
 
