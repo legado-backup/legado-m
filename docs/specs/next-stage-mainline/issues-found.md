@@ -62,7 +62,7 @@
 | 根因 | 播放器侧文章模式的唯一判据是 `VideoPlay.rssArticles.size > 1`。②③④ 三条入口都**只带单篇上下文**：③ `ReadRss.readRss(activity, record)` 直接 `startActivity`（连 `prepareVideoPlayContext` 都不走）；④ `RssFavoritesFragment.readRss` 传 `rssArticles = null` ⇒ 单一写入点内 `?: listOf(rssArticle)` 兜底为 **1 篇** |
 | 修复 | `ReadRss` 抽出统一补齐入口 `resolveVideoArticles(article, given)`（口径与列表页 `flowByOriginSort`、阅读页 `getListByOriginSort` 完全一致：**同源 + 同分类**；查不到或未含本篇则**本篇补入并置首**），并把两个 `type==2` 分支收敛到 `startVideoFromActivity` / `startVideoFromFragment` 两个私有 helper。列表路径（`size > 1`）仍**同步启动**，不引入查库延迟；仅上下文缺失时走异步补齐 |
 | 回归用例 | `RssVideoRouteTest.historyAndFavoriteRoutesAlsoResolveArticleList`（① 补齐入口与口径 ② 本篇补入置首 ③ 两处调用点 ④ 播放器启动点收敛为 2 个 helper） |
-| 遗留 | 链路③④的**真机取证**未取（历史记录入口需先产生阅读记录、收藏页需先收藏文章；两条均为「有上下文才显形」的能力，判据同 IF-03 的 `switchToArticle idx=` 日志） |
+| 真机取证（**2026-09-28 补取 · 已通过**） | ③④ 两条链路**均已真机验证通过**。**判据**（`VideoRoutesDiag switchToArticle idx=`）：③ **阅读历史**：订阅页 ⋮ → 历史记录（`ReadRecordDialog`）→ 点探针条目 ⇒ 自动路由到 `VideoPlayerActivity`，两次上滑产生 `idx=0` / `idx=1`；④ **收藏页**：订阅页 ⋮ → 收藏夹（`RssFavoritesFragment`）→ 点同一条目 ⇒ 同样路由到播放器，上滑产生 `idx=0` / `idx=1`。两链路均**无 FATAL**。**可复用取证路径**：① 先跑 `l2_verify_video_article_swipe.py --scenario list --keep-probe` 种探针数据（该脚本 `list` 场景因 `RssSortActivity` **非 exported**、`am start` 无效 ⇒ 必在「点文章」处失败，属**预期**，数据已留存）；② 以**独立常驻内容服务**（复刻其 `/sw/paper{1..3}` 合成正文路由）+ `adb reverse tcp:8899` 恢复可达性（脚本退出会关闭服务 ⇒ 正文不可达则不会路由到播放器）；③ 手工 UI 导航（主壳底部 4 Tab 设备坐标 ≈ 330/642/955/1267，y≈836；主壳 `uiautomator dump` 恒 `could not get idle state` ⇒ 必须截图+比例坐标）；④ 收藏页需先有 `RssStar` 行（可由库直接种入：镜像同源文章行 + `starTime`）。 |
 
 ---
 
