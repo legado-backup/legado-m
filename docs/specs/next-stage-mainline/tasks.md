@@ -677,8 +677,15 @@
   - **实际落点 = 五处**（design 说四处，实测 `BackupController` 内还有 **概览** `BackupItemDef` 清单 —— 漏则用户在"选择备份内容"里看不到该类别体量，故一并登记）：① `BackupSelectorConfig.allItems` 加 `BackupItem("sceneBookmark", "sceneBookmarks.json", "名场面书签", "数据库")`；② `Backup.kt` 写出分支；③ `Restore.kt` 还原分支（`@Insert(REPLACE)` 逐条插入 ⇒ 幂等；旧备份无该文件静默跳过）；④ `BackupController.executeWebBackup`（**硬编码全集、不走选择器**）；⑤ `BackupController` 概览 `BackupItemDef`。
   - **测试**：`SceneBookmarkBackupRoundTripTest`(4，含 **Gson 往返保真**：`desc`/`tags`/`id`/`contentKind`/锚点 `articleLink` 全保留 + `@Keep` 在位)；`BackupControllerSceneBookmarkTest`(2)；`BackupRestoreParityTest` 自动纳管新条目（`selectorItemsAreAllWrittenByBackup` / `...RestoredByRestore` 均绿）。
   - **§11 通用防线**：G-01 配对（PAIR-FILE + PAIR-DIR 全配对）／G-02 取色门禁（库页零硬编码色、零 M3 派生色）／G-12 数据库迁移（无新增迁移，仍绿）／G-08 全量单测 **1715 通过 / 0 失败 / 5 跳过**；G-04 Gson 双包审计属 **deliver 阶段**（打包后跑）。
-  - **L1/L2（真机实测）**：L1 = `quick_build_install.py` 通过；L2 = **库页直启渲染**（截图 `output/l2/l2_scene_library.png` + uiautomator dump 三节点：标题「名场面书签」/「还没有名场面」/「去阅读」）；**入口可达性** = 我的→工具列表截图见「名场面书签（回看你收藏的精彩瞬间，AI 自动生成描述）」+ 设置搜索页 dump 定位该行（clickable bounds `[18,1010][702,1100]`）后点击，logcat 出 `START ... ui.scene.SceneBookmarkActivity from uid <app>`（框架级证明入口点击链路打通）。
-  - **环境限制（如实登记）**：本轮 MEmu 曾在会话中途被关闭导致 `screencap`/`uiautomator` 全黑（**连系统桌面截图同为 7738B** ⇒ 判为模拟器侧问题，非本页缺陷），重启 VM 后截图通道恢复；切换页面后截图偶有滞后，故入口点击以 logcat 框架日志为准。
+  - **L1/L2（真机实测 · 文字路径端到端）**：L1 = `quick_build_install.py` 通过。L2 逐步取证：
+    1. **库页渲染**：直启截图 `output/l2/l2_scene_library.png` + uiautomator dump 三节点（标题「名场面书签」/「还没有名场面」/「去阅读」）；
+    2. **入口可达**：我的→工具列表截图见「名场面书签（回看你收藏的精彩瞬间，AI 自动生成描述）」；设置搜索页 dump 定位该行（clickable `[18,1010][702,1100]`）点击后 logcat 出 `START ... ui.scene.SceneBookmarkActivity from uid <app>`；
+    3. **划词打标**：样本书长按选中文字 → 划词菜单**第 2 页**出现「加入名场面」（dump `output/l2/l2_sel_menu2.xml`：分享/高亮/编辑此处/AI 净化/加入名场面）；点击后无 FATAL；
+    4. **落库可见**：库页 dump `output/l2/l2_scene_after_add.xml` 出现分组头「回归样本读物O」+ 条目「正文」+ 副文本「正文 · 09-28 13:03」——**AI 未配置 ⇒ desc 走降级链**（原文片段），符合 REQ-32 降级口径；截图 `output/l2/l2_scene_with_item.png`；
+    5. **跳回**：点击该条目 → `mResumedActivity = ReadBookActivity`（文字路径带 `index`/`chapterPos` 精确跳回）。
+  - **踩坑（重要，接手必读）**：**划词菜单是分页的** —— 首屏只放 8 个（旧 4×2 网格），新增动作在第 2 页；本轮一度误判「入口不存在」，实为未翻页（`TextActionMenu` 的 `pageCapacity` 机制）。**核对菜单类入口必须先翻页/扫全部页再断言**。
+  - **环境限制（如实登记）**：MEmu 曾在会话中途被关闭致 `screencap`/`uiautomator` 全黑（连系统桌面截图同为 7738B ⇒ 模拟器侧问题），重启 VM 后恢复；页面切换后截图偶有滞后，故存在性断言以 uiautomator dump + logcat 为准。
+  - **未做（登记为 IF-07）**：漫画/图片两路径的**运行时**打标回跳复测 —— 当前样本书集只有文字书（无漫画书/RSS 图片订阅条目），需先造数据；代码链路已由 `SceneBookmarkMangaEntryTest`/`SceneBookmarkImageEntryTest` 静态锁定，接线同文字路径。
 - **9.6 已随 9.5 一并完成**（配对测试 + 防线见上）。
 
 ---
