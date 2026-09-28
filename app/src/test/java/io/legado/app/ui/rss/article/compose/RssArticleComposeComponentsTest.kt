@@ -28,12 +28,31 @@ class RssArticleComposeComponentsTest {
     private fun favoritesSource(): String =
         SourceFileProbe.sourceText("ui/rss/favorites/compose/RssFavoritesComposeList.kt")
 
+    private fun pagingSource(): String =
+        SourceFileProbe.sourceText("ui/rss/article/compose/RssPaging.kt")
+
+    /**
+     * 取「非注释」代码文本。
+     *
+     * 断言「旧写法已删」时必须先剔除注释行：本文件的 KDoc 会**刻意保留**被替换旧实现的说明
+     * （如 `AndroidView(FilletImageView)`），若直接在全文上断言 `!contains(...)` 会被注释自身误报命中
+     * （本仓既有教训：断言"旧写法已删"要先剔除注释行）。
+     */
+    private fun codeOnly(text: String): String =
+        text.lineSequence()
+            .filterNot {
+                val t = it.trimStart()
+                t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")
+            }
+            .joinToString("\n")
+
     @Test
     fun composeImplementationsExist() {
         val root = SourceFileProbe.mainJavaRoot()
         listOf(
             "io/legado/app/ui/rss/article/compose/RssArticlesComposeList.kt",
             "io/legado/app/ui/rss/article/compose/RssArticleImage.kt",
+            "io/legado/app/ui/rss/article/compose/RssPaging.kt",
             "io/legado/app/ui/rss/favorites/compose/RssFavoritesComposeList.kt",
         ).forEach { rel ->
             assertTrue("Compose 列表实现缺失：$rel", File(root, rel).isFile)
@@ -60,8 +79,12 @@ class RssArticleComposeComponentsTest {
         ).forEach { marker ->
             assertTrue("样式行组件缺失：`$marker`", s.contains(marker))
         }
-        // 瀑布流预加载阈值（与原 StaggeredGrid 分支的 5 条一致）
-        assertTrue("预加载阈值单源缺失", s.contains("PRELOAD_THRESHOLD = 5"))
+        // 翻页提前量必须走单源纯函数（阈值不再散落在列表层与宿主层两处）
+        assertTrue(
+            "翻页提前量必须由 RssPagingThresholdResolver 单源给出",
+            s.contains("RssPagingThresholdResolver.resolve(style, isPreload)")
+        )
+        assertTrue("预加载阈值单源缺失", pagingSource().contains("PRELOAD_THRESHOLD = 5"))
     }
 
     /**
@@ -135,18 +158,66 @@ class RssArticleComposeComponentsTest {
 
     @Test
     fun articleImageIsSingleSourced() {
-        val img = imageSource()
+        val img = codeOnly(imageSource())
         // 取数：逐项单行 DAO（列表主查询不含 image，见 KDoc 的 CursorWindow 2MB 说明）
         assertTrue("必须逐项单行查 image", img.contains("appDb.rssArticleDao.getImage(origin, link)"))
         // Glide 必须带源站选项（漏传 ⇒ 大量源取不到图）
         assertTrue("Glide 必须带 sourceOriginOption", img.contains("OkHttpModelLoader.sourceOriginOption"))
-        // 圆角沿用项目自定义 View
-        assertTrue("圆角必须沿用 FilletImageView", img.contains("FilletImageView(") && img.contains("setCornerRadius("))
         // 瀑布流比例缓存（20 天持久化）单源
         assertTrue("比例缓存单源缺失", img.contains("object RssImageAspectRatioStore"))
         assertTrue("比例必须落持久缓存", img.contains("CacheManager.put(KEY_NAME + url, aspectRatio, SAVE_TIME)"))
-        // 复用错位防护（原 holder.itemView.tag 口径）
-        assertTrue("必须防条目复用错位", img.contains("if (imageView.tag == key) return@AndroidView"))
+        // 取数通道 typealias 由列表与收藏页共同引用，不得改名（收藏页注入 rssStarDao 通道）
+        assertTrue("取数通道 typealias 缺失", img.contains("typealias RssArticleImageQuery"))
+    }
+
+    /**
+     * AD-05 回归（2026-09-28 用户报障）：封面必须走 **Compose 原生渲染**。
+     *
+     * 原实现用 `AndroidView(FilletImageView)`：RecyclerView 有 ViewHolder 复用池，而 LazyList 中
+     * `AndroidView` **不保证底层 View 复用** ⇒ 每行滑入都新建 View + 一次单行查库 + 一次 Glide 请求
+     * （View 创建在 UI 线程），fling 时被放大成可感知卡顿。
+     */
+    @Test
+    fun articleImageRendersNativelyWithoutAndroidView() {
+        val img = codeOnly(imageSource())
+        assertFalse(
+            "不得再用 AndroidView 承载封面（LazyList 不复用 ⇒ fling 时逐行新建 View + 查库 + 请求）",
+            img.contains("AndroidView")
+        )
+        assertFalse("不得再依赖 FilletImageView 承载圆角", img.contains("FilletImageView"))
+        assertTrue("必须用 Compose Image 呈现", img.contains("asImageBitmap()") && img.contains("ContentScale.Crop"))
+        assertTrue("圆角必须走 Compose clip", img.contains("clip(RoundedCornerShape(radiusDp.dp))"))
+        assertTrue("必须用 loadBitmap 取 Bitmap", img.contains("ImageLoader.loadBitmap(context, image)"))
+        assertTrue("请求生命周期必须托管在 CustomTarget", img.contains("CustomTarget<Bitmap>"))
+        assertTrue(
+            "组合离开必须取消请求（View 版依赖 View 回收，改 Compose 后必须显式清除，否则泄漏 target）",
+            img.contains("Glide.with(context.applicationContext).clear(")
+        )
+        assertTrue("必须显式限制解码尺寸（替代 ImageView 自动尺寸探测）", img.contains("onSizeChanged"))
+        assertTrue("解码尺寸必须下发给 Glide", img.contains("CustomTarget<Bitmap>(width, height)"))
+        // 硬编码色红线同样适用于图片组件（本仓取色门禁口径）
+        assertFalse("不得硬编码色值", Regex("0x[0-9A-Fa-f]{8}").containsMatchIn(img))
+    }
+
+    /**
+     * AD-01 / AD-03 / AD-04 回归：列表翻页改由 `snapshotFlow` + 纯函数驱动，数据/在途/有下一页走
+     * **State 入参**，key 预计算。同时锁死「回退为组合期 `derivedStateOf` 读 `layoutInfo`」。
+     */
+    @Test
+    fun listPagingUsesSnapshotFlowWithStateInputs() {
+        val s = codeOnly(listSource())
+        assertTrue("翻页判定必须走 snapshotFlow", s.contains("snapshotFlow {"))
+        assertTrue("判定必须调用纯函数", s.contains("RssPagingDecision.shouldLoadMore("))
+        assertTrue("必须用 distinctUntilChanged 收敛重复事件", s.contains("distinctUntilChanged()"))
+        // 数据入口必须是 State：普通参数下 `items.size` 变化不被 snapshotFlow 捕获 ⇒ 判定永久不重算
+        assertTrue("items 必须为 State 入参", s.contains("itemsState: State<List<RssArticle>>"))
+        assertTrue("isLoading 必须为 State 入参", s.contains("isLoadingState: State<Boolean>"))
+        assertTrue("hasMore 必须为 State 入参", s.contains("hasMoreState: State<Boolean>"))
+        // key 预计算（不得每次组合为每个条目重新拼接字符串）
+        assertTrue("稳定 key 必须预计算", s.contains("remember(items) { items.map(RssArticleKey::of) }"))
+        // 回退防线
+        assertFalse("不得回退为组合期 derivedStateOf 读 layoutInfo", s.contains("derivedStateOf"))
+        assertFalse("不得残留旧阈值写法（threshold 恒 0）", s.contains("PRELOAD_THRESHOLD else 0"))
     }
 
     @Test
