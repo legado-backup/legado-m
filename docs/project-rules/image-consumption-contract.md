@@ -1,6 +1,6 @@
 # 图片消费契约（image-consumption-contract）
 
-> 定位：**W7 8.3 的附加产出**（`docs/specs/next-stage-mainline/tasks.md` §8.3 / AD-21 沉淀）。
+> 定位：**W7 8.3 的附加产出**（`docs/specs/archive/2026-09-28-next-stage-mainline/tasks.md` §8.3 / AD-21 沉淀）。
 > 目的：把「画布域图片如何呈现」收敛为**单一契约**，后续任何图片相关需求**先读本文**再动手，
 > **禁止再新增第三种图片视图**（历史上长图/普通图双轨已导致手势与回弹行为随图尺寸分叉）。
 >
@@ -89,7 +89,7 @@ Glide.downloadOnly()  →  磁盘缓存文件  →  decodeBounds(仅读文件头
 | `ui/widget/image/PhotoView.kt` 本体 | — | ⚖️ 保留（上述两处例外依赖） |
 | `ui/book/manga/`（`WebtoonRecyclerView`） | 漫画专用 | 阅读域，不属本契约呈现轨（见 `item_book_manga_page.xml` 豁免） |
 
-> 例外口径来源：`docs/specs/next-stage-mainline/design.md` §5.7.1 / §5.7.2（四要素条目）。
+> 例外口径来源：`docs/specs/archive/2026-09-28-next-stage-mainline/design.md` §5.7.1 / §5.7.2（四要素条目）。
 
 ## 九、新增图片需求的标准流程
 

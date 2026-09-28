@@ -1367,6 +1367,53 @@ flowchart LR
 
 > **无单测的 4 条（REQ-01 / REQ-03 / REQ-06 / REQ-27）为显式登记**：均为「外部产物 / 文档 / 静态合规 / 死件清理」，**以 L2 或门禁判据替代**，不得留空 —— 这是"不留空"原则的具体落地（对齐 `AGENTS.md` 规则 8 与 `testing-iron-rule` T1）。
 
+### 8.3.1 逐行取证（实际用例锚点，2026-09-28）
+
+> 按 tasks §12.1 的「矩阵逐行取证」要求，对 §8.3 的 35 行做**实读核对**（独立子代理全量 Glob + Grep `@Test`，非自证）。**结论**：35 条 REQ **全部有可执行判据落点**（含 4 条门禁替代），**无一行留空**。两点如实登记：
+> ① **20 行属「名称漂移」** —— 矩阵采用**设计期命名**（如 `ImageCanvasItemStateTest`），实现期按规范落点改名（如 `ui/image/adapter/ImageItemLoadStateWiringTest`），语义等价且用例齐备；本表给出**实读文件与用例名**作为权威锚点。
+> ② **REQ-01 的判据声明失真（已登记）**：`test.yml` 的 `push:` 触发器已于早前被注释（fork secrets 未配置）⇒ 该 REQ 对应的 1.1.1 已由**用户裁决「不做」**（见 tasks §1 记录表）⇒ 判据改以「本地双包构建 + `publish_release.py` 发布链」替代，**不属遗漏**。
+> ③ §8.3 点名的 **9 个 `l2_verify_*.py` 脚本实读全部存在**（真机层证据链完整）。
+
+| REQ | 实读用例文件（权威锚点） | 关键用例名 | 层次 | 备注 |
+|-----|------------------------|-----------|------|------|
+| REQ-01 CI push | —（无单测） | `publish_release.py` 发布链 + 本地双包构建 | L3 | **1.1.1 裁决不做**；原 `push:` 判据不成立（已登记） |
+| REQ-02 R2 门控 | `help/update/AppUpdateChannelTest.kt` | `versionName数值化…` / `资产名带versionCode时正确解析` | L0 | 通道/代理 URL 模板断言在位 |
+| REQ-03 docs 口径 | —（无单测） | `ai_tests/scripts/verify_doc_refs.py`（G-07） | L3 | 门禁替代 |
+| REQ-04 FGS 时限 | `AndroidManifestServiceTypeTest.kt` | `everyServiceDeclaresForegroundServiceType` / `serviceDeclarationsAreStillExplicitTypeOnly` | L0 | — |
+| REQ-05 流式导入 | `ImportBookSourceIncrementalParseTest.kt` / `ImportBookSourceEmptyConfigTest.kt` | `incrementalResultMatchesOneShotForEachItem` / `exceedingMaxBytesIsRejectedWhileReading` / `malformedItemCarriesIndexAndLeavesNoHalfProduct` | L0 | — |
+| REQ-06 R8 JNI | —（无单测） | `ai_tests/scripts/audit_gson_generic_signature.py`（G-04；本次双包实跑 exit 0） | L3 | 门禁替代 |
+| REQ-07 Web 备份纳锁 | `help/storage/BackupRestoreLockTest.kt` | `webBackupEntryIsWrappedByStorageLock` / `withStorageLock_isNotReentrant_nestedCallTimesOut` | L0 | — |
+| REQ-08 备份消息非空 | `api/controller/BackupControllerContractTest.kt` + `ui/config/ConfigUiConsistencyTest.kt` | `backupFailureMessageIsNeverNull` / `bothBackupFailureBranchesHaveNonNullFallback` | L0 | 名称漂移（拆到同包） |
+| REQ-09 字符集 | `EncodingDetectGb18030Test.kt` / `OkHttpUtilsPostFormCharsetTest.kt` | `resolveEncode_gbkDetected_upgradesToGb18030` / `postForm_string_explicitCharsetSwitchesContentTypeAndBytes` | L0 | — |
+| REQ-10 extractPrecise | `help/video/VideoUrlExtractorTest.kt` | `guardA_m3u8PlayerHtmlPage_stillUnwrapped` | L0 | — |
+| REQ-11 `<video>` 路由 | `help/rss/RssVideoDetectTest.kt` | `atMinLengthVideoTagIsDetected` / `videoTagBeyondMaxScanWindowIsMissedByDesign` | L0 | — |
+| REQ-12 识别开关 | `ui/rss/read/RssVideoRouteTest.kt` | `detectionIsGatedBySwitchAndLogsDecision` | L0 | 名称漂移 |
+| REQ-13 播放错误自愈 | `help/player/PlaybackErrorPolicyTest.kt` | `networkAndLiveWindowSelfHealOthersDegrade` / `attemptsCapAtThreeThenCooldownBlocksFurtherSelfHeal` | L0 | — |
+| REQ-14 嗅探赛马 | `help/player/SniffRaceTest.kt` | `firstAuthoritativeResultWins` / `losingStrategiesAreCancelledStructurally` | L0 | — |
+| REQ-15 听书时长 | `model/ListeningPlaybackCoordinatorTest.kt` + `model/AudioPlayReadTimeSettleTest.kt` | `readAloudAcquire_stopsAudioPlayFirst` / `audioPlayAcquire_stopsReadAloudFirst` | L0 | 名称漂移（第 2 文件） |
+| REQ-16 段落锚点 | `service/ReadAloudVoiceAnchorTest.kt` | `anchorIsWrittenOnParagraphSwitchPauseAndDestroy` / `conflictFallsBackSilentlyWithAllThreeRules` | L0 | 名称漂移 |
+| REQ-17 已读进备份 | `help/storage/BackupSelectorBehaviorTest.kt` + `help/storage/BackupRssReadRecordParityTest.kt` + `api/controller/BackupControllerRssReadRecordTest.kt` | `partialSelection_yieldsExactlySelectedFileNames` | L0 | 名称漂移（第 3 文件） |
+| REQ-18 全标已读 | `data/dao/RssReadRecordDaoContractTest.kt` | `scopedUpdateReturnsAffectedRows` / `backfillOnlyTouchesArticlesWithoutRecord` | L0 | 名称漂移 |
+| REQ-19 OPML | `help/rss/OpmlRoundTripTest.kt` | `parsesSingleLevelGroupAndUngroupedFeed` / `multiLevelNestingIsFlattenedIntoOneTagWithReceiptCount` / `doctypeIsRejectedToBlockXxe` | L0 | 名称漂移（两文件合为单文件往返） |
+| REQ-20 缩放默认 | `ui/config/OtherConfigMangaSwitchTest.kt` | `switchSitsNextToShowMangaUiWithSameDefaults` | L0 | 名称漂移 |
+| REQ-21 内存缓存 | `model/BookCoverMangaLoadTest.kt` | `memoryCacheIsEnabledForManga` / `decodeHeightIsCappedBySharedSingleSource` | L0 | 名称漂移 |
+| REQ-22 音量键 gate | `ui/book/manga/ReadMangaVolumeKeyGateTest.kt` | `gateReadsGlobalSwitchBeforeConsumingKey` / `gateDelegatesToSuperSoSystemKeepsVolumeControl` | L0 | 名称漂移 |
+| REQ-23 真分享 | `help/image/ImageShareHelperTest.kt` | `usesFileProviderWithSingleSourceAuthority` / `shareDirectoryIsCoveredByFilePathsXml` | L0 | 名称漂移 |
+| REQ-24 文件名规范化 | `ui/image/ImageSaveShareNamingWiringTest.kt` | `bothSaveSitesUseSemanticNamingWithDedup` | L0 | 名称漂移 |
+| REQ-25 呈现轨归一 | `ui/image/adapter/ImageCanvasUnifiedTrackWiringTest.kt` | `unifiedShowBindsThroughSingleEntry` / `onImageFileNoLongerBranchesBySize` | L0 | 名称漂移 |
+| REQ-26 Loader 通用化 | `ui/image/ImagePyramidUnifiedTrackTest.kt` | `unifiedEntryExistsAndCompatEntryDelegates` / `frozenSignaturesRemainIntact` | L0 | 名称漂移 |
+| REQ-27 PhotoView 收口 | —（无单测） | `ai_tests/scripts/audit_dead_code.py`（G-14） | L3 | 门禁替代 |
+| REQ-28 长按存图 | `ui/book/manga/ReadMangaLongTapSaveTest.kt` | `longTapListenerIsWired` / `currentPageTakenFromCenterView` | L0 | 名称漂移 |
+| REQ-29 逐项垫底 | `ui/image/adapter/ImageItemLoadStateWiringTest.kt` | `layoutProvidesItemScopedLoadingAndErrorViews` / `terminalFailureShowsItemErrorAndKeepsRetryReachable` | L0 | 名称漂移 |
+| REQ-30 文章级预取 | `ui/image/ImageArticlePrefetchTest.kt` | `switchKeyExistsAndDefaultsOff` / `prefetchLimitsAreFixedByDesign` | L0 | 名称漂移 |
+| REQ-31 SceneBookmark 数据层 | `data/dao/SceneBookmarkDaoContractTest.kt` + `DatabaseMigration111To112Test` + `SceneBookmarkEntityTest` | `declaresDaoInterfaceOnSceneBookmarksTable` / `writePathsAreCompleteAndIdempotent` | L0 | 名称漂移；迁移起点 89 覆盖 |
+| REQ-32 三路径 + AI | `help/book/SceneBookmarkHelperTest.kt` + `help/ai/AiSceneDescServiceTest.kt` | `textAnchorRoundTrips` / `imageAnchorKeepsArticleLinkForJumpBack` / `fallbackDescFollowsFieldPriority` | L0 | Helper 落 `help/book/` |
+| REQ-33 书签进备份 | `help/storage/BackupSelectorBehaviorTest.kt` + `help/storage/SceneBookmarkBackupRoundTripTest.kt` | `allFourPlacesUseTheSameFileName` / `gsonRoundTripKeepsDescTagsAndAnchor` | L0 | — |
+| REQ-34 README 文案 | `ui/about/AboutPositioningTest.kt` | `readmeHasNoLegacyBaselineWording` / `copyFollowsDisciplineNoHypeWords` | L0 | 名称漂移 |
+| REQ-35 about 页 | `ui/about/AboutPositioningTest.kt` | `positioningBlockIsWiredIntoFooter` / `positioningCopiesExistInResources` | L0 | 名称漂移 |
+
+> **取证统计**：实读命中（§8.3 原名或改名后等价文件 + `@Test` 用例）**31 / 35**；门禁替代 **3 / 35**（REQ-03/06/27）；裁决不做（判据改替代）**1 / 35**（REQ-01）。**无「文件不存在且无等价实现」的行**。
+
 ### 8.4 每批收尾必须提交的「测试更新证据」（格式固定）
 
 ```
