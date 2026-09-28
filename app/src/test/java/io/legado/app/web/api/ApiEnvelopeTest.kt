@@ -115,6 +115,14 @@ class ApiEnvelopeTest {
     }
 
     @Test
+    fun errorResponseOf_fileNotFound_mapsTo404() {
+        // SC-1-19：未注册路径落到静态资源处理，资源不存在时必须是 404（改造前恒 200 + 纯文本）
+        val resp = ApiEnvelope.errorResponseOf(java.io.FileNotFoundException("/web/not-exist.html"))
+        assertEquals(404, resp.status.requestStatus)
+        assertEquals(404, JsonParser.parseString(body(resp)).asJsonObject.get("code").asInt)
+    }
+
+    @Test
     fun deny_buildsUniform401Envelope() {
         val resp = ApiEnvelope.deny(401, "unauthorized")
         assertEquals(401, resp.status.requestStatus)
