@@ -106,7 +106,7 @@
 | 更可能的阻塞来源（待证） | ① 底部控件带 `left_bottom_container`（实测 bounds **[23,651]-[1450,795]**，内含可滚动子级）—— 可滚动子级会消费竖向拖动，且其水平范围**不含 x=1200**，与「x=1200 可切换」**吻合**；② 承载播放器的 `ViewPager`（bounds 近满屏，横向滚动，通常不消费竖向拖动，需排除）；③ GSY 播放器自身的控件层 |
 | 已做的低风险加固（**不等于已修复**） | `VideoFragment.maybeShowGestureGuide()`：卡本身 + 卡内除确认按钮外的子级一律退出触摸路径（clickable/focusable/focusableInTouchMode=false）。**真机复测表明该加固未改变阻塞表现** ⇒ 仅作卫生性加固保留，注释已按实测边界改写 |
 | 回归用例 | `VideoGestureGuideTransparencyTest`(2)：锁「加固不变量」+ 「未经验证的旧注释不得残留」；**不断言**修复该现象 |
-| 下一步判据（接手直接可用） | ① 用 `uiautomator dump`（**播放器页可 dump**）取 `left_bottom_container` / `rv_episodes` 的实测 bounds，核对其水平范围是否恰好排除 `x=1200`；② 在其上做 `input swipe` 起点扫描（x 从 800 → 1200 二分）确定阻塞带的**左右边界**；③ 若确认为可滚动子级消费 ⇒ 按「只在可滚动子级内部消费、其余落回手势」处理；④备选方案：把手势挂点由 `surface_container` 提升到**页根**（`controlsLayer` 与 `playerView` 的公共祖先） |
+| 下一步判据（接手直接可用） | **可复用 helper（本轮实战留在 `output/`，gitignore）**：`output/probe_server.py`（独立常驻探针内容服务 :8899，复刻 `/sw/paperN`）、`output/seed_star.py`（把探针文章镜像成 `RssStar` 收藏行）、`output/flip_pref.py`（把 `videoGestureGuideShown` 置回 false 以重置引导卡）。复核步骤：① 用 `uiautomator dump`（**播放器页可 dump**）取 `left_bottom_container` / `rv_episodes` 的实测 bounds，核对其水平范围是否恰好排除 `x=1200`；② 在其上做 `input swipe` 起点扫描（x 从 800 → 1200 二分）确定阻塞带的**左右边界**；③ 若确认为可滚动子级消费 ⇒ 按「只在可滚动子级内部消费、其余落回手势」处理；④备选方案：把手势挂点由 `surface_container` 提升到**页根**（`controlsLayer` 与 `playerView` 的公共祖先） |
 | 教训 | ① **「代码看似不拦截」≠「实测不拦截」，反之亦然** —— 触摸因果必须**多点位 A/B**，单点对照会被状态混淆（本轮「卡可见/关卡」单点对照就得出了被推翻的因果）；② **证据不足时不得把结论写进注释与 updateLog**（本轮已按此原则撤回）；③ 阻塞带是**水平受限**的，说明消费者是具体子视图而非整层 |
 
 ---
