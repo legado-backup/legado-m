@@ -6,9 +6,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * W7 8.4（REQ-27 / AD-19）：`PhotoView` 收口 —— **保留为技术硬例外** 的引用收敛审计。
+ * W7 8.4（REQ-27 / AD-19）+ W6 7.4/7.5（例外登记）：`PhotoView` 收口 —— **保留为技术硬例外** 的引用收敛审计。
  *
- * 收口结论（按实际引用逐个评估，**待删项 = 空集**）：
+ * ## 技术硬例外表（W6 7.4 / 7.5 判据要求四要素：页面 / 依赖 API / 保留理由 / 替代评估结论）
+ *
+ * | # | 页面（消费点） | 依赖 API（实测） | 保留理由 | 替代评估结论 |
+ * |---|---------------|----------------|---------|-------------|
+ * | ① | `ImageCropActivity` | `photoView.setScaleType/setMaxScale` + `cropOverlay.getCropRect()` + `android.graphics.Matrix` | 裁剪需要**旋转变换矩阵**参与裁剪矩形计算 | **SSIV 无等价 API**（无 `setMaxScale`/裁剪矩形读取）⇒ 不替换 |
+ * | ② | `ImageDetailAdapter`（含子类 `ImageDetailViewPagerAdapter`；宿主 `ImageDetailActivity` 经 adapter 使用） | `photoView.rotation`（顺/逆 90° 旋转 + 重置）、`photoView.scaleType = FIT_CENTER` | 详情页有**独立旋转按钮**（每图独立 `rotationDegree`，R1b.5-R1b.8） | **SSIV 无 `rotation` 属性 / 无 `setOrientation`**：替换即**丢失旋转能力**（用户可感回归）⇒ 7.4 改为**例外登记**，不替换（与 7.5 同范式） |
+ *
+ * > 判定口径来源：`spec.md`/tasks §7.4-7.5「消费点替换」原文只给「手势回归录屏」判据，**未评估旋转 API**；
+ * > 实施期实读源码后按「**能力等价优先于轨统一**」原则降级为例外（本表即 7.4/7.5 交付物）。
+ *
+ * ## 收口清单（按实际引用逐个评估，**待删项 = 空集**）
  *
  * | 候选 | 引用者 | 结论 |
  * |------|--------|------|
@@ -19,10 +29,12 @@ import org.junit.Test
  * | `res/layout/item_image_page.xml` | `ImageDetailAdapter`（例外②） | 保留 |
  * | `res/layout/dialog_photo_view.xml` | `PhotoDialog`（**W6 7.3 已换 SSIV 轨，无 PhotoView 标签**） | 保留 |
  *
- * 本测试锁两件事（防未来失守）：
+ * 本测试锁三件事（防未来失守）：
  * ① **防误删**：白名单内文件必须仍然存在（否则例外能力会被静默移除）；
  * ② **防扩散**：全仓 `PhotoView` 的**实际引用**（import / XML 标签）必须收敛在白名单内 ——
- *    白名单外出现新引用即「新的技术债」（应换轨，或补例外登记后更新白名单）。
+ *    白名单外出现新引用即「新的技术债」（应换轨，或补例外登记后更新白名单）；
+ * ③ **防过期**：两条例外的**依赖 API 必须在源码中仍可追溯** —— 否则说明该页已换轨（应删例外条目），
+ *    或说明理由已失真（应重写），两种都必须显式处理而不是留一条假理由。
  *
  * 注：**注释里提到** `PhotoView`（换轨说明）不计入实际引用，故判据用 `import ` 与 `<` 前缀。
  */
@@ -99,6 +111,33 @@ class ImagePhotoViewRetentionAuditTest {
         // 裁剪页与详情页（例外①②）的保留理由必须仍在源码中可追溯
         val crop = File(appDir, "src/main/java/io/legado/app/ui/image/ImageCropActivity.kt").readText()
         assertTrue("裁剪页须仍使用 PhotoView（例外①）", crop.contains("PhotoView"))
+    }
+
+    /**
+     * 例外表的**理由可追溯性**（W6 7.4 / 7.5）：两条例外各自的「依赖 API」必须仍在源码中命中。
+     *
+     * 为什么必须机器校验：例外条目最危险的失效形态是**理由过期** —— 页面早已换轨，例外表却还写着
+     * 「因 A/B API 保留」，后人据此以为「这里不能动」（本仓已有先例：文档行号/注释与实际失同步）。
+     */
+    @Test
+    fun exceptionRationalesStayTraceable() {
+        val crop =
+            File(appDir, "src/main/java/io/legado/app/ui/image/ImageCropActivity.kt").readText()
+        assertTrue(
+            "例外① 理由失真：裁剪页已不再依赖 setMaxScale/getCropRect（若已换轨应删该例外条目）",
+            crop.contains("setMaxScale") && crop.contains("getCropRect()")
+        )
+        val detail =
+            File(appDir, "src/main/java/io/legado/app/ui/image/adapter/ImageDetailAdapter.kt")
+                .readText()
+        assertTrue(
+            "例外② 理由失真：详情页已不再使用 photoView.rotation（若已换轨应删该例外条目）",
+            detail.contains("photoView.rotation")
+        )
+        assertTrue(
+            "例外② 的「每图独立旋转状态」能力不得静默删除（删能力须显式评审并改例外表）",
+            detail.contains("rotationDegree")
+        )
     }
 
     @Test

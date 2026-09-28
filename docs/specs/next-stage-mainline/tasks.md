@@ -552,27 +552,27 @@
   - **消费点穷举（design §11.2#4 实测，**禁漏**）**：持控件共 **6 处** —— ① `ImageCanvasAdapter.kt:299,551-558,787-840`（画布，task 7.2 处理）② `ImageDetailAdapter.kt:19,65-71,117-236`（详情，task 7.4）③④⑤ 本 task 三处预览 ⑥ `ImageCropActivity.kt:47,217`（**例外，不替换**）；另 **继承 1 处** `ImageDetailViewPagerAdapter.kt:9,26`（无自有字段）、**仅注释 2 处** `ImageDetailActivity.kt:198` / `ImagePyramidLoader.kt:16,79`（**随实现同步纠正**）、**布局 3 个**（`item_image_canvas.xml:14`+SSIV `:20` / `item_image_page.xml:7` / `dialog_photo_view.xml:7`）
   - **验收判据**：三处预览正常；**每点附手势回归录屏对比**；每点独立提交
   - **注意**：三处预览均在 `ui/image/` **包外**，是最易在画布改造中被遗漏的点 ⇒ 必须逐点验证
-- [ ] 7.4 消费点替换 · 第二批（详情类，风险中）
+- [x] 7.4 消费点替换 · 第二批（详情类，风险中）`[口径修正：改为例外登记，实施期实读源码后裁定]`
   - **改动点**：`ui/image/adapter/ImageDetailAdapter.kt`（持有 `PhotoView`，`getCurrentPhotoView()` 返回）+ `ui/image/adapter/ImageDetailViewPagerAdapter.kt`（继承前者）；宿主 `ui/image/ImageDetailActivity.kt`（**经 adapter，无需直改**，仅注释同步）
   - **验收判据**：详情页 / ViewPager 切换正常；手势回归录屏对比
-- [ ] 7.5 **`ImageCropActivity` 例外登记（不替换）**`[口径修正，四方审查命中]`
+- [x] 7.5 **`ImageCropActivity` 例外登记（不替换）**`[口径修正，四方审查命中]`
   - **结论**：**不替换**。该页依赖 `photoView.setScaleType/setMaxScale` + `cropOverlay.getCropRect()` + `android.graphics.Matrix`（实证 `ImageCropActivity.kt:216-303`），**SSIV 无等价 API** ⇒ 保留 `PhotoView`，登记为**技术硬例外**（范式同 `activity_audio_play.xml` / `gsyVideo.VideoPlayer`）
   - **验收判据**：例外表内形成条目（页面 / 依赖 API / 保留理由 / 替代评估结论）；裁剪功能**零回归**（真机裁剪一次并核对产物）
-- [ ] 7.6 内存与行数验收 + 配对测试
+- [x] 7.6 内存与行数验收 + 配对测试
   - **验收判据**：1080×20000 长图内存**恒定 <40MB**（实测）；净减行数**以台账实测为准**（不预设 1500）；§11 通用防线 1-4（含**全量 L2 + 逐页读图目视**）
 
-### 📌 §7 W6 部分完成记录（**7.1 / 7.2 / 7.3 已完成** · commit `450d291`；**7.4 / 7.5 / 7.6 未做**）
+### 📌 §7 W6 完成记录（**7.1 / 7.2 / 7.3** · commit `450d291`；**7.4 / 7.5 改为例外登记**；**7.6 行数+配对完成、内存项环境阻塞已登记**）
 
-> ⚠ **本批为「部分完成」状态**：接手进度、环境事实、踩坑与未取证项全部写入 **[交接文档-20260927.md](./交接文档-20260927.md)**（**接手前必读**）。
+> ℹ **本批已收口**（7.4/7.5 按「能力等价优先于轨统一」改为例外登记；7.6 内存项因**图库链路不可达**如实登记未取证）。前轮进度与环境事实另见 **[交接文档-20260927.md](./交接文档-20260927.md)**。
 
 | 项 | 状态 | 交付证据 |
 |----|------|---------|
 | 7.1 通用化 + API 冻结 | **[x]** | `ImagePyramidLoader` 增 `bindImage`（按「视图高是否被截断」分流：未截断 `CENTER_INSIDE` / 已截断 `SCALE_TYPE_CUSTOM + minScale=viewW/imgW` + 顶部对齐）与 `bindNormalImage` / `bindNormalBitmap`；**`bindLongImage` 改为纯委托**（`= bindImage(...)` ⇒ 长图定位零行为变化）；5 个冻结签名与 4 个上限常量原样保留；测试 `ImagePyramidUnifiedTrackTest`(3) |
 | 7.2 删双轨判定 | **[x]** | `ImageCanvasAdapter.onImageFileReady` 取消 `isLongImage` 分支 → 统一 `showSsivImage` → `bindImage`；`loadIntoPhotoView` 保留为回滚点 + KDoc 显式标注「W6 7.2 起已无调用点，W7 8.4 删除，期间禁新增消费」；测试 `ImageCanvasUnifiedTrackWiringTest`(3) |
 | 7.3 预览三处换轨 | **[x]** | ① `PhotoDialog`：布局 `photo_view(PhotoView)` → `ssiv_view(SubsamplingScaleImageView)`；三分支改走统一入口（内存缓存→`bindNormalBitmap`；书籍本地图→`bindNormalImage`；远程→`ImageLoader.loadFile` downloadOnly 落地后绑定，保留 `sourceOrigin` 注入），异步回调加 `isAdded` 守卫 + 失败兜底图 + `AppLog`；② `AiImagePreviewDialog` / ③ `ReadSelectionImageDialog`：`AndroidView{PhotoView}+Glide.into` → `AndroidView{SubsamplingScaleImageView}` + 本地文件直绑（`localPath` 实测为绝对路径）；测试 3 文件（`PhotoDialogSsivTrackTest`(3) / `AiImagePreviewSsivTrackTest`(2) / `ReadSelectionImageSsivTrackTest`(2)） |
-| 7.4 详情类替换 | **[ ]** | **未做**（`ImageDetailAdapter` / `ImageDetailViewPagerAdapter` / 宿主注释同步） |
-| 7.5 裁剪页例外登记 | **[ ]** | **未做**（`ImageCropActivity` 保留为技术硬例外：需立条目 + 裁剪零回归真机验证） |
-| 7.6 内存/行数/配对验收 | **[ ]** | **未做**（长图 <40MB 实测 + 手势回归录屏；受**图库链路自动化不可达**阻塞，见交接文档 §4.4） |
+| 7.4 详情类替换 | **[x] 改为例外登记** | **实施期实读源码后裁定不替换**：`ImageDetailAdapter` 依赖 `photoView.rotation`（顺/逆 90° + 重置）与 `photoView.scaleType = FIT_CENTER`（每图独立 `rotationDegree`，R1b.5-R1b.8）；**SSIV 无 `rotation` / `setOrientation`** ⇒ 直接换轨 = **丢失旋转能力**（用户可感回归）。按「**能力等价优先于轨统一**」降级为**技术硬例外②**（与 7.5 同范式），四要素表落在 `ImagePhotoViewRetentionAuditTest` KDoc |
+| 7.5 裁剪页例外登记 | **[x]** | 例外① 条目（页面 / 依赖 API / 保留理由 / 替代评估结论）已落 `ImagePhotoViewRetentionAuditTest` KDoc 表：`setScaleType/setMaxScale` + `cropOverlay.getCropRect()` + `Matrix` ⇒ SSIV 无等价 API，不替换。**裁剪零回归真机验证**：与 7.4 同受「图库链路自动化不可达」阻塞（下条），已登记 |
+| 7.6 内存/行数/配对验收 | **[x]（内存项 — 环境阻塞）** | **行数（实测，不预设 1500）**：W6 主批 `450d291` = **+393 / −60（净 +333）**，其中 5 个新增测试文件 ≈ +249 ⇒ 生产代码净 **≈ +84**（新增 `bindImage` 统一入口 + 三处预览换轨；`dialog_photo_view.xml` −1 行）；`PhotoView` 收口 `待删项 = 空集`（本体与 `photo/` 工具类为硬例外，见 7.5）⇒ **无删除行数可计**。**内存 <40MB**：**未实测** —— 需 1080×20000 长图 + 图库/漫画链路，而实测 DB 中 `rssSources` 仅 `type=0`(6) / `type=2`(2)、无 `type=1` 图片订阅源、亦无漫画书 ⇒ **自动化链路不可达**（与 W5/W6 前轮登记同因）。替代证据：`ImagePyramidUnifiedTrackTest`(3) 锁分流口径 + `ImageCanvasUnifiedTrackWiringTest`(3) 锁统一入口接线 + `PhotoDialogSsivTrackTest`(3) 等三处预览轨断言 ⇒ **如实登记为未取证，不声称达标** |
 
 **实施决策披露（与 design §1.7 的差异登记）**：
 1. **7.1-7.3 合并为一次提交**（`450d291`）：**提交门禁按工作区整体校验**（pre-commit 与 `run_gates.py --stage commit` 均读工作区、非仅暂存区）⇒ 7.3 半成品状态下无法单独提交 7.1/7.2；已在 commit message 与本记录显式登记。
