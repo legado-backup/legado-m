@@ -73,6 +73,34 @@ class ApiEnvelopeTest {
         assertSame("Response 逃生舱须原样返回（如 /backup 的 ZIP 流）", raw, resp)
     }
 
+    // ------------------------------------------------------------ 3.2 顶层 catch 的真实状态码
+
+    @Test
+    fun errorResponseOf_illegalArgument_mapsTo400() {
+        // HttpServer 顶层 catch 复用本方法：改造前该分支恒 200 + 纯文本（质量债 3.2）
+        val resp = ApiEnvelope.errorResponseOf(IllegalArgumentException("bad param"))
+        assertEquals(400, resp.status.requestStatus)
+        val json = JsonParser.parseString(body(resp)).asJsonObject
+        assertEquals(400, json.get("code").asInt)
+        assertFalse(json.get("isSuccess").asBoolean)
+        assertEquals("bad param", json.get("errorMsg").asString)
+    }
+
+    @Test
+    fun errorResponseOf_otherException_mapsTo500() {
+        val resp = ApiEnvelope.errorResponseOf(IllegalStateException("boom"))
+        assertEquals(500, resp.status.requestStatus)
+        assertEquals(500, JsonParser.parseString(body(resp)).asJsonObject.get("code").asInt)
+    }
+
+    @Test
+    fun errorResponseOf_exceptionWithoutMessage_stillHasMessage() {
+        // errorMsg 不得为空串（否则老页展示空白）
+        val resp = ApiEnvelope.errorResponseOf(RuntimeException())
+        val msg = JsonParser.parseString(body(resp)).asJsonObject.get("errorMsg").asString
+        assertTrue("errorMsg 必须有兜底文案：'$msg'", msg.isNotBlank())
+    }
+
     @Test
     fun deny_buildsUniform401Envelope() {
         val resp = ApiEnvelope.deny(401, "unauthorized")
