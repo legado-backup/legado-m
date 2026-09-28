@@ -26,8 +26,13 @@ class DatabaseMigration110To111Test {
     private val migrations by lazy { read("src/main/java/io/legado/app/data/DatabaseMigrations.kt") }
 
     @Test
-    fun databaseVersionIsBumpedTo111() {
-        assertTrue("AppDatabase version 须为 111", appDatabase.contains("version = 111"))
+    fun databaseVersionCoversMigration110To111() {
+        // ⚠ 版本号随后续批次继续上抬（如 W8 的 111→112）⇒ 只能断言「**至少**到 111」，
+        // **不得**硬编码等于某具体值：否则每次后续升级都会把本用例打成假失败（2026-09-28 W8 实测）。
+        val version = Regex("""version\s*=\s*(\d+)""").find(appDatabase)
+            ?.groupValues?.get(1)?.toIntOrNull()
+        assertTrue("AppDatabase version 须可解析", version != null)
+        assertTrue("AppDatabase version 须 >= 111（110→111 已落地，当前=$version）", version!! >= 111)
         assertTrue("迁移数组须登记 migration_110_111", migrations.contains("migration_110_111"))
         assertTrue(
             "迁移对象须为 Migration(110, 111)",
