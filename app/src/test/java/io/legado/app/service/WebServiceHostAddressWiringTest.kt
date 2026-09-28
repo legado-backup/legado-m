@@ -68,6 +68,16 @@ class WebServiceHostAddressWiringTest {
     }
 
     @Test
+    fun auditRetentionPurgeIsWiredAtServiceStart() {
+        // 一期 3.7：审计保留策略（>7 天）在服务启动投递一次；漏接线会让审计表无限增长。
+        val t = code()
+        assertTrue(
+            "服务启动须投递审计清理",
+            t.contains("McpAuditor.purgeExpired()")
+        )
+    }
+
+    @Test
     fun portComesFromSingleSourcePolicy() {
         val t = code()
         assertTrue(
