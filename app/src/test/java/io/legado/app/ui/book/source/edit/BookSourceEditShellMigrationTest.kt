@@ -98,6 +98,29 @@ class BookSourceEditShellMigrationTest {
     }
 
     @Test
+    fun recyclerViewAlwaysGetsLayoutManager() {
+        val s = hostCode()
+        // 回归（2026-09-28，用户报障「基本/搜索/发现…下的编辑项全部没有了」）：
+        // 原 XML 的 `app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"` 是**永久兜底**，
+        // CE-a 程序化重建时被丢弃；而宿主仅在 `editEntityMaxLine < 999` 时才装配 layoutManager。
+        // `AppConfig.sourceEditMaxLine` 默认返回 `Int.MAX_VALUE`（≥999）⇒ 该分支不成立 ⇒ RecyclerView
+        // 无布局管理器 ⇒ 六个 Tab 的编辑项全部不渲染（100% 可复现）。
+        // 锁死：layoutManager 必须**无条件**赋值，条件只能用来选择变体，不得作为赋值前置守卫。
+        assertTrue(
+            "RecyclerView 必须无条件装配 layoutManager（条件仅选择变体，禁止作为赋值前置守卫）",
+            s.contains("shell.recyclerView.layoutManager = if (adapter.editEntityMaxLine < 999)")
+        )
+        assertTrue(
+            "行数多时必须回落到普通 LinearLayoutManager（原 XML 兜底语义）",
+            s.contains("LinearLayoutManager(this)")
+        )
+        assertFalse(
+            "禁止回退为「if 守卫内赋值」的旧写法（默认配置下会漏装 layoutManager）",
+            s.contains("if (adapter.editEntityMaxLine < 999) {\n            shell.recyclerView.layoutManager")
+        )
+    }
+
+    @Test
     fun menuGroupsAndTabsIntact() {
         val s = hostCode()
         listOf(
