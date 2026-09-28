@@ -3,6 +3,7 @@ package io.legado.app.web.api
 import fi.iki.elonen.NanoHTTPD.Method
 import io.legado.app.api.ReturnData
 import io.legado.app.web.TokenManager.Level
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -108,6 +109,27 @@ class ApiRegistryTest {
         assertEquals(Level.READONLY, ApiRegistry.find(Method.GET, "/getBookSources")?.level)
         assertEquals(Level.MANAGE, ApiRegistry.find(Method.POST, "/saveBook")?.level)
         assertEquals(Level.MANAGE, ApiRegistry.find(Method.POST, "/deleteRssSources")?.level)
+    }
+
+    // ------------------------------------------------------------ 扩展性（SC-1-14）
+
+    @Test
+    fun newRoute_isReachableWithoutTouchingHttpServer() = runBlocking {
+        // SC-1-14 证据：新增端点只需在 web/api/routes/ 声明一行（此处以运行时注册等价模拟），
+        // `serve()` / `HttpServer.kt` 零改动 —— 结构侧由 httpServer_hasNoEndpointLevelWhenBranch 断言。
+        ApiRouteBootstrap.install()
+        val probePath = "/__probe_extensibility__"
+        ApiRegistry.register(
+            ApiRoute(Method.GET, probePath, Level.READONLY) { ReturnData().setData("ok") }
+        )
+
+        assertEquals("新增 1 条须叠加在原 28 条之上（互不干扰）", 29, ApiRegistry.size)
+        val route = ApiRegistry.find(Method.GET, probePath)
+        assertNotNull("声明即注册 ⇒ 查表立即可达", route)
+
+        // 端到端：新端点经 ApiEnvelope 自动继承统一信封 / 真实状态码能力（无需触碰 serve()）
+        val resp = ApiEnvelope.dispatch(route!!, ApiContext(Method.GET, probePath, emptyMap()))
+        assertEquals("新端点自动继承 200 信封能力", 200, resp.status.requestStatus)
     }
 
     // ------------------------------------------------------------ 结构（源码扫描）
