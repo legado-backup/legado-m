@@ -50,6 +50,28 @@ class SceneBookmarkHelperTest {
     fun imageAnchorRoundTrips() {
         val anchor = SceneBookmarkHelper.imageAnchor("https://example.invalid/a.jpg")
         assertEquals("https://example.invalid/a.jpg", SceneBookmarkHelper.imageUrlOf(anchor))
+        assertNull("未传文章链接时不得写入空键", SceneBookmarkHelper.articleLinkOf(anchor))
+    }
+
+    @Test
+    fun imageAnchorKeepsArticleLinkForJumpBack() {
+        val anchor = SceneBookmarkHelper.imageAnchor(
+            "https://example.invalid/a.jpg",
+            "https://example.invalid/post/1"
+        )
+        assertEquals("https://example.invalid/post/1", SceneBookmarkHelper.articleLinkOf(anchor))
+        assertEquals(
+            "新增 articleLink 不得破坏 imageUrl 读回",
+            "https://example.invalid/a.jpg",
+            SceneBookmarkHelper.imageUrlOf(anchor)
+        )
+    }
+
+    @Test
+    fun legacyImageAnchorWithoutArticleLinkDegradesToNull() {
+        assertNull("老数据（无 articleLink 键）应回落 null 而非抛异常", SceneBookmarkHelper.articleLinkOf("{\"imageUrl\":\"u\"}"))
+        assertNull("空串按缺省处理", SceneBookmarkHelper.articleLinkOf(""))
+        assertNull("损坏锚点", SceneBookmarkHelper.articleLinkOf("{oops"))
     }
 
     @Test
