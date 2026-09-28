@@ -66,6 +66,35 @@
 
 ---
 
+## IF-05（P0 · 用户真机报障 · 静默失效）书源编辑页六个 Tab 的编辑项**全部不显示**
+
+| 项 | 内容 |
+|----|------|
+| 发现批次 | **用户真机报障（2026-09-28，安装 `3.26.092800` 后）**：「书源编辑页面，基本、搜索、发现等下面的编辑项全部没有了」 |
+| 现象 | 页头/两行勾选/TabLayout 均在，**Tab 下方列表区空白**；切任意 Tab（基本/搜索/发现/详情/目录/正文）都无字段；**无异常、无日志**（静默失效） |
+| 根因 | `f7ac81e`（CE-a #12，2026-09-26）把 `activity_book_source_edit.xml` 退役、改为 `BookSourceEditShellViews` 程序化重建时**丢失旧 XML 的 `app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"` 永久兜底**；宿主 `BookSourceEditActivity.initView()` 仅在 `adapter.editEntityMaxLine < 999` 分支内装配 layoutManager，而 `AppConfig.sourceEditMaxLine` 默认返回 `Int.MAX_VALUE`（≥999）⇒ **该分支永不成立** ⇒ `RecyclerView` 无布局管理器 ⇒ 列表项全部不渲染 |
+| 引入批次 | **`f7ac81e`（CE-a #12，XML 退役 + 六段结构程序化重建）** |
+| 修复 | `initView()` 改为**无条件**装配 layoutManager，条件只用于选择变体（`NoChildScrollLinearLayoutManager` vs `LinearLayoutManager`）—— 等价旧 XML 的永久兜底。commit `7d8b59d` |
+| 回归用例（先红后绿） | ① `BookSourceEditShellMigrationTest.recyclerViewAlwaysGetsLayoutManager`（先写、`AssertionError@:109` 复现，修复后转绿）；② **通用防线** `ProgrammaticRecyclerViewLayoutManagerGuardTest`：全量扫描源码中**程序化创建 `RecyclerView`** 的文件，锁三条不变量 —— 「非壳文件必须自行装配 layoutManager」「壳由登记宿主无条件装配」「登记表不得过期」 |
+| 同类排查（用户要求） | ① 全部「XML 退役」提交中带 `app:layoutManager` 的布局**仅 4 处**：`activity_book_source_edit`（本项）、`activity_book_source`/`activity_rss_source`/`activity_rule_sub`（后三者现已纯 Compose `LazyColumn`/`AppManagementScaffold`，无 RecyclerView）⇒ 不受影响；② 全局程序化 `RecyclerView` 创建点**共 5 处**（书源编辑壳 / 主题管理壳 / 图库 / 订阅源编辑 / 标签栏），除本页外**均已装配 layoutManager**（主题管理族 14 页宿主无条件装配、订阅源编辑无条件装配）⇒ **唯一缺陷页 = 书源编辑页** |
+| 教训 | **「程序化重建 XML」必须逐属性对照**：XML 里带默认语义的属性（尤其 `app:layoutManager`、`app:itemAnimator`、`android:visibility`）是**永久兜底**，代码里的条件赋值**不能**替代它（默认配置可能恰好走不到赋值分支）。同源盲区：迁移测试的「易丢语义清单」与迁移实现出自同一次理解 ⇒ 清单漏项即测试漏项 |
+
+### IF-05 反思：为什么测试体系没发现 · 后续如何避免
+
+**为什么没发现（三层原因）**
+
+1. **同源盲区**：迁移测试 `BookSourceEditShellMigrationTest` 锁的是「易丢语义逐项复刻」清单（Spinner `theme+entries` / 勾选默认值 / `review` 隐藏 / 36dp+3dp / `clipToPadding`）——**该清单本身就漏了 `layoutManager`**。测试与实现出自同一次迁移、同一份（不完整的）理解 ⇒ 清单漏项即测试漏项。
+2. **静默失效 + 判据缺失**：缺陷无异常、无日志，编译与既有**文本型契约单测**全绿照样逃逸；既有 L2 脚本未覆盖「书源编辑页」这一页面。
+3. **未做同构页差异比对**：同构的 `RssSourceEditActivity` **无条件**装配 layoutManager（参考实现是对的），但迁移时未把「同构页差异」当作必查项。
+
+**后续避免（已落地 + 机制改进）**
+
+- ✅ **已落地 · 通用防线**：`ProgrammaticRecyclerViewLayoutManagerGuardTest` 全量扫描程序化 `RecyclerView`，新壳漏登记 / 新页漏装配即红。
+- ✅ **已落地 · 反例库免疫**：G-18 新增 **R-007**（invariant：宿主必须含**无条件** layoutManager 装配 + 通用防线测试必须存在）⇒ 历史失守永久免疫。
+- ⏳ **机制改进（待纳入 XML 退役迁移 SOP）**：XML 退役类迁移**必须附「XML 属性全量对照表」**——逐个 `android:`/`app:` 属性标注「重建后有 / 无 / 刻意保留」，并对**永久兜底类属性**（layoutManager 等）单独加断言；同时新增「**同构页差异比对**」卡点（同构页的正确写法必须逐项比对）。
+
+---
+
 ## 未覆盖项（如实登记，非缺陷）
 
 | 项 | 说明 | 当前覆盖方式 |
