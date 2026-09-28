@@ -121,6 +121,8 @@ class RssArticlesComposeListMigrationTest {
             "private fun scrollToBottom(",
             "loadMoreView.error(",
             "loadMoreView.noMore()",
+            // AD-02：页脚在途闸单源 —— 任何出口都先无条件收敛转圈（修复「一直下一页转圈」）
+            "loadMoreView.stopLoad()",
             // 位置记忆（播放器/图片页返回）
             "VideoPlay.lastPlayedArticleLink",
             "ImagePlay.lastPlayedArticleLink",
@@ -151,4 +153,34 @@ class RssArticlesComposeListMigrationTest {
             favorites.contains("RssFavoritesAdapter")
         )
     }
+
+    /**
+     * AD-02 回归（2026-09-28 用户报障「一直下一页在转圈」）：在途闸必须**单源**。
+     *
+     * 修复前：页脚转圈由 `loadMoreView.hasMore()` 置位，却只在 `!hasMore` 时被 `noMore()` 收敛
+     * ⇒ 翻页成功但仍有下一页时页脚永远转圈；且在途判定存在双源（`viewModel.isLoading` 与 `isLoadingState`），
+     * 两者可能漂移。修复后唯一判据 = `isLoadingState`，且每个出口都无条件 `stopLoad()`。
+     */
+    @Test
+    fun inFlightGateIsSingleSourced() {
+        val code = codeOnly(fragment())
+        assertFalse(
+            "UI 层不得再读 viewModel.isLoading（在途闸单源 = isLoadingState）",
+            code.contains("viewModel.isLoading")
+        )
+        assertTrue("触底守卫必须读 isLoadingState", code.contains("if (isLoadingState.value) return"))
+        assertTrue("页脚必须在任何出口无条件收敛转圈", code.contains("loadMoreView.stopLoad()"))
+    }
+
+    /**
+     * 取「非注释」代码文本：断言「旧写法已删」时必须先剔除注释行，否则注释里的示例会误报命中
+     * （本仓既有教训：断言"旧写法已删"要先剔除注释行）。
+     */
+    private fun codeOnly(text: String): String =
+        text.lineSequence()
+            .filterNot {
+                val t = it.trimStart()
+                t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")
+            }
+            .joinToString("\n")
 }
