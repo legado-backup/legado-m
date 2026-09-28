@@ -645,10 +645,10 @@
   - **🔴 入口接线（必须，防「死页面」—— design §11.2#2）**：① 在 `ui/main/my/MySettingsData.kt` 的**工具分区**（`config_category_tools:108`）既有 `bookmark:116`（`AllBookmarkActivity`）**之后**用 `actionRow(...)` 新增「名场面书签」入口 ② 在 `handleSettingsRowClick`（`:289-341`，分支处约 `:297`）新增跳转 `SceneBookmarkActivity`；**入口不可达 ⇒ 本任务未完成**
   - **前置**：**K1 取色归属三步必须先做**（**预填见 design §10.3**，开工只需勾选确认）；新组件登记到 `component-registry.md`（预计 **0 新建**）
   - **验收判据**：**从「我的 → 工具」可进入库页**（入口可达性）；可按书聚合浏览；**取色门禁 PASS**；四态截图 + 15 红线（design §10.7）
-- [ ] 9.5 书签进备份（REQ-33）
+- [x] 9.5 书签进备份（REQ-33）
   - **改动点**：按 §5.1 的**四处**口径扩展（`Backup.kt` / `Restore.kt` / `BackupSelectorConfig.allItems` / `BackupController.executeWebBackup`）
   - **验收判据**：恢复后书签与 AI 描述保留；选择器可见；Web 备份含该文件；配对测试断言
-- [ ] 9.6 配对测试 + 批次验证
+- [x] 9.6 配对测试 + 批次验证
   - **验收命令**：详设所列 4 个测试文件（`SceneBookmarkDaoTest` / `HelperTest` / `AiSceneDescServiceTest` / `BackupTest`）+ §11 通用防线 1-7（含 **Gson 签名双包审计**与**取色门禁**）
 
 ---
@@ -673,10 +673,13 @@
   - **跳回路由**：文字 = `startActivityForBook` + `index`/`chapterPos`（**精确到段落**）；漫画 = 同入口（**已知上限**：`ReadMangaViewModel` 只读 `bookUrl`，页内定位取书内进度 ⇒ 不保证落在原页，登记遗留）；图片 = 重建 `ImagePlay`（源 + 单篇文章含 link）后开 `ImageGalleryActivity`（与 `ReadRss.readNoHtml` 同口径）；**为此锚点新增 `articleLink` 键**（老数据无该键 → `articleLinkOf` 回落 null 并提示，不崩）。
   - **未实现（如实登记）**：design §3.4 的「**批量删除**」未做 —— 长按删除 + 按书清空已覆盖删除诉求，批量多选需新增选择态基建（本轮不作扩张）；`desc` 直接可编辑未做，改为「重新生成描述」（AI 或降级重算）。
   - **测试（新增 24 用例全绿）**：`SceneBookmarkEntryWiringTest`(5) / `SceneBookmarkMangaEntryTest`(3) / `SceneBookmarkImageEntryTest`(2) / `SceneBookmarkLibraryWiringTest`(5) / `SceneBookmarkEntryTest`(3，我的页入口) / `SceneBookmarkHelperTest` 补 3（articleLink 往返与老数据降级）⇒ 共 **11**。门禁待跑。
-- **9.5-9.6 未做（接手直接续做）**：
-  - **9.5** 备份四处口径（`Backup.kt` / `Restore.kt` / `BackupSelectorConfig.allItems` / `BackupController.executeWebBackup`）；**9.6** 配对测试 + §11 通用防线。
-  - **updateLog 已随 9.3/9.4 登记**（2026/09/28 条目新增「名场面书签」一行，见 `app/src/main/assets/updateLog.md`）；9.1/9.2 属数据层与业务层，按 `version-delivery-sync` 口径仍不单列（存疑默认不写）。
-  - **待办（9.3/9.4 遗留）**：漫画路径「页内精确定位」；图片路径 `ImagePlay` 重建的**真机 L2 复核**（本轮仅静态 + 单测覆盖）。
+- **9.5 书签进备份 [x]** / **9.6 配对测试与防线 [x]**（同批提交）：
+  - **实际落点 = 五处**（design 说四处，实测 `BackupController` 内还有 **概览** `BackupItemDef` 清单 —— 漏则用户在"选择备份内容"里看不到该类别体量，故一并登记）：① `BackupSelectorConfig.allItems` 加 `BackupItem("sceneBookmark", "sceneBookmarks.json", "名场面书签", "数据库")`；② `Backup.kt` 写出分支；③ `Restore.kt` 还原分支（`@Insert(REPLACE)` 逐条插入 ⇒ 幂等；旧备份无该文件静默跳过）；④ `BackupController.executeWebBackup`（**硬编码全集、不走选择器**）；⑤ `BackupController` 概览 `BackupItemDef`。
+  - **测试**：`SceneBookmarkBackupRoundTripTest`(4，含 **Gson 往返保真**：`desc`/`tags`/`id`/`contentKind`/锚点 `articleLink` 全保留 + `@Keep` 在位)；`BackupControllerSceneBookmarkTest`(2)；`BackupRestoreParityTest` 自动纳管新条目（`selectorItemsAreAllWrittenByBackup` / `...RestoredByRestore` 均绿）。
+  - **§11 通用防线**：G-01 配对（PAIR-FILE + PAIR-DIR 全配对）／G-02 取色门禁（库页零硬编码色、零 M3 派生色）／G-12 数据库迁移（无新增迁移，仍绿）／G-08 全量单测 **1715 通过 / 0 失败 / 5 跳过**；G-04 Gson 双包审计属 **deliver 阶段**（打包后跑）。
+  - **L1/L2（真机实测）**：L1 = `quick_build_install.py` 通过；L2 = **库页直启渲染**（截图 `output/l2/l2_scene_library.png` + uiautomator dump 三节点：标题「名场面书签」/「还没有名场面」/「去阅读」）；**入口可达性** = 我的→工具列表截图见「名场面书签（回看你收藏的精彩瞬间，AI 自动生成描述）」+ 设置搜索页 dump 定位该行（clickable bounds `[18,1010][702,1100]`）后点击，logcat 出 `START ... ui.scene.SceneBookmarkActivity from uid <app>`（框架级证明入口点击链路打通）。
+  - **环境限制（如实登记）**：本轮 MEmu 曾在会话中途被关闭导致 `screencap`/`uiautomator` 全黑（**连系统桌面截图同为 7738B** ⇒ 判为模拟器侧问题，非本页缺陷），重启 VM 后截图通道恢复；切换页面后截图偶有滞后，故入口点击以 logcat 框架日志为准。
+- **9.6 已随 9.5 一并完成**（配对测试 + 防线见上）。
 
 ---
 
