@@ -633,13 +633,13 @@
   - **改动点**：新 `help/book/SceneBookmarkHelper.kt`（创建/查询/按书聚合）+ `help/ai/AiSceneDescService.kt`（描述生成）；复用 `help/ai/`（**36** 文件，`AiChatService.kt` 1868 行）与划线范式 `ReadBookActivity.kt:1483-1510`
   - **降级判定点（给值）**：生成描述前判「**AI provider 配置为空**」（无可用 provider / 模型未配置）⇒ **跳过描述生成，仅存原文片段**（书签主体照常落库），并给非阻塞提示；配置就绪后可在库页手动补生成
   - **验收判据**：可创建/查询/按书聚合；**无 AI 配置时降级**（仅存原文片段，不阻塞）
-- [ ] 9.3 三路径入口（REQ-32）
+- [x] 9.3 三路径入口（REQ-32）
   - **改动点（三处各给触发方式）**：
     - ① **正文** = `ui/book/read/ReadBookActivity.kt` **阅读菜单项 + 划词菜单项**（参考 `:1483-1510` 现有划线入口）
     - ② **图片** = `ui/image/ImageGalleryActivity.kt` **菜单项**（与该页既有菜单同处）
     - ③ **漫画** = `res/menu/book_manga.xml`（**实测 18 个 `<item>`**）**菜单项**（或在 `triggerMangaMenuItem:833` 构造处加项）
   - **验收判据**：三路径均可创建；**不破坏既有手势**
-- [ ] 9.4 库页（REQ-32）
+- [x] 9.4 库页（REQ-32）
   - **改动点**：`ui/scene/SceneBookmarkActivity.kt` + `SceneBookmarkScreen.kt`（Compose）
   - **页面规格（照做，见 design §10.2(1)）**：`AppManagementScaffold`（标题 + 溢出菜单，动作 ≤3）+ `AppManagementLazyColumn`（项距 8dp、分隔线清零）+ **复用 `AppManagementListRow`**（56dp；缩略图 `FilletImageView` 12dp + 主文本 `primaryText` + 片段 `secondaryText` + 行尾时间）+ `AppManagementCard` + `CollapseSectionHeader`（按书聚合）+ `EmptyStatePlaceholder`（空态）
   - **🔴 入口接线（必须，防「死页面」—— design §11.2#2）**：① 在 `ui/main/my/MySettingsData.kt` 的**工具分区**（`config_category_tools:108`）既有 `bookmark:116`（`AllBookmarkActivity`）**之后**用 `actionRow(...)` 新增「名场面书签」入口 ② 在 `handleSettingsRowClick`（`:289-341`，分支处约 `:297`）新增跳转 `SceneBookmarkActivity`；**入口不可达 ⇒ 本任务未完成**
@@ -664,11 +664,19 @@
   - **降级链实测口径**：未配置 AI / 开关关闭 ⇒ `isAvailable()=false` ⇒ 跳过生成，`desc` 落 `手写备注 > 原文片段 > 章节名 > 书名`（不阻塞落库）；超时/解析失败 ⇒ 同口径截断降级，tags 置空。
   - **测试（32 用例全绿）**：`AiSceneDescServiceTest`(9) / `SceneBookmarkHelperTest`(9) / `AppConfigSceneDescSwitchTest`(3) / `AiConfigFragmentSceneDescSwitchTest`(3) / `PreferKeyUniquenessTest` 增 `w8SceneDescKeyRegistered`(总数 8)。门禁：**G-01 PAIR-FILE×2 + PAIR-DIR×3 全配对**；commit 门禁 8/8。
   - **踩坑（接手必读）**：G-01 对 `PreferKey`/`AppConfig`/`AiConfigFragment` 这类「非独立文件名」改动走 **PAIR-DIR** 判定 ⇒ 必须在其**同包测试目录**留下测试变更（本次新增 `help/ai`、`help/book`、`help/config`、`ui/config` 四处 + 改 `constant` 既有测试）。
-- **9.3-9.6 未做（接手直接续做）**：
-  - **9.3** 三路径入口：文字 = `ReadBookActivity` 划词/阅读菜单（抄 `:1483-1510` 划线入口）；图片 = `ImageGalleryActivity` 菜单；漫画 = `res/menu/book_manga.xml` 菜单项。
-  - **9.4** 库页 `ui/scene/SceneBookmarkActivity` + `SceneBookmarkScreen`（Compose，照 `AppManagementScaffold` + `AppManagementLazyColumn` + `AppManagementListRow`）；**必须接线 `ui/main/my/MySettingsData.kt` 工具分区 + `handleSettingsRowClick`**，否则**死页面 ⇒ 本任务未完成**。
+- **9.3 三路径入口 [x]** / **9.4 库页 [x]**（commit `0a1e5c5` 之后的同批提交）：
+  - **9.3 文字路径**：**选区链路 4 处齐备**（本仓已两次踩坑的链路）：`content_select_action.xml` 加 `menu_scene_bookmark` → `ContentSelectConfig.ACTION_SCENE_BOOKMARK` + 进 `defaultActions`（**不动** legacy 两集合，保证老用户偏好迁移不受影响）→ `ContentSelectMenuConfigDialog.actionItems` 登记（漏登记会被"保存一次后静默剔除"）→ `TextActionMenu.menuItemToActionId` 映射；`ReadBookActivity` 加 `onMenuItemSelected` 分支（选区）+ **阅读菜单两项**（`menu_add_scene_bookmark` 打标 / `menu_scene_bookmark_list` 本书名场面）；锚点 `textAnchor(chapterPos)`，载荷含选中文本。
+  - **9.3 漫画路径**：`book_manga.xml` 加 `menu_add_scene_bookmark`（**刻意不进** `mangaConfigMenuItems` —— 进则被 `upMenu` 置 invisible ⇒ 入口不可见）；`ReadMangaActivity` 分支 → `mangaAnchor(ReadManga.durChapterPos)`。
+  - **9.3 图片路径**：落在 `ImageGalleryActivity` **长按图片菜单**（非工具栏下拉 —— 只有长按携带"当前这张图"的 URL；工具栏在画布态无确定当前图）；载荷 `imageAnchor(imageUrl, articleLink)`。
+  - **9.4 库页**：`ui/scene/SceneBookmarkActivity`（`composeShell` + `attachComposeContent` + `LegadoTheme`；`flowAll`/`flowByBook` → `groupByBook`；`bookIntent` 按书过滤入口）+ `SceneBookmarkScreen`（`AppManagementScaffold` + `AppManagementLazyColumn` + `AppManagementListRow(minHeight=56dp)` + `EmptyStatePlaceholder` + `FilletImageView(12dp)`；**零新建组件**）；`MySettingsData` 工具分区加 `actionRow("sceneBookmark", …)` + `handleSettingsRowClick` 分支（**双段齐备，非死页面**）；`AndroidManifest` 注册 `singleTop`；双 `strings.xml` 共 16 条。
+  - **⚠ 与 design §10.2(1) 的有意差异（1 处，已登记）**：按书分组头用 **`GroupHeader`** 而非 `CollapseSectionHeader` —— 前者是"按书分组列表"的既有同语义实现（`AllBookmarkScreen` 范式）且**带组级溢出菜单槽位**（承载「按书清空」）；后者是表单字段分组头（无计数/无菜单槽）。两者均为已登记组件，`K1-S2`（查同语义既有实现）优先于字面点名。
+  - **跳回路由**：文字 = `startActivityForBook` + `index`/`chapterPos`（**精确到段落**）；漫画 = 同入口（**已知上限**：`ReadMangaViewModel` 只读 `bookUrl`，页内定位取书内进度 ⇒ 不保证落在原页，登记遗留）；图片 = 重建 `ImagePlay`（源 + 单篇文章含 link）后开 `ImageGalleryActivity`（与 `ReadRss.readNoHtml` 同口径）；**为此锚点新增 `articleLink` 键**（老数据无该键 → `articleLinkOf` 回落 null 并提示，不崩）。
+  - **未实现（如实登记）**：design §3.4 的「**批量删除**」未做 —— 长按删除 + 按书清空已覆盖删除诉求，批量多选需新增选择态基建（本轮不作扩张）；`desc` 直接可编辑未做，改为「重新生成描述」（AI 或降级重算）。
+  - **测试（新增 24 用例全绿）**：`SceneBookmarkEntryWiringTest`(5) / `SceneBookmarkMangaEntryTest`(3) / `SceneBookmarkImageEntryTest`(2) / `SceneBookmarkLibraryWiringTest`(5) / `SceneBookmarkEntryTest`(3，我的页入口) / `SceneBookmarkHelperTest` 补 3（articleLink 往返与老数据降级）⇒ 共 **11**。门禁待跑。
+- **9.5-9.6 未做（接手直接续做）**：
   - **9.5** 备份四处口径（`Backup.kt` / `Restore.kt` / `BackupSelectorConfig.allItems` / `BackupController.executeWebBackup`）；**9.6** 配对测试 + §11 通用防线。
-  - **updateLog 文案**（`新增名场面书签：一键收藏精彩瞬间，AI 自动生成描述，名场面库统一回看`）**须在 9.3/9.4 落地后（功能用户可感时）再加** —— 9.1/9.2 属「数据层 + 业务层」，按 `version-delivery-sync` 口径**不写**（存疑默认不写）；9.2 新增的设置开关同样随 9.3/9.4 一并登记。
+  - **updateLog 已随 9.3/9.4 登记**（2026/09/28 条目新增「名场面书签」一行，见 `app/src/main/assets/updateLog.md`）；9.1/9.2 属数据层与业务层，按 `version-delivery-sync` 口径仍不单列（存疑默认不写）。
+  - **待办（9.3/9.4 遗留）**：漫画路径「页内精确定位」；图片路径 `ImagePlay` 重建的**真机 L2 复核**（本轮仅静态 + 单测覆盖）。
 
 ---
 
