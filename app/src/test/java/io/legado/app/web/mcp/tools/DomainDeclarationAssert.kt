@@ -15,11 +15,14 @@ import java.io.File
  */
 internal object DomainDeclarationAssert {
 
-    fun assertMetadataConsistent(tools: List<McpTool>, domain: String, prefix: String) {
+    fun assertMetadataConsistent(tools: List<McpTool>, domain: String, vararg allowedPrefixes: String) {
         assertTrue("域 $domain 不应为空", tools.isNotEmpty())
         tools.forEach { tool ->
             assertEquals("域文件内的 domain 必须一致", domain, tool.domain)
-            assertTrue("工具名须带域前缀（$prefix）：${tool.name}", tool.name.startsWith(prefix))
+            assertTrue(
+                "工具名须带域内前缀（${allowedPrefixes.joinToString(" / ")}）：${tool.name}",
+                allowedPrefixes.any { tool.name.startsWith(it) }
+            )
         }
         assertEquals("工具名在本域内须唯一", tools.size, tools.map { it.name }.toSet().size)
     }
