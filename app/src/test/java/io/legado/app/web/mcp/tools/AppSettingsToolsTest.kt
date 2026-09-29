@@ -32,6 +32,20 @@ class AppSettingsToolsTest {
         assertEquals(setOf("keys"), tool.inputSchema.getAsJsonObject("properties").keySet())
     }
 
+    /**
+     * IF-22（第 5 轮 UX/IA 重构）：`app_prefs_get` 的**说明须与内核出参一致**。
+     *
+     * 起因：描述写「keys 省略 = 白名单全集」，而内核原实现空列表返回空结果（实现与描述不符，
+     * 控制台据此读取会误判"没有可写偏好"）；补 `available` 元数据后描述也必须同步 ⇒
+     * 用断言把「描述 ↔ 内核契约」钉在一起，防再漂移。
+     */
+    @Test
+    fun appPrefsGet_descriptionMatchesKernelContract() {
+        val description = tools.single { it.name == "app_prefs_get" }.description
+        assertTrue("描述须说明「keys 省略 = 白名单全集」", description.contains("省略"))
+        assertTrue("描述须说明回传 available 元数据", description.contains("available"))
+    }
+
     @Test
     fun writeTools_areManageWithoutReadOnlyHint() {
         listOf("app_prefs_save", "app_theme_mode_set").forEach { name ->
