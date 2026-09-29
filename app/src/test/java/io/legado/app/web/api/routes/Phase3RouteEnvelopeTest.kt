@@ -65,4 +65,29 @@ class Phase3RouteEnvelopeTest {
             )
         }
     }
+
+    /**
+     * 四期 F 组控制台端点**级别契约**回归（REQ-3-601 / REQ-4-108~110）。
+     *
+     * 锁死两件事：① 三个写端点（安装 / 本地上传 / 回退）必须 **ADMIN**（安装控制台 = 远程执行已装前端，
+     * 属最高权限动作，降级即越权面）；② 状态查询端点必须是 **READONLY 且非 NONE**
+     * （一期契约硬断言「路由级别不得为 NONE」，免令牌须走 `WebAuth` 白名单而非级别置空）。
+     */
+    @Test
+    fun consoleRoutes_declareExpectedLevels() {
+        val src = code("ConsoleRoutes.kt")
+        listOf("/consoleInstall", "/uploadConsoleZip", "/consoleRollback").forEach { path ->
+            val m = Regex(
+                """ApiRoute\(Method\.POST,\s*"${Regex.escape(path)}",\s*Level\.(\w+)"""
+            ).find(src)
+            assertTrue("$path 必须已声明", m != null)
+            assertTrue("$path 必须为 ADMIN（安装/回退控制台属最高权限动作）", m!!.groupValues[1] == "ADMIN")
+        }
+        val status = Regex("""ApiRoute\(Method\.GET,\s*"/consoleStatus",\s*Level\.(\w+)""").find(src)
+        assertTrue("/consoleStatus 必须已声明", status != null)
+        assertTrue(
+            "/consoleStatus 须为 READONLY 且不得为 NONE（一期契约）",
+            status!!.groupValues[1] == "READONLY",
+        )
+    }
 }
