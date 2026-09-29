@@ -20,6 +20,12 @@ class RuleToolsTest {
 
     private val tools: List<McpTool> = RuleTools.tools
 
+    /** 规则域工具名前缀白名单（域内含 replace_rule / highlight_rule / txt_toc_rule / paragraph_rule / dict_* / rule_* 等子域）。 */
+    private val rulePrefixes = listOf(
+        "replace_rule", "test_", "highlight_rule", "txt_toc_rule",
+        "paragraph_rule", "book_paragraph_rule", "dict_", "rule_",
+    )
+
     @Test
     fun replaceRuleGet_isReadonlyWithoutParams() {
         val tool = tools.single { it.name == "replace_rule_get" }
@@ -45,8 +51,8 @@ class RuleToolsTest {
         tools.forEach { tool ->
             assertEquals("域文件内的 domain 必须一致", MCP_DOMAIN_RULE, tool.domain)
             assertTrue(
-                "规则域工具名前缀须为 replace_rule / test_replace_rule：${tool.name}",
-                tool.name.startsWith("replace_rule") || tool.name.startsWith("test_replace_rule")
+                "规则域工具名须带域内前缀：${tool.name}",
+                rulePrefixes.any { tool.name.startsWith(it) }
             )
             assertNotNull("域文件声明的工具须被目录聚合：${tool.name}", McpToolCatalog.find(tool.name))
         }

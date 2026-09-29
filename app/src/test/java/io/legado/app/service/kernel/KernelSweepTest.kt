@@ -25,13 +25,22 @@ class KernelSweepTest {
     ).firstOrNull { it.isDirectory }
         ?: throw AssertionError("未找到 service/kernel 目录（工作目录=${File(".").absolutePath}）")
 
-    /** 已落地内核文件（2.3.3 BackupKernel 落地后须把 "BackupKernel.kt" 补入 —— 一期目标为 5 个）。 */
+    /**
+     * 已落地内核文件清单（新增内核须同步本清单 —— 一期 5 个 + 二期 §2 新落地的 5 个）。
+     * 该清单是"内核集合不得被静默增删"的锚点（配合 G-22 结构门禁）。
+     */
     private val expectedKernels = setOf(
         "BookKernel.kt",
         "BookSourceKernel.kt",
         "RssSourceKernel.kt",
         "ReplaceRuleKernel.kt",
         "BackupKernel.kt",
+        // 二期（MCP 双通道 §2）新增业务内核
+        "BookshelfKernel.kt",
+        "ContentKernel.kt",
+        "BookmarkKernel.kt",
+        "RuleKernel.kt",
+        "SourceTempKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =

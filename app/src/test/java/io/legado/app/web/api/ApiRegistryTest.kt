@@ -167,6 +167,52 @@ class ApiRegistryTest {
         }
     }
 
+    // ------------------------------------------------------------ 二期 §2.1 / §2.6：MCP 元数据与悬空清理
+
+    @Test
+    fun mcpMetadataFields_areOptionalWithSafeDefaults() {
+        // 二期 §2.1：ApiRoute 追加 mcpTitle/mcpDescription/mcpDangerous 三个可选字段，
+        // 默认 null/null/false ⇒ 一期 28 条路由零改动（编译不受影响）。
+        val plain = ApiRoute(Method.GET, "/__probe_mcp_meta__", Level.READONLY) { ReturnData() }
+        assertNull("未声明时 mcpToolName 为 null", plain.mcpToolName)
+        assertNull("未声明时 mcpTitle 为 null", plain.mcpTitle)
+        assertNull("未声明时 mcpDescription 为 null", plain.mcpDescription)
+        assertEquals("未声明时 mcpDangerous 为 false", false, plain.mcpDangerous)
+
+        val declared = ApiRoute(
+            Method.GET, "/__probe_mcp_meta_declared__", Level.READONLY,
+            mcpToolName = "bookshelf_list",
+            mcpTitle = "书架列表",
+            mcpDescription = "读取书架全部书籍",
+            mcpDangerous = false,
+        ) { ReturnData() }
+        assertEquals("bookshelf_list", declared.mcpToolName)
+        assertEquals("书架列表", declared.mcpTitle)
+        assertNotNull(declared.mcpDescription)
+    }
+
+    @Test
+    fun sourceRoutes_doNotDeclareDanglingMcpToolNames() {
+        // 二期 §2.6：列表/批量变体（source_get_all / source_save_multi / rss_source_get_all /
+        // rss_source_save_multi）在 spec §4.2 无 1:1 工具 ⇒ 置为不投影（默认 null），
+        // 避免"路由指向不存在的工具"这种隐性错误。此处以源码扫描锁死防回归。
+        val code = mainSource("web/api/routes/SourceRoutes.kt").lines()
+            .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+            .joinToString("\n")
+        listOf("source_get_all", "source_save_multi", "rss_source_get_all", "rss_source_save_multi")
+            .forEach { name ->
+                assertTrue(
+                    "悬空 mcpToolName 须已清理（$name 在 spec §4.2 无 1:1 工具）",
+                    !code.contains("mcpToolName = \"$name\""),
+                )
+            }
+        // 正向断言：1:1 可对拍的投影须保留（防"一刀切全删"）
+        assertTrue(
+            "1:1 可对拍的路由仍须保留 mcpToolName（source_get）",
+            code.contains("mcpToolName = \"source_get\""),
+        )
+    }
+
     private fun mainSource(relFromMainJava: String): String {
         val rel = "src/main/java/io/legado/app/$relFromMainJava"
         val file = listOf(File(rel), File("../app/$rel"), File("app/$rel")).firstOrNull { it.isFile }

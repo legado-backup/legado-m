@@ -159,4 +159,24 @@ class WebApiRoutesTest {
         val keys = (allRoutes + McpRoutes.routes).map { it.key }
         assertEquals("加入 /mcp 后（方法+路径）仍须唯一", keys.size, keys.toSet().size)
     }
+
+    @Test
+    fun sourceRoutes_dropDanglingMcpProjections() {
+        // 二期 §2.6：列表/批量变体（/getBookSources、/saveBookSources、/getRssSources、/saveRssSources）
+        // 在 spec §4.2 无 1:1 工具 ⇒ 不投影（mcpToolName=null），避免"路由指向不存在的工具"。
+        val dangling = setOf("/getBookSources", "/saveBookSources", "/getRssSources", "/saveRssSources")
+        assertEquals(
+            "4 条悬空投影须全部落地为 null",
+            4,
+            SourceRoutes.routes.count { it.path in dangling },
+        )
+        SourceRoutes.routes.filter { it.path in dangling }.forEach { route ->
+            assertEquals("列表/批量变体不投影为 MCP 工具：${route.key}", null, route.mcpToolName)
+        }
+        // 正向断言：1:1 可对拍的路由仍保留投影（防"一刀切全删"）
+        assertEquals(
+            "source_get",
+            SourceRoutes.routes.first { it.path == "/getBookSource" }.mcpToolName,
+        )
+    }
 }

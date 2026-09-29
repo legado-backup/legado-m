@@ -48,7 +48,7 @@ class ReadingToolsTest {
 
     @Test
     fun declarationsAreMetadataConsistent_andRegisteredInCatalog() {
-        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_READING, "book_")
+        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_READING, "book_", "read_", "auto_read_", "epub_")
         tools.forEach { tool ->
             assertNotNull("域文件声明的工具须被目录聚合：${tool.name}", McpToolCatalog.find(tool.name))
         }

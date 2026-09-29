@@ -31,7 +31,7 @@ class BookshelfToolsTest {
 
     @Test
     fun declarationsAreMetadataConsistent_andRegisteredInCatalog() {
-        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_BOOKSHELF, "bookshelf_")
+        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_BOOKSHELF, "bookshelf_", "book_", "search_")
         tools.forEach { tool ->
             assertNotNull("域文件声明的工具须被目录聚合：${tool.name}", McpToolCatalog.find(tool.name))
         }
