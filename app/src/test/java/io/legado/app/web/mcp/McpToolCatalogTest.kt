@@ -86,10 +86,22 @@ class McpToolCatalogTest {
         val domains = McpToolCatalog.domains().toSet()
         listOf(
             MCP_DOMAIN_BOOKSHELF, MCP_DOMAIN_READING, MCP_DOMAIN_SOURCE,
-            MCP_DOMAIN_RSS, MCP_DOMAIN_RULE, MCP_DOMAIN_BACKUP
+            MCP_DOMAIN_RSS, MCP_DOMAIN_RULE, MCP_DOMAIN_BACKUP,
+            MCP_DOMAIN_TTS, MCP_DOMAIN_STATS, MCP_DOMAIN_AUTOTASK, MCP_DOMAIN_DIAG,
+            MCP_DOMAIN_STORAGE, MCP_DOMAIN_MULTIFORM, MCP_DOMAIN_EXPLORE, MCP_DOMAIN_CHARACTER,
+            MCP_DOMAIN_AI, MCP_DOMAIN_APPEARANCE, MCP_DOMAIN_CACHE, MCP_DOMAIN_APP
         ).forEach { domain ->
             assertTrue("域 $domain 须已有工具声明", domains.contains(domain))
         }
+    }
+
+    @Test
+    fun toolCount_matchesLandedScope() {
+        // tasks 2.26（分期口径 · 与决策 #25 一致）：以**逐工具清单实测数**为准，禁止为凑目标数增删工具。
+        // release 面 = 19 个域文件声明的 216 个；debug 面另含已落地的 L3 调试工具
+        // （当前仅 perf_metrics_get 1 个；§5.12 的 14 个 L3 工具落地后此处同步上调为 230）。
+        val expected = if (BuildConfig.BUILD_DEBUG) 217 else 216
+        assertEquals("工具总数须与已落地域一致（release 216 / debug 217）", expected, McpToolCatalog.all().size)
     }
 
     @Test

@@ -41,6 +41,20 @@ class KernelSweepTest {
         "BookmarkKernel.kt",
         "RuleKernel.kt",
         "SourceTempKernel.kt",
+        "TtsKernel.kt",
+        "AudioKernel.kt",
+        "ReadStatsKernel.kt",
+        "AutoTaskKernel.kt",
+        "DiagKernel.kt",
+        "MangaKernel.kt",
+        "VideoKernel.kt",
+        "ExploreKernel.kt",
+        "CharacterKernel.kt",
+        "StorageKernel.kt",
+        "AiKernel.kt",
+        "AppearanceKernel.kt",
+        "CacheTaskKernel.kt",
+        "AppSettingsKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =

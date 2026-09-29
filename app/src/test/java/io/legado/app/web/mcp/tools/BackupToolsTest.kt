@@ -5,16 +5,16 @@ import io.legado.app.web.mcp.MCP_DOMAIN_BACKUP
 import io.legado.app.web.mcp.McpTool
 import io.legado.app.web.mcp.McpToolCatalog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * ⑪ 备份域声明单测（二期 · tasks 2.16 / 2.27）。
+ * ⑪ 备份域声明单测（二期 · tasks 2.16 / 2.27 / §7.3）。
  *
- * 本批次落地 `backup_export` / `backup_preview` 两个只读工具；
- * `backup_restore`（admin + 端侧确认闸门）随 §7.3 落地 —— 级别与危险标记届时按
- * [dangerousTools_mustBeAdminLevel] 的耐久不变量校验。
+ * 本文件覆盖 5 个工具：`backup_export` / `backup_preview`（只读）＋ `backup_restore`
+ * （**ADMIN + dangerous**，端侧确认闸门）/ `backup_config_get`（只读）/ `backup_config_save`（MANAGE）。
  */
 class BackupToolsTest {
 
@@ -38,8 +38,32 @@ class BackupToolsTest {
     }
 
     @Test
+    fun backupRestore_isAdminAndDangerous() {
+        val tool = tools.single { it.name == "backup_restore" }
+        assertEquals(MCP_DOMAIN_BACKUP, tool.domain)
+        assertEquals("恢复级别必须为 ADMIN", TokenManager.Level.ADMIN, tool.level)
+        assertTrue("恢复为破坏性操作，须标 dangerous", tool.dangerous)
+        assertFalse("ADMIN 工具不标 readOnlyHint", tool.readOnlyHint)
+    }
+
+    @Test
+    fun configTools_levels() {
+        assertEquals(
+            "备份配置读取应为只读",
+            TokenManager.Level.READONLY,
+            tools.single { it.name == "backup_config_get" }.level
+        )
+        assertEquals(
+            "备份配置保存应为 MANAGE",
+            TokenManager.Level.MANAGE,
+            tools.single { it.name == "backup_config_save" }.level
+        )
+    }
+
+    @Test
     fun declarationsAreMetadataConsistent_andRegisteredInCatalog() {
         DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_BACKUP, "backup_")
+        assertEquals("备份域共 5 个工具", 5, tools.size)
         tools.forEach { tool ->
             assertNotNull("域文件声明的工具须被目录聚合：${tool.name}", McpToolCatalog.find(tool.name))
         }
