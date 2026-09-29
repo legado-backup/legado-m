@@ -56,6 +56,23 @@ class Phase3KernelApiTest {
     }
 
     @Test
+    fun cacheTaskKernel_syncRequiresCloudStorageConfigured() {
+        val src = code("CacheTaskKernel.kt")
+        // 云存储未配置时 `syncList` 应前置校验并抛业务 400（IllegalArgumentException），
+        // 而不是放行到 `getBackupNames` 抛「WebDAV not configured」→ HTTP 500（真机实测缺陷，2026-09-29）
+        assertTrue(
+            "syncList 应先校验 AppCloudStorage.isOk（未配置 ⇒ 400 人话引导，而非 500）",
+            Regex("""suspend\s+fun\s+syncList\([^)]*\)\s*:\s*Map<[^>]*>\s*=\s*withContext\(IO\)\s*\{(?s:.{0,500}?)require\(AppCloudStorage\.isOk\)""")
+                .containsMatchIn(src),
+        )
+        assertTrue(
+            "syncRun 也应先校验 AppCloudStorage.isOk（与 syncList 同前置条件）",
+            Regex("""suspend\s+fun\s+syncRun\([^)]*\)\s*:\s*Map<[^>]*>\s*=\s*withContext\(IO\)\s*\{(?s:.{0,600}?)require\(AppCloudStorage\.isOk\)""")
+                .containsMatchIn(src),
+        )
+    }
+
+    @Test
     fun phase3AddedKernelMethods_areSuspend() {
         phase3KernelMethods.forEach { (fileName, methods) ->
             val src = code(fileName)
