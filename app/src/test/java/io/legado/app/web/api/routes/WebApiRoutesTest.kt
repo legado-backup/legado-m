@@ -135,4 +135,28 @@ class WebApiRoutesTest {
             )
         }
     }
+
+    // ---------------------------------------------------------------- 二期：/mcp 传输入口
+
+    @Test
+    fun mcpTransport_isRegisteredAsThreeRoutesAtReadonly() {
+        // REQ-2-107 / SC-2-16：`/mcp` 是**注册进去的一条路由**（三方法同名路径），
+        // 不是新的 HTTP 服务 ⇒ `HttpServer.kt` 零改动。
+        assertEquals("POST/GET/DELETE 三方法", 3, McpRoutes.routes.size)
+        McpRoutes.routes.forEach { route ->
+            assertEquals(McpRoutes.PATH, route.path)
+            assertEquals("路由级门槛为 READONLY（双闸在协议核内）", Level.READONLY, route.level)
+            assertEquals("传输入口不投影为工具", null, route.mcpToolName)
+        }
+        assertEquals(
+            setOf(Method.POST, Method.GET, Method.DELETE),
+            McpRoutes.routes.map { it.method }.toSet()
+        )
+    }
+
+    @Test
+    fun mcpRoutes_doNotCollideWithBusinessRoutes() {
+        val keys = (allRoutes + McpRoutes.routes).map { it.key }
+        assertEquals("加入 /mcp 后（方法+路径）仍须唯一", keys.size, keys.toSet().size)
+    }
 }
