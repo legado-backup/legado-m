@@ -2,8 +2,11 @@ package io.legado.app.web.api.routes
 
 import fi.iki.elonen.NanoHTTPD.Method
 import io.legado.app.web.TokenManager.Level
+import io.legado.app.web.api.ApiRegistry
 import io.legado.app.web.api.ApiRoute
+import io.legado.app.web.api.ApiRouteBootstrap
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -158,6 +161,25 @@ class WebApiRoutesTest {
     fun mcpRoutes_doNotCollideWithBusinessRoutes() {
         val keys = (allRoutes + McpRoutes.routes).map { it.key }
         assertEquals("加入 /mcp 后（方法+路径）仍须唯一", keys.size, keys.toSet().size)
+    }
+
+    @Test
+    fun phase3_routesAreRegisteredUnderSameRegistry() {
+        // 三期 §1：13 组 144 端点全部经**同一个** ApiRegistry 投影（`HttpServer.kt` 零改动，门禁 G-21）。
+        // 这里只抽验各组 1 条代表性路径 + 两处级别口径，防「新增组忘了挂进 install()」。
+        ApiRouteBootstrap.install()
+        val probes = listOf(
+            Method.GET to "/testSourceSearch",      // B 组
+            Method.GET to "/getLogs",               // C 组
+            Method.GET to "/consoleStatus",         // F 组（桩）
+            Method.POST to "/setSourceEnabled",     // G 组（manage）
+        )
+        probes.forEach { (method, path) ->
+            val route = ApiRegistry.find(method, path)
+            assertNotNull("三期端点须已注册：$method $path", route)
+            assertTrue("级别不得为 NONE：$path", route!!.level != Level.NONE)
+        }
+        assertEquals("G 组写端点须为 MANAGE", Level.MANAGE, ApiRegistry.find(Method.POST, "/setSourceEnabled")?.level)
     }
 
     @Test
