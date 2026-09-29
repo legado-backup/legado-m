@@ -30,10 +30,22 @@ class ApiRegistryTest {
     // ------------------------------------------------------------ 安装 / 计数
 
     @Test
-    fun install_registersExactly28Routes() {
+    fun install_registersExactly31Routes() {
         ApiRouteBootstrap.install()
-        assertEquals("一期旧端点须为 28 条（与改造前一一对应）", 28, ApiRegistry.size)
+        assertEquals("一期旧端点 28 条 + 二期 /mcp 传输入口 3 条（POST/GET/DELETE）", 31, ApiRegistry.size)
         assertTrue(ApiRouteBootstrap.isInstalled)
+    }
+
+    @Test
+    fun mcpTransport_registersThreeMethodsAtReadonly() {
+        // REQ-2-107 / SC-2-16：「/mcp 是一条注册路由」的证据 —— 三方法同名路径、级别 READONLY，
+        // 真正双闸在协议核内（路由级只做最低门槛，否则只读令牌连 tools/list 都进不去）。
+        ApiRouteBootstrap.install()
+        listOf(Method.POST, Method.GET, Method.DELETE).forEach { method ->
+            val route = ApiRegistry.find(method, "/mcp")
+            assertNotNull("/mcp 须注册 $method 分支（REQ-2-102）", route)
+            assertEquals("路由级门槛须为 READONLY（双闸在协议核）", Level.READONLY, route!!.level)
+        }
     }
 
     @Test
@@ -41,7 +53,7 @@ class ApiRegistryTest {
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
-        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 28, ApiRegistry.size)
+        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 31, ApiRegistry.size)
     }
 
     @Test
@@ -123,7 +135,7 @@ class ApiRegistryTest {
             ApiRoute(Method.GET, probePath, Level.READONLY) { ReturnData().setData("ok") }
         )
 
-        assertEquals("新增 1 条须叠加在原 28 条之上（互不干扰）", 29, ApiRegistry.size)
+        assertEquals("新增 1 条须叠加在原 31 条之上（互不干扰）", 32, ApiRegistry.size)
         val route = ApiRegistry.find(Method.GET, probePath)
         assertNotNull("声明即注册 ⇒ 查表立即可达", route)
 
