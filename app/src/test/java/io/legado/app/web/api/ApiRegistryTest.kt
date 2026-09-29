@@ -30,9 +30,12 @@ class ApiRegistryTest {
     // ------------------------------------------------------------ 安装 / 计数
 
     @Test
-    fun install_registersExactly31Routes() {
+    fun install_registersAllDeclaredRoutes() {
         ApiRouteBootstrap.install()
-        assertEquals("一期旧端点 28 条 + 二期 /mcp 传输入口 3 条（POST/GET/DELETE）", 31, ApiRegistry.size)
+        // 口径：一期 28 条 + 二期 `/mcp` 3 条（POST/GET/DELETE）+ **三期 13 组 144 条**（B 10 / C 3 / D 6 /
+        // E 9 / N 漫画 5 / N 视频 7 / O 发现 7 / M 角色 4 / L 存储 6 / AI+外观+缓存 38 / G 书架 11 /
+        // G 设置 36 / F 控制台 2）= 175。新增端点时须同步此常量（tasks 三期 §1 收尾项）。
+        assertEquals("路由总数 = 一期 28 + 二期 3 + 三期 144", 175, ApiRegistry.size)
         assertTrue(ApiRouteBootstrap.isInstalled)
     }
 
@@ -53,7 +56,7 @@ class ApiRegistryTest {
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
-        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 31, ApiRegistry.size)
+        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 175, ApiRegistry.size)
     }
 
     @Test
@@ -135,7 +138,7 @@ class ApiRegistryTest {
             ApiRoute(Method.GET, probePath, Level.READONLY) { ReturnData().setData("ok") }
         )
 
-        assertEquals("新增 1 条须叠加在原 31 条之上（互不干扰）", 32, ApiRegistry.size)
+        assertEquals("新增 1 条须叠加在原 175 条之上（互不干扰）", 176, ApiRegistry.size)
         val route = ApiRegistry.find(Method.GET, probePath)
         assertNotNull("声明即注册 ⇒ 查表立即可达", route)
 
