@@ -55,10 +55,41 @@ class WebServiceSettingsScreenContractTest {
         // 所有非主按钮都必须走 actionPalette；漏传会静默退回不可见的 miuix.surfaceVariant
         val buttonCalls = Regex("""LegadoMiuixActionButton\(""").findAll(screen).count()
         val paletteArgs = Regex("""palette = buttons,""").findAll(screen).count()
-        assertTrue("本页按钮数应 ≥ 5（地址 1 / 令牌 3 / 引导 4）", buttonCalls >= 5)
+        assertTrue("本页按钮数应 ≥ 9（地址 1 / 令牌 3 / 引导 4 / 中继 1）", buttonCalls >= 9)
         assertTrue(
             "每个按钮都须用 actionPalette（实际 $paletteArgs / $buttonCalls）",
             paletteArgs >= buttonCalls
+        )
+    }
+
+    /**
+     * 四期 §2.1（S7 一键断电）/ §2.2（帮助入口）/ §3（公网中继卡片）新增区块的**文案与接线**回归。
+     *
+     * 为何基线化：中文字面量与资源键必须**两份 strings 齐备**，漏一份即英文/繁中环境显示资源键名；
+     * 断电按钮若漏 `danger` 会退化成普通按钮 ⇒ 不可逆动作失去视觉警示。
+     */
+    @Test
+    fun relayHelpAndShutdownSections_areFullyWired() {
+        val keys = listOf(
+            "web_section_relay", "web_relay_state_off", "web_relay_state_paired",
+            "web_relay_state_connected", "web_relay_open_settings",
+            "web_section_help", "web_help_open",
+            "web_shutdown_title", "web_shutdown_summary",
+            "web_shutdown_confirm_title", "web_shutdown_confirm_message",
+            "web_shutdown_confirm_positive", "web_shutdown_done",
+        )
+        keys.forEach { key ->
+            listOf(strings, stringsZh).forEach { file ->
+                assertTrue("文案键 $key 须同时存在于 values 与 values-zh", file.contains("""name="$key""""))
+            }
+        }
+        assertTrue(
+            "断电按钮必须标记 danger（红色警示不可逆动作）",
+            Regex("""R\.string\.web_shutdown_title[\s\S]{0,300}?danger = true""").containsMatchIn(screen)
+        )
+        assertTrue(
+            "中继卡片须提供跳原中继设置页的按钮",
+            screen.contains("R.string.web_relay_open_settings")
         )
     }
 }

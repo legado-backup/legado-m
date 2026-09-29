@@ -34,8 +34,8 @@ class Phase3RouteEnvelopeTest {
             .joinToString("\n")
     }
 
-    /** 本轮实测出缺陷的两个文件（B/C 组）。 */
-    private val guarded = listOf("DebugRoutes.kt", "LogRoutes.kt")
+    /** 本轮实测出缺陷的两个文件（B/C 组）+ 四期接入真实实现后同样必须守恒的 F 组。 */
+    private val guarded = listOf("DebugRoutes.kt", "LogRoutes.kt", "ConsoleRoutes.kt")
 
     @Test
     fun debugAndLogRoutes_wrapEveryHandlerResultInReturnData() {

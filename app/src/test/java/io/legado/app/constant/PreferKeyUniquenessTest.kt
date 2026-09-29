@@ -135,4 +135,19 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("aiSceneDescEnabled", pairs["aiSceneDescEnabled"])
     }
+
+    /**
+     * 四期 §2.1 / REQ-4-110：S7「一键断电」待补吊销标记登记。
+     *
+     * 该键是「中继离线断电 → 下次连接补吊销」的**唯一开关**，被 `RelayKernel`（读/写）消费
+     * ⇒ 改名漏改会造成「补吊销永不触发」的静默失联（编译期无提示）；取值与键名固化为同一口径。
+     */
+    @Test
+    fun s7RelayRevokePendingKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("publicWebRelayRevokePending", pairs["publicWebRelayRevokePending"])
+    }
 }
