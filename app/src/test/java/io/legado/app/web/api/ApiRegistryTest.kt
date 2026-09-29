@@ -34,9 +34,10 @@ class ApiRegistryTest {
         ApiRouteBootstrap.install()
         // 口径：一期 28 条 + 二期 `/mcp` 3 条（POST/GET/DELETE）+ **三期 13 组 144 条**（B 10 / C 3 / D 6 /
         // E 9 / N 漫画 5 / N 视频 7 / O 发现 7 / M 角色 4 / L 存储 6 / AI+外观+缓存 38 / G 书架 11 /
-        // G 设置 36 / F 控制台 2）+ **四期 F 组补 2 条**（`/consoleInstall` 接线 + `/consoleRollback` 回退）= 177。
+        // G 设置 36 / F 控制台 2）+ **四期 3 条**（`/consoleInstall` 接线 + `/consoleRollback` 回退 +
+        // 三期缺口补齐 `/ping` 连通性自检）= 178。
         // 新增端点时须同步此常量（tasks 三期 §1 收尾项）。
-        assertEquals("路由总数 = 一期 28 + 二期 3 + 三期 144 + 四期 2", 177, ApiRegistry.size)
+        assertEquals("路由总数 = 一期 28 + 二期 3 + 三期 144 + 四期 3", 178, ApiRegistry.size)
         assertTrue(ApiRouteBootstrap.isInstalled)
     }
 
@@ -57,7 +58,7 @@ class ApiRegistryTest {
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
-        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 177, ApiRegistry.size)
+        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 178, ApiRegistry.size)
     }
 
     @Test
@@ -139,7 +140,7 @@ class ApiRegistryTest {
             ApiRoute(Method.GET, probePath, Level.READONLY) { ReturnData().setData("ok") }
         )
 
-        assertEquals("新增 1 条须叠加在原 177 条之上（互不干扰）", 178, ApiRegistry.size)
+        assertEquals("新增 1 条须叠加在原 178 条之上（互不干扰）", 179, ApiRegistry.size)
         val route = ApiRegistry.find(Method.GET, probePath)
         assertNotNull("声明即注册 ⇒ 查表立即可达", route)
 

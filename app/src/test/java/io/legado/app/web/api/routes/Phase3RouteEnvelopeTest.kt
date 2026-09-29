@@ -90,4 +90,22 @@ class Phase3RouteEnvelopeTest {
             status!!.groupValues[1] == "READONLY",
         )
     }
+
+    /**
+     * 三期 L11 缺口补齐：`GET /ping` 连通性自检端点（S3 支撑件，REQ-3-905）。
+     *
+     * 锁死两件事：① 必须 **READONLY**（探针不含敏感数据，且要能"无写权限也能自检"）；
+     * ② 必须走信封（与其它端点同构，裸 Map 会被判非法 ⇒ 500）。
+     */
+    @Test
+    fun settingsRoutes_hasReadonlyPingEndpoint() {
+        val src = code("SettingsRoutes.kt")
+        val m = Regex("""ApiRoute\(Method\.GET,\s*"/ping",\s*Level\.(\w+)""").find(src)
+        assertTrue("`/ping` 连通性自检端点必须已声明", m != null)
+        assertTrue("`/ping` 必须为 READONLY", m!!.groupValues[1] == "READONLY")
+        assertTrue(
+            "`/ping` handler 须 ReturnData().setData(...)（裸 Map 会被信封判非法）",
+            Regex(""""/ping"[\s\S]{0,220}?ReturnData\(\)\.setData\(""").containsMatchIn(src),
+        )
+    }
 }
