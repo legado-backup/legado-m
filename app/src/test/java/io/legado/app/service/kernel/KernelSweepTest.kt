@@ -58,6 +58,8 @@ class KernelSweepTest {
         "SourceDebugKernel.kt",
         "DiagReadKernel.kt",
         "SourceStepTracer.kt",
+        // 四期（S7 一键断电）新增业务内核
+        "RelayKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =
