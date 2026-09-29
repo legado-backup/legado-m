@@ -38,6 +38,8 @@ class Phase3KernelApiTest {
         "AppSettingsKernel.kt" to listOf("appInfo"),
         "ContentKernel.kt" to listOf(
             "rssArticles", "rssArticleContent", "markRssRead", "readStats", "saveBookmark", "restoreBackup",
+            // 三期补记（IF-12）：名场面保存的 JSON 体包装（bookUrl 必填校验）—— 与 7 条补记路由配套
+            "saveSceneBookmark",
         ),
         "RssSourceKernel.kt" to listOf("markArticleRead"),
     )
