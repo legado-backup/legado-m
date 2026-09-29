@@ -98,10 +98,10 @@ class McpToolCatalogTest {
     @Test
     fun toolCount_matchesLandedScope() {
         // tasks 2.26（分期口径 · 与决策 #25 一致）：以**逐工具清单实测数**为准，禁止为凑目标数增删工具。
-        // release 面 = 19 个域文件声明的 216 个；debug 面另含已落地的 L3 调试工具
-        // （当前仅 perf_metrics_get 1 个；§5.12 的 14 个 L3 工具落地后此处同步上调为 230）。
-        val expected = if (BuildConfig.BUILD_DEBUG) 217 else 216
-        assertEquals("工具总数须与已落地域一致（release 216 / debug 217）", expected, McpToolCatalog.all().size)
+        // release 面 = 19 个域文件声明的 216 个；debug 面另含 14 个 L3 调试工具（tasks 5.12：
+        // perf 1 + 源/订阅调试 9 + 诊断 4）⇒ 230。
+        val expected = if (BuildConfig.BUILD_DEBUG) 230 else 216
+        assertEquals("工具总数须与已落地域一致（release 216 / debug 230）", expected, McpToolCatalog.all().size)
     }
 
     @Test
