@@ -28,6 +28,8 @@ class ConsoleEndpointAdditionsTest {
         Triple(Method.GET, "/getHttpTtsList", Level.READONLY),
         Triple(Method.POST, "/saveHttpTts", Level.MANAGE),
         Triple(Method.POST, "/deleteHttpTts", Level.MANAGE),
+        Triple(Method.GET, "/getReadGoal", Level.READONLY),
+        Triple(Method.POST, "/saveReadGoal", Level.MANAGE),
     )
 
     @Test
