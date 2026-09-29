@@ -57,6 +57,26 @@ class ConsoleInstallerTest {
         assertTrue("验签入口须显式区分本地上传豁免", src.contains("localBypass"))
     }
 
+    /**
+     * sha256 比对必须**仅在线通道生效**（本地上传豁免）。
+     *
+     * 根因（2026-09-29 L3 实测）：包内 `manifest.json` 无法携带"包含它自己的 zip 的哈希"（自引用不可实现）
+     * ⇒ 若本地通道也比对，合规包会被判 `SHA_MISMATCH` 而**永远装不上**（本地上传是断网兜底通道，属 P0 可用性）。
+     */
+    @Test
+    fun sha256Comparison_isGuardedByLocalBypass() {
+        val src = source()
+        assertTrue("必须存在 SHA_MISMATCH 拒绝分支（在线通道用）", src.contains("SHA_MISMATCH"))
+        assertTrue(
+            "sha256 比对必须包在 `!localBypass` 内（本地通道豁免，否则合规包装不上）",
+            Regex("""if\s*\(!localBypass\)\s*\{\s*\n\s*val actualSha""").containsMatchIn(src),
+        )
+        assertTrue(
+            "包内 manifest 的 sha256 字段须可缺省（默认空串）",
+            src.contains("val sha256: String = \"\""),
+        )
+    }
+
     @Test
     fun unzip_rejectsPathTraversalPerEntry() {
         val src = source()
