@@ -101,6 +101,9 @@ class McpToolCatalogTest {
         // release 面 = 19 个域文件声明的 **217** 个（三期缺口补齐新增 `legado_ping` 连通性自检探针
         // —— 见 FEATURE-MATRIX L11 / 三期 tasks 2.15.3）；debug 面另含 14 个 L3 调试工具
         // （tasks 5.12：perf 1 + 源/订阅调试 9 + 诊断 4）⇒ 231。
+        // **口径说明（2026-09-29）**：三期补记的 7 条路由（书签删除 / 名场面 / HTTP TTS 增删）
+        // 只补 **HTTP 路由**（前端控制台接线），**未**新增 MCP 工具 ⇒ 本计数不变
+        // （`ApiRoute.mcpToolName` 仅为 REST↔MCP 对拍标注，不产生工具，故这 7 条不带该标注）。
         val expected = if (BuildConfig.BUILD_DEBUG) 231 else 217
         assertEquals("工具总数须与已落地域一致（release 217 / debug 231）", expected, McpToolCatalog.all().size)
     }
