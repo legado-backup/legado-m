@@ -50,6 +50,48 @@ class WebServiceSettingsScreenContractTest {
         }
     }
 
+    /** 设置页宿主的**危险动作确认**契约（四期 REQ-4-404 / §2.1 S7）。 */
+    private val activity by lazy {
+        read("src/main/java/io/legado/app/ui/config/WebServiceSettingsActivity.kt")
+    }
+
+    /**
+     * 四期 REQ-4-403 / REQ-4-404：令牌生成的"分级确认"不得退化为"一律直接生成"。
+     *
+     * - readonly = 只读无风险 ⇒ 直接生成；
+     * - manage / admin = 写权限 ⇒ **生成前二次确认**（降级即把写权限令牌一键发出去，属安全默认失守）。
+     */
+    @Test
+    fun writeLevelTokens_requireConfirmBeforeGenerate() {
+        assertTrue("须存在只读直通分支", activity.contains("if (level == TokenManager.Level.READONLY)"))
+        assertTrue(
+            "写级令牌生成须走确认弹窗（含专属文案键）",
+            activity.contains("R.string.web_token_generate_confirm_title") &&
+                activity.contains("R.string.web_token_generate_confirm_message"),
+        )
+        assertTrue("确认后必须回到真实生成（doGenerateToken）", activity.contains("doGenerateToken(level)"))
+        listOf(strings, stringsZh).forEach { file ->
+            assertTrue(
+                "确认文案键须两份 strings 齐备",
+                file.contains("""name="web_token_generate_confirm_title"""") &&
+                    file.contains("""name="web_token_generate_confirm_message""""),
+            )
+        }
+    }
+
+    /**
+     * 四期 §2.1 S7：一键断电**必须先吊销令牌再停服务/清中继身份**（漏吊销即"假断电"）。
+     */
+    @Test
+    fun shutdownRevokesTokensBeforeKernelShutdown() {
+        val revokeAt = activity.indexOf("TokenManager.revokeAll()")
+        val shutdownAt = activity.indexOf("RelayKernel.shutdown()")
+        assertTrue("设置页须调用令牌全量吊销", revokeAt >= 0)
+        assertTrue("设置页须调用内核断电", shutdownAt >= 0)
+        assertTrue("令牌吊销必须排在断电之前", revokeAt < shutdownAt)
+        assertTrue("断电属危险动作，必须走危险样式确认弹窗", activity.contains("dangerPositive = true"))
+    }
+
     @Test
     fun secondaryButtonsAllUseTheActionPalette() {
         // 所有非主按钮都必须走 actionPalette；漏传会静默退回不可见的 miuix.surfaceVariant
