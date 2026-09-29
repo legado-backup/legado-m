@@ -110,4 +110,43 @@ class Phase3KernelApiTest {
             )
         }
     }
+
+    /**
+     * IF-22（第 5 轮 UX/IA 重构）：`prefsGet` 的**白名单语义与元数据出参**。
+     *
+     * 为什么必须钉住：
+     * 1. 工具描述写的是「keys 省略 = 白名单全集」，而原实现空列表**返回空结果**（实现与描述不符）——
+     *    控制台设置页按「不传 keys」读取会拿到空列表而误判"没有可写偏好"；此断言防回退。
+     * 2. `available`（白名单键元数据）是控制台**按类型渲染控件**的唯一来源（前端不复制键表，
+     *    删掉它不会编译错，但会让设置页在无元数据时退化）。
+     * 3. 白名单是安全边界：**绝不含**凭据类键（AD-18 同类口径）。
+     */
+    @Test
+    fun appSettingsKernel_prefsGetWhitelistSemanticsAndMetadata() {
+        val src = code("AppSettingsKernel.kt")
+        assertTrue(
+            "prefsGet 空 keys 须回落到白名单全集（与 MCP 工具描述一致；否则控制台读到空列表）",
+            Regex("""\.ifEmpty\s*\{\s*settingDefs\.map""").containsMatchIn(src),
+        )
+        assertTrue(
+            "prefsGet 须回传 available 元数据（控制台据此按类型渲染控件，前端不复制键表）",
+            src.contains("\"available\" to availableDefs()"),
+        )
+        assertTrue(
+            "availableDefs 必须**只由白名单**生成（不得另有来源，否则可能漏出非白名单键）",
+            Regex("""private fun availableDefs\(\)\s*:\s*List<Map<String,\s*Any\?>>\s*=\s*settingDefs\.map""")
+                .containsMatchIn(src),
+        )
+
+        // 白名单块不得含凭据类字样（不含裸 `key`：白名单本就是 `PreferKey.*` 常量）
+        val whitelistBlock = Regex("""private val settingDefs = listOf\([\s\S]*?\n    \)""").find(src)?.value
+        assertTrue("应能定位 settingDefs 白名单块", whitelistBlock != null)
+        listOf("token", "password", "passwd", "secret", "auth", "cookie", "credential", "apikey")
+            .forEach { banned ->
+                assertTrue(
+                    "白名单**不得**含凭据类键（命中 $banned）",
+                    !whitelistBlock!!.lowercase().contains(banned),
+                )
+            }
+    }
 }
