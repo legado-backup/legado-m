@@ -55,6 +55,9 @@ class KernelSweepTest {
         "AppearanceKernel.kt",
         "CacheTaskKernel.kt",
         "AppSettingsKernel.kt",
+        "SourceDebugKernel.kt",
+        "DiagReadKernel.kt",
+        "SourceStepTracer.kt",
     )
 
     private fun kernelFiles(): List<File> =
