@@ -51,11 +51,28 @@ class AppSettingsToolsTest {
 
     @Test
     fun declarationsAreMetadataConsistent_andRegisteredInCatalog() {
-        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_APP, "app_")
+        // 三期 L11：本域含 `legado_ping`（**矩阵指定名**，不属 `app_` 前缀）⇒ 允许两套前缀
+        DomainDeclarationAssert.assertMetadataConsistent(tools, MCP_DOMAIN_APP, "app_", "legado_")
         tools.forEach { tool ->
             assertNotNull("域文件声明的工具须被目录聚合：${tool.name}", McpToolCatalog.find(tool.name))
         }
-        assertEquals("应用设置域须 4 个工具", 4, tools.size)
+        assertEquals("应用设置域须 5 个工具（4 + 连通性自检 legado_ping）", 5, tools.size)
+    }
+
+    /** 三期 2.15.3 / FEATURE-MATRIX L11：连通性自检探针的契约（只读、无入参、非危险）。 */
+    @Test
+    fun legadoPing_isReadonlyNoArgProbe() {
+        val tool = tools.single { it.name == "legado_ping" }
+        assertEquals(MCP_DOMAIN_APP, tool.domain)
+        assertEquals(TokenManager.Level.READONLY, tool.level)
+        assertTrue("探针须标 readOnlyHint", tool.readOnlyHint)
+        assertFalse("探针不是危险操作（不触发端侧确认闸门）", tool.dangerous)
+        assertEquals("探针不接收入参", 0, tool.inputSchema.getAsJsonArray("required").size())
+        assertEquals(
+            "探针入参属性应为空（无参数）",
+            emptySet<String>(),
+            tool.inputSchema.getAsJsonObject("properties").keySet(),
+        )
     }
 
     @Test

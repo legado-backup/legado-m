@@ -67,4 +67,28 @@ class Phase3KernelApiTest {
             }
         }
     }
+
+    /**
+     * 三期 L11 缺口补齐（S3 支撑件）：`AppSettingsKernel.ping()` 连通性探针。
+     *
+     * 锁三件事：① 必须是 suspend（内核契约）；② **只回非敏感键**（曾漏的 L11 属"后端无端点"缺口，
+     * 补时最容易顺手把地址/令牌塞进去 ⇒ 此处按白名单反查）；③ 不得回传凭据类字样。
+     */
+    @Test
+    fun appSettingsKernel_pingIsSuspendedAndNonSensitive() {
+        val src = code("AppSettingsKernel.kt")
+        assertTrue("ping 须是 suspend（内核契约）", Regex("""suspend\s+fun\s+ping\s*\(""").containsMatchIn(src))
+        val body = Regex("""suspend\s+fun\s+ping\s*\(\s*\)[\s\S]{0,600}?\n\s{4}\}""").find(src)?.value
+        assertTrue("应能定位 ping 函数体", body != null)
+        listOf("ok", "serverTime", "versionName", "consoleApiLevel", "webServiceRunning", "mcpEndpoint")
+            .forEach { key ->
+                assertTrue("ping 出参须含非敏感键 $key", body!!.contains("\"$key\""))
+            }
+        listOf("token", "Token", "password", "secret", "hostAddress", "ip").forEach { banned ->
+            assertTrue(
+                "ping 出参**不得**含敏感/凭据类字段（命中 $banned）",
+                !body!!.contains("\"$banned"),
+            )
+        }
+    }
 }
