@@ -5,16 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 书架续读条**底栏避让契约**回归测试（2026-10-01 缺陷⑤）。
+ * 书架续读条**悬空半透明胶囊契约**回归测试（2026-10-01 缺陷⑤ → 2026-10-02 视觉迭代）。
  *
- * 背景：用户报障「书架左下角『继续阅读…』被底栏遮住，要不是底栏半透明都不知道有这提示」。
- * 根因：续读条渲染在 Lazy 列表**之外**（外层 Column 末项），而底栏避让此前只做在列表的
- * `contentPadding` 上 ⇒ 本条落在底栏覆盖区。修复 = 补 `Modifier.mainBottomBarPadding()`。
+ * 背景：用户先报障「书架左下角『继续阅读…』被底栏遮住」⇒ 补 `Modifier.mainBottomBarPadding()`；
+ * 后反馈「样式丑、偏大、太高，想要悬空半透明小条」⇒ 修饰符链整体重排（悬空/半透明/胶囊/瘦身）。
  *
  * 断言的是 **modifiers 顺序即契约**：
- * `background`（底色铺满含避让区）→ `mainBottomBarPadding`（内容上移到「底栏高 + 导航栏」之上）
- * → `clickable`（点击区随内容上移，底栏区域不可误触）。
- * 顺序被调换（例如把 padding 放到 clickable 之后或 background 之前）会重新破坏避让或点击热区。
+ * `mainBottomBarPadding(extra = 8.dp)`（底栏避让 + 悬空间隙，防缺陷⑤回归）→ `padding(start/end/top)`（悬空留白）
+ * → `clip(AppShapes.Capsule)`（胶囊造型）→ `background(row.copy(alpha = 0.72f))`（半透明底色）
+ * → `clickable`（点击区随内容上移，底栏区域不可误触）→ `padding`（内容内边距）。
+ * 顺序被调换（例如 padding 放到 clickable 之后、或此前 background 先于避让铺满整宽）都会破坏悬空/造型/热区。
  */
 class BookshelfContinueBarInsetsContractTest {
 
@@ -42,20 +42,39 @@ class BookshelfContinueBarInsetsContractTest {
     }
 
     @Test
-    fun continueBarAppliesBottomBarInsetBetweenBackgroundAndClickable() {
+    fun continueBarIsFloatingTranslucentCapsuleAboveBottomBar() {
         val bar = body("private fun ContinueReadingBar(")
-        val bg = bar.indexOf(".background(Color(palette.row))")
-        val inset = bar.indexOf(".mainBottomBarPadding()")
+        val inset = bar.indexOf(".mainBottomBarPadding(extra = 8.dp)")
+        val margin = bar.indexOf(".padding(start = 12.dp, end = 12.dp, top = 6.dp)")
+        val clip = bar.indexOf(".clip(AppShapes.Capsule)")
+        val bg = bar.indexOf(".background(Color(palette.row).copy(alpha = 0.72f))")
         val click = bar.indexOf(".clickable(onClick = onClick)")
 
-        assertTrue("续读条必须补底栏避让留白 mainBottomBarPadding()（否则被底栏遮住）", inset >= 0)
-        assertTrue("未找到 background(Color(palette.row))", bg >= 0)
+        assertTrue(
+            "续读条必须补底栏避让留白 mainBottomBarPadding(extra = 8.dp)（否则被底栏遮住 / 无悬空间隙）",
+            inset >= 0
+        )
+        assertTrue(
+            "未找到悬空留白 padding(start = 12.dp, end = 12.dp, top = 6.dp)",
+            margin >= 0
+        )
+        assertTrue("未找到胶囊裁剪 clip(AppShapes.Capsule)", clip >= 0)
+        assertTrue(
+            "未找到半透明底色 background(Color(palette.row).copy(alpha = 0.72f))",
+            bg >= 0
+        )
         assertTrue("未找到 clickable(onClick = onClick)", click >= 0)
 
         assertTrue(
-            "顺序契约：background → mainBottomBarPadding → clickable（底色铺满含避让区、内容与点击区上移）。" +
-                "实得 bg=$bg inset=$inset click=$click",
-            bg < inset && inset < click
+            "顺序契约：mainBottomBarPadding → 悬空 padding → clip → background → clickable。" +
+                "实得 inset=$inset margin=$margin clip=$clip bg=$bg click=$click",
+            inset < margin && margin < clip && clip < bg && bg < click
+        )
+
+        // 旧「整宽不透明」写法必须消失（本文档缺陷根因：background 先于避让 padding 铺满整宽）
+        assertTrue(
+            "旧整宽不透明底色 background(Color(palette.row)) 残留（应改为悬空裁剪 + 半透明）",
+            bar.indexOf(".background(Color(palette.row))") < 0
         )
     }
 }
