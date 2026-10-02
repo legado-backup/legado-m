@@ -13,8 +13,9 @@ import org.junit.Test
  *
  * 断言的是 **结构即契约**：
  * ① 调用点必须是 `align(Alignment.BottomCenter)` 的 Box overlay（**不得回退为 Column 流式子项**）；
- * ② 底部留白必须由避让单源 `mainBottomBarContentPadding(...).calculateBottomPadding()` 算出后
- *    `padding(bottom = bottomBarInset)` ⇒ **紧贴底栏上沿**（不得出现裸的硬编码 bottom dp）；
+ * ② 底部留白必须取自「**底栏实际高度**」单源 `mainBottomBarActualHeight()`（= `main_bottom_bar_height`
+ *    + `main_bottom_controls_bottom_padding` + 导航栏 inset）⇒ `padding(bottom = bottomBarInset)` **紧贴底栏上沿**
+ *    （**不得**误用内容留白口径 `mainBottomBarContentPadding`，会多出 ~32dp 空档；也不得出现硬编码 bottom dp）；
  * ③ 背景**透明**（不得回退为整宽不透明/半透明色块）；
  * ④ 列表/网格必须为悬浮条**预留高度**（`extraBottomReserve`），否则透明条会盖住最后一行。
  */
@@ -61,14 +62,15 @@ class BookshelfContinueBarInsetsContractTest {
                 "实得调用点片段：$call",
             "modifier = Modifier.align(Alignment.BottomCenter)" in call
         )
-        // ② 紧贴底栏上沿：底部留白取自避让单源（底栏高 + 导航栏）
+        // ② 紧贴底栏上沿：必须取「底栏实际高度」单源（用内容留白口径会多出 ~32dp 空档）
         assertTrue(
-            "续读条底部留白必须取自避让单源 mainBottomBarContentPadding(...)",
-            "mainBottomBarContentPadding(" in bar
+            "续读条底部留白必须取自「底栏实际高度」单源 mainBottomBarActualHeight()" +
+                "（误用 mainBottomBarContentPadding() 会多出空档，用户 2026-10-02 报障）",
+            "mainBottomBarActualHeight()" in bar
         )
         assertTrue(
-            "续读条必须用 calculateBottomPadding() 算出底栏高度并以 padding(bottom = bottomBarInset) 紧贴底栏上沿",
-            "calculateBottomPadding()" in bar && "padding(bottom = bottomBarInset)" in bar
+            "续读条必须以 padding(bottom = bottomBarInset) 紧贴底栏上沿（不得出现硬编码 bottom dp）",
+            "padding(bottom = bottomBarInset)" in bar
         )
         // ③ 背景透明（不做色块）——用户明确「哪怕设置成透明色也比现在的好看」
         assertTrue(
