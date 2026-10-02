@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.bookshelf
 
 import io.legado.app.testkit.SourceFileProbe
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,7 +17,8 @@ import org.junit.Test
  * ② 底部留白必须取自「**底栏实际高度**」单源 `mainBottomBarActualHeight()`（= `main_bottom_bar_height`
  *    + `main_bottom_controls_bottom_padding` + 导航栏 inset）⇒ `padding(bottom = bottomBarInset)` **紧贴底栏上沿**
  *    （**不得**误用内容留白口径 `mainBottomBarContentPadding`，会多出 ~32dp 空档；也不得出现硬编码 bottom dp）；
- * ③ 背景**透明**（不得回退为整宽不透明/半透明色块）；
+ * ③ 配色/造型必须**跟随底栏**（`palette.bottomBar` / `palette.bottomBarText` + 底栏同款圆角 `main_bottom_bar_corner_radius`
+ *    与左右内缩 `main_bottom_controls_horizontal_padding`，零硬编码色）；
  * ④ 列表/网格必须为悬浮条**预留高度**（`extraBottomReserve`），否则透明条会盖住最后一行。
  */
 class BookshelfContinueBarInsetsContractTest {
@@ -72,10 +74,23 @@ class BookshelfContinueBarInsetsContractTest {
             "续读条必须以 padding(bottom = bottomBarInset) 紧贴底栏上沿（不得出现硬编码 bottom dp）",
             "padding(bottom = bottomBarInset)" in bar
         )
-        // ③ 背景透明（不做色块）——用户明确「哪怕设置成透明色也比现在的好看」
+        // ③ 配色/造型必须跟随底栏单源（磨砂玻璃同款）——用户第四轮：「跟底栏一样的配色样式方案」
         assertTrue(
-            "续读条必须为透明背景（不得回退为整宽不透明/半透明色块）",
-            ".background(" !in bar
+            "续读条底色必须取主题底栏色 palette.bottomBar（跟随底栏配色方案）",
+            "background(Color(palette.bottomBar)" in bar
+        )
+        assertTrue(
+            "续读条图标/文字色必须取 palette.bottomBarText（跟随底栏配色方案）",
+            "palette.bottomBarText" in bar
+        )
+        assertTrue(
+            "续读条必须用底栏同款圆角 main_bottom_bar_corner_radius + 左右内缩 main_bottom_controls_horizontal_padding",
+            "R.dimen.main_bottom_bar_corner_radius" in bar &&
+                "R.dimen.main_bottom_controls_horizontal_padding" in bar
+        )
+        assertFalse(
+            "禁止硬编码颜色（必须走主题 token）",
+            Regex("Color\\(0x").containsMatchIn(bar)
         )
     }
 
