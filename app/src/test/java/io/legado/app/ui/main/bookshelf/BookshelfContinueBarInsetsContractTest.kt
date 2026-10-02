@@ -5,16 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 书架续读条**悬空半透明胶囊契约**回归测试（2026-10-01 缺陷⑤ → 2026-10-02 视觉迭代）。
+ * 书架续读条**悬浮结构契约**回归测试。
  *
- * 背景：用户先报障「书架左下角『继续阅读…』被底栏遮住」⇒ 补 `Modifier.mainBottomBarPadding()`；
- * 后反馈「样式丑、偏大、太高，想要悬空半透明小条」⇒ 修饰符链整体重排（悬空/半透明/胶囊/瘦身）。
+ * 演进：2026-10-01 缺陷⑤（被底栏遮挡 ⇒ 补避让）→ 2026-10-02 视觉迭代（悬空胶囊）→
+ * **2026-10-02 二改**（用户原文：「续读条不能在一个父容器里面呢，就不能通过计算高度的方式紧贴底栏
+ * 上部，中间哪怕你设置成透明色也比你现在的好看」）⇒ 由「Column 流式子项」改为 **Box overlay**。
  *
- * 断言的是 **modifiers 顺序即契约**：
- * `mainBottomBarPadding(extra = 8.dp)`（底栏避让 + 悬空间隙，防缺陷⑤回归）→ `padding(start/end/top)`（悬空留白）
- * → `clip(AppShapes.Capsule)`（胶囊造型）→ `background(row.copy(alpha = 0.72f))`（半透明底色）
- * → `clickable`（点击区随内容上移，底栏区域不可误触）→ `padding`（内容内边距）。
- * 顺序被调换（例如 padding 放到 clickable 之后、或此前 background 先于避让铺满整宽）都会破坏悬空/造型/热区。
+ * 断言的是 **结构即契约**：
+ * ① 调用点必须是 `align(Alignment.BottomCenter)` 的 Box overlay（**不得回退为 Column 流式子项**）；
+ * ② 底部留白必须由避让单源 `mainBottomBarContentPadding(...).calculateBottomPadding()` 算出后
+ *    `padding(bottom = bottomBarInset)` ⇒ **紧贴底栏上沿**（不得出现裸的硬编码 bottom dp）；
+ * ③ 背景**透明**（不得回退为整宽不透明/半透明色块）；
+ * ④ 列表/网格必须为悬浮条**预留高度**（`extraBottomReserve`），否则透明条会盖住最后一行。
  */
 class BookshelfContinueBarInsetsContractTest {
 
@@ -41,40 +43,47 @@ class BookshelfContinueBarInsetsContractTest {
         throw AssertionError("函数体括号不匹配：$signature")
     }
 
+    /** 续读条**调用点**窗口（函数定义在文件后部，故首次出现即调用点）——用于 overlay 结构断言 */
+    private fun callSite(): String {
+        val idx = source.indexOf("ContinueReadingBar(")
+        assertTrue("未找到 ContinueReadingBar 调用点", idx >= 0)
+        return source.substring(idx, minOf(source.length, idx + 260))
+    }
+
     @Test
-    fun continueBarIsFloatingTranslucentCapsuleAboveBottomBar() {
+    fun continueBarIsBottomOverlayHuggingBottomBarWithTransparentBg() {
         val bar = body("private fun ContinueReadingBar(")
-        val inset = bar.indexOf(".mainBottomBarPadding(extra = 8.dp)")
-        val margin = bar.indexOf(".padding(start = 12.dp, end = 12.dp, top = 6.dp)")
-        val clip = bar.indexOf(".clip(AppShapes.Capsule)")
-        val bg = bar.indexOf(".background(Color(palette.row).copy(alpha = 0.72f))")
-        val click = bar.indexOf(".clickable(onClick = onClick)")
+        val call = callSite()
 
+        // ① 结构：必须是 Box overlay（align BottomCenter），不得回退为 Column 流式子项
         assertTrue(
-            "续读条必须补底栏避让留白 mainBottomBarPadding(extra = 8.dp)（否则被底栏遮住 / 无悬空间隙）",
-            inset >= 0
+            "续读条必须以 Box overlay + align(Alignment.BottomCenter) 悬浮定位（不得回退为 Column 流式子项）。" +
+                "实得调用点片段：$call",
+            "modifier = Modifier.align(Alignment.BottomCenter)" in call
+        )
+        // ② 紧贴底栏上沿：底部留白取自避让单源（底栏高 + 导航栏）
+        assertTrue(
+            "续读条底部留白必须取自避让单源 mainBottomBarContentPadding(...)",
+            "mainBottomBarContentPadding(" in bar
         )
         assertTrue(
-            "未找到悬空留白 padding(start = 12.dp, end = 12.dp, top = 6.dp)",
-            margin >= 0
+            "续读条必须用 calculateBottomPadding() 算出底栏高度并以 padding(bottom = bottomBarInset) 紧贴底栏上沿",
+            "calculateBottomPadding()" in bar && "padding(bottom = bottomBarInset)" in bar
         )
-        assertTrue("未找到胶囊裁剪 clip(AppShapes.Capsule)", clip >= 0)
+        // ③ 背景透明（不做色块）——用户明确「哪怕设置成透明色也比现在的好看」
         assertTrue(
-            "未找到半透明底色 background(Color(palette.row).copy(alpha = 0.72f))",
-            bg >= 0
+            "续读条必须为透明背景（不得回退为整宽不透明/半透明色块）",
+            ".background(" !in bar
         )
-        assertTrue("未找到 clickable(onClick = onClick)", click >= 0)
+    }
 
+    @Test
+    fun bookshelfListsReserveHeightForFloatingContinueBar() {
+        val hits = source.split("extraBottomReserve = continueBarReserve").size - 1
         assertTrue(
-            "顺序契约：mainBottomBarPadding → 悬空 padding → clip → background → clickable。" +
-                "实得 inset=$inset margin=$margin clip=$clip bg=$bg click=$click",
-            inset < margin && margin < clip && clip < bg && bg < click
-        )
-
-        // 旧「整宽不透明」写法必须消失（本文档缺陷根因：background 先于避让 padding 铺满整宽）
-        assertTrue(
-            "旧整宽不透明底色 background(Color(palette.row)) 残留（应改为悬空裁剪 + 半透明）",
-            bar.indexOf(".background(Color(palette.row))") < 0
+            "书架列表/网格（≥2 处调用）必须为悬浮续读条预留底部高度 extraBottomReserve，" +
+                "否则透明条会盖住最后一行。命中=$hits",
+            hits >= 2
         )
     }
 }
