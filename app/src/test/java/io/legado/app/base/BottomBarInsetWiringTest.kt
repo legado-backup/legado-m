@@ -84,4 +84,26 @@ class BottomBarInsetWiringTest {
             tool.contains("navigationBarHeight + 90.dpToPx()")
         )
     }
+
+    @Test
+    fun singleSource_actualHeightUsesRealBarDimens() {
+        // 「底栏实际占位高」单源：供需要**紧贴底栏上沿**的悬浮元素（书架续读条 overlay）定位。
+        // 与内容留白口径（main_content_bottom_bar_padding = 90dp）用途不同，误用会多出 ~32dp 空档
+        // （用户 2026-10-02 报障「离底栏上部还是很远，中间至少有续读条两倍的空档」）。
+        val tool = code("base/ComposeMainInsets.kt")
+        assertTrue(
+            "必须导出「底栏实际占位高」单源入口 mainBottomBarActualHeight()",
+            tool.contains("fun mainBottomBarActualHeight(")
+        )
+        assertTrue(
+            "实际高度必须取底栏真实 dimen（main_bottom_bar_height + main_bottom_controls_bottom_padding），" +
+                "不得复用内容留白 dimen（90dp）",
+            tool.contains("R.dimen.main_bottom_bar_height") &&
+                tool.contains("R.dimen.main_bottom_controls_bottom_padding")
+        )
+        assertTrue(
+            "实际高度必须叠加导航栏 inset（否则三键导航设备上悬浮条会压住底栏）",
+            tool.contains("WindowInsets.navigationBars")
+        )
+    }
 }
