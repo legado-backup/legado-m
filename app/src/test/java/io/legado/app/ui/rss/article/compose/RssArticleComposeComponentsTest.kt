@@ -194,7 +194,9 @@ class RssArticleComposeComponentsTest {
             img.contains("Glide.with(context.applicationContext).clear(")
         )
         assertTrue("必须显式限制解码尺寸（替代 ImageView 自动尺寸探测）", img.contains("onSizeChanged"))
-        assertTrue("解码尺寸必须下发给 Glide", img.contains("CustomTarget<Bitmap>(width, height)"))
+        // 2026-10-01 缺陷④：尺寸由「等首个非零测量后一次性取用」得到（key 收敛为 origin,link），
+        // 故下发形态由 `(width, height)` 变为 `(size.width, size.height)`；语义不变（仍限制解码尺寸）
+        assertTrue("解码尺寸必须下发给 Glide", img.contains("CustomTarget<Bitmap>(size.width, size.height)"))
         // 硬编码色红线同样适用于图片组件（本仓取色门禁口径）
         assertFalse("不得硬编码色值", Regex("0x[0-9A-Fa-f]{8}").containsMatchIn(img))
     }

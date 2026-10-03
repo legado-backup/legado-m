@@ -84,18 +84,24 @@ class BackupRestoreLockTest {
      */
     @Test
     fun webBackupEntryIsWrappedByStorageLock() {
+        // 一期 §2.3.3：业务下沉到 `service/kernel/BackupKernel.kt` ⇒ 断言须同时覆盖两处源码
+        val kernel = listOf(
+            File("src/main/java/io/legado/app/service/kernel/BackupKernel.kt"),
+            File("../app/src/main/java/io/legado/app/service/kernel/BackupKernel.kt"),
+            File("app/src/main/java/io/legado/app/service/kernel/BackupKernel.kt")
+        ).first { it.isFile }.readText()
         val source = listOf(
             File("src/main/java/io/legado/app/api/controller/BackupController.kt"),
             File("../app/src/main/java/io/legado/app/api/controller/BackupController.kt"),
             File("app/src/main/java/io/legado/app/api/controller/BackupController.kt")
-        ).first { it.isFile }.readText()
+        ).first { it.isFile }.readText() + "\n" + kernel
         assertTrue(
             "Web 备份对外入口须经 BackupRestoreLock 包裹",
-            source.contains("BackupRestoreLock.withStorageLock { executeWebBackupUnlocked() }")
+            source.contains("BackupRestoreLock.withStorageLock { buildBackupZip() }")
         )
         assertTrue(
             "未加锁实现必须私有，避免被外部绕过锁直接调用",
-            source.contains("private suspend fun executeWebBackupUnlocked()")
+            source.contains("private suspend fun buildBackupZip(): File")
         )
     }
 }

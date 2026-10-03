@@ -43,7 +43,10 @@ class DatabaseMigration111To112Test {
 
     @Test
     fun databaseVersionIsBumpedTo112() {
-        assertTrue("AppDatabase version 须为 112", appDatabase.contains("version = 112"))
+        // 版本号只能递增：112 之后新增迁移（113 mcp_audit 等）不得让本测试失真
+        // ⇒ 断言「不低于 112」而非「恒等于 112」（后者每加一版都要回来改，属脆断言）。
+        val version = Regex("""\bversion\s*=\s*(\d+)""").find(appDatabase)?.groupValues?.get(1)?.toInt()
+        assertTrue("AppDatabase version 须 ≥ 112（实测 $version）", version != null && version >= 112)
         assertTrue("实体须登记 SceneBookmark", appDatabase.contains("SceneBookmark::class"))
         assertTrue("DAO 须暴露 sceneBookmarkDao", appDatabase.contains("abstract val sceneBookmarkDao"))
         assertTrue("迁移数组须登记 migration_111_112", migrations.contains("migration_111_112"))
