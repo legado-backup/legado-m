@@ -21,7 +21,10 @@ class BackupControllerContractTest {
         listOf(File(rel), File("../app/$rel"), File("app/$rel")).first { it.isFile }.readText()
 
     private val controller by lazy {
-        read("src/main/java/io/legado/app/api/controller/BackupController.kt")
+        // 一期 §2.3.3：备份业务已下沉到 `service/kernel/BackupKernel.kt`（Controller 只剩包响应）
+        // ⇒ 契约断言必须同时覆盖两处源码，否则搬迁会让这些不变量静默失真。
+        read("src/main/java/io/legado/app/api/controller/BackupController.kt") +
+            "\n" + read("src/main/java/io/legado/app/service/kernel/BackupKernel.kt")
     }
     private val selector by lazy {
         read("src/main/java/io/legado/app/help/storage/BackupSelectorConfig.kt")
@@ -60,11 +63,25 @@ class BackupControllerContractTest {
     fun webBackupIsWrappedBySharedStorageLock() {
         assertTrue(
             "Web 备份对外入口须经 BackupRestoreLock 包裹（REQ-07）",
-            controller.contains("BackupRestoreLock.withStorageLock { executeWebBackupUnlocked() }")
+            controller.contains("BackupRestoreLock.withStorageLock { buildBackupZip() }")
         )
         assertTrue(
             "未加锁实现必须私有（防绕过锁直调）",
-            controller.contains("private suspend fun executeWebBackupUnlocked()")
+            controller.contains("private suspend fun buildBackupZip(): File")
+        )
+    }
+
+    @Test
+    fun backupTimeoutIsExpressedByCancellationNotByOrphanCoroutine() {
+        // 原实现用「120s 门闩 + 后台协程」：超时后响应已回错，但备份仍在跑且共享锁被孤儿协程持有。
+        // 下沉后统一用 withTimeout（超时即取消 ⇒ 随 withLock 正常释放锁）。
+        assertTrue(
+            "备份须由 withTimeout 限时（超时可取消，不留孤儿协程）",
+            controller.contains("withTimeout(BACKUP_TIMEOUT_MS)")
+        )
+        assertFalse(
+            "不得回退到 CountDownLatch 门闩写法",
+            controller.contains("CountDownLatch")
         )
     }
 

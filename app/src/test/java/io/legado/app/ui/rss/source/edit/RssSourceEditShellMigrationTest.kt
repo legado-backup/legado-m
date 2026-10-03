@@ -55,7 +55,9 @@ class RssSourceEditShellMigrationTest {
             "四个 View 内核必须经 AndroidView 托管",
             s.contains("AndroidView(") && s.contains("factory = { checkRowView }") &&
                 s.contains("factory = { paramRowView }") && s.contains("factory = { tabLayoutView }") &&
-                s.contains("factory = { recyclerView }")
+                // 2026-10-02 fix-source-edit-list-overflow：RecyclerView 改由外层裁剪容器承载
+                // （堵住列表上滑时 item 越界溢出到 TabLayout 区域的重影）
+                s.contains("factory = { recyclerViewContainer }")
         )
         assertTrue(
             "多选框行/参数行必须程序化重建为 HorizontalScrollView + LinearLayout（原几何：8dp 内边距 + 垂直居中）",
@@ -82,6 +84,40 @@ class RssSourceEditShellMigrationTest {
         assertTrue(
             "解析并发输入框必须保持 60dp/数字键盘/最长 2 位（原 XML 逐项）",
             s.contains("InputType.TYPE_CLASS_NUMBER") && s.contains("InputFilter.LengthFilter(2)")
+        )
+    }
+
+    /**
+     * 2026-10-02 fix-source-edit-list-overflow 契约（用户报障「列表上滑时内容重影到 Tab 标签区」）。
+     *
+     * 根因：`RecyclerView` 因 `clipToPadding=false` 不在自身 `dispatchDraw` 设 canvas 裁剪，滚出顶部的
+     * item 溢出；换装 Compose 后承载层 `AndroidViewsHandler` 又不按 `elevation` 排序兄弟 View，
+     * 原 XML 时代负责遮挡的 `TabLayout`(3dp) 失效。修法：外层 `FrameLayout`（`clipToPadding` 默认 true）
+     * 在 `dispatchDraw` 裁到自身边界；容器无 padding ⇒ RecyclerView 底部 inset 留白语义不变。
+     */
+    @Test
+    fun listHostedInClippingContainer() {
+        val s = src()
+        assertTrue(
+            "必须新增外层裁剪容器（FrameLayout 包 RecyclerView）",
+            s.contains("private val recyclerViewContainer: FrameLayout by lazy") &&
+                s.contains("FrameLayout(this)") &&
+                Regex("addView\\(\\s*recyclerView,").containsMatchIn(s)
+        )
+        assertTrue(
+            "容器必须包住 RecyclerView 且铺满（MATCH_PARENT）",
+            s.contains("FrameLayout.LayoutParams(") && s.contains("ViewGroup.LayoutParams.MATCH_PARENT")
+        )
+        assertFalse(
+            "容器自身不得设 padding（否则会改变 RecyclerView 的底部 inset 留白语义）",
+            // 锚定到容器声明行，避免正则从后面 `factory = { recyclerViewContainer }` 处起匹配
+            // 而误命中其它控件的 setPadding(。（2026-10-02 断言缺陷修正）
+            Regex("recyclerViewContainer: FrameLayout by lazy \\{[\\s\\S]{0,800}?setPadding\\(")
+                .containsMatchIn(s)
+        )
+        assertTrue(
+            "RecyclerView 仍须保持 clipToPadding=false（底部留白语义不丢）",
+            s.contains("RecyclerView(this)") && s.contains("clipToPadding = false")
         )
     }
 
