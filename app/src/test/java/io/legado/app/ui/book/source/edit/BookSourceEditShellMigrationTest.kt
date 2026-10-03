@@ -97,6 +97,40 @@ class BookSourceEditShellMigrationTest {
         )
     }
 
+    /**
+     * 2026-10-02 fix-source-edit-list-overflow 契约（用户报障「列表上滑时内容重影到 Tab 标签区」）。
+     *
+     * 根因：`RecyclerView` 因 `clipToPadding=false` 不在自身 `dispatchDraw` 设 canvas 裁剪，滚出顶部的
+     * item 溢出；换装 Compose 后承载层 `AndroidViewsHandler` 又不按 `elevation` 排序兄弟 View，
+     * 原 XML 时代负责遮挡的 `TabLayout`(3dp) 失效。修法：装配单源新增外层 `FrameLayout`
+     * （`clipToPadding` 默认 true）在 `dispatchDraw` 裁到自身边界；容器无 padding ⇒ RecyclerView
+     * 底部 inset 留白语义不变；宿主 `AndroidView` 的 factory 改指向该容器。
+     */
+    @Test
+    fun listHostedInClippingContainer() {
+        val shellSrc = shellCode()
+        assertTrue(
+            "装配单源必须新增外层裁剪容器（FrameLayout 包 RecyclerView）",
+            shellSrc.contains("val recyclerViewContainer: FrameLayout = FrameLayout(context)") &&
+                Regex("addView\\(\\s*recyclerView,").containsMatchIn(shellSrc)
+        )
+        assertFalse(
+            "容器自身不得设 padding（否则会改变 RecyclerView 的底部 inset 留白语义）",
+            // 锚定到容器声明行，避免正则从后面 `factory = { shell.recyclerViewContainer }` 处起匹配
+            // 而误命中其它控件的 setPadding(。（2026-10-02 断言缺陷修正）
+            Regex("recyclerViewContainer: FrameLayout = FrameLayout\\(context\\)\\.apply \\{[\\s\\S]{0,800}?setPadding\\(")
+                .containsMatchIn(shellSrc)
+        )
+        assertTrue(
+            "宿主 AndroidView 必须改由容器承载列表",
+            hostCode().contains("factory = { shell.recyclerViewContainer }")
+        )
+        assertFalse(
+            "宿主不得再直接把 RecyclerView 交给 AndroidView（须经裁剪容器）",
+            hostCode().contains("factory = { shell.recyclerView }")
+        )
+    }
+
     @Test
     fun recyclerViewAlwaysGetsLayoutManager() {
         val s = hostCode()
