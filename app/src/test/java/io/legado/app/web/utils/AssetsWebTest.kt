@@ -61,6 +61,28 @@ class AssetsWebTest {
         assertEquals("text/html", AssetsWeb.mimeOf("/"))
     }
 
+    // ------------------------------------------------------------ 缓存策略
+
+    @Test
+    fun cacheControlOf_hashedAssets_areImmutableLongCached() {
+        // Vite 产物文件名带内容哈希 ⇒ /assets/ 下可长期缓存（真机卡顿修复：此前无任何缓存头）
+        listOf(
+            "/vue/assets/vendor-Beqdr9ys.js",
+            "/vue/assets/index-D-xjtX9_.css",
+            "/assets/a.woff2",
+        ).forEach {
+            assertEquals("$it 应为 immutable 长缓存", "public, max-age=31536000, immutable", AssetsWeb.cacheControlOf(it))
+        }
+    }
+
+    @Test
+    fun cacheControlOf_nonHashedEntries_revalidateEveryTime() {
+        // 入口页/图标等无内容哈希 ⇒ 必须回源校验，否则升级后仍引用旧哈希产物
+        listOf("/vue/index.html", "/index.html", "/", "/favicon.ico").forEach {
+            assertEquals("$it 应为 no-cache", "no-cache", AssetsWeb.cacheControlOf(it))
+        }
+    }
+
     // ------------------------------------------------------------ 3.5 路径安全
 
     @Test
