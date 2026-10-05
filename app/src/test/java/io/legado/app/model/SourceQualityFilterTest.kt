@@ -1,4 +1,4 @@
-﻿package io.legado.app.model
+package io.legado.app.model
 
 import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.BookSource
@@ -326,5 +326,44 @@ class SourceQualityFilterTest {
         assertTrue(SourceQualityChecker.isPrivateAddress("http://169.254.169.254/latest"))
         assertFalse(SourceQualityChecker.isPrivateAddress("https://www.example.com/x"))
         assertFalse(SourceQualityChecker.isPrivateAddress("http://8.8.8.8/x"))
+    }
+
+    // === L3 列表试采入口地址：sortUrl 整行（名称::地址）必须取地址部分 ===
+
+    @Test
+    fun `入口地址-名称前缀行取地址部分`() {
+        assertEquals(
+            "/b/list.asp?ac=list&pg={{page}},{\"webView\":true}",
+            firstRssEntryUrl("影视::/b/list.asp?ac=list&pg={{page}},{\"webView\":true}", "https://s.example.com")
+        )
+    }
+
+    @Test
+    fun `入口地址-多行取首个非空行`() {
+        assertEquals(
+            "https://a.example.com/list",
+            firstRssEntryUrl("\n\n分类A::https://a.example.com/list\n分类B::https://b.example.com/list", "https://s.example.com")
+        )
+    }
+
+    @Test
+    fun `入口地址-无名称前缀时原样返回`() {
+        assertEquals(
+            "https://a.example.com/list",
+            firstRssEntryUrl("https://a.example.com/list", "https://s.example.com")
+        )
+    }
+
+    @Test
+    fun `入口地址-JS规则串原样保留不被切分`() {
+        val js = "<js>return 'a::b'.split('::')</js>"
+        assertEquals(js, firstRssEntryUrl(js, "https://s.example.com"))
+        assertEquals("@js:1::2", firstRssEntryUrl("@js:1::2", "https://s.example.com"))
+    }
+
+    @Test
+    fun `入口地址-空sortUrl回落sourceUrl`() {
+        assertEquals("https://s.example.com", firstRssEntryUrl(null, "https://s.example.com"))
+        assertEquals("https://s.example.com", firstRssEntryUrl("   ", "https://s.example.com"))
     }
 }
