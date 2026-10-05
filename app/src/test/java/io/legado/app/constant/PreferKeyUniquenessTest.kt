@@ -150,4 +150,19 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("publicWebRelayRevokePending", pairs["publicWebRelayRevokePending"])
     }
+
+    /**
+     * add-rss-article-refresh-to-top：订阅文章列表「刷新后回到顶部」开关登记。
+     *
+     * 该键被 `AppConfig.rssArticleRefreshToTop`（唯一读取点）、订阅设置页开关与搜索索引 XML
+     * 多处消费 ⇒ 改名漏改会造成「设置无效」的静默失联（编译期无提示）；此处把取值与键名固化为同一口径。
+     */
+    @Test
+    fun rssArticleRefreshToTopKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("rssArticleRefreshToTop", pairs["rssArticleRefreshToTop"])
+    }
 }
