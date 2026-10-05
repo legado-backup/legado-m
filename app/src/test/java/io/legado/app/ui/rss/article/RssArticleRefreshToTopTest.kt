@@ -202,4 +202,28 @@ class RssArticleRefreshToTopTest {
             compose.contains("key = { index, _ -> index.toString() }")
         )
     }
+
+    /**
+     * 回归（2026-10-05 模拟器 L2 实证）：Compose 回顶必须经**副作用请求通道**，
+     * 不得在数据写入同帧直接 `scrollToItem(0)` —— 该次滚动会被 LazyList 先以旧数据消费并记录旧首条 key，
+     * 新数据到达时按 key 把旧首条锚回视口顶 ⇒ 回顶被静默吞掉（现象：刷新后首条仍是旧条目）。
+     */
+    @Test
+    fun composeScrollToTopGoesThroughEffectChannel() {
+        val s = fragment()
+        assertTrue(
+            "scrollToTop 的 Compose 分支必须递增请求计数（由列表副作用消费）",
+            s.contains("scrollTopRequestState.intValue++")
+        )
+        assertTrue(
+            "请求计数必须透传给 Compose 列表",
+            s.contains("scrollTopRequest = scrollTopRequestState.intValue,")
+        )
+        assertFalse(
+            "不得在 scrollToTop 内直接 scrollToItem(0)（会被随后的新数据按 key 锚回旧首条）",
+            s.contains("listStateHolder.scrollToItem(0)")
+        )
+        // Compose 列表侧的「参数 + 副作用消费」契约由同包测试维护：
+        // app/src/test/java/io/legado/app/ui/rss/article/compose/RssArticlesComposeListScrollTopRequestTest.kt
+    }
 }
