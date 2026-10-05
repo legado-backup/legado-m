@@ -18,7 +18,7 @@ class DiscoverySubscriptionRefreshToTopSettingTest {
         SourceFileProbe.sourceText("ui/config/DiscoverySubscriptionConfigFragment.kt")
 
     private fun prefXml(): String =
-        SourceFileProbe.sourceTextByPath("app/src/main/res/xml/pref_config_discovery_subscription.xml")
+        SourceFileProbe.sourceTextByPath("src/main/res/xml/pref_config_discovery_subscription.xml")
 
     @Test
     fun settingsPageExposesRefreshToTopSwitch() {
@@ -70,7 +70,7 @@ class DiscoverySubscriptionRefreshToTopSettingTest {
             "英文 base 必须含开关摘要",
             base.contains("<string name=\"rss_article_refresh_to_top_summary\">")
         )
-        val zh = SourceFileProbe.sourceTextByPath("app/src/main/res/values-zh/strings.xml")
+        val zh = SourceFileProbe.sourceTextByPath("src/main/res/values-zh/strings.xml")
         assertTrue(
             "简体中文必须同加开关标题（否则中文环境回退英文）",
             zh.contains("<string name=\"rss_article_refresh_to_top\">")
