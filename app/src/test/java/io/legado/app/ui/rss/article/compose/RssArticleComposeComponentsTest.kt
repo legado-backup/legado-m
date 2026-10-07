@@ -88,35 +88,35 @@ class RssArticleComposeComponentsTest {
     }
 
     /**
-     * 2026-09-27 用户报障回归：样式 3「瀑布流」间距必须按**旧 View 实现的像素(px)口径**等价换算。
+     * 2026-10-07 用户报障回归（rss-list-padding-tighten）：五样式左右留白必须走**固定 dp 单源**。
      *
-     * 旧实现（`b2db2cc^` 的 `RssArticlesFragment` 样式 3 分支）用的是
-     * `RecyclerView.setPadding(20,0,20,0)` + `ItemDecoration(20,30,20,30)` —— 单位是 **px**。
-     * 换装 Compose 时若直接写 `40.dp / 30.dp / 60.dp`，会按屏幕密度整体放大
-     * （本机 ×1.5、普通手机 ×2.75~3）⇒ 卡片变窄、整页松散（用户体感「跟原来完全不一样」）。
+     * 历史写法「`N px` 数值再做 px→dp 换算」（`with(LocalDensity.current){ 40.toDp() }`）会使留白随
+     * 屏幕像素密度**反向**放大（手机 40px≈14.5dp、低密度模拟器/平板 26.7~40dp）⇒ 卡片被压窄
+     * （用户体感「其他样式宽留白太多」）。现收敛为 [RssArticleListSpacing]（`OUTER_DP` / `GAP_DP`），
+     * 对齐「自由」布局（样式 5）的紧凑口径。
      */
     @Test
-    fun staggeredSpacingUsesPixelEquivalentNotRawDp() {
-        val s = listSource()
-        listOf(
-            "val px40 = with(LocalDensity.current) { 40.toDp() }",
-            "val px30 = with(LocalDensity.current) { 30.toDp() }",
-            "val px60 = with(LocalDensity.current) { 60.toDp() }",
-        ).forEach { marker ->
-            assertTrue("样式 3 间距须按 px→dp 等价换算（缺失：`$marker`）", s.contains(marker))
+    fun spacingUsesFixedDpSingleSource() {
+        // 取值本身（真断言，非源码子串）
+        assertEquals("外沿留白必须为 4dp（对齐自由布局）", 4, RssArticleListSpacing.OUTER_DP)
+        assertEquals("条目间距必须为 4dp（对齐自由布局）", 4, RssArticleListSpacing.GAP_DP)
+        val s = codeOnly(listSource())
+        // 使用点：五样式留白均取自单源（外沿 / 间距）
+        assertTrue("外沿必须取单源 OUTER_DP", s.contains("RssArticleListSpacing.OUTER_DP.dp"))
+        assertTrue("间距必须取单源 GAP_DP", s.contains("RssArticleListSpacing.GAP_DP.dp"))
+        // 回退防线：px 伪 dp 写法必须清零（KDoc/注释中的历史说明由 codeOnly 剔除）
+        listOf("px40", "px30", "px60", "px8", "px4").forEach { gone ->
+            assertFalse("不得回退为 px 伪 dp 写法：`$gone`", s.contains(gone))
         }
-        assertTrue("瀑布流列间距须走 px 等价值", s.contains("Arrangement.spacedBy(px40)"))
-        assertTrue("瀑布流行间距须走 px 等价值", s.contains("verticalItemSpacing = px60"))
-        assertTrue("样式 2/4 外沿须走 px 等价值", s.contains("if (style == 2) px8 else px4"))
     }
 
     @Test
     fun xmlPixelAndFontFactsArePreserved() {
         val s = listSource()
         listOf(
-            // 样式 0：100dp 行高 / 16dp 内边距 / 110×68 封面
+            // 样式 0：100dp 行高 / 纵向 16dp 内边距（左右已于 2026-10-07 收窄至 OUTER_DP）/ 110×68 封面
             ".height(100.dp)",
-            ".padding(16.dp)",
+            ".padding(horizontal = RssArticleListSpacing.OUTER_DP.dp, vertical = 16.dp)",
             ".width(110.dp)",
             ".height(68.dp)",
             // 样式 1：220dp 封面 + 8dp 分隔块
