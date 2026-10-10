@@ -159,8 +159,12 @@ class ReaderTemplateRuntimeContractTest {
         )
         assertTrue("分栏模板才横移", flow.contains("container.scrollLeft = target * visible"))
         assertTrue(
-            "页码必须读容器实际滚动位置（回读静态 config.pageIndex ⇒ 翻页后页码不变、边界判据失真）",
-            flow.contains("function scrollIndex(") && flow.contains("scrollIndex(slot.scrollTop, visible)")
+            "页码必须来自**容器实际位置**（回读静态 config.pageIndex ⇒ 翻页后页码不变、边界判据失真）",
+            // 4.15 C1 起口径升级：自研回退分页不再读 `scrollTop`（含页眉补偿，换壳后会整体平移），
+            // 改读**结构无关的正文偏移**；但"读实际位置而非静态配置"这条不变量不变（由 bodyOffset 满足）
+            flow.contains("function scrollIndex(") &&
+                (flow.contains("scrollIndex(slot.scrollTop, visible)") ||
+                    flow.contains("clampIndex(bodyOffset / visible, totalPages)"))
         )
         assertTrue(
             "页码必须四舍五入（scrollTop 是小数：floor(782.x/783)=0 ⇒ 已翻页却判成第 1 页，2026-10-10 铁证）",
@@ -270,6 +274,42 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("须支持小时变量与阶段类", runtime.contains("--rp-hour"))
         assertTrue(runtime.contains("data-rp-phase"))
         assertTrue("须下发主题", runtime.contains("data-reader-theme"))
+    }
+
+    @Test
+    fun `首页续页双结构按页换壳`() {
+        // 4.15 C1：paged 的 firstPageHtml / otherPageHtml 是**两套 HTML**（开篇页 vs 正文页），
+        // 只渲染首屏那套 = "开篇仪式感缺失"（archive 原文能力的核心差距 G1）。
+        val runtime = asset("template-runtime.js")
+        assertTrue("须有换壳入口", runtime.contains("function applyPageShell(which)"))
+        assertTrue("须暴露当前结构（流程层与诊断都要读）", runtime.contains("function currentPageShell()"))
+        assertTrue("须有首页结构读取", runtime.contains("function openingHtml()"))
+        assertTrue("须有续页结构读取，且空时退回首页结构（作者只写一套时不白屏）",
+            runtime.contains("function continuationHtml()") && runtime.contains("return other || openingHtml();"))
+        assertTrue("滚动模板不得换壳（单份 scrollHtml）", runtime.contains("if (template.type === 'scroll') return false;"))
+        assertTrue("状态初值须为空串（否则首次 applyPageShell 直接返回 ⇒ 根壳恒空）",
+            runtime.contains("var pageShell = '';"))
+        assertTrue("首屏必须经单一写入点挂载（绕过它会留下 DOM 与状态不一致）",
+            runtime.contains("applyPageShell('opening');"))
+        assertFalse("paged 分支不得再直接 mountMarkup（绕过状态机）",
+            runtime.contains("mountMarkup(state.pageIndex === 0"))
+        // 换壳会整块替换根壳 innerHTML ⇒ 必须把正文再注入回来（否则续页"页眉页脚在、正文全空"）
+        assertTrue("换壳后必须重新注入正文", runtime.contains("applyBody(state.bodyHtml);"))
+        assertTrue("正文 HTML 必须被缓存以便换壳复用", runtime.contains("state.bodyHtml = bodyHtml || '';"))
+
+        // 流程层：换壳必须发生在页边界且带滚动补偿（否则正文错位/页码跳飞）
+        val flow = asset("template-browser-flow.js")
+        assertTrue("goto 须按目标页切换结构", flow.contains("switchShellForPage(target)"))
+        assertTrue("须两个方向都切（只切一个方向 ⇒ 翻回首页时开篇页不再出现）",
+            flow.contains("var want = target <= 0 ? 'opening' : 'continuation';"))
+        assertTrue("须有流程层结构副本以跳过无谓重建", flow.contains("var flowShell = '';"))
+        assertTrue("同结构连续换页不得重建 DOM", flow.contains("if (want === flowShell) return false;"))
+        assertTrue("横向分栏/滚动模板不换壳", flow.contains("if (isScrollMode() || isColumnsMode()) return false;"))
+        assertTrue("页码须由**结构无关的正文偏移**推出（读 scrollTop 会因页眉补偿而跳页）",
+            flow.contains("pageIndex: clampIndex(bodyOffset / visible, totalPages)"))
+        assertTrue("须有正文偏移反解（跨结构可比量）", flow.contains("function readBodyOffset("))
+        assertTrue("须有正文偏移定位", flow.contains("function applyBodyOffset("))
+        assertTrue("结算须回发结构自证（否则换壳失守只能肉眼比对）", flow.contains("settle,shell="))
     }
 
     @Test
