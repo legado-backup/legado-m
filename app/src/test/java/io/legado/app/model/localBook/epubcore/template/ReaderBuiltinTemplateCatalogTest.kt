@@ -90,6 +90,29 @@ class ReaderBuiltinTemplateCatalogTest {
     }
 
     @Test
+    fun `分页模板确有首页与续页两套结构`() {
+        // 4.15 C1：`firstPageHtml` / `otherPageHtml` 必须**真的不同**（开篇页 vs 正文页）。
+        // 若两者逐字相同，换壳就是空动作 —— C1 实现成了死代码（"看起来实现了，实则没差别"）。
+        val paged = load().templates.filter { !it.isScroll }
+        assertTrue("至少一套分页模板", paged.isNotEmpty())
+        paged.forEach { builtin ->
+            val t = builtin.template
+            assertTrue("${builtin.id} 必须声明首页结构", t.firstPageHtml.isNotBlank())
+            assertTrue("${builtin.id} 必须声明续页结构", t.otherPageHtml.isNotBlank())
+            assertTrue(
+                "${builtin.id} 的首页结构与续页结构必须不同（否则按页换壳是空动作 ⇒ C1 未落地）",
+                t.firstPageHtml.trim() != t.otherPageHtml.trim()
+            )
+            // 开篇页必有"仪式感"元素（整幅插画/大标题），即除正文槽位外还有作者装饰节点；
+            // 判据取"节点数更多"这一可机检口径，避免给每套模板写白名单关键词
+            assertTrue(
+                "${builtin.id} 的首页结构应比续页更满（开篇页 = 封面/题词，续页 = 窄页眉 + 正文）",
+                t.firstPageHtml.length > t.otherPageHtml.length
+            )
+        }
+    }
+
+    @Test
     fun `合规红线 零外部依赖`() {
         load().templates.forEach { builtin ->
             val source = builtin.template.resourceSource()
