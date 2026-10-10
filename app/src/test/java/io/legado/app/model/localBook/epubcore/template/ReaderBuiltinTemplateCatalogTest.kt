@@ -80,6 +80,16 @@ class ReaderBuiltinTemplateCatalogTest {
     }
 
     @Test
+    fun `派生字段槽位确有消费者`() {
+        // 4.15 C2：`page`/`pageCount`/`percent`/`time`/`battery` 是**沙箱派生**字段。
+        // 若内置模板一套都不用它们，运行时的派生实现就成了死代码 —— 这条确保它被真实消费。
+        val loaded = load().templates
+        val used = loaded.flatMap { FIELD.findAll(it.template.resourceSource()).map { m -> m.groupValues[1] } }.toSet()
+        assertTrue("至少一套模板须消费派生的页码槽位（否则 C2 派生是死代码）：实际=$used", used.contains("page"))
+        assertTrue("至少一套模板须消费派生的时间槽位：实际=$used", used.contains("time"))
+    }
+
+    @Test
     fun `合规红线 零外部依赖`() {
         load().templates.forEach { builtin ->
             val source = builtin.template.resourceSource()
@@ -231,8 +241,9 @@ class ReaderBuiltinTemplateCatalogTest {
 
     private companion object {
         val FIELD = Regex("""data-reader-field="([^"]+)"""")
+        /** 字段槽位白名单 = TPL-15 C2 口径（宿主提供 + 沙箱派生）。 */
         val ALLOWED_FIELDS = setOf(
-            "bookName", "chapterTitle", "progress", "page", "time", "battery"
+            "bookName", "chapterTitle", "progress", "page", "pageCount", "time", "battery", "percent"
         )
 
         /** 动效声明特征：出现任一项即必须提供 `prefers-reduced-motion` 静默分支。 */
