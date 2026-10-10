@@ -273,6 +273,25 @@ class ReaderTemplateRuntimeContractTest {
     }
 
     @Test
+    fun `派生字段补齐宿主未提供的槽位`() {
+        // 4.15 C2：内置模板页脚声明 `data-reader-field="page"`/`"time"`，而宿主 init 只给
+        // bookName/chapterTitle/progress/hour ⇒ 不派生则这两个槽位**恒空且不报错**。
+        val runtime = asset("template-runtime.js")
+        assertTrue("须有派生入口", runtime.contains("function derivedField(key)"))
+        assertTrue("页码须由沙箱派生（分页结果是它算的）", runtime.contains("case 'page': return String(state.pageIndex + 1)"))
+        assertTrue("总页数须派生", runtime.contains("case 'pageCount'"))
+        assertTrue("percent 须是 progress 的别名", runtime.contains("case 'percent'"))
+        assertTrue("时间须派生（本地时钟）", runtime.contains("case 'time': return localTime()"))
+        assertTrue("电量须派生（取不到不冒写假值）", runtime.contains("case 'battery': return state.battery || null"))
+        assertTrue("须有本地时间格式化", runtime.contains("function localTime()"))
+        assertTrue("宿主提供的字段优先于派生", runtime.contains("(supplied === undefined || supplied === null) ? derivedField(key)"))
+        assertTrue("结算后须回填页码槽位", runtime.contains("refreshFields();"))
+        assertTrue("须有电池状态监听（增强信息）", runtime.contains("navigator.getBattery"))
+        assertTrue("须有分钟级时钟刷新（C5 时间驱动）", runtime.contains("function startClock()"))
+        assertTrue("字段槽位必须自证（派生字段失效是纯静默的）", runtime.contains("',fields='"))
+    }
+
+    @Test
     fun `运行时提供响应式收紧竖排判定与素材治理`() {
         // 4.15 C9/C10/C11：三块能力的状态都只活在沙箱 <html> 上（跨源宿主读不到）⇒
         // 源码级钉住"运行时真的会写这些开关 + 自证回发"，否则真机只能靠"看起来对不对"判断。
