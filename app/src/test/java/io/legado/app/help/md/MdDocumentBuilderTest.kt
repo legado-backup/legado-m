@@ -155,4 +155,71 @@ class MdDocumentBuilderTest {
         assertTrue(built.html.isBlank())
         assertFalse(built.hasRichRender)
     }
+
+    // === S3① 相对图片内联钩子（ImageDestinationResolver）===
+
+    @Test
+    fun `不传解析器时图片引用原样保留`() {
+        val built = MdDocumentBuilder.build("![图](./img/a.png)")
+        assertTrue("默认零行为变化：引用原样进入 HTML", built.html.contains("src=\"./img/a.png\""))
+    }
+
+    @Test
+    fun `解析器可把相对引用换成 data URI`() {
+        val built = MdDocumentBuilder.build(
+            "![图](./img/a.png)",
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { src ->
+                if (src == "./img/a.png") "data:image/png;base64,QUJD" else null
+            }
+        )
+        assertTrue("目标须被改写", built.html.contains("src=\"data:image/png;base64,QUJD\""))
+        assertFalse("旧引用不得残留", built.html.contains("./img/a.png"))
+        assertTrue("alt 文本保留", built.html.contains("alt=\"图\""))
+    }
+
+    @Test
+    fun `解析器返回 null 时保持原引用`() {
+        val built = MdDocumentBuilder.build(
+            "![图](https://example.com/a.png)",
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { null }
+        )
+        assertTrue(built.html.contains("src=\"https://example.com/a.png\""))
+    }
+
+    @Test
+    fun `解析器抛异常不影响整章渲染`() {
+        val built = MdDocumentBuilder.build(
+            "# 标题\n\n![图](./a.png)\n\n正文",
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { error("读盘失败") }
+        )
+        assertTrue("章节其余内容必须照常渲染", built.html.contains("<h1>标题</h1>"))
+        assertTrue(built.html.contains("src=\"./a.png\""))
+        assertTrue(built.plainText.contains("正文"))
+    }
+
+    @Test
+    fun `解析器逐图调用且可只改写其中一张`() {
+        val seen = ArrayList<String>()
+        val built = MdDocumentBuilder.build(
+            "![一](./a.png)\n\n![二](https://example.com/b.png)",
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { src ->
+                seen += src
+                if (src == "./a.png") "data:image/png;base64,QQ==" else null
+            }
+        )
+        assertEquals("每张图各问一次", 2, seen.size)
+        assertTrue(built.html.contains("src=\"data:image/png;base64,QQ==\""))
+        assertTrue(built.html.contains("src=\"https://example.com/b.png\""))
+    }
+
+    @Test
+    fun `引用式图片同样被改写`() {
+        val built = MdDocumentBuilder.build(
+            "![图][ref]\n\n[ref]: ./img/a.png",
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { src ->
+                if (src == "./img/a.png") "data:image/png;base64,RUY=" else null
+            }
+        )
+        assertTrue(built.html.contains("src=\"data:image/png;base64,RUY=\""))
+    }
 }

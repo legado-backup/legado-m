@@ -90,4 +90,46 @@ class MdBookPipelineContractTest {
         val built = MdDocumentBuilder.build("")
         assertTrue(built.html.isBlank())
     }
+
+    // === S3① 相对图片内联（MdFile 的接线契约）===
+
+    /** 带相对图片的章节（与 MdFile 从源区间切出的形态一致）。 */
+    private fun imageChapter(): String = """
+        # 图章
+
+        ![示意图](./img/pic.png)
+
+        正文
+    """.trimIndent()
+
+    @Test
+    fun `章节相对图片在送达 payload 中保留 img 标签`() {
+        val built = MdDocumentBuilder.build(imageChapter())
+        val delivered = deliver(built.html)
+        assertTrue("img 必须进入送达 payload（渲染路径靠它出图）", delivered.contains("<img "))
+        assertTrue(delivered.contains("./img/pic.png"))
+        assertTrue("包裹形态不变 ⇒ 仍被分流规则识别", AppPattern.useHtmlRegex.matches(delivered))
+    }
+
+    @Test
+    fun `送入内联解析器后送达 payload 只含 data URI 不含相对引用`() {
+        // 复刻 MdFile 的调用形态（第三个参数即 MdRelativeImageInliner）：只在此断言
+        // "接线点存在且改写会进入送达 payload"，真实文件读取由真机 L2 取证。
+        val built = MdDocumentBuilder.build(
+            imageChapter(),
+            imageResolver = MdDocumentBuilder.ImageDestinationResolver { src ->
+                if (src == "./img/pic.png") "data:image/png;base64,UElD" else null
+            }
+        )
+        val delivered = deliver(built.html)
+        assertTrue(delivered.contains("src=\"data:image/png;base64,UElD\""))
+        assertFalse("相对引用不得残留（否则承载面拿不到目录仍会裂图）", delivered.contains("./img/pic.png"))
+    }
+
+    @Test
+    fun `图片不进入纯文本产物`() {
+        val built = MdDocumentBuilder.build(imageChapter())
+        assertTrue("alt 文本保留供纯文本/朗读", built.plainText.contains("示意图"))
+        assertFalse("纯文本不得含 img 标签", built.plainText.contains("<img"))
+    }
 }
