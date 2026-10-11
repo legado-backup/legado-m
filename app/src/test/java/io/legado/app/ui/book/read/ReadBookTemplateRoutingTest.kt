@@ -137,6 +137,36 @@ class ReadBookTemplateRoutingTest {
     }
 
     @Test
+    fun `模板失败按书级原子降级且熔断防反复（S11）`() {
+        // AD-28② 的模板侧落地：模板失败原本只 `switchTemplate(false)` 一次，**无书级状态** ⇒
+        // 下一章 `upContent` 又会重进模板面（逐章闪回 = "降级反复"），且没有同章熔断。
+        val s = text()
+        assertTrue("必须有书级模板闸门", s.contains("private fun templateAllowedForCurrentBook()"))
+        assertTrue(
+            "闸门必须复用书级降级判据（与 EPUB core 同一治理层）",
+            s.contains("isBookRenderDegradedToCanvas(ReadBook.book?.bookUrl)")
+        )
+        assertTrue(
+            "降级后本章必须改走文本富渲染面（不再尝试模板）",
+            s.contains("if (!templateAllowedForCurrentBook()) {") &&
+                s.contains("loadTextRichContentAwait(relativePosition, resetPageOffset, success)")
+        )
+        assertTrue(
+            "模板面开局必须向治理层登记书级后端",
+            s.contains("renderGovernor.startBook(book.bookUrl, BackendSelectionPolicy.Backend.DIRECT_WEB)")
+        )
+        assertTrue(
+            "失败必须上报治理层（书级降级 + 同章 15s 熔断）",
+            s.contains("renderGovernor.onChapterFailure(") &&
+                s.contains("textRichPreparedIndex.coerceAtLeast(0)")
+        )
+        assertTrue(
+            "契约变更必须清降级状态（换模板/切日夜后能按新契约重试）",
+            Regex("renderGovernor\\.dispose\\(\\)").findAll(s).count() >= 3
+        )
+    }
+
+    @Test
     fun `改完设置返回阅读页立即重载当前章`() {
         // 「设置后立马可以看到书籍变化」：管理页/主题设置是另一页面 ⇒ 必须按契约键比对后重载
         val s = text()
