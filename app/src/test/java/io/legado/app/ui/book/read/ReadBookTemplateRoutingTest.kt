@@ -120,14 +120,13 @@ class ReadBookTemplateRoutingTest {
             "非 md 文本类内容随模板总开关放开（默认关 ⇒ 零回归）",
             s.contains("ReaderTemplateManager.templatesEnabled()")
         )
-        assertTrue("出版 EPUB 必须排除（模板不适用）", s.contains("if (book.isEpub) return false"))
         assertTrue(
-            "本地 txt 必须随总开关放开（内容源 LocalBook.getContent 可读）",
-            s.contains("book.isLocalTxt && ReaderTemplateManager.templatesEnabled()")
+            "文本类格式闸门须排除 EPUB 与音视频/图片/PDF（对齐 archive isOrdinaryText）",
+            s.contains("if (book.isEpub || book.isAudio || book.isVideo || book.isImage || book.isPdf) return false")
         )
         assertTrue(
-            "在线正文必须**不得**进面（内容源 LocalBook.getContent 对在线书会走 TextFile 读本地文件失败）",
-            !s.contains("isOnLineTxt && ReaderTemplateManager.templatesEnabled()")
+            "在线正文必须走 BookHelp.getContent（此前统一用 LocalBook.getContent ⇒ 在线书读本地文件失败）",
+            s.contains("if (book.isLocal) LocalBook.getContent(book, chapter) else BookHelp.getContent(book, chapter)")
         )
         assertTrue(
             "非 md 内容必须允许非 <usehtml> 归一化（否则归一化前就会回落 canvas）",
