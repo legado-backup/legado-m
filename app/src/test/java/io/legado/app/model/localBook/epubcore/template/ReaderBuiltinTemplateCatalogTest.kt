@@ -1,5 +1,6 @@
 package io.legado.app.model.localBook.epubcore.template
 
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -139,7 +140,9 @@ class ReaderBuiltinTemplateCatalogTest {
             assertFalse("${builtin.id} 不得引用网络资源", source.contains("http://") || source.contains("https://"))
             assertFalse("${builtin.id} 不得使用 @import", source.contains("@import"))
             assertFalse("${builtin.id} 不得有 fetch/XHR", source.contains("fetch(") || source.contains("XMLHttpRequest"))
-            assertFalse("${builtin.id} 不得内联 data: 素材（本批为纯 CSS 零素材）", source.contains("data:"))
+            // 内联 `data:` 素材自 4.16 起**允许**（成套美术的字体/纹理只能内联：沙箱 iframe 无 base URL、
+            // 字体跨源受 CORS 限制）。"不得走私未登记素材"改由 `ReaderBuiltinTemplateAssetsTest`
+            // 以"登记数 == 内联数"双向闭合校验（此处不再重复断言，避免两处口径漂移）。
             assertEquals("${builtin.id} 不应含 javascript（纯 CSS 模板）", "", builtin.template.javascript)
         }
     }
@@ -147,13 +150,20 @@ class ReaderBuiltinTemplateCatalogTest {
     @Test
     fun `合规红线 无第三方 IP 关键词且来源声明在场`() {
         load().templates.forEach { builtin ->
-            val lower = builtin.template.resourceSource().lowercase()
+            // 关键词扫描必须**跳过内联 base64 载荷**：base64 是 4 字符表随机串，必然偶然命中
+            // `eva` 这类短关键词（实测 neon-night 的字体/纹理载荷即命中）——这是**假阳性**，
+            // 而"素材是否含 IP 内容"应由人工看素材本身 + `sources.json` 的来源/许可判定。
+            val lower = INLINE_DATA.replace(builtin.template.resourceSource(), " ").lowercase()
             FORBIDDEN_IP_KEYWORDS.forEach { keyword ->
                 assertFalse("${builtin.id} 不得出现第三方 IP 素材关键词：$keyword", lower.contains(keyword))
             }
             assertTrue("${builtin.id} 必须附 sources.json", builtin.sources.isNotBlank())
             assertTrue("${builtin.id} 来源声明须含许可字段", builtin.sources.contains("license"))
-            assertTrue("${builtin.id} 来源声明须声明零外部素材", builtin.sources.contains("\"assets\": []"))
+            // 4.16 起 `assets` 可为空数组（纯 CSS 模板）或成套美术登记表（旗舰主题）⇒
+            // 只要求字段在场且是数组；登记项的完整性/可考证性由 `ReaderBuiltinTemplateAssetsTest` 逐项校验。
+            val root = JsonParser.parseString(builtin.sources).asJsonObject
+            val assets = root.get("assets")
+            assertTrue("${builtin.id} 来源声明须含 assets 字段", assets != null && assets.isJsonArray)
         }
     }
 
@@ -304,5 +314,8 @@ class ReaderBuiltinTemplateCatalogTest {
         val FORBIDDEN_IP_KEYWORDS = listOf(
             "asuka", "eva", "evangelion", "doraemon", "minecraft", "pokemon", "naruto", "hatsune"
         )
+
+        /** 内联 base64 载荷（关键词扫描前必须剔除，否则随机串会假阳性命中短关键词）。 */
+        val INLINE_DATA = Regex("""data:[a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+""")
     }
 }
