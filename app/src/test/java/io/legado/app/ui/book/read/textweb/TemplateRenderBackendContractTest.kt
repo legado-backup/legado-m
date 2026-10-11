@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read.textweb
 import io.legado.app.help.md.MdRichRenderInjector
 import io.legado.app.model.localBook.epubcore.template.ReaderTemplateHostDocument
 import io.legado.app.testkit.SourceFileProbe
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -113,6 +114,30 @@ class TemplateRenderBackendContractTest {
         assertTrue(
             "沙箱必须挂载布局基线 CSS（响应式收紧 + 竖排规格）",
             s.contains("MdRichRenderInjector.TemplateLayoutCssAsset")
+        )
+    }
+
+    @Test
+    fun `防卡顿三条链路就位（4_19）`() {
+        // 4.19 / NFR-08：装饰冻结 / 首分页骨架 / 预算自证 —— 三条都**不会让页面白屏**，
+        // 只会静默退化（卡顿、闪白、无法归因），所以必须源码级钉住。
+        val s = text()
+        assertTrue("翻页须冻结动效（装饰不与分页重排抢主线程）", s.contains("motionFrozenForTurn = true"))
+        assertTrue("翻页须先下 set-motion paused 再 goto-page",
+            s.contains("postScript(\"set-motion\", \"\"\"{\"paused\":true}\"\"\")"))
+        assertTrue("结算后须恢复动效", s.contains("postScript(\"set-motion\", \"\"\"{\"paused\":false}\"\"\")"))
+        assertTrue("恢复必须尊重用户设置（专注/reduce-motion 下不得恢复）",
+            s.contains("valuesProvider().decorationMotion && webView != null"))
+        assertTrue("首帧须移除骨架", s.contains("skeletonScript(false)"))
+        assertTrue("失败/超时路径也必须移除骨架（否则骨架挡住回落后的正文）",
+            s.contains("private fun hideSkeleton()"))
+        // 6 处 = 定义 1（含体内调用 1）+ 失败路径 3（host ready 超时 / stable 超时 / 模板异常回落）+ 首帧 1。
+        // 用精确计数而非"≥1"：漏掉**任一条失败路径**都会让骨架留在屏幕上冒充"正在加载"（本项目
+        // 已多次栽在"正常路径验证过、异常路径漏接线"上），只有逐处点名才拦得住。
+        assertEquals(
+            "骨架移除必须覆盖定义（含体内调用）+ 三条失败路径 + 首帧，共 6 处",
+            6,
+            Regex("hideSkeleton\\(\\)|skeletonScript\\(false\\)").findAll(s).count()
         )
     }
 

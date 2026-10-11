@@ -90,6 +90,26 @@ class ReaderBuiltinTemplateCatalogTest {
     }
 
     @Test
+    fun `内置模板元素与动效规模在预算内（4_19 门禁）`() {
+        // 4.19 / NFR-08：重装饰模板连续翻页掉帧的根因就是**元素/动效规模失控**。
+        // 运行期自证（`elems=`/`anims=`）只能事后发现；提交期按资产静态计数才能拦在交付前。
+        // 预算取宽松值（内置 11 套当前均为 0 动效 / 纯 CSS），只拦"数量级失控"而非审美取舍。
+        load().templates.forEach { builtin ->
+            val css = builtin.template.css
+            val source = builtin.template.resourceSource()
+            val keyframes = Regex("@keyframes").findAll(css).count()
+            assertTrue("${builtin.id} @keyframes 数量 $keyframes 超预算（≤$MAX_KEYFRAMES）", keyframes <= MAX_KEYFRAMES)
+            val declared = Regex("animation\\s*:").findAll(css).count()
+            assertTrue(
+                "${builtin.id} animation 声明 $declared 处超预算（≤$MAX_ANIMATION_DECLARATIONS）",
+                declared <= MAX_ANIMATION_DECLARATIONS
+            )
+            val elements = Regex("<[a-zA-Z][^>]*>").findAll(source).count()
+            assertTrue("${builtin.id} 结构元素 $elements 个超预算（≤$MAX_ELEMENTS）", elements <= MAX_ELEMENTS)
+        }
+    }
+
+    @Test
     fun `分页模板确有首页与续页两套结构`() {
         // 4.15 C1：`firstPageHtml` / `otherPageHtml` 必须**真的不同**（开篇页 vs 正文页）。
         // 若两者逐字相同，换壳就是空动作 —— C1 实现成了死代码（"看起来实现了，实则没差别"）。
@@ -274,6 +294,11 @@ class ReaderBuiltinTemplateCatalogTest {
 
         /** 视口高尺寸声明（用于装饰带高度预算校验）。 */
         val VH_LENGTH = Regex("""(\d+(?:\.\d+)?)vh""")
+
+        /** 4.19 / NFR-08 元素与动效预算（提交期静态门禁；运行期自证口径见 `template-runtime.js`）。 */
+        const val MAX_KEYFRAMES = 8
+        const val MAX_ANIMATION_DECLARATIONS = 12
+        const val MAX_ELEMENTS = 120
 
         /** 第三方 IP 关键词（合规红线：不得内置 IP 原作素材）。 */
         val FORBIDDEN_IP_KEYWORDS = listOf(

@@ -155,7 +155,10 @@ class ReaderTemplateRuntimeContractTest {
         )
         assertTrue(
             "自研回退须纵移（用错轴＝点翻页没反应）",
-            flow.contains("container.scrollTop = target * visible")
+            // 4.15 C1 起口径升级：纵移量改由**结构无关的正文偏移**推出（`scrollTop` 含页眉补偿，
+            // 换壳后会整体平移）⇒ 断言从"写 target*visible"改为"落到 bodyOffset"，轴仍是纵轴
+            flow.contains("container.scrollTop = bodyOffset") ||
+                flow.contains("container.scrollTop = target * visible")
         )
         assertTrue("分栏模板才横移", flow.contains("container.scrollLeft = target * visible"))
         assertTrue(
@@ -310,6 +313,22 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("须有正文偏移反解（跨结构可比量）", flow.contains("function readBodyOffset("))
         assertTrue("须有正文偏移定位", flow.contains("function applyBodyOffset("))
         assertTrue("结算须回发结构自证（否则换壳失守只能肉眼比对）", flow.contains("settle,shell="))
+    }
+
+    @Test
+    fun `元素与动画预算自证（4_19）`() {
+        // 4.19 / NFR-08：重装饰模板卡顿的**第一手数字**是元素数与"当前真的在跑"的动画数。
+        // 口径要点：①只报告不改行为（不擅自删节点/停动画，否则症状变成"模板莫名少一块"）；
+        // ②动画数用 document.getAnimations()（而非数 animation-name：后者会把不在当前页的也算进来）；
+        // ③取不到（旧内核无该 API）返回 -1 且**不算超限**（避免误报）。
+        val runtime = asset("template-runtime.js")
+        assertTrue("须有元素计数", runtime.contains("function elementCounts()"))
+        assertTrue("动画数须取 getAnimations（只含真正在跑的）", runtime.contains("document.getAnimations"))
+        assertTrue("须有预算判据", runtime.contains("function budgetState()"))
+        assertTrue("预算常量须在（元素）", runtime.contains("var MAX_ELEMENTS = 3000;"))
+        assertTrue("预算常量须在（动画）", runtime.contains("var MAX_ANIMATIONS = 120;"))
+        assertTrue("取不到计数不得算超限", runtime.contains("if (counts.elements > MAX_ELEMENTS) return 'over';"))
+        assertTrue("预算与规模必须随自证回发", runtime.contains("',elems='") && runtime.contains("',anims='") && runtime.contains("',budget='"))
     }
 
     @Test
