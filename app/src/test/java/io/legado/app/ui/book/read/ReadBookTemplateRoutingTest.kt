@@ -125,8 +125,9 @@ class ReadBookTemplateRoutingTest {
             s.contains("if (book.isEpub || book.isAudio || book.isVideo || book.isImage || book.isPdf) return false")
         )
         assertTrue(
-            "在线正文必须走 BookHelp.getContent（此前统一用 LocalBook.getContent ⇒ 在线书读本地文件失败）",
-            s.contains("if (book.isLocal) LocalBook.getContent(book, chapter) else BookHelp.getContent(book, chapter)")
+            "在线正文须先读内容缓存、未缓存时**按需下载**（archive 同口径；只读缓存会让冷启在线书回落 canvas）",
+            s.contains("BookHelp.getContent(book, chapter)?.let { return it }") &&
+                s.contains("CacheBook.getOrCreate(source, book).downloadAwait(chapter)")
         )
         assertTrue(
             "非 md 内容必须允许非 <usehtml> 归一化（否则归一化前就会回落 canvas）",
