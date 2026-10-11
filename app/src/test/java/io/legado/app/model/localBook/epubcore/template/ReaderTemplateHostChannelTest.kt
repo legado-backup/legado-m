@@ -33,6 +33,24 @@ class ReaderTemplateHostChannelTest {
     }
 
     @Test
+    fun `首分页骨架在场且可移除`() {
+        // 4.19：沙箱建帧→注入正文→结算有几百毫秒窗口，此前宿主文档是**空白**（用户看到闪白）。
+        // 骨架必须①无动效（带动效会与分页重排叠加成抖动）②可被移除③在容器**之前**（不遮挡沙箱帧）。
+        val doc = ReaderTemplateHostDocument.build("/* host */")
+        assertTrue("必须有骨架节点", doc.contains(ReaderTemplateHostDocument.SkeletonId))
+        assertTrue(
+            "骨架必须在容器**之前**（否则会盖住沙箱帧，直到移除命令到达）",
+            doc.indexOf(ReaderTemplateHostDocument.SkeletonId) < doc.indexOf("id=\"" + ReaderTemplateHostDocument.ContainerId)
+        )
+        assertFalse("骨架不得带动效（会与分页重排叠加成抖动）", doc.contains("animation:"))
+        assertTrue("骨架须有可视形态（灰条）", doc.contains("border-radius:6px"))
+        assertTrue("须可移除（首帧与失败路径都要调）",
+            ReaderTemplateHostDocument.skeletonScript(false).contains("display='none'"))
+        assertTrue("须可显隐（排障用）",
+            ReaderTemplateHostDocument.skeletonScript(true).contains("display='block'"))
+    }
+
+    @Test
     fun `沙箱帧高必须用 px 显式值`() {
         // 真机铁证（2026-10-10，预览弹窗）：Compose `AndroidView` 承载的 WebView 里，`100vh` 与百分比高度
         // 都塌成 0px（样式表已解析、position:absolute 生效，仅高度为 0）⇒ 沙箱视口 0 ⇒ 页框算成负数
