@@ -108,4 +108,47 @@ class ReadBookTemplateRoutingTest {
         assertTrue("种子必须由书名+章节稳定推导", s.contains("ReaderTemplateSeed.of(bookName, chapterTitle)"))
         assertTrue("种子必须进 ReaderValues", s.contains("seed = ReaderTemplateSeed.of("))
     }
+
+    @Test
+    fun `文本类内容按模板总开关放开且 md 与 EPUB 口径不变`() {
+        // 用户反馈「开启模板后看不到任何变化」的机制性根因：
+        // ① 总闸原先要求 isMarkdown ⇒ 在线正文/txt 永不进模板面；
+        // ② 内容探测原先只认 <usehtml>（md 独有）⇒ 即便进面也拿不到正文。
+        val s = text()
+        assertTrue("md 仍走 mdRichRender 开关", s.contains("AppConfig.mdRichRender"))
+        assertTrue(
+            "非 md 文本类内容随模板总开关放开（默认关 ⇒ 零回归）",
+            s.contains("ReaderTemplateManager.templatesEnabled()")
+        )
+        assertTrue("出版 EPUB 必须排除（模板不适用）", s.contains("if (book.isEpub) return false"))
+        assertTrue(
+            "本地 txt 必须随总开关放开（内容源 LocalBook.getContent 可读）",
+            s.contains("book.isLocalTxt && ReaderTemplateManager.templatesEnabled()")
+        )
+        assertTrue(
+            "在线正文必须**不得**进面（内容源 LocalBook.getContent 对在线书会走 TextFile 读本地文件失败）",
+            !s.contains("isOnLineTxt && ReaderTemplateManager.templatesEnabled()")
+        )
+        assertTrue(
+            "非 md 内容必须允许非 <usehtml> 归一化（否则归一化前就会回落 canvas）",
+            s.contains("richTextAllowsPlainText()") &&
+                s.contains("allowPlainText = richTextAllowsPlainText()")
+        )
+    }
+
+    @Test
+    fun `改完设置返回阅读页立即重载当前章`() {
+        // 「设置后立马可以看到书籍变化」：管理页/主题设置是另一页面 ⇒ 必须按契约键比对后重载
+        val s = text()
+        assertTrue("必须有契约键重载入口", s.contains("private fun refreshReadSurfaceIfContractChanged()"))
+        assertTrue("onResume 必须调用它", s.contains("refreshReadSurfaceIfContractChanged()"))
+        assertTrue(
+            "契约键必须含选中模板（否则换模板时键不变 ⇒ 复用旧解析结果 ⇒ 看起来没生效）",
+            s.contains("ReaderTemplateManager.effectiveId(night)")
+        )
+        assertTrue("必须含日夜（日夜切换会换模板）", s.contains("|\$night|"))
+        assertTrue("必须含总开关", s.contains("ReaderTemplateManager.templatesEnabled()}|"))
+        assertTrue("必须清面状态（否则被'同章且后端在场即跳过'的防重入闸住）", s.contains("textRichPreparedIndex = -1"))
+        assertTrue("必须清模板解析缓存", s.contains("templateResolvedKey = null"))
+    }
 }

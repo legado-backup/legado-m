@@ -80,4 +80,43 @@ class TextRichContentProbeTest {
         assertFalse(prepared.hasMermaid)
         assertFalse(prepared.hasMath)
     }
+
+    // === 非 <usehtml> 文本类内容（在线正文 / 本地 txt）：allowPlainText ===
+    // 用户反馈「开启模板后看不到任何变化」的根因之一：txt/在线正文不带 <usehtml> ⇒ 一律回落 canvas。
+
+    @Test
+    fun `非 usehtml 内容默认不可用但放开后可归一化`() {
+        assertNull("默认（仅 md 形态）保持既有语义 ⇒ 回落 canvas", TextRichContentProbe.prepare("普通纯文本正文"))
+
+        val plain = TextRichContentProbe.prepare("第一段\n\n第二段\n同一段内换行", allowPlainText = true)
+        requireNotNull(plain)
+        assertEquals("<p>第一段</p>\n<p>第二段 同一段内换行</p>", plain.html)
+        assertFalse(plain.hasMermaid)
+        assertFalse(plain.hasMath)
+    }
+
+    @Test
+    fun `纯文本段落化必须转义且空输入不可用`() {
+        val escaped = TextRichContentProbe.prepare("a < b & c > d", allowPlainText = true)
+        requireNotNull(escaped)
+        assertEquals("纯文本必须转义（与 md 路线安全模式同口径）", "<p>a &lt; b &amp; c &gt; d</p>", escaped.html)
+
+        assertNull("空白内容不可用 ⇒ 回落 canvas", TextRichContentProbe.prepare("   \n  ", allowPlainText = true))
+        assertNull(TextRichContentProbe.prepare(null, allowPlainText = true))
+    }
+
+    @Test
+    fun `在线正文 HTML 片段原样使用不二次转义`() {
+        val html = "<p>段落</p><img src=\"data:image/png;base64,AA\">"
+        val prepared = TextRichContentProbe.prepare(html, allowPlainText = true)
+        requireNotNull(prepared)
+        assertEquals("已是 HTML 片段 ⇒ 原样使用（不得转义）", html, prepared.html)
+    }
+
+    @Test
+    fun `归一化后仍走同一套富渲染元素判定`() {
+        val prepared = TextRichContentProbe.prepare("公式 \$a^2+b^2=c^2\$ 在此", allowPlainText = true)
+        requireNotNull(prepared)
+        assertTrue("放开路径必须复用同一套公式判定（不得另起口径）", prepared.hasMath)
+    }
 }
