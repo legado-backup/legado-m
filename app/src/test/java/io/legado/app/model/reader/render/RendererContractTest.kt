@@ -3,6 +3,8 @@ package io.legado.app.model.reader.render
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import kotlin.math.abs
+import kotlin.math.floor
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -125,6 +127,26 @@ class RendererContractTest {
         assertFalse(machine.isCurrent(inFlight))
     }
 
+    @Test
+    fun `晚到结果准入须同时满足代际未变与开关仍开`() {
+        val machine = RenderBackendStateMachine(clock = { 0L })
+        machine.beginPrepare()
+        val token = machine.currentToken()
+
+        assertTrue("代际未变 + 开关开 ⇒ 准入", machine.acceptsLateResult(token, featureEnabled = true))
+        assertFalse(
+            "开关在结果在途时被关闭 ⇒ 必须丢弃（AD-28①）",
+            machine.acceptsLateResult(token, featureEnabled = false)
+        )
+
+        machine.beginSwitch()
+        assertFalse(
+            "代际已变 ⇒ 即使开关仍开也必须丢弃",
+            machine.acceptsLateResult(token, featureEnabled = true)
+        )
+        assertTrue(machine.acceptsLateResult(machine.currentToken(), featureEnabled = true))
+    }
+
     // === 统一坐标（AD-14）===
 
     @Test
@@ -169,5 +191,54 @@ class RendererContractTest {
             ReadingPosition.Page(chapterIndex = 7, pageIndex = 0, inPageRatio = 1f),
             ReadingPositionPolicy.anchorFromRatio(chapterIndex = 7, ratio = 2f)
         )
+    }
+
+    // === XB.5 坐标恢复一致（跨后端降级后位置偏差 ≤1 页）===
+
+    @Test
+    fun `跨后端降级落同章且页偏差不超过一页`() {
+        val chapterIndex = 5
+        val source = ReadingPosition.Text(chapterIndex = chapterIndex, charOffset = 850)
+        val ratio = ReadingPositionPolicy.chapterRatio(source, chapterCharCount = 1000)!!
+        assertEquals(0.85f, ratio, 0.0001f)
+
+        // 目标后端不支持字符偏移 ⇒ 降级为章内锚点（必须如实标记），但**章号守恒**（不跳章）
+        val resolution = ReadingPositionPolicy.resolveFor(source, targetSupportsTextOffset = false)
+        assertTrue("降级必须被如实标记", resolution.degraded)
+        assertEquals(chapterIndex, resolution.position.chapterIndex)
+        assertEquals(chapterIndex, ReadingPositionPolicy.anchorFromRatio(chapterIndex, ratio).chapterIndex)
+
+        val pageCount = 10
+        val derived = ReadingPositionPolicy.pageIndexFromRatio(ratio, pageCount)
+        val byEvenSplit = floor(ratio * pageCount).toInt().coerceIn(0, pageCount - 1)
+        assertTrue(
+            "XB.5：位置偏差必须 ≤1 页（derived=$derived, evenSplit=$byEvenSplit）",
+            abs(derived - byEvenSplit) <= 1
+        )
+    }
+
+    @Test
+    fun `两种独立口径推页索引偏差不超过一页`() {
+        var maxDiff = 0
+        for (pageCount in 1..40) {
+            for (step in 0..100) {
+                val ratio = step / 100f
+                val byRatioSpan = ReadingPositionPolicy.pageIndexFromRatio(ratio, pageCount)
+                val byEvenSplit = floor(ratio * pageCount).toInt().coerceIn(0, pageCount - 1)
+                maxDiff = maxOf(maxDiff, abs(byRatioSpan - byEvenSplit))
+            }
+        }
+        assertTrue("XB.5：任意比例/页数下偏差必须 ≤1 页，实测最大偏差=$maxDiff", maxDiff <= 1)
+        // 至少存在 1 页偏差的真实场景 ⇒ 该断言不是「恒 0」的空断言
+        assertEquals("必须存在偏差恰为 1 页的场景，否则断言无鉴别力", 1, maxDiff)
+    }
+
+    @Test
+    fun `页索引推导管段与空章边界`() {
+        assertEquals("空章（0 页）必须回落 0", 0, ReadingPositionPolicy.pageIndexFromRatio(0.5f, 0))
+        assertEquals("比例为 0 ⇒ 首页", 0, ReadingPositionPolicy.pageIndexFromRatio(0f, 10))
+        assertEquals("比例为 1 ⇒ 末页", 9, ReadingPositionPolicy.pageIndexFromRatio(1f, 10))
+        assertEquals("单页章恒为 0", 0, ReadingPositionPolicy.pageIndexFromRatio(0.9f, 1))
+        assertEquals("越界比例被夹取", 9, ReadingPositionPolicy.pageIndexFromRatio(2f, 10))
     }
 }

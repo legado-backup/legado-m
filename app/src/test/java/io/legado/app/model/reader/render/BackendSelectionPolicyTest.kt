@@ -92,4 +92,21 @@ class BackendSelectionPolicyTest {
             select(engine = BackendSelectionPolicy.Engine.TEXT, consistency = mostly)
         )
     }
+
+    @Test
+    fun `降级链按 WebView 到 canvas 到 text 逐级下探`() {
+        assertEquals(
+            BackendSelectionPolicy.Backend.CANVAS,
+            BackendSelectionPolicy.degradeNext(BackendSelectionPolicy.Backend.DIRECT_WEB)
+        )
+        assertEquals(
+            BackendSelectionPolicy.Backend.TEXT,
+            BackendSelectionPolicy.degradeNext(BackendSelectionPolicy.Backend.CANVAS)
+        )
+        assertEquals(
+            "TEXT 为后端链终态（再失败交由 raw 兜底页，AD-16）",
+            BackendSelectionPolicy.Backend.TEXT,
+            BackendSelectionPolicy.degradeNext(BackendSelectionPolicy.Backend.TEXT)
+        )
+    }
 }
