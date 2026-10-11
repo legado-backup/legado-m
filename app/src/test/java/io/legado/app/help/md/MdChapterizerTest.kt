@@ -1,6 +1,7 @@
 package io.legado.app.help.md
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -198,5 +199,70 @@ class MdChapterizerTest {
             MdChapterizer.MaxTitleChars + 1,
             sections.single().title.length
         )
+    }
+
+    // === 6.2 边界用例：大体量与空输入 ===
+
+    @Test
+    fun `十兆级文档切章不丢字符且区间合法`() {
+        // 6.2 边界矩阵「10MB md」行：整本 10Mi 级别的 md 必须能切章、区间首尾相接、无越界。
+        // 章体取 2KB 级（章数约 5k）而非 50 字符：既逼近体量又避免单元测试堆占用过高。
+        val body = "正文占位段落，长度用于逼近边界体量。".repeat(80) + "\n\n"
+        val chapter = "# 第 %d 章\n\n$body"
+        val builder = StringBuilder()
+        var index = 0
+        while (builder.length < 10 * 1024 * 1024) {
+            builder.append(chapter.format(index))
+            index++
+        }
+        val md = builder.toString()
+        assertTrue("样本须真的超过 10Mi 字符", md.length > 10 * 1024 * 1024)
+        val sections = MdChapterizer.chapterize(md)
+        assertEquals("每章一个标题 ⇒ 章数应等于标题数", index, sections.size)
+        assertContiguous(md, sections)
+    }
+
+    @Test
+    fun `单章超过构建器上限时切章本身仍完成`() {
+        // 「超长单章」行的分工：切章只负责切分与偏移正确；**超限报错**由构建器显式抛出
+        // （见 `MdDocumentBuilderTest.单章超限抛显式错误不截断`）。
+        val md = "# 巨章\n\n" + "内".repeat(MdDocumentBuilder.MaxChapterChars + 1024)
+        val sections = MdChapterizer.chapterize(md, softLimitChars = 0)
+        assertEquals(1, sections.size)
+        assertContiguous(md, sections)
+        assertEquals("区间长度须等于原文长度", md.length, sections.single().length)
+    }
+
+    @Test
+    fun `空输入产出单章零长度区间`() {
+        // 「空文件」行：空文件不得抛异常，且区间自洽（长度 0、不越界）
+        val sections = MdChapterizer.chapterize("")
+        assertEquals(1, sections.size)
+        assertEquals(0, sections.single().length)
+        assertContiguous("", sections)
+    }
+
+    @Test
+    fun `仅空白字符的文档不产生标题`() {
+        val md = "\n\n   \n\t\n"
+        val sections = MdChapterizer.chapterize(md)
+        assertEquals(1, sections.size)
+        assertEquals(0, sections.single().level)
+        assertContiguous(md, sections)
+    }
+
+    @Test
+    fun `未剥离的 BOM 会让首个 ATX 标题失效故解码层必须剥除`() {
+        // 「BOM」行：BOM(U+FEFF) **不是空白** ⇒ `trimStart(' ')` 去不掉它 ⇒ 首个 ATX 标题
+        // 不被识别。该用例钉住"为什么解码层必须剥 BOM"（`MdFile.decode` 的
+        // `removePrefix("\uFEFF")`；该路径依赖 Android 解码器，真机由 L2 覆盖）。
+        val withBom = "\uFEFF# 第一章\n\n正文"
+        val sections = MdChapterizer.chapterize(withBom)
+        assertEquals("BOM 未剥离时只剩整本一章", 1, sections.size)
+        assertFalse("BOM 未剥离时不得误判出 1 级标题", sections.single().level == 1)
+
+        val stripped = MdChapterizer.chapterize(withBom.removePrefix("\uFEFF"))
+        assertEquals("BOM 剥离后首个 ATX 标题须被正确识别", "第一章", stripped.single().title)
+        assertContiguous(withBom, sections)
     }
 }
