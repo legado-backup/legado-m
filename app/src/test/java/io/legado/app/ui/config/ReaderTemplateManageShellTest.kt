@@ -67,6 +67,39 @@ class ReaderTemplateManageShellTest {
     }
 
     @Test
+    fun `应用内作者指南资产与入口齐备`() {
+        val activityText = src(activity)
+        // 路径取自**单源常量**：测试用同一常量读资产，避免"改了路径测试仍绿"
+        assertTrue("必须声明指南资产路径常量", activityText.contains("const val GuideAssetPath"))
+        assertTrue("指南必须以 Markdown 模式渲染", activityText.contains("TextDialog.Mode.MD"))
+        assertTrue("指南入口处理器必须接线", activityText.contains("showAuthorGuide"))
+        assertTrue("入口必须真的挂到页面上", activityText.contains("onOpenGuide = ::showAuthorGuide"))
+        assertTrue("页面上必须有可点的「作者指南」按钮", src(screen).contains("\"作者指南\""))
+
+        val guide = listOf(
+            java.io.File("src/main/assets/md/template-author-guide.md"),
+            java.io.File("../app/src/main/assets/md/template-author-guide.md"),
+            java.io.File("app/src/main/assets/md/template-author-guide.md")
+        ).firstOrNull { it.isFile }
+        assertTrue("作者指南资产必须随包存在（缺失 = 入口点了没反应）", guide != null)
+        val text = guide!!.readText()
+        assertTrue("指南不得为空", text.length > 800)
+        // 关键契约/红线必须在场：否则"指南与实现漂移"，用户照抄就写错
+        listOf(
+            "data-reader-flow=\"body\"",       // 正文槽位（写错静默失效）
+            "data-reader-scroll-viewport",      // 滚动模板必填画框
+            "data-reader-field",                // 字段槽位
+            "[data-reader-theme=\"night\"]",    // 日/夜双版（只写一侧会读不清）
+            "--md-font-size",                   // 宿主下发字号
+            "OFL",                              // 字体许可白名单
+            "CC0",                              // 图片许可白名单
+            "本地使用"                           // 第三方素材合规（仅本地、不得分发）
+        ).forEach { mark ->
+            assertTrue("作者指南缺少关键内容：$mark", text.contains(mark))
+        }
+    }
+
+    @Test
     fun `设置域入口与清单登记齐备`() {
         val theme = src("ui/config/ThemeConfigFragment.kt")
         assertTrue("设置域必须有入口", theme.contains("KEY_READER_TEMPLATE_MANAGE"))
