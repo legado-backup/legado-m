@@ -142,6 +142,40 @@ class TemplateRenderBackendContractTest {
     }
 
     @Test
+    fun `重测分页防抖与占位高度预算就位（S11）`() {
+        // AD-28⑤ / P-05：「渲染后重测分页无占位高度/防抖 ⇒ 二次分页抖动」。
+        // 三条失守都**不会白屏**，只表现为"页码跳一下"，真机上极难归因 ⇒ 源码/资产级钉住。
+        val s = text()
+        assertTrue(
+            "必须经防抖策略（而非直接透传 remeasure）",
+            s.contains("RepaginationDebouncePolicy()") && s.contains("repagination.onRequest(")
+        )
+        assertTrue(
+            "定时到点必须自行判定『窗口已静默』后才下发",
+            s.contains("repagination.onTimer(") && s.contains("handler.postDelayed(remeasureTick")
+        )
+        assertTrue(
+            "富渲染完成必须走防抖入口（同一波注入回声合并为一次重排）",
+            s.contains("remeasure(RenderToken(generation))")
+        )
+        assertTrue(
+            "换章/释放必须复位防抖（不留悬空挂起给下一章）",
+            Regex("repagination\\.reset\\(\\)").findAll(s).count() >= 3
+        )
+        // 占位高度预算：CSS 规则与注入器的"渲染完成"标记必须**同源**（改名不同步 ⇒ 预算永不失效）
+        val css = SourceFileProbe.assetRawText("md/md-reader.css")
+        assertTrue("必须有 mermaid 占位高度预算规则", css.contains("min-height: var(--rp-rich-placeholder-h"))
+        assertTrue(
+            "CSS 的完成标记名必须与注入器常量同源（[${MdRichRenderInjector.RenderedAttribute}]）",
+            css.contains("[${MdRichRenderInjector.RenderedAttribute}]")
+        )
+        assertTrue(
+            "预算必须排除渲染失败态（markFallback 只打 fallback 标记 ⇒ 否则失败图永远占着空档）",
+            css.contains("[data-md-fallback]")
+        )
+    }
+
+    @Test
     fun `动效运行时闸门与稳定随机种子随链路就位`() {
         // 4.15 C6/C4：动效暂停必须由宿主下 `set-motion`（沙箱看不到手势/生命周期）；
         // 种子必须随 init 下发并在沙箱注入成属性/变量（否则作者的"看似随机"装饰每次重排都换画面）
