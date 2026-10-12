@@ -18,6 +18,7 @@ class EpubWebLayoutModeFlagsTest {
         preserve: Boolean = false,
         singlePage: Boolean = false,
         readerFontFamily: String? = null,
+        readerFontUrl: String? = readerFontFamily?.let { "file:///fonts/a.ttf" },
         textFullJustify: Boolean = false
     ) = EpubWebLayoutRequest(
         chapterIndex = 0,
@@ -30,7 +31,7 @@ class EpubWebLayoutModeFlagsTest {
         textColor = 0xFF102030.toInt(),
         lineHeightPx = 32f,
         readerFontFamily = readerFontFamily,
-        readerFontUrl = readerFontFamily?.let { "file:///fonts/a.ttf" },
+        readerFontUrl = readerFontUrl,
         textFullJustify = textFullJustify,
         preservePublisherLayout = preserve,
         singlePage = singlePage
@@ -69,6 +70,21 @@ class EpubWebLayoutModeFlagsTest {
         assertTrue("column-width: 1080px" in css)
         assertTrue("#102030" in css)
         assertTrue("body > article" in css)
+    }
+
+    @Test
+    fun systemFontFamilyWithoutFontUrl仍注入阅读器排版且不抛异常() {
+        // 铁证 2026-10-13：用户**未选自定义字体**时字体是系统族（sans-serif/serif/monospace），
+        // 此时 `readerFontUrl` 为 null ⇒ 旧实现对 URL 用 `!!` 抛 NPE，被 wrapHtml 的 runCatching 吞掉
+        // ⇒ 整个 Web 布局失败并降级纯文本（出版方样式与阅读器字号全丢）。本用例锁死该回归。
+        val req = request(readerFontFamily = "sans-serif", readerFontUrl = null)
+        val flags = EpubWebLayoutModeFlagsFactory.from(req)
+        assertTrue("系统字体族仍应下发字体族", flags.applyReaderFont)
+        val css = EpubWebLayoutCssBuilder.build(req)
+        assertFalse("@font-face" in css)
+        assertTrue("字号/行高仍须注入", "font-size: 18.0px" in css)
+        assertTrue("正文颜色仍须注入", "#102030" in css)
+        assertTrue("仍须分栏容器", "column-width: 1080px" in css)
     }
 
     @Test
