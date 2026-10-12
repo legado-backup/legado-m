@@ -213,6 +213,46 @@ class ReaderTemplateRuntimeContractTest {
     }
 
     @Test
+    fun `纵移步长与结算页高同源且页框贴底校正有界`() {
+        // 真机铁证（2026-10-12，用户实测「开启模板后只能翻两页、之后翻不动；单页超出可视界面可上下扒拉」）：
+        // ① `goto` 纵移若读 `container.clientHeight`，会与 `settle` 的页高（`visibleHeight()`）不一致
+        //    （实测 656.67 vs 748）⇒ `bodyOffset` 偏小、页码恒 0 ⇒ 宿主永远判不到"章末"，卡在第 2 页；
+        // ② 占位是**注入前估算**（模板装饰多为 vh 单位 SVG）⇒ 冻结后必须用**布局事实**（根壳底 vs 视口底）
+        //    再校一次，否则页框超高把页脚压出视口（用户可直接上下扒拉）。
+        val flow = asset("template-browser-flow.js")
+        assertTrue(
+            "纵移步长必须与结算页高同源（用 settled 的 lastPageHeight，不得裸读容器 clientHeight）",
+            flow.contains("lastPageHeight > 0 ? lastPageHeight : container.clientHeight")
+        )
+        assertTrue(
+            "必须存在「贴底校正」，判据为根壳底 == 视口底（布局事实，可证伪）",
+            flow.contains("function correctFrameHeight(") &&
+                flow.contains("root.getBoundingClientRect().bottom - currentViewportHeight()")
+        )
+        assertTrue(
+            "校必须有界（迭代上限 + 容差 + 页高下限守卫，防作者畸形 DOM 抖动/死循环）",
+            flow.contains("FRAME_CORRECT_MAX") &&
+                flow.contains("FRAME_CORRECT_TOL") &&
+                flow.contains("next > MIN_PAGE_HEIGHT")
+        )
+        assertTrue(
+            "校正只收缩不放大（部分模板根壳高被 CSS 钳定 ⇒ 放大无收益且在换壳瞬态上易误触发）",
+            flow.contains("overflow <= FRAME_CORRECT_TOL") &&
+                !flow.contains("Math.abs(overflow) <= FRAME_CORRECT_TOL")
+        )
+        assertTrue(
+            "校正结果必须写回按壳占位缓存（否则每次结算重复校正/抖动）",
+            flow.contains("chromeByShell[shellName() || 'none'] = ")
+        )
+        assertTrue(
+            "宿主指令的权威量是**页号**（不是那一刻算出的像素）：由 settle 用最终页高折算，防「校正前后页高不一致」漂到半页",
+            flow.contains("var authoritativePage = -1;") &&
+                flow.contains("authoritativePage = target;") &&
+                flow.contains("bodyOffset = clampBodyOffset(authoritativePage * visible, slot, root);")
+        )
+    }
+
+    @Test
     fun `运行时在正文注入前量页框并立即结算一次`() {
         // 两条顺序/完备性不变量，各自对应一类真实失守：
         // ①先注入后量 ⇒ 正文自身被算进"固定占位"，页框被算成 0 高；

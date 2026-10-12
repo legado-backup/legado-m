@@ -45,7 +45,9 @@ class ReaderTemplateManageShellTest {
     @Test
     fun `行操作覆盖设计要求的用户动作`() {
         val text = src(activity)
-        listOf("applyTemplate", "openTemplateEditor", "duplicateTemplate", "exportJson", "confirmDelete", "confirmRestoreDefaults", "importJson")
+        // 导入入口改为**按内容判别形态**的 importFile（JSON / ZIP 包）⇒ 契约随之更新，
+        // 但"必须存在可导入的用户动作"这条不变量不变（此前只放行 json，见 2026-10-12 真机问题 #4）
+        listOf("applyTemplate", "openTemplateEditor", "duplicateTemplate", "exportJson", "confirmDelete", "confirmRestoreDefaults", "importFile")
             .forEach { action ->
                 assertTrue("4.8a 行操作缺失：$action", text.contains(action))
             }

@@ -4,6 +4,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.model.localBook.epubcore.template.EpubReaderTemplate
 import io.legado.app.model.localBook.epubcore.template.ReaderTemplateAvailabilityPolicy
 import io.legado.app.model.localBook.epubcore.template.ReaderTemplateSelection
+import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -153,5 +154,24 @@ class ReaderTemplateManagerTest {
         assertEquals("空串哨兵", "", ReaderTemplateSelection.FollowTheme)
         assertEquals(ReaderTemplateSelection.FollowTheme, ReaderFeatureDefaults.READER_TEMPLATE_ID)
         assertEquals("readerTemplate", PreferKey.readerTemplate)
+    }
+
+    // === 导入通道（2026-10-12 真机问题 #4）：必须走**字节**通道，形态判别下沉到数据层 ===
+
+    @Test
+    fun `导入必须走字节通道且形态判别在数据层单源`() {
+        // 真机缺口：导入入口按**文本**读所选文件（`readText`）⇒ ZIP 二进制必然乱码，等价于"只支持 json"；
+        // 而 archive 导出的模板包恰是 ZIP（包内仅 `readerTemplate.json`）。契约钉死：
+        // ①管理器暴露 `importFile(bytes)`；②它委托数据层；③数据层落到同一映射层 `importAny`（不另造口径）。
+        val manager = SourceFileProbe.sourceText("help/config/ReaderTemplateManager.kt")
+        assertTrue("必须暴露字节通道 importFile", manager.contains("fun importFile(bytes: ByteArray)"))
+        assertTrue("必须委托数据层按形态导入", manager.contains("repository.importAny(bytes)"))
+        val repository = SourceFileProbe.sourceText(
+            "model/localBook/epubcore/template/ReaderTemplateRepository.kt"
+        )
+        assertTrue(
+            "数据层须落到同一映射层（形态判别与既有 JSON 通道同源）",
+            repository.contains("ReaderTemplateImportMapper.importAny(bytes)")
+        )
     }
 }
