@@ -167,6 +167,33 @@ class ReadBookTemplateRoutingTest {
     }
 
     @Test
+    fun `产品指标在真实站点计数且同书去重（S4）`() {
+        // S4 / SP-09：指标若漏接线就是**恒 0 的死统计**（页面照常工作、无人察觉）⇒ 源码层钉住三个站点。
+        val s = text()
+        assertTrue(
+            "内容首次加载必须记一次『打开』（md 使用率分母/分子）",
+            s.contains("reportBookOpenedOnce()") && s.contains("private fun reportBookOpenedOnce()")
+        )
+        assertTrue(
+            "打开计数必须同书去重（否则重载/换面会重复计数）",
+            s.contains("if (metricsBookKey == book.bookUrl) return")
+        )
+        assertTrue(
+            "⚠️ 不得把打开计数挂在 onResume 的契约键函数上（首帧 ReadBook.book 未就绪 ⇒ 恒漏计）",
+            !s.contains("首次进入阅读页 ⇒ 记一次")
+        )
+        assertTrue(
+            "模板面真正用上时必须计数（模板启用率分子）",
+            s.contains("ReaderMetrics.app.templateSurfaceUsed()")
+        )
+        assertTrue("同书必须去重（否则重载会重复计数）", s.contains("metricsTemplateBookKey"))
+        assertTrue(
+            "只在真的发生降级时计数（被熔断拒绝的不重复计 ⇒ 与『降级不反复』同口径）",
+            s.contains("if (outcome?.degraded == true) ReaderMetrics.app.templateDegraded()")
+        )
+    }
+
+    @Test
     fun `改完设置返回阅读页立即重载当前章`() {
         // 「设置后立马可以看到书籍变化」：管理页/主题设置是另一页面 ⇒ 必须按契约键比对后重载
         val s = text()

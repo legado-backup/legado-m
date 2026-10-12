@@ -176,6 +176,15 @@ class TemplateRenderBackendContractTest {
     }
 
     @Test
+    fun `富渲染成败在真实站点计数（S4）`() {
+        // S4：富渲染失败率若漏接线 ⇒ 恒 0 的死统计；请求侧漏记会让比率**永远偏高**（分母缺失）
+        val s = text()
+        assertTrue("请求注入时必须记分母", s.contains("ReaderMetrics.app.richRenderRequested()"))
+        assertTrue("运行时缺失（inject-unavailable）必须记分子",
+            s.contains("ReaderMetrics.app.richRenderFailed()"))
+    }
+
+    @Test
     fun `动效运行时闸门与稳定随机种子随链路就位`() {
         // 4.15 C6/C4：动效暂停必须由宿主下 `set-motion`（沙箱看不到手势/生命周期）；
         // 种子必须随 init 下发并在沙箱注入成属性/变量（否则作者的"看似随机"装饰每次重排都换画面）
