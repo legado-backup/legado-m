@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "type": "paged",
+  "id": "fixture.minimal",
+  "name": "夹具极简",
+  "description": "单测夹具：仅保留模板契约要求的最小结构（正文槽 + 页脚占位），用于解析/导入类用例。",
+  "firstPageHtml": "<div class=\"fx\"><div class=\"fx-head\" data-reader-field=\"chapterTitle\">章节</div><div class=\"fx-body\" data-reader-flow=\"body\"></div><div class=\"fx-foot\"><span data-reader-field=\"page\"></span></div></div>",
+  "otherPageHtml": "<div class=\"fx\"><div class=\"fx-head\" data-reader-field=\"chapterTitle\">章节</div><div class=\"fx-body\" data-reader-flow=\"body\"></div><div class=\"fx-foot\"><span data-reader-field=\"page\"></span></div></div>",
+  "scrollHtml": "",
+  "css": "html,body{margin:0;padding:0}.fx-body{padding:0 1em}",
+  "javascript": ""
+}
