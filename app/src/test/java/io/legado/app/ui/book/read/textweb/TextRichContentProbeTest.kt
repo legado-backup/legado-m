@@ -1,7 +1,9 @@
 package io.legado.app.ui.book.read.textweb
 
+import io.legado.app.help.md.MdDocumentBuilder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -118,5 +120,52 @@ class TextRichContentProbeTest {
         val prepared = TextRichContentProbe.prepare("公式 \$a^2+b^2=c^2\$ 在此", allowPlainText = true)
         requireNotNull(prepared)
         assertTrue("放开路径必须复用同一套公式判定（不得另起口径）", prepared.hasMath)
+    }
+
+    // === 有界文档（AD-15/§1.3「单章 2Mi / 20k blocks」，与 md 侧同源复用常量）===
+    // 超限一律返回 null ⇒ 调用方回落 canvas 基础排版（软切），不得把超大 DOM 交给 WebView。
+
+    @Test
+    fun `字符数超限的文本内容直接不可用`() {
+        val huge = "字".repeat(MdDocumentBuilder.MaxChapterChars + 1)
+        assertNull(
+            "超字符上界须拒（回落 canvas），不得把超大文档交给 WebView 承载面",
+            TextRichContentProbe.prepare(huge, allowPlainText = true)
+        )
+    }
+
+    @Test
+    fun `块数超限的 HTML 内容直接不可用`() {
+        val many = "<p>x</p>".repeat(MdDocumentBuilder.MaxChapterBlocks + 1)
+        assertTrue(
+            "前提：字符数未超字符上界（本用例只考验块数上界）",
+            many.length <= MdDocumentBuilder.MaxChapterChars
+        )
+        assertNull(
+            "字符达标但节点数爆炸同样须拒",
+            TextRichContentProbe.prepare(many, allowPlainText = true)
+        )
+    }
+
+    @Test
+    fun `纯文本海量段落超限亦不可用`() {
+        val many = "a\n\n".repeat(MdDocumentBuilder.MaxChapterBlocks + 1)
+        assertTrue("前提：字符数未超字符上界", many.length <= MdDocumentBuilder.MaxChapterChars)
+        assertNull(TextRichContentProbe.prepare(many, allowPlainText = true))
+    }
+
+    @Test
+    fun `usehtml 路径同样受有界文档约束`() {
+        val inner = "<p>x</p>".repeat(MdDocumentBuilder.MaxChapterBlocks + 1)
+        assertNull(TextRichContentProbe.prepare("<usehtml>$inner</usehtml>"))
+    }
+
+    @Test
+    fun `块数未超上界的章节照常可用`() {
+        val ok = "<p>x</p>".repeat(MdDocumentBuilder.MaxChapterBlocks - 1)
+        assertNotNull(
+            "未超上界不得误伤（判据为严格大于）",
+            TextRichContentProbe.prepare(ok, allowPlainText = true)
+        )
     }
 }
