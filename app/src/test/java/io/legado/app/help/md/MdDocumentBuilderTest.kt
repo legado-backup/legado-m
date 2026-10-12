@@ -59,6 +59,27 @@ class MdDocumentBuilderTest {
     }
 
     @Test
+    fun `块数超过上限抛显式错误（字符数未超也要拦）`() {
+        // 每个"段 + 空行"是一个段落块 ⇒ 用段落精确逼近块数上界；字符总量远小于 2Mi，字符上界不会先触发
+        val many = "段\n\n".repeat(MdDocumentBuilder.MaxChapterBlocks + 1)
+        assertTrue("前提：本用例字符数未超字符上界", many.length <= MdDocumentBuilder.MaxChapterChars)
+        val error = assertThrows(MdDocumentBuilder.MdChapterTooManyBlocksException::class.java) {
+            MdDocumentBuilder.build(many)
+        }
+        assertTrue(
+            "错误信息需含块数上限",
+            error.message!!.contains(MdDocumentBuilder.MaxChapterBlocks.toString())
+        )
+    }
+
+    @Test
+    fun `块数恰好等于上限时放行`() {
+        val atLimit = "段\n\n".repeat(MdDocumentBuilder.MaxChapterBlocks)
+        val built = MdDocumentBuilder.build(atLimit)
+        assertTrue("恰好达标不得拦（判据为严格大于）", built.html.isNotEmpty())
+    }
+
+    @Test
     fun `mermaid 围栏块保形为 pre class mermaid 并标注富渲染`() {
         val built = MdDocumentBuilder.build(
             """
