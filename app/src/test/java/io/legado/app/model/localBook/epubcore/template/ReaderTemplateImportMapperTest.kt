@@ -245,4 +245,72 @@ class ReaderTemplateImportMapperTest {
         assertTrue(summary.contains("[INFO]"))
         assertNotNull(result.template)
     }
+
+    // === C5 完整落地：按**内容**判别 ZIP 形态（2026-10-12 用户实测「导入主题竟然只支持 json」）===
+
+    private fun zipOf(entries: Map<String, String>): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(output).use { zip ->
+            entries.forEach { (name, text) ->
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(text.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return output.toByteArray()
+    }
+
+    @Test
+    fun `archive 导出的 ZIP 包可按内容导入`() {
+        // archive 导出包 = 仅含 readerTemplate.json 的 ZIP（无 package.json，素材内联）
+        val bytes = zipOf(mapOf("readerTemplate.json" to archiveV1Json()))
+        val result = ReaderTemplateImportMapper.importAny(bytes)
+        assertTrue("ZIP 包必须能导入（此前按文本读 ZIP ⇒ 只能导 JSON）", result.succeeded)
+        assertEquals(2, result.template!!.schemaVersion)
+        assertTrue("archive id 仍须改名避免与内置冲突", result.template.id.startsWith("user."))
+    }
+
+    @Test
+    fun `单文件 JSON 字节仍走原路径`() {
+        val result = ReaderTemplateImportMapper.importAny(archiveV1Json().toByteArray(Charsets.UTF_8))
+        assertTrue(result.succeeded)
+        assertEquals("无错误项", 0, result.errors.size)
+    }
+
+    @Test
+    fun `我方模板包形态同样可导`() {
+        val manifest = ReaderTemplatePackage.buildManifestJson(emptyList())
+        val result = ReaderTemplateImportMapper.importAny(
+            zipOf(mapOf("package.json" to manifest, "readerTemplate.json" to archiveV1Json()))
+        )
+        assertTrue(result.succeeded)
+        assertFalse("无外部素材声明时不得出现多余提示", "external-assets-skipped" in codes(result))
+    }
+
+    @Test
+    fun `包内声明外部素材时明说素材未随包导入`() {
+        val manifest = ReaderTemplatePackage.buildManifestJson(
+            listOf(ReaderTemplatePackage.Resource("bg", "assets/bg.png", "image"))
+        )
+        val result = ReaderTemplateImportMapper.importAny(
+            zipOf(mapOf("package.json" to manifest, "readerTemplate.json" to archiveV1Json()))
+        )
+        assertTrue("模板本体仍须导入", result.succeeded)
+        assertTrue("须明说素材未入库（铁证⑦③：可感知边界必须留痕）", "external-assets-skipped" in codes(result))
+    }
+
+    @Test
+    fun `ZIP 内没有模板时给出明确错误`() {
+        val result = ReaderTemplateImportMapper.importAny(zipOf(mapOf("readme.txt" to "hello")))
+        assertFalse(result.succeeded)
+        assertTrue("须指明包内没有模板", "no-template-in-zip" in codes(result))
+    }
+
+    @Test
+    fun `空文件与非模板文本各自给出明确错误`() {
+        assertTrue("empty-file" in codes(ReaderTemplateImportMapper.importAny(ByteArray(0))))
+        val junk = ReaderTemplateImportMapper.importAny("not a template".toByteArray(Charsets.UTF_8))
+        assertFalse(junk.succeeded)
+        assertTrue("须落到 JSON 解析错误", "invalid-json" in codes(junk))
+    }
 }
