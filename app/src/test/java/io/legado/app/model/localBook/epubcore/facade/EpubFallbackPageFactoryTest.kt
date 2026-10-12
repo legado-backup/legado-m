@@ -2,9 +2,13 @@ package io.legado.app.model.localBook.epubcore.facade
 
 import android.graphics.RectF
 import android.text.TextPaint
+import io.legado.app.constant.ReaderDocumentLimits
 import io.legado.app.model.localBook.epubcore.layout.EpubCoreLayoutConfig
 import io.legado.app.model.localBook.epubcore.layout.EpubMeasuredTextFragment
+import io.legado.app.model.localBook.epubcore.layout.EpubMeasuredTextKind
+import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,7 +17,9 @@ import org.junit.Test
  * 降级页工厂单测（epub-md-rich-rendering 阶段 1.6 配对）。
  *
  * 覆盖：①TEXT 级产出单页正文；②空内容自动升格为 RAW 说明页；
- * ③RAW 级恒非空（终态兜底不崩溃）；④空白原因回退到通用文案。
+ * ③RAW 级恒非空（终态兜底不崩溃）；④空白原因回退到通用文案；
+ * ⑤**CANVAS 级分页**（长正文切多页、超宽折行、空/超限不抛、逐行片段带行高）；
+ * ⑥CANVAS 级**接线锁**（`EpubCoreFacade` 的 `Stage.CANVAS_PAGE` 分支必须调 `canvasPages`）。
  *
  * 注：JVM 单测下 android.jar 为 stub（`returnDefaultValues = true`），故只断言结构与文本，
  * 不断言 [RectF] 的数值。
@@ -25,6 +31,18 @@ class EpubFallbackPageFactoryTest {
         pageHeightPx = height,
         textPaint = TextPaint()
     )
+
+    /** CANVAS 级用例配置：显式给页高/行高/段距，使分页结果可确定断言。 */
+    private fun canvasConfig(height: Int = 100, lineHeight: Float = 20f) = EpubCoreLayoutConfig(
+        pageWidthPx = 600,
+        pageHeightPx = height,
+        paragraphSpacingPx = 0,
+        textPaint = TextPaint(),
+        lineHeightPx = lineHeight
+    )
+
+    /** 假换行：一段一行（隔离分页逻辑与字体测量）。 */
+    private val oneLinePerParagraph = EpubFallbackPageFactory.CanvasLineBreaker { text, _ -> listOf(text) }
 
     @Test
     fun `textPages 产出单页正文且带可绘制文本片段`() {
@@ -80,5 +98,105 @@ class EpubFallbackPageFactoryTest {
             config = config()
         )
         assertTrue("不得产出空页", pages.single().text.isNotBlank())
+    }
+
+    @Test
+    fun `canvasPages 长正文按页高切成多页且不丢行不丢序`() {
+        val html = (1..12).joinToString("") { "<p>第${it}段</p>" }
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 5,
+            chapterHref = "OEBPS/text/ch5.xhtml",
+            title = "第五章",
+            html = html,
+            config = canvasConfig(height = 100, lineHeight = 20f),
+            breaker = oneLinePerParagraph
+        )
+        // 标题 + 12 段 = 13 行；每页 5 行（100 / 20）⇒ 5 + 5 + 3
+        assertEquals(3, pages.size)
+        assertEquals(listOf(5, 5, 3), pages.map { it.fragments.size })
+        assertEquals(listOf(0, 1, 2), pages.map { it.pageIndex })
+        pages.forEach { assertEquals("每页都必须回填总页数", 3, it.totalPagesInChapter) }
+        val lines = pages.flatMap { page ->
+            page.fragments.map { (it as EpubMeasuredTextFragment).text.toString() }
+        }
+        assertEquals(listOf("第五章") + (1..12).map { "第${it}段" }, lines)
+        assertEquals("分页后每页文本应与片段拼接一致", lines, pages.flatMap { it.text.split("\n") })
+    }
+
+    @Test
+    fun `canvasPages 超宽段落按注入的换行测量折行`() {
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 0,
+            chapterHref = "ch.xhtml",
+            title = "",
+            html = "<p>甲乙丙丁戊己</p>",
+            config = canvasConfig(height = 100, lineHeight = 20f),
+            breaker = EpubFallbackPageFactory.CanvasLineBreaker { text, _ -> text.chunked(2) }
+        )
+        val page = pages.single()
+        assertEquals("12\\n34\\n56 式折行后应在一页内", 1, pages.size)
+        assertEquals("甲乙\n丙丁\n戊己", page.text.toString())
+        assertEquals(listOf("甲乙", "丙丁", "戊己"), page.fragments.map { (it as EpubMeasuredTextFragment).text.toString() })
+    }
+
+    @Test
+    fun `canvasPages 空正文返回空列表交由下游 TEXT 处理`() {
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 0,
+            chapterHref = "ch.xhtml",
+            title = "",
+            html = "   \n  ",
+            config = canvasConfig(),
+            breaker = oneLinePerParagraph
+        )
+        assertTrue("空正文不得在本级产页（否则会截住降级链）", pages.isEmpty())
+    }
+
+    @Test
+    fun `canvasPages 正文超限不抛异常而是返回空列表`() {
+        val huge = "字".repeat(ReaderDocumentLimits.MaxSourceChars + 1)
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 0,
+            chapterHref = "ch.xhtml",
+            title = "",
+            html = "<p>$huge</p>",
+            config = canvasConfig(),
+            breaker = oneLinePerParagraph
+        )
+        assertTrue("超限必须软回落（不抛），由调用方继续下探", pages.isEmpty())
+    }
+
+    @Test
+    fun `canvasPages 每页片段带行高与文本类型供渲染器逐行绘制`() {
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 0,
+            chapterHref = "ch.xhtml",
+            title = "",
+            html = "<p>甲乙</p>",
+            config = canvasConfig(height = 100, lineHeight = 20f),
+            breaker = EpubFallbackPageFactory.CanvasLineBreaker { text, _ -> text.chunked(1) }
+        )
+        val fragments = pages.single().fragments.map { it as EpubMeasuredTextFragment }
+        assertEquals(listOf("甲", "乙"), fragments.map { it.text.toString() })
+        fragments.forEach {
+            assertEquals(20f, it.lineHeightPx ?: 0f)
+            assertEquals(EpubMeasuredTextKind.Text, it.kind)
+            assertNull("降级页不得臆造源锚点", it.source)
+        }
+    }
+
+    @Test
+    fun `降级链 CANVAS 级必须接线到 canvasPages 且不再恒返回空`() {
+        val code = SourceFileProbe.sourceText("model/localBook/epubcore/facade/EpubCoreFacade.kt")
+        val branch = code.lines().firstOrNull { it.contains("Stage.CANVAS_PAGE") }
+        assertTrue("EpubCoreFacade 必须存在 CANVAS_PAGE 分支", branch != null)
+        assertTrue(
+            "CANVAS_PAGE 必须调用 canvasPages（否则该级恒空 ⇒ 直接掉到单页 TEXT，整章挤一页）",
+            branch!!.contains("canvasPages(")
+        )
+        assertFalse(
+            "CANVAS_PAGE 不得再恒返回 emptyList",
+            code.contains("Stage.CANVAS_PAGE -> emptyList()")
+        )
     }
 }
