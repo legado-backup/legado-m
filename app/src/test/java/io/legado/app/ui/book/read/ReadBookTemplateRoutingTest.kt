@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read
 
 import io.legado.app.testkit.SourceFileProbe
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -245,5 +246,28 @@ class ReadBookTemplateRoutingTest {
         assertTrue("必须含总开关", s.contains("ReaderTemplateManager.templatesEnabled()}|"))
         assertTrue("必须清面状态（否则被'同章且后端在场即跳过'的防重入闸住）", s.contains("textRichPreparedIndex = -1"))
         assertTrue("必须清模板解析缓存", s.contains("templateResolvedKey = null"))
+    }
+
+    @Test
+    fun `关闭模板后必须退役 WebView 面且可再次开启`() {
+        // 真机铁证（2026-10-12，2.10 坐标专项 L2 期间实测）：面板内「关 → 开」后模板面**不再重渲染**
+        // —— 关闭走的是 canvas 分支（`isTextRichMode()==false`），原实现**没有**退役 WebView 面 ⇒
+        // 残留 `templateActive`/`templateBackend`/`textRichPreparedIndex` 让"再开启"命中
+        // `loadTemplateContentAwait` 的同章早退闸 ⇒ 用户可感知症状「关掉再打开没反应」。
+        // 该路径**默认关闭时跑不到**，只有"开着模板又去关一下再开"的用户会遇到 ⇒ 源码层钉住。
+        val s = text()
+        assertTrue(
+            "早退闸必须在位（正是它让残留状态变成'不重渲染'）",
+            s.contains("textRichPreparedIndex == index && templateBackend != null")
+        )
+        val retire = Regex(
+            "if \\(templateActive\\) switchTemplate\\(false\\)\\s*\\n\\s*" +
+                "if \\(textRichActive\\) switchTextRich\\(false\\)\\s*\\n\\s*switchEpubCore\\(false\\)"
+        )
+        assertEquals(
+            "两处内容分派（upContent / upContentAwait）都必须在走 canvas 前显式退役 WebView 面",
+            2,
+            retire.findAll(s).count()
+        )
     }
 }
