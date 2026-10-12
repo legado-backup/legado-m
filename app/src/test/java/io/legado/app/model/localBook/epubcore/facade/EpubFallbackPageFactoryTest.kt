@@ -4,6 +4,7 @@ import android.graphics.RectF
 import android.text.TextPaint
 import io.legado.app.constant.ReaderDocumentLimits
 import io.legado.app.model.localBook.epubcore.layout.EpubCoreLayoutConfig
+import io.legado.app.model.localBook.epubcore.layout.EpubImageFragment
 import io.legado.app.model.localBook.epubcore.layout.EpubMeasuredTextFragment
 import io.legado.app.model.localBook.epubcore.layout.EpubMeasuredTextKind
 import io.legado.app.testkit.SourceFileProbe
@@ -198,5 +199,45 @@ class EpubFallbackPageFactoryTest {
             "CANVAS_PAGE 不得再恒返回 emptyList",
             code.contains("Stage.CANVAS_PAGE -> emptyList()")
         )
+    }
+
+    @Test
+    fun `canvasPages 图片块产出图片片段且引用经单源解析`() {
+        val html = """<p>前文</p><img src="../images/a.png" width="300px" height="150px"><p>后文</p>"""
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 1,
+            chapterHref = "OEBPS/text/ch1.xhtml",
+            title = "",
+            html = html,
+            config = canvasConfig(height = 200, lineHeight = 20f),
+            breaker = oneLinePerParagraph,
+            imageHref = EpubFallbackPageFactory.CanvasImageHrefResolver { _, src -> "R:$src" }
+        )
+        assertEquals("声明 300x150 的图应与前后文同页", 1, pages.size)
+        val fragments = pages.single().fragments
+        assertEquals(3, fragments.size)
+        val image = fragments.filterIsInstance<EpubImageFragment>().single()
+        assertEquals("图片引用必须走注入的解析器（设备侧即 EpubResourceHref 单源）", "R:../images/a.png", image.href)
+        assertNull("图片块不得臆造源锚点", image.source)
+        assertEquals("前后两段文本片段", 2, fragments.count { it is EpubMeasuredTextFragment })
+    }
+
+    @Test
+    fun `canvasPages 图片无尺寸声明时按保守默认占位并据此分页`() {
+        val html = """<p>甲</p><img src="a.png"><p>乙</p>"""
+        val pages = EpubFallbackPageFactory.canvasPages(
+            chapterIndex = 0,
+            chapterHref = "OEBPS/text/ch1.xhtml",
+            title = "",
+            html = html,
+            config = canvasConfig(height = 200, lineHeight = 20f),
+            breaker = oneLinePerParagraph,
+            imageHref = EpubFallbackPageFactory.CanvasImageHrefResolver { _, src -> src }
+        )
+        // 无尺寸声明 ⇒ 帧高 = 帧宽 × 默认比例（600×0.6=360）被夹到页高 200 ⇒ 图片独占一页
+        assertEquals("默认占位应把图文切成三页", 3, pages.size)
+        assertEquals(listOf(1, 1, 1), pages.map { it.fragments.size })
+        assertTrue("第二页应是图片页", pages[1].fragments.single() is EpubImageFragment)
+        assertEquals("图片页无正文文本", "", pages[1].text.toString())
     }
 }
