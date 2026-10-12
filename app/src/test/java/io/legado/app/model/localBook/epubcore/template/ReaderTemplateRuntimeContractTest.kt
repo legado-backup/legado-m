@@ -146,8 +146,41 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("必须以 border-box 固定高（与量取口径一致，含 padding）", flow.contains("boxSizing = 'border-box'"))
         assertTrue("必须裁切（overflow:hidden 仍是可编程滚动容器）", flow.contains("overflow = 'hidden'"))
         assertTrue(
-            "页框高须由「视口高 − 注入前文档高 + 槽位空高」推出（页眉页脚被自然扣掉）",
-            flow.contains("(currentViewportHeight() || viewportHeight) - chromeHeight + slotEmptyHeight")
+            "页框高须由「视口高 − **当前壳**占位」推出（页眉页脚被自然扣掉）",
+            // 口径升级（用户实测「阅读页底部大片空白」）：占位**必须按当前壳**取 —— 首页壳常有
+            // hero/封面大块、续页壳没有；沿用"注入前按首页测的那一份"会让续页多扣一次首页专属装饰
+            // ⇒ 页框变小、页脚上移、页脚与视口底之间留白。故断言"按壳取占位"这一不变量。
+            flow.contains("return vp - chromeForShell(shellName(), slot);")
+        )
+        assertTrue(
+            "「按壳占位」与「整体高」两口径必须分开：前者已排除正文槽 ⇒ 不得再叠加槽位空高",
+            // 混用后果：页框多出槽空高一截 ⇒ 页脚被压到视口底之下、正文末行被裁（首页同样错位）。
+            // 只有旧的 `chromeHeight`（量 `root.scrollHeight`，已含槽空高）才需要 `slotEmptyHeight` 补偿。
+            flow.contains("return vp - chromeHeight + slotEmptyHeight;")
+        )
+        assertTrue(
+            "占位须按壳缓存（否则换壳必漂移），且量取必须是**布局事实**（根壳与正文槽的 rect 之差）",
+            // 真机铁证（2026-10-12）：① 沿用"注入前按首页壳测的那一份"⇒ 续页多扣首页专属装饰
+            // （页脚上移、底部留白 = 用户实测）；② 改"逐子元素累加"后仍偏小 59px（`offsetHeight`
+            // 对 SVG 装饰带恒 undefined，且 margin/伪元素不计）⇒ 占位 241 < 正文槽顶 244，
+            // 页框反被撑高、页脚压出视口。故必须用 rect 之差：上占位=槽顶−根顶，下占位=根底−槽底。
+            flow.contains("function chromeForShell(") &&
+                flow.contains("chromeByShell") &&
+                flow.contains("sr.top - rr.top") &&
+                flow.contains("rr.bottom - sr.bottom")
+        )
+        assertFalse(
+            "占位不得再逐子元素累加（SVG 装饰带/边距会被漏算 ⇒ 页框被撑高、页脚出屏）",
+            flow.contains("total += el.offsetHeight") ||
+                flow.contains("total += rect ? rect.height : 0;")
+        )
+        assertTrue(
+            "换章须清空按壳占位缓存（结构可能整体变化）",
+            flow.contains("function resetChromeCache(") && flow.contains("resetChromeCache();")
+        )
+        assertTrue(
+            "结算自证须带实际生效占位与壳名（否则'续页仍按首页占位扣减'无法在真机留痕定位）",
+            flow.contains("',chromeNow='") && flow.contains("',shell='")
         )
         assertTrue(
             "视口高必须结算时实时读（initialize 那刻沙箱帧可能还没布局完，实测 vp=0 ⇒ 页框算成负数）",
