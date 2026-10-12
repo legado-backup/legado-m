@@ -17,9 +17,17 @@ class MdTinyArtifactPolicyTest {
 
     private val gradle: String get() = SourceFileProbe.appBuildGradleText()
 
+    /**
+     * **剥掉行注释**后的构建脚本。
+     *
+     * 为什么必须：本文件的"禁回改"红线断言（`!contains("assets.filter.exclude")`）会被 build.gradle 里
+     * **解释该红线本身的注释**命中 ⇒ 假失败（与项目既有铁律"断言行前先剔注释"同源）。
+     */
+    private val gradleCode: String get() = SourceFileProbe.stripComments(gradle)
+
     @Test
     fun `tiny 档由 mdTiny 属性驱动且排除项落在打包阶段`() {
-        val g = gradle
+        val g = gradleCode
         assertTrue("必须存在 mdTiny 属性判据（否则无法产出 tiny 档）", g.contains("mdTiny"))
         assertTrue(
             "排除项必须走 aapt2 的 ignoreAssetsPatterns（**打包阶段**）",
@@ -30,11 +38,11 @@ class MdTinyArtifactPolicyTest {
             "属性必须以 hasProperty 判空为门（缺失时默认构建不受影响）",
             g.contains("project.hasProperty('mdTiny')")
         )
-        // ⚠️ 机制红线（2026-10-13 实测）：`assets.filter.exclude` 在 AGP 8 下**静默失效**
-        // （filter.excludes 已登记、无报错，但产物 APK 内仍含该文件）⇒ 禁止改回该写法。
+        // ⚠️ 机制红线（2026-10-13 实测）：`assets.filter` 的 `exclude` 在 AGP 8 下**静默失效**
+        // （已登记、无报错，但产物 APK 内仍含该文件）⇒ 禁止改回该写法。
         assertTrue(
-            "禁止改回 assets.filter.exclude（AGP 8 下静默失效，体积零变化）",
-            !g.contains("assets.filter.exclude")
+            "禁止改回 assets.filter 的 exclude 写法（AGP 8 下静默失效，体积零变化）",
+            !g.contains("assets.filter")
         )
     }
 
