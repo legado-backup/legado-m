@@ -86,4 +86,24 @@ object SourceFileProbe {
     /** 同 [sourceText] 但对任意相对路径（含 `app/src/...` 前缀的自由形式）。 */
     fun sourceTextByPath(relPath: String): String =
         stripComments(firstFile(relPath, "../app/$relPath", "app/$relPath").readText())
+
+    /**
+     * `app/build.gradle` 原始文本（不剥注释 —— Groovy 注释与代码同样有意义，且本文件用 `//` 注释）。
+     *
+     * 为什么单列：构建期契约（如 S9「tiny 档」的资产排除项）落在 `build.gradle`，而该文件**不在**
+     * `src/main/java` 下 ⇒ 既有三个入口（`rawText`/`sourceTextByPath` 的 `app/` 前缀回退）都不适配，
+     * 各用例再各写一套路径回退又是同形态复制（见本文件头部的 CC-1 教训）。
+     */
+    fun appBuildGradleText(): String {
+        // ⚠️ 不能只按路径回退：仓库根也有 `build.gradle` ⇒ 工作目录=仓库根时 `File("build.gradle")`
+        // 会读到**根**构建脚本（内容不符却"找到了文件"，比抛错更隐蔽）⇒ 必须按**内容特征**认。
+        val marker = "namespace = 'io.legado.app'"
+        return listOf("build.gradle", "../app/build.gradle", "app/build.gradle")
+            .map { File(it) }
+            .firstOrNull { it.isFile && it.readText().contains(marker) }
+            ?.readText()
+            ?: throw AssertionError(
+                "未找到 app/build.gradle（工作目录=${File(".").absolutePath}）"
+            )
+    }
 }
