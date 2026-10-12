@@ -83,6 +83,17 @@ class ReadBookTemplateRoutingTest {
             s.contains("private fun applyPendingTextRichRestore(") &&
                 s.contains("if (!textRichRestorePending || pageCount <= 1) return")
         )
+        // 恢复必须用**内容比例**指令（顾问判定：双壳页数不同 ⇒ 按页号折算偏 ≤2 页，用户可感知"进度不对"）
+        assertTrue(
+            "模板面恢复须用比例指令，不得再按页号折算",
+            s.contains("templateBackend?.gotoRatio(ratio)") && !s.contains("backend.gotoPage((ratio")
+        )
+        assertTrue("文本富渲染面恢复同样用比例", s.contains("textRichBackend?.scrollToRatio(ratio)"))
+        // 保存侧必须与恢复侧**同归一化**：用沙箱自报的内容比例（此前「页号/页数」与恢复侧不一致 ⇒ 偏 1~2 页）
+        assertTrue(
+            "进度保存须用沙箱自报的内容比例",
+            s.contains("backend.currentContentRatio().coerceIn(0f, 1f)")
+        )
     }
 
     @Test

@@ -257,6 +257,47 @@ class ReaderTemplateRuntimeContractTest {
                 flow.contains("authoritativeIndex = clampIndex(authoritativePage, totalPages);") &&
                 flow.contains("pageIndex: authoritativeIndex >= 0")
         )
+        // 进度恢复的**内容比例**口径（顾问判定必须根治双壳页数偏差：实测首页壳 17 页 / 续页壳 12 页
+        // ⇒ 按页号折算恢复偏 ≤2 页，用户可感知"进度不对"）。比例口径与壳无关 ⇒ 必须三方齐备。
+        assertTrue(
+            "沙箱须支持按内容比例定位（`ratio × (内容高 − 页高)`，与壳无关）",
+            flow.contains("function gotoRatio(") &&
+                flow.contains("authoritativeRatio * Math.max(0, ratioContent - visible)") &&
+                flow.contains("gotoRatio: gotoRatio")
+        )
+        // 保存侧必须与恢复侧**同归一化**（否则往返偏 1~2 页）：沙箱自报 `progressRatio`，
+        // 经 SEND_TYPES/策略/编解码三方放行后由宿主保存进度。
+        assertTrue(
+            "沙箱须自报内容比例（保存侧同归一化的唯一来源）",
+            flow.contains("function progressRatio(") &&
+                flow.contains("onFlowSettled(") &&
+                asset("template-runtime.js").contains("stable: ['pageIndex', 'pageCount', 'progressRatio']") &&
+                asset("template-runtime.js").contains("payload.progressRatio = ")
+        )
+        assertTrue(
+            "桥策略须放行 FROM_WEB `progressRatio`",
+            ReaderTemplateBridgePolicy.allowedFields(
+                ReaderTemplateBridgePolicy.Direction.FROM_WEB, "stable"
+            )?.contains("progressRatio") == true
+        )
+        assertTrue(
+            "冻结页框的页眉补偿必须为 0（旧式 `root.scrollHeight − slot.scrollHeight` 对冻结页框为负 ⇒ " +
+                "回退后 `readBodyOffset` 恒解出 0 ⇒ 非权威结算把正文打回章首，进度恢复落第 1 页）",
+            flow.contains("function pageChrome(") &&
+                flow.contains("if (slotIsFrozen(slot)) return 0;") &&
+                !flow.contains("chrome = bodyOffset;")
+        )
+        assertTrue(
+            "沙箱运行时分发须认 `ratio` 字段（否则宿主下指令后仍按页号走）",
+            asset("template-runtime.js").contains("if (typeof data.ratio === 'number')") &&
+                asset("template-runtime.js").contains("flow.gotoRatio(data.ratio);")
+        )
+        assertTrue(
+            "桥策略须放行 `ratio` 字段（未登记即被拒收）",
+            ReaderTemplateBridgePolicy.allowedFields(
+                ReaderTemplateBridgePolicy.Direction.TO_WEB, "goto-page"
+            )?.containsAll(setOf("pageIndex", "ratio")) == true
+        )
     }
 
     @Test
