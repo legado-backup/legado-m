@@ -56,6 +56,33 @@ class ReadBookTemplateRoutingTest {
         assertTrue("首帧后必须恢复位置", s.contains("private fun onTemplateRendered("))
         assertTrue("onDestroy 必须释放", s.contains("switchTemplate(false)"))
         assertTrue("两面共用承载位 ⇒ 必须互斥", s.contains("if (templateActive) switchTemplate(false)"))
+        // 真机铁证（2026-10-12，用户实测「每次进去都是从头开始看」）：首次 stable 的页数可能 =1，
+        // 此时 `(ratio * 1).toInt()` 恒 0 ⇒ 进度被退回首页。故恢复必须**页数未定型时不消费**，
+        // 并由后续重测（onReMeasured）补落位。
+        assertTrue(
+            "恢复必须页数未定型时不消费（<=1 时保留待恢复比例）",
+            s.contains("private fun applyTemplatePendingRestore(") &&
+                s.contains("if (pageCount <= 1) return")
+        )
+        assertTrue("重测也必须补落位", s.contains("applyTemplatePendingRestore(pageCount)"))
+        assertTrue(
+            "换章/关模板必须作废待恢复比例（否则新章按旧比例落位）",
+            s.contains("templatePendingRestoreRatio = null")
+        )
+        // 冷启口径：`upContent()` 的默认参数 `resetPageOffset = true` **只**表示"不复用内存页偏移"，
+        // 不等于忽略已落盘进度 ⇒ 两个面都必须**始终**由 durChapterPos 折算恢复（此前直接归零）
+        assertTrue(
+            "恢复标记不得再按 resetPageOffset 归零（该标记只表示不复用内存页偏移）",
+            !s.contains("templateRestorePending = !resetPageOffset") &&
+                !s.contains("textRichRestorePending = !resetPageOffset") &&
+                s.contains("templateRestorePending = true") &&
+                s.contains("textRichRestorePending = true")
+        )
+        assertTrue(
+            "文本富渲染面同口径（同类缺陷必须一并修，不得只修一面）",
+            s.contains("private fun applyPendingTextRichRestore(") &&
+                s.contains("if (!textRichRestorePending || pageCount <= 1) return")
+        )
     }
 
     @Test

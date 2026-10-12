@@ -200,7 +200,7 @@ class ReaderTemplateRuntimeContractTest {
             // 改读**结构无关的正文偏移**；但"读实际位置而非静态配置"这条不变量不变（由 bodyOffset 满足）
             flow.contains("function scrollIndex(") &&
                 (flow.contains("scrollIndex(slot.scrollTop, visible)") ||
-                    flow.contains("clampIndex(bodyOffset / visible, totalPages)"))
+                    flow.contains("indexFromOffset(bodyOffset, visible, totalPages, maxOffset)"))
         )
         assertTrue(
             "页码必须四舍五入（scrollTop 是小数：floor(782.x/783)=0 ⇒ 已翻页却判成第 1 页，2026-10-10 铁证）",
@@ -249,6 +249,13 @@ class ReaderTemplateRuntimeContractTest {
             flow.contains("var authoritativePage = -1;") &&
                 flow.contains("authoritativePage = target;") &&
                 flow.contains("bodyOffset = clampBodyOffset(authoritativePage * visible, slot, root);")
+        )
+        assertTrue(
+            "**末页必须可达**（末页是部分页：`target*页高` 被夹到最大偏移后 floor 会退回前一页 ⇒ 症状＝只能翻两页）",
+            flow.contains("function indexFromOffset(") &&
+                flow.contains("offset >= maxOffset - 1") &&
+                flow.contains("authoritativeIndex = clampIndex(authoritativePage, totalPages);") &&
+                flow.contains("pageIndex: authoritativeIndex >= 0")
         )
     }
 
@@ -382,7 +389,7 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("同结构连续换页不得重建 DOM", flow.contains("if (want === flowShell) return false;"))
         assertTrue("横向分栏/滚动模板不换壳", flow.contains("if (isScrollMode() || isColumnsMode()) return false;"))
         assertTrue("页码须由**结构无关的正文偏移**推出（读 scrollTop 会因页眉补偿而跳页）",
-            flow.contains("pageIndex: clampIndex(bodyOffset / visible, totalPages)"))
+            flow.contains("indexFromOffset(bodyOffset, visible, totalPages, maxOffset)"))
         assertTrue("须有正文偏移反解（跨结构可比量）", flow.contains("function readBodyOffset("))
         assertTrue("须有正文偏移定位", flow.contains("function applyBodyOffset("))
         assertTrue("结算须回发结构自证（否则换壳失守只能肉眼比对）", flow.contains("settle,shell="))
