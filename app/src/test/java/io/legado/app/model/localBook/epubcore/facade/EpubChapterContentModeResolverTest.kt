@@ -89,6 +89,26 @@ class EpubChapterContentModeResolverTest {
     }
 
     @Test
+    fun `横排声明与出版方样式并存时仍走归一化`() {
+        // 铁证 2026-10-13：真实可重排章节常同时带 `-epub-writing-mode: horizontal-tb` 与出版方样式
+        // （h2 字色/引用边框/列表/缩进）。旧判据把横排声明也当「语义排版」⇒ 保真态 ⇒ 阅读器字号失效。
+        val mode = resolve(
+            html = """
+                <html><head><style>
+                  p { duokan-text-indent: 2em; -epub-writing-mode: horizontal-tb; color: #222222; }
+                  .pub-note { color: #c0392b; font-weight: bold; }
+                  h2 { color: #1b5e20; }
+                </style></head>
+                <body><h2>标题</h2><p>正文<span class="pub-note">强调</span></p></body></html>
+            """.trimIndent()
+        )
+        assertEquals(EpubDirectLayoutMode.REFLOWABLE, mode.layoutMode)
+        assertFalse("横排不是出版方排版，必须注入阅读器字号", mode.preservePublisherLayout)
+        assertTrue(mode.readerNormalized)
+        assertFalse(mode.singlePage)
+    }
+
+    @Test
     fun `图库页走交互态单页且不缩放`() {
         val mode = resolve(
             html = """

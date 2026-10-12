@@ -77,6 +77,30 @@ class EpubDirectContentClassifierTest {
     }
 
     @Test
+    fun `横排书写模式声明不构成出版方排版`() {
+        // 铁证 2026-10-13：EPUB 常见的 `-epub-writing-mode: horizontal-tb` 曾被误判为 PUBLISHER_STYLED，
+        // 导致该章跳过阅读器归一化 ⇒ 阅读器字号/行高/左右安全区全部失效（正文退回 UA 默认 16px）。
+        listOf(
+            "<style>p { -epub-writing-mode: horizontal-tb; }</style>",
+            "<style>body { -webkit-writing-mode: horizontal-tb; }</style>",
+            "<style>html { writing-mode: horizontal-tb; }</style>"
+        ).forEach { style ->
+            val mode = classify(html = "<html><head>$style</head><body><p>text</p></body></html>")
+            assertEquals("横排声明不得进入保真态：$style", EpubDirectLayoutMode.REFLOWABLE, mode)
+        }
+    }
+
+    @Test
+    fun `竖排书写模式声明仍判定为出版方排版`() {
+        listOf("vertical-rl", "vertical-lr", "tb-rl", "sideways-rl").forEach { value ->
+            val mode = classify(html = "<html><head><style>p { writing-mode: $value; }</style></head><body><p>text</p></body></html>")
+            assertEquals("竖排 $value 应保真", EpubDirectLayoutMode.PUBLISHER_STYLED, mode)
+            val epubPrefixed = classify(html = "<html><head><style>p { -epub-writing-mode: $value; }</style></head><body><p>text</p></body></html>")
+            assertEquals("竖排 $value（-epub- 前缀）应保真", EpubDirectLayoutMode.PUBLISHER_STYLED, epubPrefixed)
+        }
+    }
+
+    @Test
     fun `rendition 可重排显式声明优先于画布启发式`() {
         val mode = classify(
             spineProperties = setOf("rendition:layout-reflowable"),
