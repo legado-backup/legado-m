@@ -140,7 +140,10 @@ class ReaderTemplateBridgePolicyTest {
     fun `白名单字段表与协议文档一致`() {
         val fromWeb = ReaderTemplateBridgePolicy.Direction.FROM_WEB
         val toWeb = ReaderTemplateBridgePolicy.Direction.TO_WEB
-        assertEquals(setOf("pageIndex", "pageCount"), ReaderTemplateBridgePolicy.allowedFields(fromWeb, "stable"))
+        assertEquals(
+            setOf("pageIndex", "pageCount", "progressRatio"),
+            ReaderTemplateBridgePolicy.allowedFields(fromWeb, "stable")
+        )
         assertEquals(setOf("rects"), ReaderTemplateBridgePolicy.allowedFields(fromWeb, "selection"))
         assertEquals(setOf("src", "alias"), ReaderTemplateBridgePolicy.allowedFields(fromWeb, "image"))
         assertEquals(setOf("id", "enabled"), ReaderTemplateBridgePolicy.allowedFields(fromWeb, "annotationState"))
@@ -160,11 +163,19 @@ class ReaderTemplateBridgePolicyTest {
             )
         )
         assertEquals(
-            "goto-page 只允许 pageIndex（多一个字段就是开放通道）",
+            "goto-page 只允许 pageIndex / ratio（多一个字段就是开放通道）",
             "unexpected-field",
             verify(
                 type = "goto-page",
-                fields = setOf("pageIndex", "pageCount"),
+                fields = setOf("pageIndex", "ratio", "pageCount"),
+                dir = ReaderTemplateBridgePolicy.Direction.TO_WEB
+            )
+        )
+        assertNull(
+            "ratio 与 pageIndex 同为已登记字段（进度恢复用内容比例口径）",
+            verify(
+                type = "goto-page",
+                fields = setOf("ratio"),
                 dir = ReaderTemplateBridgePolicy.Direction.TO_WEB
             )
         )

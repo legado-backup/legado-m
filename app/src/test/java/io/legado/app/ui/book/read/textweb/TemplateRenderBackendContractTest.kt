@@ -23,6 +23,28 @@ class TemplateRenderBackendContractTest {
     private fun text(): String = SourceFileProbe.sourceText(src)
 
     @Test
+    fun `进度往返须走内容比例且与宿主同归一化`() {
+        // 2026-10-12（顾问判定必须根治）：模板面双壳页数不同（17 / 12）⇒ 按"页号"折算恢复必偏 1~2 页。
+        // 契约：①恢复用**比例指令** `goto-page{ratio}`；②保存用沙箱自报的 `progressRatio`
+        // ⇒ 两侧同一归一化（`正文偏移 / (内容高 − 页高)`），重开精确落回同一内容位置。
+        val s = text()
+        assertTrue("须提供比例定位 API", s.contains("fun gotoRatio(ratio: Float)"))
+        assertTrue("比例须以 6 位小数下发（防脏值进文档）", s.contains("%.6f"))
+        assertTrue("须与页号共用同一发送通道", s.contains("postGoto("))
+        assertTrue(
+            "须把沙箱自报的内容比例存下来（保存侧同归一化的唯一来源）",
+            s.contains("contentRatio = event.progressRatio.coerceIn(0f, 1f)") &&
+                s.contains("fun currentContentRatio(): Float = contentRatio")
+        )
+        // 文本富渲染面（同类）也须有比例定位
+        assertTrue(
+            "文本富渲染面须同样支持比例定位（与页数何时定型无关）",
+            SourceFileProbe.sourceText("ui/book/read/textweb/TextRichRenderBackend.kt")
+                .contains("fun scrollToRatio(ratio: Float)")
+        )
+    }
+
+    @Test
     fun `通道禁用宿主对象注入且走消息监听`() {
         val s = text()
         assertFalse("AD-23：禁 addJavascriptInterface", s.contains("addJavascriptInterface"))
