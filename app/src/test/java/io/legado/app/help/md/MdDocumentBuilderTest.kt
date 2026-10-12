@@ -16,6 +16,24 @@ import org.junit.Test
 class MdDocumentBuilderTest {
 
     @Test
+    fun `单章上界取单一来源且与统一文档模型同界`() {
+        // 3.1 统一口径（2026-10-13）：同一章会先后流经 md 构建 / 富渲染探测 / 统一文档模型三条链，
+        // 任一处写死字面量 ⇒ "一端通过、另一端抛出"（能进阅读页却白屏），且调上界时只改一处 ⇒ 静默分裂。
+        assertEquals(io.legado.app.constant.ReaderDocumentLimits.MaxSourceChars, MdDocumentBuilder.MaxChapterChars)
+        assertEquals(io.legado.app.constant.ReaderDocumentLimits.MaxBlocks, MdDocumentBuilder.MaxChapterBlocks)
+        assertEquals(
+            "统一文档模型必须与 md 侧同界",
+            MdDocumentBuilder.MaxChapterChars,
+            io.legado.app.model.localBook.epubcore.direct.TextReaderDocument.MAX_SOURCE_CHARS
+        )
+        assertEquals(
+            "块数上界同样必须同界",
+            MdDocumentBuilder.MaxChapterBlocks,
+            io.legado.app.model.localBook.epubcore.direct.TextReaderDocument.MAX_BLOCKS
+        )
+    }
+
+    @Test
     fun `GFM 表格与删除线渲染为片段 HTML`() {
         val built = MdDocumentBuilder.build(
             """
