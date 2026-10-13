@@ -169,6 +169,20 @@ class ReaderTemplateRuntimeContractTest {
                 flow.contains("sr.top - rr.top") &&
                 flow.contains("rr.bottom - sr.bottom")
         )
+        // 真机铁证（2026-10-13）：换壳后**首帧**量取时装饰带（内联 SVG）尚未定型 ⇒ 占位偏小整整一条
+        // 行高（实测续页 `chromeNow=71` vs 后续 `91`，箱高 782 vs 763）⇒ 该壳首帧比后续页多一行，
+        // 且保存/恢复跨一档页码（用户实测：「每页文字个数的不同，页脚还能自己变动」）。旧实现"同壳
+        // 只测一次"会把这份偏小值缓存住 ⇒ 必须改为**每次实测** + 差异超阈值时下一帧重结算一次。
+        assertTrue(
+            "按壳占位必须每次实测并比对上次（首帧装饰未定型 ⇒ 差一整行，须下一帧重结算）",
+            flow.contains("var prev = chromeByShell[key];") &&
+                flow.contains("Math.abs(prev - total) > CHROME_DRIFT_TOL") &&
+                flow.contains("var CHROME_DRIFT_TOL = 2;") &&
+                flow.contains("function scheduleResettle(") &&
+                flow.contains("settle(true);") &&
+                // 反向锁：不得再出现"同壳只测一次"的早退缓存（它正是首帧多一行的成因）
+                !flow.contains("if (chromeByShell[key] !== undefined)")
+        )
         assertFalse(
             "占位不得再逐子元素累加（SVG 装饰带/边距会被漏算 ⇒ 页框被撑高、页脚出屏）",
             flow.contains("total += el.offsetHeight") ||
