@@ -91,6 +91,17 @@ class ReaderTemplateRepositoryTest {
     }
 
     @Test
+    fun `默认体量上限须容纳 archive 最大内置主题`() {
+        // 「落实兼容 archive 所有主题模式」（2026-10-13 用户铁证）：archive 官方内置
+        // `builtin.lord_of_mysteries` 的 `resourceSource()` 约 2.65 MB（css 单项即 2.6 MB）。
+        // 默认上限若低于该值，这套主题**导入期就被拒** ⇒ "兼容所有主题"名不副实。
+        assertTrue(
+            "默认上限须 ≥ 3 MiB（容纳 archive 最大内置主题约 2.65 MB）",
+            ReaderTemplateRepository.DefaultMaxTemplateChars >= 3 * 1024 * 1024
+        )
+    }
+
+    @Test
     fun `模板数量上限生效`() {
         val store = repo(maxTemplates = 2)
         assertTrue(store.save(template(id = "user.a")))

@@ -219,4 +219,27 @@ class TemplateRenderBackendContractTest {
         val host = SourceFileProbe.assetRawText("md/template-host.js")
         assertTrue("宿主转发必须消费 seed（白名单漏键即静默丢字段）", host.contains("config.seed"))
     }
+
+    @Test
+    fun `主题 id 覆盖日间夜间水墨屏三态且水墨屏优先`() {
+        // 「兼顾软件整体主题：日间/夜间/水墨屏」——沙箱只认 `data-reader-theme`/`data-md-theme`
+        // 这一对属性，主题 id 必须由宿主按三态算出；水墨屏优先级高于夜间（与
+        // `HighlightPalette.Tone.EINK` 的判序一致），否则水墨屏设备在夜间设置下会取错基线色。
+        fun values(dark: Boolean, eink: Boolean) = TemplateRenderBackend.ReaderValues(
+            dark = dark, eink = eink, bookName = "b", chapterTitle = "c",
+            progressPercent = 0, hour = 0
+        )
+        assertEquals("日间", "day", values(dark = false, eink = false).themeId)
+        assertEquals("夜间", "night", values(dark = true, eink = false).themeId)
+        assertEquals("水墨屏", "eink", values(dark = false, eink = true).themeId)
+        assertEquals("水墨屏须优先于夜间", "eink", values(dark = true, eink = true).themeId)
+        val s = text()
+        assertTrue("ReaderValues 必须带水墨屏标志", s.contains("val eink: Boolean"))
+        assertTrue("主题 id 必须来自单源映射", s.contains("TemplateThemeId.of(dark, eink)"))
+        // 三态字面量收口到单源文件（映射只能有一处实现，否则模板取态与基线取态会漂移）
+        val themeIdSrc = SourceFileProbe.sourceText("ui/book/read/textweb/TemplateThemeId.kt")
+        listOf("\"day\"", "\"night\"", "\"eink\"").forEach { literal ->
+            assertTrue("三态字面量须在单源文件登记：$literal", themeIdSrc.contains(literal))
+        }
+    }
 }

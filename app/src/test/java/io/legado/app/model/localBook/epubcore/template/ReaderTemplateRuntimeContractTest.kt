@@ -481,7 +481,18 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue(
             "①⑤ 箱高与可见窗口必须**分开**（箱高铺满/不可拖/页脚贴底；窗口整行对齐/不裁字）",
             flow.contains("function freezePagedSlot(slot, boxHeight)") &&
-                flow.contains("slot.style.paddingBottom = Math.max(0, Math.floor(gutter)) + 'px';")
+                flow.contains("slot.style.paddingBottom = gutter + 'px';")
+        )
+        assertTrue(
+            "⑤ 裁切必须用 clip-path 裁在「上内边距 + 整行窗口」处",
+            // 2026-10-14 行带剖面铁证：`padding-bottom` **裁不掉**溢出正文 —— 正文是滚动容器的溢出内容，
+            // 会画进内边距区；而 `overflow:hidden` 的裁切边是**内边距盒（箱底）**⇒ 可见区 = 箱高 − 上内边距
+            // （star-chart 实测 23.47 行）⇒ 第 24 行只剩 6px 字形顶。clip-path 不改布局 ⇒ 不引入占位反馈环。
+            flow.contains("var clip = 'inset(0 0 ' + gutter + 'px 0)';") &&
+                flow.contains("slot.style.clipPath = clip;") &&
+                flow.contains(
+                    "var gutter = Math.max(0, Math.floor(boxHeight - slotPaddingTop(slot) - windowHeight));"
+                )
         )
         assertTrue(
             "① 必须**恒定冻结**（短章也要冻结；旧的『仅在溢出时冻结』守卫须已删除）",
@@ -728,6 +739,42 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue(
             "竖排判据须与运行时单源（<html data-rp-writing>）",
             flow.contains("getAttribute('data-rp-writing') === 'vertical'")
+        )
+    }
+
+    @Test
+    fun `archive 页元素属性与三态主题齐备`() {
+        // 2026-10-13 用户铁证（「落实兼容 archive 所有主题模式」）：archive 官方作者文档写明
+        // 「页面根节点：data-reader-page="first|other"」，其主题 CSS 大量依赖该属性做首页/续页差异
+        // （`[data-reader-page]{padding:0}`、`[data-reader-page="first"] …`、`[data-reader-page="scroll"] …`），
+        // `builtin.minecraft_live` 还用 `[data-reader-active="true"][data-reader-motion="paused"]`。
+        // 缺这些属性时选择器**静默落空**（不报错），真机观感即「导入主题和 archive 完全不一样」。
+        val runtime = asset("template-runtime.js")
+        assertTrue("须有页元素属性写入入口", runtime.contains("function applyPageAttrs("))
+        assertTrue("须写 data-reader-page", runtime.contains("setAttribute('data-reader-page'"))
+        assertTrue("须写 data-reader-active", runtime.contains("setAttribute('data-reader-active'"))
+        assertTrue("须支持 scroll/first/other 三值", runtime.contains("'scroll' : (which === 'continuation' ? 'other' : 'first')"))
+        assertTrue("换壳处必须同步页元素属性", runtime.contains("applyPageAttrs(target);"))
+        assertTrue("滚动模板页根同样须带标记", runtime.contains("applyPageAttrs('scroll');"))
+
+        // 三态主题：`data-reader-theme`（archive 契约 / 内置模板取色）必须与 `data-md-theme`
+        // （md 基线三态变量块的唯一选择器）**同时**下发 —— 只写一侧会让基线（代码块/引用/表格底纹）
+        // 在夜间与水墨屏下停在天亮态默认值。
+        assertTrue("须同时下发 data-md-theme", runtime.contains("setAttribute('data-md-theme'"))
+        val mdReader = asset("md-reader.css")
+        assertTrue("基线须有水墨屏变量块", mdReader.contains("html[data-md-theme=\"eink\"]"))
+        val decoration = asset("template-decoration.css")
+        assertTrue("装饰基线须有水墨屏块（停动效）", decoration.contains("html[data-reader-theme=\"eink\"]"))
+
+        // 默认档位「中」**不得**改写作者透明度：archive 插画/纹理层由作者自声明 `opacity`，
+        // 引擎在默认档强行覆写会让导入主题整体走样（这正是「适配过来就是死图」的观感成因之一）。
+        assertFalse(
+            "默认档不得在装饰元素上强制 opacity",
+            decoration.contains("data-rp-decoration=\"medium\"] [data-reader-decor]")
+        )
+        assertTrue(
+            "「中」档仍须登记（档位与 Kotlin 枚举三处同表）",
+            decoration.contains("data-rp-decoration=\"medium\"")
         )
     }
 }
