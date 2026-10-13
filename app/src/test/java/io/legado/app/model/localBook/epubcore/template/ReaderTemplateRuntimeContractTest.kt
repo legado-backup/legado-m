@@ -142,7 +142,7 @@ class ReaderTemplateRuntimeContractTest {
         // 真机缺口（2026-10-10）：模板只声明正文槽位、作者 CSS 让正文自由增高（素笺 `.mi-body`
         // 无 height/overflow）⇒ 页数恒 1、翻页无效、后半章溢出读不到。引擎必须自己冻结页框。
         val flow = asset("template-browser-flow.js")
-        assertTrue("必须冻结页框（固定高）", flow.contains("function freezeSlot("))
+        assertTrue("必须冻结页框（固定高）", flow.contains("function freezePagedSlot("))
         assertTrue("必须以 border-box 固定高（与量取口径一致，含 padding）", flow.contains("boxSizing = 'border-box'"))
         assertTrue("必须裁切（overflow:hidden 仍是可编程滚动容器）", flow.contains("overflow = 'hidden'"))
         assertTrue(
@@ -236,9 +236,11 @@ class ReaderTemplateRuntimeContractTest {
                 flow.contains("next > MIN_PAGE_HEIGHT")
         )
         assertTrue(
-            "校正只收缩不放大（部分模板根壳高被 CSS 钳定 ⇒ 放大无收益且在换壳瞬态上易误触发）",
-            flow.contains("overflow <= FRAME_CORRECT_TOL") &&
-                !flow.contains("Math.abs(overflow) <= FRAME_CORRECT_TOL")
+            "校正须**双向**（2026-10-13 用户铁证：冻结成 BFC 后下占位变小 ⇒ 单向收缩会让根壳底够不到视口底）" +
+                "，且须防根壳被 CSS 钳定时放大无效（放大前先验是否真有位移）",
+            flow.contains("Math.abs(delta) <= FRAME_CORRECT_TOL") &&
+                flow.contains("after <= delta + FRAME_CORRECT_TOL") &&
+                !flow.contains("overflow <= FRAME_CORRECT_TOL")
         )
         assertTrue(
             "校正结果必须写回按壳占位缓存（否则每次结算重复校正/抖动）",
@@ -437,6 +439,63 @@ class ReaderTemplateRuntimeContractTest {
     }
 
     @Test
+    fun `页框恒定冻结并整行对齐（短章留白与末行裁切）`() {
+        // 2026-10-13 用户真机铁证三条（必须逐条钉住，否则会随重构回退）：
+        // ①短章外壳塌陷 ⇒ 底部一大片空白、页脚紧贴正文末尾（续页壳同因"只在溢出时冻结"而留 91px）；
+        // ②页高不是行高整数倍 ⇒ 裁切边界落在某行中间，「最后一行的字能显示一半」；
+        // ③用 `zoom` 收紧外壳 ⇒ 缩放的是元素自身盒宽，块级页眉/页脚右侧空出一条（「左右不占满屏幕」）。
+        val flow = asset("template-browser-flow.js")
+        assertTrue("⑤ 须有整行对齐入口（把「箱高 − 槽顶部内边距」向下取整到整行）",
+            flow.contains("function alignToWholeLines(") &&
+                flow.contains("Math.floor(room / lh)"))
+        assertTrue("⑤ 须取正文槽的实际行高（computed 才是最终生效值）", flow.contains("function lineHeightOf("))
+        assertTrue("⑤ 须取正文槽顶部内边距（网格原点必须含它）", flow.contains("function slotPaddingTop("))
+        assertTrue(
+            "①⑤ 箱高与可见窗口必须**分开**（箱高铺满/不可拖/页脚贴底；窗口整行对齐/不裁字）",
+            flow.contains("function freezePagedSlot(slot, boxHeight)") &&
+                flow.contains("slot.style.paddingBottom = Math.max(0, Math.floor(gutter)) + 'px';")
+        )
+        assertTrue(
+            "① 必须**恒定冻结**（短章也要冻结；旧的『仅在溢出时冻结』守卫须已删除）",
+            flow.contains("freezePagedSlot(slot, box)") &&
+                !flow.contains("if ((slot.scrollHeight || 0) > visible + 1)")
+        )
+        assertTrue(
+            "最大正文偏移须用**箱高**口径（用可见窗口高会多滚一段 ⇒ 章末页底部露白）",
+            flow.contains("var box = (slot && slot.clientHeight) || 0;") &&
+                flow.contains("var page = box > 0 ? box : (lastPageHeight > 0 ? lastPageHeight : visibleHeight());")
+        )
+        assertTrue("换章须作废页高/箱高（不得跨章复用）",
+            flow.contains("lastPageHeight = 0;") && flow.contains("lastBoxHeight = 0;"))
+        assertTrue("① 贴底校正须**双向**（冻结成 BFC 后下占位变小 ⇒ 欠填须放大到贴底）",
+            flow.contains("Math.abs(delta) <= FRAME_CORRECT_TOL"))
+        assertTrue("① 校正后须**重算可见窗口**（否则裁切边界又落到行中间）",
+            Regex("""visible = freezePagedSlot\(slot, box\);""").findAll(flow).count() >= 2)
+        assertTrue("① 换壳须用**箱高**冻结新壳（否则新壳比视口矮 ⇒ 又能上下扒拉）",
+            flow.contains("freezePagedSlot(fresh, boxHeight);"))
+        assertTrue("① 放大前须先验根壳是否真的下移（根壳被 CSS 钳定时放大只是裁掉正文）",
+            flow.contains("after <= delta + FRAME_CORRECT_TOL"))
+        val layoutCss = asset("template-layout.css")
+        assertTrue("① 画布须恒铺满视口（否则整行对齐残量处露出异色画布底）",
+            layoutCss.contains("min-height: 100vh"))
+        assertTrue("⑤ 沙箱文档自身不得可滚动（否则整页仍能被上下拖出一截）",
+            layoutCss.contains("overflow: hidden"))
+        assertTrue("⑤ 正文须落在**整行网格**上（段距非整行会让页边界落在行中间 ⇒ 末行被裁半）",
+            layoutCss.contains("--rp-line-height") &&
+                layoutCss.contains("padding-top: var(--rp-line-height") &&
+                layoutCss.contains("margin-bottom: var(--rp-line-height"))
+
+        val runtime = asset("template-runtime.js")
+        assertTrue("⑤ 运行时须按 computed 行高写入整行网格变量", runtime.contains("function applyLineGrid()") &&
+            runtime.contains("setProperty('--rp-line-height'"))
+        assertTrue("⑤ 整行网格须在页眉/页脚占位量取（flow.initialize）之前应用",
+            runtime.indexOf("applyLineGrid();") in 1 until runtime.indexOf("flow.initialize(config.flow);"))
+        assertFalse("③ 引擎不得再对模板外壳施加 zoom（右侧会空出一条）", runtime.contains("setProperty('zoom'"))
+        assertFalse("③ 收紧入口须已移除", runtime.contains("function tightenChrome("))
+        assertTrue("空白归属须可自证（html/body/根壳三层底色）", runtime.contains(",bg=' + backgroundFacts()"))
+    }
+
+    @Test
     fun `元素与动画预算自证（4_19）`() {
         // 4.19 / NFR-08：重装饰模板卡顿的**第一手数字**是元素数与"当前真的在跑"的动画数。
         // 口径要点：①只报告不改行为（不擅自删节点/停动画，否则症状变成"模板莫名少一块"）；
@@ -502,18 +561,26 @@ class ReaderTemplateRuntimeContractTest {
 
     @Test
     fun `响应式与竖排在结算之前完成且素材治理不吞掉结算`() {
-        // 顺序即正确性：页框量取/分页以 --rp-vp-h 与 data-rp-writing 为依据 ⇒ 滞后一拍就按错尺寸分页；
+        // 顺序即正确性：页框量取/分页以 `--rp-vp-w/h` 与 `data-rp-writing` 为依据 ⇒ 滞后一拍就按错尺寸分页；
         // 而结算必须发生在素材就绪回调内（否则图片未解码就提交了可翻阅页面 = C11 形同虚设）。
+        //
+        // ⚠️ 锚点用法（2026-10-13 修正）：`applyViewport();` 在**两个位置**都出现（`continueInit` 与
+        // `remeasure` 分支），而 `markDecorations();` 只出现在 `continueInit` ⇒ 旧实现以
+        // `markDecorations();` 之后的第一个 `applyViewport();` 为锚会恒取到 −1（位置断言假失败）。
+        // 改为以 `flow.initialize(config.flow);`（continueInit 内的唯一锚）为中心：向前找其一、向后找其余。
         val runtime = asset("template-runtime.js")
-        val anchor = runtime.indexOf("markDecorations();")
-        assertTrue("未找到 continueInit 的装饰分层调用锚点", anchor >= 0)
-        val iViewport = runtime.indexOf("applyViewport();", anchor)
-        val iWriting = runtime.indexOf("applyWritingMode();", anchor)
-        val iMaterials = runtime.indexOf("materializeMaterials(function () {", anchor)
-        val iSettle = runtime.indexOf("flow.settle(false)", anchor)
-        assertTrue("响应式收紧须在锚点之后", iViewport > anchor)
-        assertTrue("竖排判定须在响应式之后", iWriting > iViewport)
+        val init = runtime.indexOf("flow.initialize(config.flow);")
+        assertTrue("未找到 continueInit 的 flow.initialize 锚点", init > 0)
+        val iViewport = runtime.lastIndexOf("applyViewport();", init)
+        val iWriting = runtime.indexOf("applyWritingMode();", init)
+        val iMaterials = runtime.indexOf("materializeMaterials(function () {", init)
+        val iSettle = runtime.indexOf("flow.settle(false)", init)
+        val iMark = runtime.indexOf("markDecorations();", init)
+        assertTrue("响应式断点须在锚点之前（早于页眉/页脚占位量取，否则首屏按旧尺寸分页）",
+            iViewport in 1 until init)
+        assertTrue("竖排判定须在锚点之后", iWriting > init)
         assertTrue("素材治理须在竖排之后", iMaterials > iWriting)
         assertTrue("结算必须发生在素材就绪回调内", iSettle > iMaterials)
+        assertTrue("装饰分层须在结算之前完成（首个 stable 即带最终外观）", iMark in 1 until iSettle)
     }
 }
