@@ -687,4 +687,35 @@ class ReaderTemplateRuntimeContractTest {
             runtime.contains("emitHook('motionChange', motionEvent());")
         )
     }
+
+    @Test
+    fun `分栏判据须要列布局证据否则退回自研回退分页`() {
+        // 真机铁证（2026-10-13，archive「明日香」）：作者只声明
+        // `data-reader-flow-pagination="columns"` 却不写 `column-*` ⇒ 旧判据（只认声明）掉进
+        // `settleColumns` 的"只读结果"路径：`scrollWidth == clientWidth` ⇒ 页数恒 1、且该路径
+        // 从不冻结页框（`lastPageHeight == 0`）⇒ 正文溢出视口、页脚缺失、无法翻页。
+        // 判据必须要求"列布局证据"，否则退回自研回退分页（纵向冻结 + 首/续页换壳照常生效）。
+        val flow = asset("template-browser-flow.js")
+        assertTrue("须有列布局证据判据", flow.contains("function authorProvidesColumns()"))
+        assertTrue(
+            "证据①：正文槽已产生横向溢出（作者的 column-* 真在起作用）",
+            flow.contains("(slot.scrollWidth || 0) > (slot.clientWidth || 0) + 1")
+        )
+        assertTrue(
+            "证据②：作者显式声明列数/列宽",
+            flow.contains("cs.columnCount") && flow.contains("cs.columnWidth")
+        )
+        assertTrue(
+            "isColumnsMode 必须要求证据（不得只认声明）",
+            flow.contains("return authorProvidesColumns();")
+        )
+        assertTrue(
+            "竖排必须仍走分栏（横移；退回纵移会打错轴）",
+            flow.contains("function isVerticalWriting()") && flow.contains("if (isVerticalWriting()) return true;")
+        )
+        assertTrue(
+            "竖排判据须与运行时单源（<html data-rp-writing>）",
+            flow.contains("getAttribute('data-rp-writing') === 'vertical'")
+        )
+    }
 }
