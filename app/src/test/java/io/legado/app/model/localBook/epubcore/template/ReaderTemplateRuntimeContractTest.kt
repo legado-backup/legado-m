@@ -174,11 +174,14 @@ class ReaderTemplateRuntimeContractTest {
         // 且保存/恢复跨一档页码（用户实测：「每页文字个数的不同，页脚还能自己变动」）。旧实现"同壳
         // 只测一次"会把这份偏小值缓存住 ⇒ 必须改为**每次实测** + 差异超阈值时下一帧重结算一次。
         assertTrue(
-            "按壳占位必须每次实测并比对上次（首帧装饰未定型 ⇒ 差一整行，须下一帧重结算）",
+            "按壳占位必须每次实测并比对上次（首帧装饰未定型 ⇒ 差一整行，须重测重结算）",
             flow.contains("var prev = chromeByShell[key];") &&
-                flow.contains("Math.abs(prev - total) > CHROME_DRIFT_TOL") &&
+                // 该壳**首次**量取必然偏小 ⇒ 必须延迟重测（rAF 仍可能过早，实测首帧 71 vs 定型 91）
+                flow.contains("if (prev === undefined) scheduleResettle(CHROME_FIRST_MEASURE_DELAY_MS);") &&
+                flow.contains("var CHROME_FIRST_MEASURE_DELAY_MS = 150;") &&
+                flow.contains("else if (Math.abs(prev - total) > CHROME_DRIFT_TOL) scheduleResettle(0);") &&
                 flow.contains("var CHROME_DRIFT_TOL = 2;") &&
-                flow.contains("function scheduleResettle(") &&
+                flow.contains("function scheduleResettle(delay)") &&
                 flow.contains("settle(true);") &&
                 // 反向锁：不得再出现"同壳只测一次"的早退缓存（它正是首帧多一行的成因）
                 !flow.contains("if (chromeByShell[key] !== undefined)")
