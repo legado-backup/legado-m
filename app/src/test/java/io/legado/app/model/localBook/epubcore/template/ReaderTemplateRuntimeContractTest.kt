@@ -276,6 +276,15 @@ class ReaderTemplateRuntimeContractTest {
                 flow.contains("authoritativeIndex = clampIndex(authoritativePage, totalPages);") &&
                 flow.contains("pageIndex: authoritativeIndex >= 0")
         )
+        // 真机铁证（2026-10-13）：分页偏移按"页号 × 可见窗口高"取整生成，恢复侧再把"比例 × 区间"
+        // 回乘 ⇒ 结果**恰好落在页边界上**；`floor` 会把浮点误差/箱高微差一律判退**一页**
+        // （实测 `page=4/14` 冷启恢复成 `3/14`）。与 `scrollIndex` 的既有铁证同源 ⇒ 必须四舍五入。
+        assertTrue(
+            "偏移→页码的逆映射必须**四舍五入**（页边界上 floor 会把恢复结果判退一页）",
+            flow.contains("return clampIndex(Math.round(value), totalPages);") &&
+                // 反向锁：分页逆映射不得再用直接相除的 floor 形式
+                !flow.contains("return clampIndex(offset / visible, totalPages);")
+        )
         // 进度恢复的**内容比例**口径（顾问判定必须根治双壳页数偏差：实测首页壳 17 页 / 续页壳 12 页
         // ⇒ 按页号折算恢复偏 ≤2 页，用户可感知"进度不对"）。比例口径与壳无关 ⇒ 必须三方齐备。
         assertTrue(
