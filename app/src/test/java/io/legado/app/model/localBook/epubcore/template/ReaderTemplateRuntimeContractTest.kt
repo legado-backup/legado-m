@@ -262,9 +262,11 @@ class ReaderTemplateRuntimeContractTest {
         // 进度恢复的**内容比例**口径（顾问判定必须根治双壳页数偏差：实测首页壳 17 页 / 续页壳 12 页
         // ⇒ 按页号折算恢复偏 ≤2 页，用户可感知"进度不对"）。比例口径与壳无关 ⇒ 必须三方齐备。
         assertTrue(
-            "沙箱须支持按内容比例定位（`ratio × (内容高 − 页高)`，与壳无关）",
+            "沙箱须支持按滚动区间比例定位（`ratio × maxBodyOffset`，与保存侧同分母）",
             flow.contains("function gotoRatio(") &&
-                flow.contains("authoritativeRatio * Math.max(0, ratioContent - visible)") &&
+                flow.contains("authoritativeRatio * maxBodyOffset(slot, root)") &&
+                // 反向锁：恢复侧**不得**再拿可见窗口高当分母（曾致精确恢复退化为 ±1 页）
+                !flow.contains("authoritativeRatio * Math.max(0, ratioContent - visible)") &&
                 flow.contains("gotoRatio: gotoRatio")
         )
         // 保存侧必须与恢复侧**同归一化**（否则往返偏 1~2 页）：沙箱自报 `progressRatio`，
