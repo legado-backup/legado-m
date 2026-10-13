@@ -174,11 +174,20 @@ class MdRichRenderInjectorTest {
         // 4.15 C9/C10：布局基线必须**与装饰基线分离**（装饰基线禁止声明几何，见上一测试），
         // 且规则全部由运行时写在 <html> 上的状态开关驱动（作者未声明对应状态时一条都不生效）。
         val css = SourceFileProbe.assetRawText(MdRichRenderInjector.TemplateLayoutCssAsset)
-        assertTrue("C9：须有窄屏开关", css.contains("data-rp-narrow"))
-        assertTrue("C9：须有横屏开关", css.contains("data-rp-landscape"))
-        assertTrue("C9：收紧系数须走变量（宿主/运行时单源）", css.contains("--rp-chrome-scale"))
-        assertTrue("C9：只作用于装饰/页眉，绝不缩放正文槽位", css.contains("[data-reader-decor]"))
-        assertTrue("C9：须用 transform 收紧（纯视觉 ⇒ 不牵动正文测量）", css.contains("transform: scale("))
+        assertTrue("C9：须有窄屏开关（供作者 CSS 消费）", css.contains("data-rp-narrow"))
+        assertTrue("C9：须有横屏开关（供作者 CSS 消费）", css.contains("data-rp-landscape"))
+        assertTrue("C9：收紧系数保留为**可选变量**（宿主/运行时单源）", css.contains("--rp-chrome-scale"))
+        // 2026-10-13（AD-36）：引擎级收紧**已废止** —— `transform: scale()` 只缩视觉不动布局盒（留下大片空白），
+        // `zoom` 缩放元素自身盒宽（页眉页脚右侧空出一条）。收紧的正解是模板用相对单位声明 + 引擎把剩余空间交还正文槽。
+        assertFalse(
+            "C9：引擎不得再对模板外壳施加缩放（两种实现都已被真机证伪；注释里回顾旧实现不算）",
+            css.contains("transform: scale(var(")
+        )
+        assertTrue(
+            "分页前提：正文须落在**整行网格**上（否则段距推移网格 ⇒ 末行被裁半）",
+            css.contains("--rp-line-height") && css.contains("padding-top: var(--rp-line-height")
+        )
+        assertTrue("整行对齐残量须有底色兜底（画布恒铺满视口）", css.contains("min-height: 100vh"))
         assertFalse("职责分离：布局基线不得重复装饰强度规则（那是装饰基线的职责）", css.contains("data-rp-decoration"))
         assertTrue("C10：须有竖排开关", css.contains("data-rp-writing=\"vertical\""))
         assertTrue("C10：段距须走逻辑属性 block 轴", css.contains("margin-block-end"))
