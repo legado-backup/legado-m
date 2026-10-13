@@ -611,4 +611,80 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("结算必须发生在素材就绪回调内", iSettle > iMaterials)
         assertTrue("装饰分层须在结算之前完成（首个 stable 即带最终外观）", iMark in 1 until iSettle)
     }
+
+    @Test
+    fun `archive 契约层齐备（变量_字段_作者 API）`() {
+        // AD-38 / archive-template-compat：archive 主题（如内置「明日香」`builtin.asuka_sync`）的
+        // CSS 依赖一组 `--reader-*`、页脚依赖 `data-reader-field="pageIndex/pageCount"`、JS 依赖
+        // `readerTemplate` 对象与钩子。三样缺一 ⇒ 主题明文失效（JS 首行抛 / 变量回落 UA 值 /
+        // 页脚恒空），真机观感即用户实测的「死图」「完全效果都不一样」。
+        val runtime = asset("template-runtime.js")
+        // R1 变量：asuka 实测消费的 12 个 + archive baseCss 的 4 个 padding
+        listOf(
+            "--reader-text-color", "--reader-page-background", "--reader-accent",
+            "--reader-font-size", "--reader-line-height", "--reader-font-family",
+            "--reader-paragraph-indent", "--reader-paragraph-spacing",
+            "--reader-safe-left", "--reader-safe-top", "--reader-safe-right", "--reader-safe-bottom",
+            "--reader-padding-left", "--reader-padding-top", "--reader-padding-right", "--reader-padding-bottom"
+        ).forEach { name ->
+            assertTrue("须登记契约变量 $name", runtime.contains("'$name'"))
+        }
+        assertTrue("变量须有注入入口", runtime.contains("function applyReaderVars(config)"))
+        assertTrue(
+            "变量须在渲染作者 CSS 之前注入（否则首帧按回落值画一帧再跳变）",
+            runtime.indexOf("applyReaderVars(config);") in 1 until runtime.indexOf("renderShell();")
+        )
+        // R2 字段：页脚 0 基页号
+        assertTrue(
+            "须补 pageIndex 派生字段（archive 页脚口径为 0 基）",
+            runtime.contains("case 'pageIndex': return String(state.pageIndex)")
+        )
+        // R3 作者 API 与钩子
+        assertTrue("须暴露 window.readerTemplate（缺则 archive 主题 JS 首行抛）", runtime.contains("window.readerTemplate = authorApi;"))
+        assertTrue("须支持 on 注册", runtime.contains("readerTemplate.on requires a function"))
+        assertTrue("须提供 .source（首个正文槽位）", runtime.contains("get source()"))
+        assertTrue(
+            "须提供 .pageCount/.pageIndex/.viewport/.motionState/.type 只读属性",
+            runtime.contains("get pageCount()") && runtime.contains("get pageIndex()") &&
+                runtime.contains("get viewport()") && runtime.contains("get motionState()") &&
+                runtime.contains("get type()")
+        )
+        listOf("beforeLayout", "afterLayout", "pageChange", "motionChange", "fieldsChange", "dispose")
+            .forEach { hook ->
+                assertTrue("须触发 archive 钩子 $hook", runtime.contains("emitHook('$hook'"))
+            }
+        // R5 多正文槽顺序
+        assertTrue(
+            "须按 data-reader-order 排序正文槽位",
+            runtime.contains("function orderedBodySlots()") && runtime.contains("data-reader-order")
+        )
+        // R8 段落/标题语义类归一：archive 主题 JS 只点选 `.reader-paragraph`，而我方 md/在线正文
+        // 管线产出裸 `<p>` ⇒ 不补类则主题段落语义装饰"点空"（观感退回死图）
+        assertTrue(
+            "须补段落/标题语义类归一",
+            runtime.contains("function normalizeReaderClasses()") &&
+                runtime.contains("classList.add('reader-paragraph')") &&
+                runtime.contains("classList.add('reader-chapter-title')")
+        )
+        // R3 载荷：钩子必须带"页元素"——archive 主题在 `event.pages` / `event.page` 上查询
+        // （`.as-scan`/`.as-wave i`/`.as-live-dot`）并用 Web Animations 起"每页动图"；
+        // 载荷为 null/空数组时主题**静默失效**（动图与进度同步全无，即用户实测的「死图」）。
+        assertTrue("须提供页元素（模板根壳）", runtime.contains("function authorPage()"))
+        assertTrue(
+            "afterLayout 载荷须带页元素数组 pages",
+            runtime.contains("emitHook('afterLayout', { pages: shell ? [shell] : []")
+        )
+        assertTrue(
+            "pageChange 载荷须带页元素 page",
+            runtime.contains("emitHook('pageChange', { page: shell,")
+        )
+        assertTrue(
+            "motionChange 载荷须带 page/state/reducedMotion",
+            runtime.contains("function motionEvent()") && runtime.contains("reducedMotion: false")
+        )
+        assertTrue(
+            "结算后须补发一次动效事件（否则首屏/换壳后主题动图永不启动）",
+            runtime.contains("emitHook('motionChange', motionEvent());")
+        )
+    }
 }
