@@ -625,7 +625,8 @@ class ReaderTemplateRuntimeContractTest {
             "--reader-font-size", "--reader-line-height", "--reader-font-family",
             "--reader-paragraph-indent", "--reader-paragraph-spacing",
             "--reader-safe-left", "--reader-safe-top", "--reader-safe-right", "--reader-safe-bottom",
-            "--reader-padding-left", "--reader-padding-top", "--reader-padding-right", "--reader-padding-bottom"
+            "--reader-padding-left", "--reader-padding-top", "--reader-padding-right", "--reader-padding-bottom",
+            "--reader-selection-color"
         ).forEach { name ->
             assertTrue("须登记契约变量 $name", runtime.contains("'$name'"))
         }
@@ -649,10 +650,14 @@ class ReaderTemplateRuntimeContractTest {
                 runtime.contains("get viewport()") && runtime.contains("get motionState()") &&
                 runtime.contains("get type()")
         )
-        listOf("beforeLayout", "afterLayout", "pageChange", "motionChange", "fieldsChange", "dispose")
+        listOf("beforeLayout", "afterLayout", "pageChange", "motionChange", "fieldsChange", "dispose", "beforePage")
             .forEach { hook ->
                 assertTrue("须触发 archive 钩子 $hook", runtime.contains("emitHook('$hook'"))
             }
+        assertTrue(
+            "beforePage 载荷须带页元素（doraemon/vertical 依赖它做每页逻辑）",
+            runtime.contains("function pageEvent(shellName)") && runtime.contains("emitHook('beforePage', pageEvent(")
+        )
         // R5 多正文槽顺序
         assertTrue(
             "须按 data-reader-order 排序正文槽位",
@@ -665,6 +670,13 @@ class ReaderTemplateRuntimeContractTest {
             runtime.contains("function normalizeReaderClasses()") &&
                 runtime.contains("classList.add('reader-paragraph')") &&
                 runtime.contains("classList.add('reader-chapter-title')")
+        )
+        // 装饰基线须并集 archive 主题的**作者自标**属性 `data-reader-decoration`
+        // （`builtin.magazine` / `builtin.vertical` 的装饰元素用它）⇒ 导入主题同样吃
+        // "装饰强度 / 专注模式"设置，否则这两套主题的设置项形同虚设。
+        assertTrue(
+            "装饰基线须并集 data-reader-decoration",
+            asset("template-decoration.css").contains("[data-reader-decoration]")
         )
         // R3 载荷：钩子必须带"页元素"——archive 主题在 `event.pages` / `event.page` 上查询
         // （`.as-scan`/`.as-wave i`/`.as-live-dot`）并用 Web Animations 起"每页动图"；
