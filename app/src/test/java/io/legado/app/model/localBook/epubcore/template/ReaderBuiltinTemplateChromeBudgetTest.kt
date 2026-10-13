@@ -92,7 +92,7 @@ class ReaderBuiltinTemplateChromeBudgetTest {
         listOf("builtin.ink", "builtin.star-chart").forEach { id ->
             val css = cssOf(id)
             assertFalse(
-                "$id 不得残留 1.5em/1.4em 级左右正文内边距（用户实测："左右留白偏大"）",
+                "$id 不得残留 1.5em/1.4em 级左右正文内边距（用户实测：左右留白偏大）",
                 css.contains("1.5em 0") || css.contains("1.4em 0")
             )
         }
