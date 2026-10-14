@@ -46,6 +46,16 @@ class ReadBookTemplateRoutingTest {
     fun `翻页主题切换与进度都覆盖模板面`() {
         val s = text()
         assertTrue("keyPage 必须有模板分支", s.contains("if (templateActive) {") && s.contains("backend.pageNext()"))
+        // 2026-10-14（用户报「页面动画呢？」）：模板面翻页必须走**带过渡**通路 —— 直接
+        // `backend.pageNext()` 是瞬时跳变，只有经 `turnTemplatePage` 才会把用户档位
+        // （cover/slide/linkedCover/无动画）映射成"旧页快照移出"的过渡。
+        assertTrue(
+            "模板面翻页必须带过渡（走 turnTemplatePage 且按用户档位取规格）",
+            s.contains("private fun turnTemplatePage(") &&
+                s.contains("turnTemplatePage(1) { backend.pageNext() }") &&
+                s.contains("turnTemplatePage(-1) { backend.pagePrev() }") &&
+                s.contains("TemplateTurnMotion.specOf(ReadBook.pageAnim())")
+        )
         assertTrue("主题/字号变更必须重载模板面", s.contains("private fun reloadTemplateCurrent()"))
         assertTrue("进度条必须覆盖模板面", s.contains("if (textRichActive || templateActive) {"))
     }
