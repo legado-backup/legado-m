@@ -902,4 +902,27 @@ class ReaderTemplateRuntimeContractTest {
             decoration.contains("data-rp-decoration=\"medium\"")
         )
     }
+
+    @Test
+    fun `archive R6 页元素进页动效状态齐备`() {
+        // 2026-10-14：R6 是 archive 契约里最后一个未落地的项。archive 官方 `syncMotion` 逐页维护
+        // `data-reader-entry`（pending → playing → done），archive 导出的主题用它做**每页进场**动效；
+        // 缺失时该类 CSS 选择器静默落空 ⇒ 页眉/页脚/开篇插画只剩静态帧（用户报「页面动画呢」的一类成因）。
+        val runtime = asset("template-runtime.js")
+        assertTrue("须有进页状态推进函数", runtime.contains("function applyEntryAttribute("))
+        assertTrue("须写 data-reader-entry", runtime.contains("setAttribute('data-reader-entry'"))
+        assertTrue(
+            "pending 放行须转 playing",
+            runtime.contains("if (running && entry === 'pending') entry = 'playing';")
+        )
+        assertTrue(
+            "停动效须转 done（保留静态帧）",
+            runtime.contains("else if (!running && entry === 'playing') entry = 'done';")
+        )
+        assertTrue("须与页元素动效闸门同处推进", runtime.contains("applyEntryAttribute(shell, next);"))
+        assertTrue(
+            "换壳须把进页状态重置为 pending（否则续页进场动效静默）",
+            runtime.contains("shellEl.setAttribute('data-reader-entry', 'pending');")
+        )
+    }
 }
