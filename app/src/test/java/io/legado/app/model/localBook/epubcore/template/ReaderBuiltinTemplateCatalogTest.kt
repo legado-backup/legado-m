@@ -94,7 +94,8 @@ class ReaderBuiltinTemplateCatalogTest {
     fun `内置模板元素与动效规模在预算内（4_19 门禁）`() {
         // 4.19 / NFR-08：重装饰模板连续翻页掉帧的根因就是**元素/动效规模失控**。
         // 运行期自证（`elems=`/`anims=`）只能事后发现；提交期按资产静态计数才能拦在交付前。
-        // 预算取宽松值（内置 11 套当前均为 0 动效 / 纯 CSS），只拦"数量级失控"而非审美取舍。
+        // 预算取宽松值，只拦"数量级失控"而非审美取舍（动效本体由各主题 `javascript` 用 Web Animations 驱动，
+        // 不计入本表；本表只数 CSS 侧的 `@keyframes`/`animation:` 声明）。
         load().templates.forEach { builtin ->
             val css = builtin.template.css
             val source = builtin.template.resourceSource()
@@ -107,6 +108,37 @@ class ReaderBuiltinTemplateCatalogTest {
             )
             val elements = Regex("<[a-zA-Z][^>]*>").findAll(source).count()
             assertTrue("${builtin.id} 结构元素 $elements 个超预算（≤$MAX_ELEMENTS）", elements <= MAX_ELEMENTS)
+        }
+    }
+
+    @Test
+    fun `内置模板动效在场且只用双方共有的作者 API`() {
+        // 用户目标「基于 archive 主题模式优化内置主题」+「互兼容、行为尽可能一样」：
+        // ①每套内置模板必须有动效（否则就是用户点名的「没有动图效果」）；
+        // ②动效只能使用**双方共有的** `readerTemplate` 钩子 API + Web Animations ——
+        //   一旦用了任何一方私有的桥字段/变量，导出到另一方就会静默失效（互兼容断掉）。
+        val allowedMembers = setOf(
+            "on", "source", "viewport", "fields", "pageCount", "pageIndex",
+            "motionState", "waitUntil", "requestLayout"
+        )
+        val allowedHooks = setOf(
+            "beforeLayout", "afterLayout", "beforePage", "pageChange", "motionChange", "fieldsChange", "dispose"
+        )
+        load().templates.forEach { builtin ->
+            val js = builtin.template.javascript
+            val css = builtin.template.css
+            val hasMotion = js.isNotBlank() || Regex("animation\\s*:").containsMatchIn(css)
+            assertTrue("${builtin.id} 必须带动效（否则用户点名的「没有动图效果」仍在）", hasMotion)
+            if (js.isBlank()) return@forEach
+            val members = Regex("readerTemplate\\.([A-Za-z_$][\\w$]*)").findAll(js).map { it.groupValues[1] }.toSet()
+            assertTrue("${builtin.id} 用了非共有成员：${members - allowedMembers}", allowedMembers.containsAll(members))
+            val hooks = Regex("readerTemplate\\.on\\(\\s*'([a-zA-Z]+)'").findAll(js).map { it.groupValues[1] }.toSet()
+            assertTrue("${builtin.id} 注册了非共有钩子：${hooks - allowedHooks}", allowedHooks.containsAll(hooks))
+            assertTrue(
+                "${builtin.id} 动效须由 motionChange 驱动（否则专注模式/水墨屏停动效失效）",
+                js.contains("'motionChange'")
+            )
+            assertTrue("${builtin.id} 动效须在 dispose 时清理", js.contains("'dispose'"))
         }
     }
 
@@ -143,7 +175,20 @@ class ReaderBuiltinTemplateCatalogTest {
             // 内联 `data:` 素材自 4.16 起**允许**（成套美术的字体/纹理只能内联：沙箱 iframe 无 base URL、
             // 字体跨源受 CORS 限制）。"不得走私未登记素材"改由 `ReaderBuiltinTemplateAssetsTest`
             // 以"登记数 == 内联数"双向闭合校验（此处不再重复断言，避免两处口径漂移）。
-            assertEquals("${builtin.id} 不应含 javascript（纯 CSS 模板）", "", builtin.template.javascript)
+            //
+            // ⚠️ 口径变更（2026-10-14，用户目标「内置主题要有动图效果/互兼容、行为尽可能一样」）：
+            // 原先"内置模板不得含 `javascript`（纯 CSS）"这条红线**已按新设计作废** —— 内置主题的每页动效
+            // 与 archive 主题**同机制**（共有的 `readerTemplate` 钩子 + Web Animations），只写 CSS 做不出来。
+            // 取而代之的是**更准确的沙箱边界**：模板 JS 不得自行触达网络 / 宿主 / 存储（隔离纪律不变）。
+            val js = builtin.template.javascript
+            listOf("fetch(", "XMLHttpRequest", "window.parent", "window.top", "localStorage", "document.cookie")
+                .forEach { forbidden ->
+                    assertFalse("${builtin.id} 的模板 JS 不得触及 $forbidden", js.contains(forbidden))
+                }
+            assertFalse(
+                "${builtin.id} 不得引用宿主桥对象（沙箱禁宿主对象注入）",
+                js.contains("legadoBridge") || js.contains("androidBridge") || js.contains("readerBridge")
+            )
         }
     }
 
