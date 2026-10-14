@@ -616,7 +616,11 @@ class ReaderTemplateRuntimeContractTest {
                 // 而不是按类名字面值匹配 —— 类名由作者主题自定义，属性才是契约
                 runtime.contains("querySelectorAll('[data-reader-text-ignore]')") &&
                 // 正文槽与其容器：判定"续页正文下方大片空白"是"容器没拉伸"还是"内容不足一屏"
-                runtime.contains("'slot=' + boxOf(slotEl)") && runtime.contains("'paper=' + shortCls(paperEl)")
+                runtime.contains("'slot=' + boxOf(slotEl)") && runtime.contains("'paper=' + shortCls(paperEl)") &&
+                // 装饰层清单（用户报「我们自己的少元素」）：以 `aria-hidden` 为通用信号逐个回发，
+                // 使"装饰一个都没少"可被机检证明，而不是靠肉眼比截图
+                runtime.contains("querySelectorAll('[aria-hidden=\"true\"]')") &&
+                runtime.contains("'deco=' + decoParts.join(',')")
         )
     }
 
