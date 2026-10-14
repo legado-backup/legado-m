@@ -532,6 +532,29 @@ class ReaderTemplateRuntimeContractTest {
         assertFalse("③ 引擎不得再对模板外壳施加 zoom（右侧会空出一条）", runtime.contains("setProperty('zoom'"))
         assertFalse("③ 收紧入口须已移除", runtime.contains("function tightenChrome("))
         assertTrue("空白归属须可自证（html/body/根壳三层底色）", runtime.contains(",bg=' + backgroundFacts()"))
+
+        // 2026-10-14 真机铁证（data-stream 末行只剩约 40% 高度）：只有"段距归一到整行"不够 ——
+        // 章名（h1/.reader-chapter-title）的行盒高是正文行高的 1.34 倍（字号更大）⇒ 它之后的**每一行**
+        // 都被推移这段非整行残量 ⇒ 分页裁切边界（按整行倍数算）落到行中间。必须逐块把总占位补齐到整行。
+        assertTrue(
+            "⑤ 非整行高的块必须把其后网格补齐（否则章名之后的行整体错位、末行仍被裁半）",
+            runtime.contains("function roundChildHeights(") &&
+                runtime.contains("var lines = Math.ceil(box / lh - GRID_RESIDUE_EPSILON);") &&
+                // 必须**叠加**在既有下边距上且带 !important（布局基线把段距压成一行 !important，
+                // 普通内联会被压回；直接改写则会把段落间距清零）
+                runtime.contains("el.style.setProperty('margin-bottom', (base + extra) + 'px', 'important')") &&
+                // 末块不补（否则凭空多出一页空白）
+                runtime.contains("if (i === last) continue;") &&
+                // 重复调用前必须撤上一轮补齐（换壳/重测会多次调用，不撤会累积）
+                runtime.contains("el.style.removeProperty('margin-bottom')")
+        )
+        val iBodyInjected = runtime.indexOf("applyBody(config.bodyHtml);")
+        val iGridAfterBody = runtime.indexOf("applyLineGrid();", iBodyInjected)
+        assertTrue(
+            "⑤ 正文注入后必须再补一次整行网格（首次调用时槽里还没有子块，补齐无从下手）",
+            iBodyInjected > 0 && iGridAfterBody > iBodyInjected &&
+                iGridAfterBody < runtime.indexOf("flow.settle(false)", iBodyInjected)
+        )
     }
 
     @Test
