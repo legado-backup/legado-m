@@ -732,6 +732,33 @@ class ReaderTemplateRuntimeContractTest {
             "结算后须补发一次动效事件（否则首屏/换壳后主题动图永不启动）",
             runtime.contains("emitHook('motionChange', motionEvent());")
         )
+        // R11（2026-10-14 补齐，用户实测根因）：作者 JS 必须**真的执行** —— archive 主题的
+        // 动效/段落语义（as-scene/as-dialogue）/页脚同步**全在 `javascript` 字段里**（用
+        // `readerTemplate.on(...)` 注册钩子 + 在 `event.page(s)` 上起 Web Animations）。
+        // 此前该字段全文零引用 ⇒ 主题 JS 一行不跑 ⇒ 观感与 archive 差一大截（「死图」）。
+        assertTrue("须有作者脚本执行入口", runtime.contains("function mountAuthorScript("))
+        assertTrue(
+            "须**同步**执行（动态插入的 `<script>` 按规范异步执行 ⇒ 注册晚于首个钩子 ⇒ 首屏装饰/动效永久丢失）",
+            runtime.contains("(new Function(code))();")
+        )
+        assertTrue("须每份文档只执行一次（重复执行会重复注册钩子）", runtime.contains("state.authorScriptMounted"))
+        assertTrue(
+            "须在首个钩子（beforeLayout）之前执行",
+            runtime.indexOf("mountAuthorScript();") in 1 until runtime.indexOf("emitHook('beforeLayout'")
+        )
+        assertTrue(
+            "执行成败须自证（跨源、无调试器 ⇒ 这是「作者脚本是否真跑」的唯一凭据）",
+            runtime.contains("'author-script,ok=1,chars='") && runtime.contains("'author-script,ok=0,chars='")
+        )
+        assertTrue("作者脚本抛错须只留痕（绝不因作者代码把阅读页打死）", runtime.contains("reportError('template-script-failed'"))
+        // 两个钩子会改 DOM（段落语义类/量取写变量）⇒ 网格必须在钩子之后再补一次
+        assertTrue(
+            "钩子之后必须再补一次整行网格（语义类带来的高度差会把其后行推出网格）",
+            runtime.indexOf(
+                "applyLineGrid();",
+                runtime.indexOf("emitHook('beforePage', pageEvent(currentPageShell()));")
+            ) > 0
+        )
     }
 
     @Test
