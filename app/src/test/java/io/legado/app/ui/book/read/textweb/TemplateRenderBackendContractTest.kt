@@ -162,6 +162,20 @@ class TemplateRenderBackendContractTest {
             MdRichRenderInjector.TemplateBaselineCssAssets.contains(MdRichRenderInjector.TemplateLayoutCssAsset) &&
                 MdRichRenderInjector.TemplateBaselineCssAssets.contains(MdRichRenderInjector.ArchiveBaseCssAsset)
         )
+        // 页根安全区（archive 同口径，2026-10-14 同屏对照实测）：archive 用**系统稳定区 inset** 填
+        // `--reader-safe-*`（真机 mStable top=36 物理 ⇒ 24 CSS，正是其页眉带比我方高出的量），
+        // 我方此前恒注入 0 ⇒ 同屏对照"页眉就不一样"。该值只能经**宿主逐项覆盖**注入 ⇒ 载荷必须带
+        // readerVars，且宿主文档的**白名单转发**必须放行它（漏放行 ⇒ 沙箱按默认 0 渲染且不报错，
+        // 正是本项目反复栽过的"静默失效"类型）。
+        assertTrue(
+            "init 载荷必须下发 readerVars（页根安全区按系统栏尺寸透传）",
+            s.contains("add(\"readerVars\", JsonObject()") && s.contains("--reader-safe-top") &&
+                s.contains("--reader-safe-bottom")
+        )
+        assertTrue(
+            "宿主文档必须放行 readerVars 的白名单转发（漏放行即静默按 0 渲染）",
+            SourceFileProbe.assetRawText("md/template-host.js").contains("readerVars: config.readerVars || {}")
+        )
     }
 
     @Test
