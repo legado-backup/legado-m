@@ -129,13 +129,17 @@ class TemplateRenderBackendContractTest {
         assertTrue("init 载荷必须下发动效", s.contains("addProperty(\"motion\", values.decorationMotion)"))
         assertTrue(
             "沙箱必须挂载装饰基线 CSS（否则档位下发到 <html> 也没人执行）",
-            s.contains("MdRichRenderInjector.TemplateDecorationCssAsset")
+            // 顺序已收口单源（2026-10-14）：后端按 `TemplateBaselineCssAssets` 依次挂载 ⇒
+            // 断言改为"列表含装饰基线 + 后端消费该列表"，避免把顺序在两处各钉一份
+            MdRichRenderInjector.TemplateBaselineCssAssets.contains(MdRichRenderInjector.TemplateDecorationCssAsset) &&
+                s.contains("MdRichRenderInjector.TemplateBaselineCssAssets")
         )
         // 4.15 C9/C10：布局基线若不挂载，运行时写到 <html> 的 data-rp-narrow / data-rp-writing
         // 就是死开关 —— 症状同样是"设置了没反应且不报错"
         assertTrue(
             "沙箱必须挂载布局基线 CSS（响应式收紧 + 竖排规格）",
-            s.contains("MdRichRenderInjector.TemplateLayoutCssAsset")
+            MdRichRenderInjector.TemplateBaselineCssAssets.contains(MdRichRenderInjector.TemplateLayoutCssAsset) &&
+                MdRichRenderInjector.TemplateBaselineCssAssets.contains(MdRichRenderInjector.ArchiveBaseCssAsset)
         )
     }
 
@@ -241,5 +245,24 @@ class TemplateRenderBackendContractTest {
         listOf("\"day\"", "\"night\"", "\"eink\"").forEach { literal ->
             assertTrue("三态字面量须在单源文件登记：$literal", themeIdSrc.contains(literal))
         }
+    }
+
+    @Test
+    fun `archive 页基线等价物按序注入`() {
+        // 2026-10-14 真机基准对照（archive 原版 vs 我方，同判据）：纸面左距 16px vs 42px、四角主题底色
+        // vs 非主题底色 ⇒ 根因是我方只注入 `--reader-*` **变量值**、从未注入 archive 的**页基线规则**
+        // （`EpubTemplateDocument.baseCss`）。顺序收口到 `TemplateBaselineCssAssets` 单源。
+        val s = text()
+        assertTrue("后端须按单源列表注入模板基线", s.contains("MdRichRenderInjector.TemplateBaselineCssAssets"))
+        val injector = SourceFileProbe.sourceText("help/md/MdRichRenderInjector.kt")
+        assertTrue(
+            "顺序须为 md-reader → archive-base → decoration → layout（layout 的 !important 必须最后）",
+            Regex(
+                "MdReaderCssAsset,\\s*ArchiveBaseCssAsset,\\s*TemplateDecorationCssAsset,\\s*TemplateLayoutCssAsset"
+            ).containsMatchIn(injector)
+        )
+        val base = SourceFileProbe.assetRawText("md/template-archive-base.css")
+        listOf("[data-reader-page]", "--reader-safe-", ".reader-paragraph", "--reader-page-background")
+            .forEach { marker -> assertTrue("页基线须含 $marker", base.contains(marker)) }
     }
 }
