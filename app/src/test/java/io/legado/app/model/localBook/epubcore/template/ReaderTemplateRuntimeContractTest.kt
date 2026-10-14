@@ -735,6 +735,10 @@ class ReaderTemplateRuntimeContractTest {
         }
         assertTrue("变量须有注入入口", runtime.contains("function applyReaderVars(config)"))
         assertTrue(
+            "契约变量须支持宿主**逐项覆盖**（页根安全区按系统栏尺寸透传的唯一入口）",
+            runtime.contains("var overrides = (config && config.readerVars) || {}")
+        )
+        assertTrue(
             "变量须在渲染作者 CSS 之前注入（否则首帧按回落值画一帧再跳变）",
             runtime.indexOf("applyReaderVars(config);") in 1 until runtime.indexOf("renderShell();")
         )
