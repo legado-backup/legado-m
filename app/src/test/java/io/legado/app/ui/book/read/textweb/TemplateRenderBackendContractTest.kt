@@ -110,9 +110,30 @@ class TemplateRenderBackendContractTest {
         // （样式表已解析、position:absolute 生效，仅高度为 0）⇒ 沙箱视口 0 ⇒ 页框算成负数 ⇒ 预览空白且页数恒 1
         val s = text()
         assertTrue("必须在 init 之前给容器定尺寸", s.contains("sizeSandboxContainer(view)"))
+        // 脚本本体 2026-10-14 收口到宿主文档构造器（与骨架/探针脚本同处，避免后端超 800 行门禁）
+        assertTrue(
+            "定尺寸脚本须收口在宿主文档构造器（几何自证与骨架/探针同处）",
+            s.contains("ReaderTemplateHostDocument.containerSizeScript()")
+        )
+        val docText = SourceFileProbe.rawText("model/localBook/epubcore/template/ReaderTemplateHostDocument.kt")
         assertTrue("必须用宿主文档视口高以 px 定尺寸（不依赖 vh/百分比）",
-            s.contains("f.style.height=document.documentElement.clientHeight+'px'"))
-        assertTrue("宽度同理", s.contains("f.style.width=document.documentElement.clientWidth+'px'"))
+            docText.contains("f.style.height=d.documentElement.clientHeight+'px'"))
+        assertTrue("宽度同理", docText.contains("f.style.width=d.documentElement.clientWidth+'px'"))
+        // 几何自证（2026-10-14「左右黑边」）：WebView 布局框铺满时缺口只可能出现在文档内部某层，
+        // 漏回发几何 ⇒ 只能靠截图反推"是视口窄了、容器没铺满、还是帧偏了"，必然误判。
+        assertTrue(
+            "必须回发宿主视口宽（clientWidth 与 innerWidth 之差即滚动条占宽）",
+            docText.contains("cw='+d.documentElement.clientWidth+'/iw='+window.innerWidth")
+        )
+        assertTrue(
+            "必须回发容器与沙箱帧各自的 left/width（缺口归属的决定性判据）",
+            docText.contains("+',cr='+(cr.left+','+cr.width.toFixed(1))") &&
+                docText.contains("+',fr='+(rr?rr.left")
+        )
+        assertTrue(
+            "必须回发 body 实测宽（区分容器窄与 body 自身窄）",
+            docText.contains(",cw2='+d.body.clientWidth+'/bw='+d.body.getBoundingClientRect().width")
+        )
         val doc = SourceFileProbe.rawText("model/localBook/epubcore/template/ReaderTemplateHostDocument.kt")
         assertTrue("宿主文档容器不得只靠 inset 百分比链（真机上会塌成 0）",
             doc.contains("height:100vh") || doc.contains("height:100%"))

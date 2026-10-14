@@ -169,6 +169,18 @@ class ReaderTemplateRuntimeContractTest {
                 flow.contains("sr.top - rr.top") &&
                 flow.contains("rr.bottom - sr.bottom")
         )
+        // 2026-10-14 真机铁证（用户报「第 2 页正文下面有大量空白」）：占位与页框**互为因果**
+        // （`页框 = 视口 − 占位`）。若量取时槽仍带着上一轮冻结的 `height`/`padding-bottom`/`clip-path`，
+        // 量到的就是"被冻结后的几何" ⇒ 自我锁死：实测续页 `chromeNow` 恒等于首页值 337、页框恒 517，
+        // 而续页真实占位只有 ~207（`80px 26px 1fr 76px`）⇒ 正文下方固定留白约 130 CSS px。
+        // 故"量取前解冻"是正确性的**前提**，不是优化。
+        assertTrue(
+            "量取占位前必须先解除槽的冻结（否则占位与页框自我锁死）",
+            flow.contains("function unfreezeSlot(slot)") &&
+                flow.contains("unfreezeSlot(slot);") &&
+                // 顺序即正确性：解冻必须发生在 rect 量取之前
+                flow.indexOf("unfreezeSlot(slot);") in 1 until flow.indexOf("rr = root.getBoundingClientRect();")
+        )
         // 真机铁证（2026-10-13）：换壳后**首帧**量取时装饰带（内联 SVG）尚未定型 ⇒ 占位偏小整整一条
         // 行高（实测续页 `chromeNow=71` vs 后续 `91`，箱高 782 vs 763）⇒ 该壳首帧比后续页多一行，
         // 且保存/恢复跨一档页码（用户实测：「每页文字个数的不同，页脚还能自己变动」）。旧实现"同壳
@@ -586,7 +598,25 @@ class ReaderTemplateRuntimeContractTest {
                 runtime.contains("',slotW='") &&
                 // bodyW 与 body 的 padding/margin：用来定位"根壳比视口窄"的差额来源（2026-10-14 补）
                 runtime.contains("',bodyW='") && runtime.contains("',bodyPad(L/R/mL/mR)=") &&
-                runtime.contains("',padRules='") && runtime.contains("',safe='")
+                runtime.contains("',padRules='") && runtime.contains("',safe='") &&
+                // 2026-10-14 二次定位：页根实测 left=3/宽 477 而 body 的 padding/margin 全为 0
+                // ⇒ 缺口只可能来自 border 或未登记规则 ⇒ 必须回发 border 与页根 margin/box-sizing
+                runtime.contains("',bodyBord(L/R/T/B)='") && runtime.contains("',rootGap='")
+        )
+        // 2026-10-14 用户报「下面展示不全」后新增：真机截图上页脚**只露出第一行**、页面底边与
+        // 屏幕底之间还留一段空白 ⇒ 必须回发"html/body 的计算高 + 页根与其子块（含页脚各分段）的
+        // rect/display/height"，否则无法区分「内容没生成」「生成了但被裁」「百分比高度链断
+        // （父级只有 min-height ⇒ 子 `height:100%` 落回 auto）」——三者修法完全不同。
+        assertTrue(
+            "须自证模板外壳几何（html/body 计算高 + 页根与页脚分段 rect）",
+            runtime.contains("var shellFacts = '-'") && runtime.contains("',shell=' + shellFacts") &&
+                runtime.contains("'html=' + boxOf(document.documentElement)") &&
+                runtime.contains("'body=' + boxOf(document.body)") &&
+                // 页眉/页脚按 archive 的 R4 契约属性下钻（`data-reader-text-ignore`），
+                // 而不是按类名字面值匹配 —— 类名由作者主题自定义，属性才是契约
+                runtime.contains("querySelectorAll('[data-reader-text-ignore]')") &&
+                // 正文槽与其容器：判定"续页正文下方大片空白"是"容器没拉伸"还是"内容不足一屏"
+                runtime.contains("'slot=' + boxOf(slotEl)") && runtime.contains("'paper=' + shortCls(paperEl)")
         )
     }
 
@@ -602,7 +632,25 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("时间须派生（本地时钟）", runtime.contains("case 'time': return localTime()"))
         assertTrue("电量须派生（取不到不冒写假值）", runtime.contains("case 'battery': return state.battery || null"))
         assertTrue("须有本地时间格式化", runtime.contains("function localTime()"))
-        assertTrue("宿主提供的字段优先于派生", runtime.contains("(supplied === undefined || supplied === null) ? derivedField(key)"))
+        // 2026-10-14 双端截图铁证修正（原断言锁的是 0 基口径，与 archive 实测不符）：
+        // archive 页脚实测显示 `PAGE 1 / 6`（第 1 页）⇒ 展示派生必须是 **1 基**；
+        // 同时 `progress` 槽位在 archive 是**页进度百分比**（16.7% = 1/6），与宿主给的"整书进度"
+        // 不是同一个量 ⇒ 该槽位必须优先取派生值。
+        assertTrue(
+            "pageIndex 展示派生须为 1 基（archive 页脚实测 PAGE 1/6）",
+            runtime.contains("case 'pageIndex':") &&
+                runtime.contains("return String(state.pageIndex + 1)")
+        )
+        assertTrue(
+            "progress 须按页进度百分比派生（archive 同口径，与页码同源）",
+            runtime.contains("case 'progress': {") &&
+                runtime.contains("return (((state.pageIndex + 1) / total) * 100).toFixed(1) + '%'")
+        )
+        assertTrue(
+            "宿主提供的字段优先于派生（progress 例外：走沙箱页进度口径）",
+            runtime.contains("(supplied === undefined || supplied === null) ? derived : String(supplied)") &&
+                runtime.contains("key === 'progress' && derived !== null")
+        )
         assertTrue("结算后须回填页码槽位", runtime.contains("refreshFields();"))
         assertTrue("须有电池状态监听（增强信息）", runtime.contains("navigator.getBattery"))
         assertTrue("须有分钟级时钟刷新（C5 时间驱动）", runtime.contains("function startClock()"))
@@ -686,10 +734,12 @@ class ReaderTemplateRuntimeContractTest {
             "变量须在渲染作者 CSS 之前注入（否则首帧按回落值画一帧再跳变）",
             runtime.indexOf("applyReaderVars(config);") in 1 until runtime.indexOf("renderShell();")
         )
-        // R2 字段：页脚 0 基页号
+        // R2 字段：页脚页码（2026-10-14 双端截图铁证改口径 —— archive 页脚实测 `PAGE 1 / 6`，
+        // 即字段从 **1 起**；原"0 基"判断与 archive 原版不符，这里按实测对齐）
         assertTrue(
-            "须补 pageIndex 派生字段（archive 页脚口径为 0 基）",
-            runtime.contains("case 'pageIndex': return String(state.pageIndex)")
+            "须补 pageIndex 派生字段（archive 页脚口径为 1 基，实测 PAGE 1/6）",
+            runtime.contains("case 'pageIndex':") &&
+                runtime.contains("return String(state.pageIndex + 1)")
         )
         // R3 作者 API 与钩子
         assertTrue("须暴露 window.readerTemplate（缺则 archive 主题 JS 首行抛）", runtime.contains("window.readerTemplate = authorApi;"))

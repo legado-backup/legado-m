@@ -107,6 +107,32 @@ class MdRichRenderInjectorTest {
     }
 
     @Test
+    fun `降级外观绝不打在整页根上`() {
+        // 2026-10-14 真机铁证：模板主题下出现「左右异色带（黑边）+ 底色不对」。根因是库缺失分支把
+        // `md-rich-fallback` 打在 `document.body` 上 —— 该类的 `border-left:3px` 在 content-box 下
+        // 吃掉内容盒宽度（实测 body.borderLeftWidth=2.7px ⇒ 页根 480→477、整体右移 3px，右侧露出
+        // 画布底色），`background:var(--md-code-bg)` 又把整页底色改成代码块色。
+        // "库缺失"是**全局状态**（没有对应的失败块）⇒ 只应记入 status.error。
+        val script = build().script
+        assertFalse(
+            "不得对 document.body / documentElement 打降级外观类",
+            script.contains("markFallback(document.body") || script.contains("markFallback(document.documentElement")
+        )
+        assertTrue(
+            "须有整页根守护（命中 body/html 时只记状态、不打类）",
+            script.contains("if(el===document.body||el===document.documentElement){status.error=status.error||kind;return;}")
+        )
+        assertTrue(
+            "库缺失须改为标记各自目标节点（图/代码块），保住可见降级契约",
+            script.contains("function markFallbackTargets(") &&
+                script.contains("markFallbackTargets('pre.mermaid,div.mermaid','mermaid-missing')") &&
+                script.contains("markFallbackTargets('pre code','hljs-missing')")
+        )
+        // 反向锁：katex 缺失没有明确目标节点，禁止退化成通配标记（那会把降级外观撒满整页）
+        assertFalse("katex 缺失不得用通配选择器标满全页", script.contains("markFallbackTargets('*'"))
+    }
+
+    @Test
     fun `防二次渲染标记被选择器与写入两侧同时使用`() {
         val script = build().script
         val attribute = MdRichRenderInjector.RenderedAttribute
@@ -299,5 +325,13 @@ class MdRichRenderInjectorTest {
             base.contains(".reader-paragraph") && base.contains("orphans: 2") && base.contains("widows: 2"))
         assertTrue("body 无内边距须强制（否则根壳恒窄 ⇒ 左右露出底色）",
             base.contains("padding: 0 !important"))
+        // 2026-10-14 真机铁证（「下面展示不全」）：archive 主题的页根是 `.as-page{width:100%;height:100%}`，
+        // 其 `height:100%` 只在父级**有确定 height 属性**才解析 —— 父级仅靠 `min-height` 撑开时按规范
+        // 落回 auto（实测页根 477×826 而视口 480×854 ⇒ 页脚整体下移、底部多 28px 空白）。
+        // 故基线必须同时给"确定的 body 高"与"确定的页根宽高"，缺任一条都复现该缺陷。
+        assertTrue("body 必须同时给确定 height 与 min-height（前者使子元素百分比高度可解析）",
+            base.contains("height: 100%;\n  min-height: 100%;"))
+        assertTrue("页根容器必须给确定宽高（作者主题以它为百分比基准）",
+            base.contains("#reader-template-root {") && base.contains("width: 100%;\n  height: 100%;"))
     }
 }
