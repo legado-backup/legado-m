@@ -274,4 +274,30 @@ class MdRichRenderInjectorTest {
         assertTrue("自动驱动仍须跑一次（文本富渲染面依赖它）", script.contains("whenReady().then(runAll)"))
         assertTrue("完成标记语义不变（宿主轮询依赖）", script.contains("function finish(){status.done=true;}"))
     }
+
+    @Test
+    fun `模板基线资产按 archive 口径登记且顺序单源`() {
+        // 2026-10-14：archive 原版基准对照暴露"导入主题左右露出底色 / 正文区偏小"的根因＝
+        // 我方只注入 `--reader-*` 变量值、缺 archive `EpubTemplateDocument.baseCss` 的**页基线规则**。
+        // 本包配对测试：资产登记、路径正确、顺序单源，且基线文件确实含那几组口径。
+        assertEquals("md/template-archive-base.css", MdRichRenderInjector.ArchiveBaseCssAsset)
+        assertEquals(
+            "基线顺序单源（layout 的整行网格 !important 必须最后）",
+            listOf(
+                MdRichRenderInjector.MdReaderCssAsset,
+                MdRichRenderInjector.ArchiveBaseCssAsset,
+                MdRichRenderInjector.TemplateDecorationCssAsset,
+                MdRichRenderInjector.TemplateLayoutCssAsset
+            ),
+            MdRichRenderInjector.TemplateBaselineCssAssets
+        )
+        val base = SourceFileProbe.assetRawText("md/template-archive-base.css")
+        assertTrue("画布须铺满（html 定高 + body 以页背景兜底）",
+            base.contains("height: 100%") && base.contains("--reader-page-background"))
+        assertTrue("页根安全区须消费 --reader-safe-*", base.contains("[data-reader-page]") && base.contains("--reader-safe-"))
+        assertTrue("段落基线须在场（段距/缩进/孤寡行）",
+            base.contains(".reader-paragraph") && base.contains("orphans: 2") && base.contains("widows: 2"))
+        assertTrue("body 无内边距须强制（否则根壳恒窄 ⇒ 左右露出底色）",
+            base.contains("padding: 0 !important"))
+    }
 }

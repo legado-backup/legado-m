@@ -571,6 +571,23 @@ class ReaderTemplateRuntimeContractTest {
         assertTrue("预算常量须在（动画）", runtime.contains("var MAX_ANIMATIONS = 120;"))
         assertTrue("取不到计数不得算超限", runtime.contains("if (counts.elements > MAX_ELEMENTS) return 'over';"))
         assertTrue("预算与规模必须随自证回发", runtime.contains("',elems='") && runtime.contains("',anims='") && runtime.contains("',budget='"))
+        // 2026-10-14 用户报「动图不展示 / 左右黑边」后新增的两条自证：
+        // ①只报"动画在跑"会把**不可见**动画当成已生效（真机像素差分证实差异仅 0.01%）⇒ 必须报可见性；
+        // ②`innerWidth` 含滚动条、`clientWidth` 不含 ⇒ 两者之差即"沙箱文档被滚动条挤压"（黑边来源）。
+        assertTrue(
+            "动效须自证可见性（几何+不透明度），不能只报\"在跑\"",
+            // ⚠️ 断言串必须与 JS 字面量**逐字一致**：运行时是 `… + ',animVis=' + …`（逗号在引号内）
+            runtime.contains("function animationFacts(") && runtime.contains("',animVis='") &&
+                runtime.contains("',animY='") && runtime.contains("',animTotal='")
+        )
+        assertTrue(
+            "须自证布局盒宽（定位\"左右黑边 / 滚动条挤压\"）",
+            runtime.contains("',iw=' + winW + '/' + docW") && runtime.contains("',rootW='") &&
+                runtime.contains("',slotW='") &&
+                // bodyW 与 body 的 padding/margin：用来定位"根壳比视口窄"的差额来源（2026-10-14 补）
+                runtime.contains("',bodyW='") && runtime.contains("',bodyPad(L/R/mL/mR)=") &&
+                runtime.contains("',padRules='") && runtime.contains("',safe='")
+        )
     }
 
     @Test
