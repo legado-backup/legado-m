@@ -60,7 +60,10 @@ class BackupRestoreParityTest {
         "\"config.xml\"" to listOf("\"config\""),
         // 目录类：两侧用常量而非字面量
         "\"bg\"" to listOf("Backup.READ_BG_DIR", "READ_BG_DIR"),
-        "\"book_cache\"" to listOf("Backup.bookCacheFolderName", "bookCacheFolderName")
+        "\"book_cache\"" to listOf("Backup.bookCacheFolderName", "bookCacheFolderName"),
+        // NEW-51：朗读配乐/音效亦是**目录项**（同 `bg`）——备份/恢复两侧统一走常量
+        // `Backup.READ_ALOUD_AUDIO_DIR`（单源，与存储侧目录名防漂移）
+        "\"readAloudAudio\"" to listOf("Backup.READ_ALOUD_AUDIO_DIR", "READ_ALOUD_AUDIO_DIR")
     )
 
     /** 从 `BackupItem("key", "fileName", …)` 中提取第 2 个构造参数的字面文本（剔除注释行）。 */
