@@ -115,4 +115,16 @@ class BackupKernelTest {
             body.indexOf("bookCharacters.json") < body.indexOf("bookCharacterRelations.json")
         )
     }
+
+    @Test
+    fun webBackupFullSetCoversReadAloudBgm() {
+        // NEW-51：Web 备份硬编码全集（不走选择器）⇒ 内核层须自证已覆盖新入备份的
+        // 「朗读配乐/音效（分组 + 曲目 + 音频文件）」。四处一致性（选择器 / Backup 写出 /
+        // Restore 还原 / Web 全集）由 `help/storage/ReadAloudBgmBackupRoundTripTest` 整体守。
+        val body = kernel.substringAfter("private suspend fun buildBackupZip()")
+        assertTrue(
+            "Web 备份须调用 stageReadAloudBgm（元数据 + 音频目录由该入口一并写出）",
+            body.contains("Backup.stageReadAloudBgm(webBackupPath)")
+        )
+    }
 }
