@@ -26,6 +26,12 @@ class ShareNoteDeadPathRetiredTest {
         assertFalse("旧即时分享实现不得回潮", activity.contains("fun shareSelectionAsNoteImage("))
         val renderer = code("src/main/java/io/legado/app/ui/book/read/ShareNoteImageRenderer.kt")
         assertFalse("孤儿的自建 WebView 渲染入口不得回潮", renderer.contains("fun renderShareImage("))
+        // B29 死码清理（2026-10-16）：同族漏网 —— `exportMountedWebView` 亦为「重复的导出入口」
+        // （零调用，能力被 renderHtmlToPngFileWithFallback 覆盖），已一并退役，防回潮。
+        assertFalse(
+            "重复的挂载视图导出入口不得回潮（活路径已覆盖其能力）",
+            renderer.contains("fun exportMountedWebView(")
+        )
     }
 
     @Test
