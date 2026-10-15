@@ -63,7 +63,13 @@ class RetiredPreferKeyTest {
     fun deadKeysFromSweepAreFullyRetired() {
         // 2026-10-15 死件普查（扩大测试基准第三轮）：两键**全仓零读取**（代码引用与字面量通道皆无）
         // ⇒ 按本测试类 KDoc 的「删键三处」约定处置：删声明 + 纳入 ignorePrefKeys + 无消费点
-        listOf("downloadDismissedIds", "highlightRuleBuiltinMergedV2").forEach { key ->
+        listOf(
+            "downloadDismissedIds", "highlightRuleBuiltinMergedV2",
+            // NEW-52（2026-10-16）：「设置项形同虚设」审计（audit_prefer_key_consumption）命中 ——
+            // 两项功能已迁移（清除缓存并入缓存管理 / WebView 清理为缓存管理第 4 分项），旧处理逻辑
+            // 与 XML 条目均已删；XML 另一侧由下方 `xmlDeadEntriesStayRemoved` 独立守护。
+            "cleanCache", "clearWebViewData"
+        ).forEach { key ->
             assertFalse(
                 "已删键仍声明在 PreferKey（成为死键）：$key",
                 preferKey.contains("const val $key =")
@@ -71,6 +77,20 @@ class RetiredPreferKeyTest {
             assertTrue(
                 "旧备份中的已删键必须纳入 ignorePrefKeys（防写回）：$key",
                 backupConfig.contains("\"$key\"")
+            )
+        }
+    }
+
+    @Test
+    fun xmlDeadEntriesStayRemoved() {
+        // NEW-52：XML 片段（页面已 Compose 化、不再渲染该 XML）仍被 `MySettingsData` 的
+        // `buildPreferenceXmlSearchItems` 解析为**搜索项** ⇒ XML 里残留的已迁移条目会变成
+        // 「搜得到、点进去却没有」的**幽灵项**。故退役键必须同时从 XML 移除（本断言防回潮）。
+        val xml = read("src/main/res/xml/pref_config_other.xml")
+        listOf("cleanCache", "clearWebViewData").forEach { key ->
+            assertFalse(
+                "已退役键不得残留在 XML 偏好片段（会生成幽灵搜索项）：$key",
+                xml.contains("android:key=\"$key\"")
             )
         }
     }
