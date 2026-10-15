@@ -99,4 +99,20 @@ class BackupKernelTest {
             kernel.contains("suspend fun backup(): ByteArray")
         )
     }
+
+    @Test
+    fun webBackupFullSetCoversBookCharacterCategories() {
+        // NEW-50：Web 备份是**硬编码全集、不走选择器**（历史上有 5 类曾在此静默缺失①）
+        // ⇒ 内核层须自证已覆盖新入备份的「书角角色 / 角色关系」。本用例是第 ④ 处的**域内守卫**，
+        // 四处一致性（选择器 / Backup 写出 / Restore 还原 / Web 全集）由
+        // `help/storage/BookCharacterBackupRoundTripTest` 整体守。
+        // ① 见 `BackupKernel.buildBackupZip` 内「REQ-05 / 1.2.7 对等性补全」注释。
+        val body = kernel.substringAfter("private suspend fun buildBackupZip()")
+        assertTrue("Web 备份须写出书角角色", body.contains("\"bookCharacters.json\""))
+        assertTrue("Web 备份须写出角色关系", body.contains("\"bookCharacterRelations.json\""))
+        assertTrue(
+            "角色须先于关系写出（与还原侧同序，便于逐行核对）",
+            body.indexOf("bookCharacters.json") < body.indexOf("bookCharacterRelations.json")
+        )
+    }
 }
