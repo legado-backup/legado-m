@@ -62,4 +62,43 @@ class RetiredDaoQueryTest {
         assertTrue("级联删除角色（事务）须保留", characterDao.contains("fun deleteCharacterWithRelations("))
         assertTrue("模板按 id 直取（suspend 版）须保留", castingDao.contains("fun get(id: String)"))
     }
+
+    @Test
+    fun b27RetiredNarrowQueriesDoNotComeBackAndReplacementsStay() {
+        // B27（2026-10-16）：同判据（零调用 + 同语义活替代）续批 10 条，横跨 7 个 DAO 文件。
+        val bookSourceDao = code("src/main/java/io/legado/app/data/dao/BookSourceDao.kt")
+        val coverDao = code("src/main/java/io/legado/app/data/dao/CoverGalleryDao.kt")
+        val keyboardDao = code("src/main/java/io/legado/app/data/dao/KeyboardAssistsDao.kt")
+        val paragraphDao = code("src/main/java/io/legado/app/data/dao/ParagraphRuleDao.kt")
+        val bgmDao = code("src/main/java/io/legado/app/data/dao/ReadAloudBgmDao.kt")
+        val replaceDao = code("src/main/java/io/legado/app/data/dao/ReplaceRuleDao.kt")
+        val rssStarDao = code("src/main/java/io/legado/app/data/dao/RssStarDao.kt")
+
+        listOf(
+            bookSourceDao to "fun flowExploreNoGroup(",
+            bookSourceDao to "fun flowExploreNoGroupSearch(",
+            bookSourceDao to "fun getEnabledByGroup(",
+            coverDao to "fun insertGroups(",
+            keyboardDao to "fun getByType(",
+            paragraphDao to "fun updateBookRule(",
+            bgmDao to "fun flowTracks(",
+            bgmDao to "fun flowTracksByType(",
+            replaceDao to "fun enableAll(",
+            rssStarDao to "fun liveAll("
+        ).forEach { (src, decl) ->
+            assertFalse("B27 零调用窄查询已退役，不得回潮：$decl", src.contains(decl))
+        }
+
+        // 活替代者必须留存（与 B25 同口径：单侧「只证已删」防不住误删替代者）
+        assertTrue("发现页统一入口须保留", bookSourceDao.contains("fun flowExplore()"))
+        assertTrue("发现页关键词版须保留", bookSourceDao.contains("fun flowExplore(key: String)"))
+        assertTrue("Projection 版按组取源须保留", bookSourceDao.contains("fun getEnabledPartByGroup(group: String)"))
+        assertTrue("图集单条插入须保留", coverDao.contains("suspend fun insertGroup(group: CoverGalleryGroup)"))
+        assertTrue("键盘辅助 Flow 版须保留", keyboardDao.contains("fun flowByType(type: Int)"))
+        assertTrue("段落规则先删后插两半须保留", paragraphDao.contains("fun deleteBookRule(bookUrl: String, ruleId: Long)"))
+        assertTrue("段落规则插入须保留", paragraphDao.contains("fun insertBookRule(rule: BookParagraphRule)"))
+        assertTrue("BGM 按类型 List 版须保留", bgmDao.contains("fun tracksByType(assetType: String)"))
+        assertTrue("BGM 启用曲目须保留", bgmDao.contains("fun enabledTracks()"))
+        assertTrue("订阅收藏分组主查询须保留", rssStarDao.contains("fun flowByGroup(group: String)"))
+    }
 }
