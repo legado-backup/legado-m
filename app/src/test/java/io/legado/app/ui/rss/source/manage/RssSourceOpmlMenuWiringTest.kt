@@ -72,4 +72,20 @@ class RssSourceOpmlMenuWiringTest {
     fun emptyLibraryGivesReceiptInsteadOfWritingEmptyFile() {
         assertTrue("无订阅源时须明确提示", activity.contains("toastOnUi(R.string.opml_error_empty)"))
     }
+
+    // ---- NEW-28（订阅源巡检接线）：选择态入口不得再缺 ----
+
+    @Test
+    fun selectionCheckEntryIsWiredToRssCheckService() {
+        // 此前 `CheckRssSourceService` 全链**无任何 UI 入口**（选择态菜单只有启用/禁用/置顶/导出/分享/
+        // 分组/删除）⇒ 整条订阅源巡检 + 去重标注不可达。现按书源管理页同构补「校验所选」入口。
+        assertTrue(
+            "选择态须有「校验所选」入口（与书源管理页同构）",
+            activity.contains("text = getString(R.string.check_select_source)")
+        )
+        assertTrue("入口须落在 bottomActions 内且调 checkRssSelected", activity.contains("onClick = ::checkRssSelected"))
+        assertTrue("须有落地方法", activity.contains("private fun checkRssSelected()"))
+        assertTrue("须启动订阅源校验服务", activity.contains("CheckRssSource.start(this, selection)"))
+        assertTrue("跑完须退出选择态（避免与巡检态混淆）", activity.contains("selectedUrls.value = emptySet()"))
+    }
 }
