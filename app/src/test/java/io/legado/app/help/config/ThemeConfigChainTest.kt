@@ -103,15 +103,24 @@ class ThemeConfigChainTest {
     }
 
     @Test
-    fun sniffRaceSwitchDefaultsToEnabled() {
-        // W2 / REQ-14：嗅探赛马化默认开启；关闭即为零回归回滚点（回落原串行链）
-        assertTrue(
-            "AppConfig.sniffRaceEnabled 须存在且默认 true",
-            appConfig.contains("getPrefBoolean(PreferKey.sniffRaceEnabled, true)")
+    fun retiredBottomWallpaperSaveEntryStaysDeletedAndLivePathRemains() {
+        // B30 死码清理（2026-10-16）：`saveBottomWallpaperToPackage` 零调用（连族内亦无），其能力
+        // （壁纸复制进包目录 + 默认包只读拦截）已被**活路径**完整覆盖 —— UI 写绝对路径 →
+        // `addOrUpdate` 内 `normalizeWallpaperPath` 复制进包 + UI 侧只读校验
+        // （`NavigationBarManageActivity` :497/:893/:1228）⇒ 属**被取代**。
+        // **成对核对（B25 教训）**：同族 `clearBottomWallpaper` 含「物理删除包内壁纸」独有能力
+        // （活路径置 null 时不清理 ⇒ 无活替代者）⇒ **保留**，故本用例为**双侧断言**。
+        assertFalse(
+            "被取代的重复保存入口不得回潮",
+            navIconConfig.contains("fun saveBottomWallpaperToPackage(")
         )
         assertTrue(
-            "setter 须落同一键（防读写分叉）",
-            appConfig.contains("putPrefBoolean(PreferKey.sniffRaceEnabled, value)")
+            "活单源 normalizeWallpaperPath 须仍在（壁纸入包能力的唯一实现）",
+            navIconConfig.contains("private fun normalizeWallpaperPath(")
+        )
+        assertTrue(
+            "clearBottomWallpaper 含独有物理清理能力，须保留（无活替代者）",
+            navIconConfig.contains("fun clearBottomWallpaper(entry: Entry): Entry")
         )
     }
 }
