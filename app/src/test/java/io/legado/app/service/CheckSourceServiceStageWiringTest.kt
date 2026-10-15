@@ -54,4 +54,35 @@ class CheckSourceServiceStageWiringTest {
         assertTrue("归因须委托单源分类器", t.contains("QualityReportApplier.failureKindOf(e)"))
         assertTrue("分组名须取自单源", t.contains("QualityReportApplier.failureKindGroup("))
     }
+
+    @Test
+    fun groupBackfillDelegatesToSharedOrchestration() {
+        val t = code()
+        // 缺口2 末尾：服务侧**不再自持**加组规则（旧约 50 行内联 add/removeGroup 已删），
+        // 一律走「结果 → 维度态适配器 → 唯一编排」
+        assertTrue(
+            "须用结果→维度态适配器",
+            t.contains("QualityReportApplier.bookResultToDimStates(result)")
+        )
+        assertTrue(
+            "须走唯一编排写组",
+            t.contains("QualityReportApplier.applyBookGroupsFromDims(")
+        )
+        assertTrue(
+            "服务侧不得再直接引用分组词表（口径单源化）",
+            !t.contains("SourceCheckGroups.")
+        )
+    }
+
+    @Test
+    fun suspectSkipClearsGroupsWrittenThisRound() {
+        val t = code()
+        // 存疑放行分支必须复清一次「失效」分组：本轮开头已清、探测中又按维度写下，
+        // 若跳过时不复清则残留"失效"标签，与「存疑不写失败分组」自相矛盾
+        val occurrences = Regex("source\\.removeInvalidGroups\\(\\)").findAll(t).count()
+        assertTrue(
+            "本轮开头 + 存疑放行分支须各清一次（实际 $occurrences 次）",
+            occurrences >= 2
+        )
+    }
 }
