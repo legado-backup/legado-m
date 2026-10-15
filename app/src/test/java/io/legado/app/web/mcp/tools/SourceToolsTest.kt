@@ -5,7 +5,9 @@ import io.legado.app.web.mcp.MCP_DOMAIN_SOURCE
 import io.legado.app.web.mcp.McpTool
 import io.legado.app.web.mcp.McpToolCatalog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -38,6 +40,17 @@ class SourceToolsTest {
                 tool.level
             )
         }
+    }
+
+    @Test
+    fun checkSourceReport_isReadonlyAndRegistered() {
+        val tool = tools.single { it.name == "source_check_report" }
+        assertEquals(MCP_DOMAIN_SOURCE, tool.domain)
+        assertEquals(TokenManager.Level.READONLY, tool.level)
+        assertTrue("只读工具须标 readOnlyHint", tool.readOnlyHint)
+        assertFalse("巡检结果读出不是危险操作", tool.dangerous)
+        assertEquals("无入参（无 required）", 0, tool.inputSchema.getAsJsonArray("required").size())
+        assertNotNull("须被目录聚合", McpToolCatalog.find(tool.name))
     }
 
     @Test
