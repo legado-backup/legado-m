@@ -47,4 +47,28 @@ class RssCheckConfigWiringTest {
         assertTrue("须有 stop 通道", src.contains("fun stop(context: Context)"))
         assertTrue("须有 resume 通道", src.contains("fun resume(context: Context)"))
     }
+
+    @Test
+    fun applyConfigCoversEveryFieldAndEveryPersistedKey() {
+        // NEW-33：8 个配置项原先无任何 UI 入口（只能跑默认档），新增设置弹窗后由
+        // `applyConfig` 单源负责「赋值 = 落盘」。若将来新增字段却漏掉赋值或漏掉 put 键，
+        // 用户会看到「设置不生效」且编译期无提示 ⇒ 此处把该对应关系固化为断言。
+        val src = code("src/main/java/io/legado/app/model/CheckRssSource.kt")
+        val applyBody = src.substringAfter("fun applyConfig(").substringBefore("fun putConfig()")
+        listOf(
+            "this.timeout =", "this.checkDomain =", "this.domainCheckMode =",
+            "this.checkArticles =", "this.checkSearch =", "this.checkSort =",
+            "this.checkContent =", "this.enableDedup =", "putConfig()"
+        ).forEach { marker ->
+            assertTrue("applyConfig 必须覆盖 `$marker`（否则该设置静默不生效）", applyBody.contains(marker))
+        }
+        val putBody = src.substringAfter("fun putConfig()").substringBefore("private fun upSummary")
+        listOf(
+            "checkRssSourceTimeout", "checkRssDomain", "checkRssDomainCheckMode",
+            "checkRssArticles", "checkRssSearch", "checkRssSort", "checkRssContent",
+            "checkRssEnableDedup"
+        ).forEach { key ->
+            assertTrue("putConfig 必须落盘 `$key`（服务侧按该键读回）", putBody.contains(key))
+        }
+    }
 }

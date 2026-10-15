@@ -165,4 +165,18 @@ class PreferKeyUniquenessTest {
             .toMap()
         assertEquals("rssArticleRefreshToTop", pairs["rssArticleRefreshToTop"])
     }
+
+    /** NEW-33 新增键登记（订阅源校验设置入口）。未登记即编译不过，此处固化取值防改名漏改。 */
+    @Test
+    fun new33CheckRssSourceKeyRegistered() {
+        val pairs = Regex("const val (\\w+)\\s*=\\s*\"([^\"]*)\"")
+            .findAll(source())
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toMap()
+        assertEquals("checkRssSource", pairs["checkRssSource"])
+        assertTrue(
+            "订阅源校验设置键必须与书源侧 checkSource 取值不同（否则两个设置互相覆盖）",
+            pairs["checkRssSource"] != pairs["checkSource"]
+        )
+    }
 }
