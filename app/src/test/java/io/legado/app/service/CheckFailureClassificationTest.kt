@@ -5,6 +5,7 @@ import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.RegexTimeoutException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.model.QualityReportApplier
 import io.legado.app.model.SourceCheckGroups
 import kotlinx.coroutines.TimeoutCancellationException
 import org.junit.Assert.assertEquals
@@ -56,6 +57,20 @@ class CheckFailureClassificationTest {
         assertNull(checkFailureGroupName(ContentEmptyException("正文为空")))
         assertNull(checkFailureGroupName(RegexTimeoutException("regex timeout")))
         assertNull(checkFailureGroupName(NoStackTraceException("搜索链接规则为空")))
+    }
+
+    @Test
+    fun serviceClassifier_delegatesToSingleSource() {
+        // 缺口2 收敛：服务侧归因不再自带 `when`，而是委托 QualityReportApplier 的唯一分类器
+        // ⇒ 三处（服务/体检/分组名表）口径合一，改动只需改底座
+        assertEquals(
+            QualityReportApplier.failureKindGroup(QualityReportApplier.failureKindOf(IOException("x"))),
+            checkFailureGroupName(IOException("x"))
+        )
+        assertEquals(
+            QualityReportApplier.failureKindGroup(QualityReportApplier.failureKindOf(TocEmptyException("目录为空"))),
+            checkFailureGroupName(TocEmptyException("目录为空"))
+        )
     }
 
     @Test
