@@ -5,6 +5,7 @@ import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.RegexTimeoutException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.model.SourceCheckGroups
 import kotlinx.coroutines.TimeoutCancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -59,10 +60,11 @@ class CheckFailureClassificationTest {
 
     @Test
     fun networkError_mapsToSiteDeadGroup() {
-        assertEquals("网站失效", checkFailureGroupName(IOException("connection reset")))
-        assertEquals("网站失效", checkFailureGroupName(IllegalStateException("bad state")))
+        // 缺口6：分组名须来自**单源** SourceCheckGroups（此前为内联字面量，与质检底座的私有副本重复）
+        assertEquals(SourceCheckGroups.SITE_FAIL, checkFailureGroupName(IOException("connection reset")))
+        assertEquals(SourceCheckGroups.SITE_FAIL, checkFailureGroupName(IllegalStateException("bad state")))
         // 目录取样空曾抛出的 NoSuchElementException 属"非业务异常" ⇒ 仍判网站失效；
         // 该情形已由 sampleProbeChapters 的空守卫消除（NEW-21），本断言锁定"异常类型→归因"映射本身
-        assertEquals("网站失效", checkFailureGroupName(NoSuchElementException("List is empty.")))
+        assertEquals(SourceCheckGroups.SITE_FAIL, checkFailureGroupName(NoSuchElementException("List is empty.")))
     }
 }
