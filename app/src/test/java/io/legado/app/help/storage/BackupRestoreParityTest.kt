@@ -18,6 +18,20 @@ import org.junit.Test
  */
 class BackupRestoreParityTest {
 
+    @Test
+    fun retiredPrefKeysStayInIgnoreList() {
+        // 2026-10-15 死件普查：已退役的 pref 键（旧备份里可能仍存在）必须留在 ignorePrefKeys，
+        // 否则旧备份会把已删键写回（详见 constant/RetiredPreferKeyTest 的「删键三处」约定）
+        val cfg = read("src/main/java/io/legado/app/help/storage/BackupConfig.kt")
+        listOf(
+            "floatingBottomBarHideSearch",   // 2026-09-27 底栏悬浮搜索按钮裁决
+            "downloadDismissedIds",          // 2026-10-15 死件普查（能力已由 DB 承载）
+            "highlightRuleBuiltinMergedV2",  // 2026-10-15 死件普查（一次性迁移标志，使命已完成）
+        ).forEach { key ->
+            assertTrue("已退役键必须纳入 ignorePrefKeys（防写回）：$key", cfg.contains("\"$key\""))
+        }
+    }
+
     private fun read(rel: String): String =
         listOf(File(rel), File("../app/$rel"), File("app/$rel")).first { it.isFile }.readText()
 
