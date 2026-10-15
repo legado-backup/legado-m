@@ -3,6 +3,7 @@ package io.legado.app.service
 import com.script.ScriptException
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.exception.RegexTimeoutException
 import io.legado.app.exception.TocEmptyException
 import kotlinx.coroutines.TimeoutCancellationException
 import org.junit.Assert.assertEquals
@@ -41,13 +42,18 @@ class CheckFailureClassificationTest {
         assertEquals("js失效", checkFailureGroupName(org.mozilla.javascript.WrappedException(
             RuntimeException("inner")
         )))
+        // Rhino 运行时常见形态：WrappedException 包着脚本体自己的异常
+        assertEquals("js失效", checkFailureGroupName(org.mozilla.javascript.WrappedException(
+            ScriptException("inner")
+        )))
     }
 
     @Test
     fun businessException_addsNoGroup() {
-        // 目录为空 / 正文为空 / 通用业务结论：均不加分组（维度失败已在 doCheckSource 回写）
+        // 目录为空 / 正文为空 / 正则超时 / 通用业务结论：均不加分组（维度失败已在 doCheckSource 回写）
         assertNull(checkFailureGroupName(TocEmptyException("目录为空")))
         assertNull(checkFailureGroupName(ContentEmptyException("正文为空")))
+        assertNull(checkFailureGroupName(RegexTimeoutException("regex timeout")))
         assertNull(checkFailureGroupName(NoStackTraceException("搜索链接规则为空")))
     }
 
