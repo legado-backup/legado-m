@@ -217,4 +217,49 @@ class SourceCheckFailureUnificationTest {
         assertEquals(listOf(SourceCheckGroups.DOMAIN_FAIL), namesOf(result, checkDomain = true))
         assertTrue("域名校验关闭时不得因不可达打组", namesOf(result, checkDomain = false).isEmpty())
     }
+
+    // ---------- 待清空诊断组（缺口2 最后一步：删内联时的等价性补偿） ----------
+
+    @Test
+    fun groupsToClear_rulePresent_clearsRuleEmptyMarker() {
+        // 旧内联：搜索已检且链接非空 ⇒ removeGroup(搜索链接规则为空)；发现同理
+        assertEquals(
+            listOf(SourceCheckGroups.SEARCH_URL_EMPTY),
+            QualityReportApplier.groupsToClear(
+                mapOf(
+                    QualityDim.SEARCH to DimState.PASS,
+                    QualityDim.DISCOVERY to DimState.NOT_CHECKED,
+                )
+            )
+        )
+        assertEquals(
+            listOf(SourceCheckGroups.DISCOVERY_RULE_EMPTY),
+            QualityReportApplier.groupsToClear(mapOf(QualityDim.DISCOVERY to DimState.FAIL))
+        )
+    }
+
+    @Test
+    fun groupsToClear_ruleEmptyOrUnchecked_keepsMarker() {
+        // 规则为空（NOT_APPLICABLE）⇒ 本轮结论就是"为空"，不得清；未校验（NOT_CHECKED）/缺项同理
+        val dims = mapOf(
+            QualityDim.SEARCH to DimState.NOT_APPLICABLE,
+            QualityDim.DISCOVERY to DimState.NOT_CHECKED,
+        )
+        assertEquals(emptyList<String>(), QualityReportApplier.groupsToClear(dims))
+        assertEquals(emptyList<String>(), QualityReportApplier.groupsToClear(emptyMap()))
+    }
+
+    @Test
+    fun groupsToClear_neverOverlapsFailureGroupNames() {
+        // 等价性闭环：同轮"清空集"与"新增集"不得相交 —— 否则同一组会先清后加（无意义且顺序敏感）
+        val dims = mapOf(
+            QualityDim.SEARCH to DimState.PASS,
+            QualityDim.DISCOVERY to DimState.NOT_APPLICABLE,
+        )
+        val clear = QualityReportApplier.groupsToClear(dims)
+        val add = QualityReportApplier.failureGroupNames(dims, FailureKind.NONE, false, false)
+        assertEquals(listOf(SourceCheckGroups.SEARCH_URL_EMPTY), clear)
+        assertEquals(listOf(SourceCheckGroups.DISCOVERY_RULE_EMPTY), add)
+        assertTrue("清空集与新增集必须不相交", clear.toSet().intersect(add.toSet()).isEmpty())
+    }
 }
