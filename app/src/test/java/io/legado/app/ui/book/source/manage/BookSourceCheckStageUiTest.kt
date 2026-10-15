@@ -58,4 +58,14 @@ class BookSourceCheckStageUiTest {
             t.contains("if (checkBannerRunning) InlineTaskState.Running else InlineTaskState.Done")
         )
     }
+
+    @Test
+    fun menuExposesCheckReportExport() {
+        // 缺口4 接线不变量：巡检结果必须能从书源管理页导出（结构化任务态 ⇒ CSV ⇒ 系统分享）
+        val t = activity()
+        assertTrue("菜单须有导出入口", t.contains("R.string.export_check_report"))
+        assertTrue("导出须取同一份任务态", t.contains("CheckSourceTaskStore.state.value"))
+        assertTrue("导出须经单一格式化口径", t.contains("formatCheckSourceReportCsv(state)"))
+        assertTrue("导出须走系统分享", t.contains("share(file)"))
+    }
 }
