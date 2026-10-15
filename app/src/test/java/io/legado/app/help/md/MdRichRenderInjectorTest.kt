@@ -329,9 +329,12 @@ class MdRichRenderInjectorTest {
         // 其 `height:100%` 只在父级**有确定 height 属性**才解析 —— 父级仅靠 `min-height` 撑开时按规范
         // 落回 auto（实测页根 477×826 而视口 480×854 ⇒ 页脚整体下移、底部多 28px 空白）。
         // 故基线必须同时给"确定的 body 高"与"确定的页根宽高"，缺任一条都复现该缺陷。
+        // 换行符容错（2026-10-15 新发现）：`git` 检出在 Windows 工作区可能给出 CRLF，
+        // 硬编码 `\n` 的断言会在 CRLF 下**假失败**（与产品代码无关）。
+        val baseLf = base.replace("\r\n", "\n")
         assertTrue("body 必须同时给确定 height 与 min-height（前者使子元素百分比高度可解析）",
-            base.contains("height: 100%;\n  min-height: 100%;"))
+            baseLf.contains("height: 100%;\n  min-height: 100%;"))
         assertTrue("页根容器必须给确定宽高（作者主题以它为百分比基准）",
-            base.contains("#reader-template-root {") && base.contains("width: 100%;\n  height: 100%;"))
+            baseLf.contains("#reader-template-root {") && baseLf.contains("width: 100%;\n  height: 100%;"))
     }
 }
