@@ -2,6 +2,7 @@ package io.legado.app.help
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -176,6 +177,110 @@ class HighlightHtmlDecoratorTest {
         )
         assertEquals(1, result.matchedRules)
         assertEquals("两处数字都须被包裹", 2, Regex("<span").findAll(result.html).count())
+    }
+
+    // === HL-3：手动划线进模板正文（按文本定位，不用 canvas 偏移硬套） ===
+
+    @Test
+    fun `手动划线按文本定位并包成 span`() {
+        val result = HighlightHtmlDecorator.decorate(
+            "<p>第一句。</p><p>第二句带重点。</p>",
+            emptyList(),
+            HighlightPalette.Tone.DAY,
+            manual = listOf(
+                HighlightHtmlDecorator.ManualHighlight(
+                    text = "带重点", start = 0, end = 3, style = HighlightStyle(fill = 0x66FFEB3B.toInt())
+                )
+            )
+        )
+        assertEquals("手动划线不应计入规则命中数", 0, result.matchedRules)
+        assertEquals("须记录 1 条手动划线已装饰", 1, result.matchedManual)
+        assertTrue("划线文字须被 span 包住", result.html.contains("<span"))
+        assertTrue("须带上填充色", result.html.contains(colorCss(0x66FFEB3B.toInt())))
+        assertFalse("未划线的句子不得被包", result.html.substringBefore("第二句").contains("<span"))
+    }
+
+    @Test
+    fun `手动划线文本在章内找不到时跳过不误锚`() {
+        val result = HighlightHtmlDecorator.decorate(
+            "<p>甲乙丙</p>",
+            emptyList(),
+            HighlightPalette.Tone.DAY,
+            manual = listOf(
+                HighlightHtmlDecorator.ManualHighlight(
+                    text = "完全不在正文里的句子", start = 0, end = 9,
+                    style = HighlightStyle(fill = 0x66FFEB3B.toInt())
+                )
+            )
+        )
+        assertEquals("零命中必须原样返回（宁可不高亮也不画错位置）", 0, result.matchedManual)
+        assertFalse(result.html.contains("<span"))
+    }
+
+    @Test
+    fun `手动划线空文本或空样式一律跳过`() {
+        val blankText = HighlightHtmlDecorator.decorate(
+            "<p>甲乙丙</p>", emptyList(), HighlightPalette.Tone.DAY,
+            manual = listOf(
+                HighlightHtmlDecorator.ManualHighlight("", 0, 0, HighlightStyle(fill = 1))
+            )
+        )
+        assertEquals(0, blankText.matchedManual)
+        val emptyStyle = HighlightHtmlDecorator.decorate(
+            "<p>甲乙丙</p>", emptyList(), HighlightPalette.Tone.DAY,
+            manual = listOf(HighlightHtmlDecorator.ManualHighlight("甲乙", 0, 2, HighlightStyle()))
+        )
+        assertEquals("空样式等于无高亮，不必多包一层 span", 0, emptyStyle.matchedManual)
+    }
+
+    @Test
+    fun `手动划线跨块时两段各自上色`() {
+        // 跨块的划线被块边界切开：本用例两段都被整段覆盖 ⇒ 走"整段命中落段元素"优化
+        // （样式挂在各段元素上而非包 span，背景因此铺满整行、也没有逐字符包裹的缝隙）
+        val result = HighlightHtmlDecorator.decorate(
+            "<p>前半句</p><p>后半句</p>",
+            emptyList(),
+            HighlightPalette.Tone.DAY,
+            manual = listOf(
+                HighlightHtmlDecorator.ManualHighlight(
+                    text = "前半句后半句", start = 0, end = 6,
+                    style = HighlightStyle(fill = 0x66FFEB3B.toInt())
+                )
+            )
+        )
+        assertEquals("划线命中数按划线条数计，不按被切开的段数计", 1, result.matchedManual)
+        assertEquals(
+            "两段都必须带上填充色",
+            2,
+            Regex(Regex.escape(colorCss(0x66FFEB3B.toInt()))).findAll(result.html).count()
+        )
+    }
+
+    // === locateByText：空白无关定位（模板面与 canvas 文本口径不同，靠它对齐） ===
+
+    @Test
+    fun `locateByText 忽略空白差异并返回原文本区间`() {
+        val chapter = "第一段\n\n　第二段正文"
+        val range = HighlightHtmlDecorator.locateByText(chapter, "第二段 正文", 0)
+        assertEquals("须定位到原文本坐标", chapter.indexOf("第二段"), range?.first)
+        assertEquals("末字须落在原文本上", chapter.indexOf("正文") + 2, (range?.last ?: -1) + 1)
+    }
+
+    @Test
+    fun `locateByText 重复文本择离提示最近的一处`() {
+        val chapter = "甲方说着。乙方点头。甲方说着。"
+        val first = HighlightHtmlDecorator.locateByText(chapter, "甲方说着", 0)
+        val second = HighlightHtmlDecorator.locateByText(chapter, "甲方说着", chapter.lastIndexOf("甲方说着"))
+        assertEquals("hint=0 取第一处", chapter.indexOf("甲方说着"), first?.first)
+        assertEquals("hint 指第二处即取第二处", chapter.lastIndexOf("甲方说着"), second?.first)
+    }
+
+    @Test
+    fun `locateByText 找不到或入参非法返回 null`() {
+        assertNull(HighlightHtmlDecorator.locateByText("甲乙丙", "丁", 0))
+        assertNull(HighlightHtmlDecorator.locateByText("", "甲", 0))
+        assertNull(HighlightHtmlDecorator.locateByText("甲乙丙", "   ", 0))
+        assertNull("needle 比全文还长时必须安全返回 null", HighlightHtmlDecorator.locateByText("甲", "甲乙丙丁", 0))
     }
 
     private fun colorCss(argb: Int): String = String.format(

@@ -266,9 +266,19 @@ class ReadBookTemplateRoutingTest {
         // `loadTemplateContentAwait` 的同章早退闸 ⇒ 用户可感知症状「关掉再打开没反应」。
         // 该路径**默认关闭时跑不到**，只有"开着模板又去关一下再开"的用户会遇到 ⇒ 源码层钉住。
         val s = text()
+        // HL-3：判据已抽成纯函数 `TemplateReuseGate`（可单测真值表，见 TemplateReuseGateTest）
+        // ⇒ 这里只钉"闸在位 + 单源不再散落"，具体条件由该纯函数的用例覆盖
+        val gate = SourceFileProbe.sourceText("ui/book/read/TemplateReuseGate.kt")
         assertTrue(
             "早退闸必须在位（正是它让残留状态变成'不重渲染'）",
-            s.contains("textRichPreparedIndex == index && templateBackend != null")
+            s.contains("TemplateReuseGate.shouldReuse(")
+        )
+        assertTrue("闸须判同章", gate.contains("preparedIndex == chapterIndex"))
+        assertTrue("闸须判后端在场", gate.contains("backendPresent"))
+        assertTrue("闸须判高亮规则版本", gate.contains("decoratedRulesVersion == currentRulesVersion"))
+        assertTrue(
+            "闸须判**手动划线**版本（HL-3：漏掉它 ⇒ 划了线也不重渲染）",
+            gate.contains("decoratedManualVersion == currentManualVersion")
         )
         val retire = Regex(
             "if \\(templateActive\\) switchTemplate\\(false\\)\\s*\\n\\s*" +
