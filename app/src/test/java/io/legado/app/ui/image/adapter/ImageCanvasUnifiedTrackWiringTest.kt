@@ -59,6 +59,21 @@ class ImageCanvasUnifiedTrackWiringTest {
             "须显式标注已无调用点 + 禁新增消费（防被当活路径复用）",
             adapter.contains("W6 7.2 起本函数已无调用点")
         )
+        assertTrue(
+            "KDoc 须写明删除闸门归属 W7 8.4（防再次被当成零调用死码误删）",
+            adapter.contains("由 **W7 8.4** 在 `PhotoView` 收口时一并删除")
+        )
+        // B24 越界删除事故（2026-10-16）：曾按「零调用 = 死码」删掉本回滚点 ⇒
+        // 破坏 W6 批次约定 + 使本用例与 `ImageItemLoadStateWiringTest` 两个用例失败。
+        // 故在此把回滚点的**实现契约**也锁住：内存安全钳位一旦丢失，回滚轨即不可用。
+        assertTrue(
+            "回滚轨须保留小内存设备解码高度钳位（否则回滚点形同虚设）",
+            adapter.contains("io.legado.app.help.MemoryPressure.isSmallHeap")
+        )
+        assertTrue(
+            "回滚轨须保留按宽高比折算的目标高度",
+            adapter.contains("ImagePyramidLoader.normalDisplayHeight(imgW, imgH, screenW, screenH)")
+        )
         assertFalse(
             "回滚轨不得再有调用点",
             adapter.contains("loadIntoPhotoView(file, url, imgW, imgH, screenW, screenH, position)")
