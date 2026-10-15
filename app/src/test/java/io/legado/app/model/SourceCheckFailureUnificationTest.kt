@@ -1,0 +1,141 @@
+package io.legado.app.model
+
+import com.script.ScriptException
+import io.legado.app.exception.TocEmptyException
+import kotlinx.coroutines.TimeoutCancellationException
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.IOException
+
+/**
+ * 失败归因 + 分组回填的**单源化**护栏（缺口2 收敛第一步）。
+ *
+ * 收敛前：分组名词表、归因分类器、分组回填编排各有 2 份（服务侧内联 / 体检侧 `QualityReportApplier`），
+ * 靠"逐字一致（单测锁定）"维系。现在唯一来源＝`QualityReportApplier`（`failureKindOf` /
+ * `failureKindGroup` / `failureGroupNames` / `applyBookGroupsFromDims`），服务侧与体检侧同调。
+ *
+ * 断言口径说明：编排判定用**纯函数 `failureGroupNames`**（无副作用）断言；`applyBookGroupsFromDims`
+ * 只负责把清单逐个 `addGroup`（写库侧语义由既有 `QualityReportApplierTest` 的 report 路径覆盖）。
+ */
+class SourceCheckFailureUnificationTest {
+
+    private fun timeoutInstance(): Throwable = kotlinx.coroutines.runBlocking {
+        try {
+            kotlinx.coroutines.withTimeout(1) { kotlinx.coroutines.delay(80) }
+            error("unreachable")
+        } catch (t: TimeoutCancellationException) {
+            t
+        }
+    }
+
+    @Test
+    fun failureKindOf_classifiesByExceptionType() {
+        assertEquals(FailureKind.TIMEOUT, QualityReportApplier.failureKindOf(timeoutInstance()))
+        assertEquals(FailureKind.SCRIPT, QualityReportApplier.failureKindOf(ScriptException("s")))
+        assertEquals(
+            FailureKind.SCRIPT,
+            QualityReportApplier.failureKindOf(org.mozilla.javascript.WrappedException(RuntimeException("inner")))
+        )
+        assertEquals(FailureKind.NETWORK, QualityReportApplier.failureKindOf(IOException("reset")))
+        // 业务异常（引擎侧已给结论）⇒ NONE，不得再打"网站失效"
+        assertEquals(FailureKind.NONE, QualityReportApplier.failureKindOf(TocEmptyException("目录为空")))
+    }
+
+    @Test
+    fun failureKindGroup_mapsToSingleSourceVocabulary() {
+        assertEquals(SourceCheckGroups.CHECK_TIMEOUT, QualityReportApplier.failureKindGroup(FailureKind.TIMEOUT))
+        assertEquals(SourceCheckGroups.SCRIPT_FAIL, QualityReportApplier.failureKindGroup(FailureKind.SCRIPT))
+        assertEquals(SourceCheckGroups.SITE_FAIL, QualityReportApplier.failureKindGroup(FailureKind.NETWORK))
+        assertNull(QualityReportApplier.failureKindGroup(FailureKind.NONE))
+    }
+
+    @Test
+    fun groupNames_byDims_respectDimensionStates() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(
+                QualityDim.SEARCH to DimState.FAIL,
+                QualityDim.DISCOVERY to DimState.FAIL,
+                QualityDim.CATEGORY to DimState.FAIL,
+                QualityDim.CONTENT to DimState.FAIL,
+                QualityDim.INFO to DimState.PASS,
+                QualityDim.DOMAIN to DimState.FAIL,
+            ),
+            failureKind = FailureKind.NONE,
+            suspect = false,
+            checkDomain = false,
+        )
+        assertEquals(
+            listOf(
+                SourceCheckGroups.SEARCH_FAIL,
+                SourceCheckGroups.DISCOVERY_FAIL,
+                SourceCheckGroups.SEARCH_CATEGORY_FAIL,
+                SourceCheckGroups.SEARCH_CONTENT_FAIL,
+            ),
+            names
+        )
+        assertTrue("域名开关关闭时不得打域名失效", SourceCheckGroups.DOMAIN_FAIL !in names)
+    }
+
+    @Test
+    fun groupNames_domainFail_onlyWhenCheckDomainEnabled() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(QualityDim.DOMAIN to DimState.FAIL, QualityDim.SEARCH to DimState.PASS),
+            failureKind = FailureKind.NONE,
+            suspect = false,
+            checkDomain = true,
+        )
+        assertEquals(listOf(SourceCheckGroups.DOMAIN_FAIL), names)
+    }
+
+    @Test
+    fun groupNames_ruleEmptyDim_takesRuleEmptyGroup() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(
+                QualityDim.SEARCH to DimState.NOT_APPLICABLE,
+                QualityDim.DISCOVERY to DimState.NOT_APPLICABLE,
+            ),
+            failureKind = FailureKind.NONE,
+            suspect = false,
+            checkDomain = false,
+        )
+        assertEquals(
+            listOf(SourceCheckGroups.SEARCH_URL_EMPTY, SourceCheckGroups.DISCOVERY_RULE_EMPTY),
+            names
+        )
+    }
+
+    @Test
+    fun groupNames_failureKind_shortCircuitsDims() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(QualityDim.SEARCH to DimState.FAIL, QualityDim.CONTENT to DimState.FAIL),
+            failureKind = FailureKind.TIMEOUT,
+            suspect = false,
+            checkDomain = true,
+        )
+        assertEquals("归因短路：只打超时组，不再按维度加组", listOf(SourceCheckGroups.CHECK_TIMEOUT), names)
+    }
+
+    @Test
+    fun groupNames_suspectSource_isEmpty() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(QualityDim.SEARCH to DimState.FAIL, QualityDim.CONTENT to DimState.FAIL),
+            failureKind = FailureKind.NONE,
+            suspect = true,
+            checkDomain = true,
+        )
+        assertEquals("存疑放行：不得写任何失效分组（防误伤）", emptyList<String>(), names)
+    }
+
+    @Test
+    fun groupNames_notCheckedDim_addsNothing() {
+        val names = QualityReportApplier.failureGroupNames(
+            dims = mapOf(QualityDim.SEARCH to DimState.NOT_CHECKED, QualityDim.DISCOVERY to null),
+            failureKind = FailureKind.NONE,
+            suspect = false,
+            checkDomain = false,
+        )
+        assertEquals(emptyList<String>(), names)
+    }
+}

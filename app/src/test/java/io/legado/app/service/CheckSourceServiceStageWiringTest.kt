@@ -49,14 +49,9 @@ class CheckSourceServiceStageWiringTest {
     fun failureGroupingIsUnchanged() {
         val t = code()
         // 观测层不得改变既有分组/权重判定（回归护栏）。
-        // 缺口6（死代码/重复口径）后分组名收口到**单源** `SourceCheckGroups` ⇒ 本断言改为锁定
-        // "经常量引用"，字面量本身由 `SourceCheckGroupsTest` 锁定 —— 双保险：分组名不变 + 判定路径不变
-        listOf("CHECK_TIMEOUT", "SCRIPT_FAIL", "SITE_FAIL").forEach {
-            assertTrue(
-                "既有失败分组引用丢失：SourceCheckGroups.$it",
-                t.contains("SourceCheckGroups.$it")
-            )
-        }
-        assertTrue("分组名词表须由单源提供", t.contains("import io.legado.app.model.SourceCheckGroups"))
+        // 缺口6 → 缺口2 两步收敛后：分组名不再由服务自带，归因/分组名均**委托单源底座** ——
+        // 字面量由 `SourceCheckGroupsTest` 锁定、归因与编排由 `SourceCheckFailureUnificationTest` 锁定（双保险）
+        assertTrue("归因须委托单源分类器", t.contains("QualityReportApplier.failureKindOf(e)"))
+        assertTrue("分组名须取自单源", t.contains("QualityReportApplier.failureKindGroup("))
     }
 }
