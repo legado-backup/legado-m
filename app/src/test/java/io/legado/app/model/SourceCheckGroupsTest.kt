@@ -40,6 +40,23 @@ class SourceCheckGroupsTest {
         assertEquals("列表失效", SourceCheckGroups.RSS_ARTICLES_FAIL)
         assertEquals("分类失效", SourceCheckGroups.RSS_SORT_FAIL)
         assertEquals("正文失效", SourceCheckGroups.RSS_CONTENT_FAIL)
+        assertEquals("重复源", SourceCheckGroups.RSS_DUPLICATE)
+    }
+
+    @Test
+    fun duplicateMarker_isNotInAutoCleanupSetByDesign() {
+        // 自动清除集判据＝`"失效" in group || group == "校验超时"`（RssSource.getInvalidGroupNames，
+        // 私有实现，JVM 不可直调）⇒ 用同一判据在常量上断言。两条都不满足 ⇒ 「重复源」**不会**被
+        // removeInvalidGroups() 自动清 ⇒ 必须由 CheckRssSourceService 每轮显式清一次
+        // （若日后把它改成"重复失效"，反而会推翻"去重标记不是失败结论"的语义）
+        assertFalse(
+            "去重标记不得落入自动清除判据（否则每轮会被清掉，去重结论丢失）",
+            SourceCheckGroups.RSS_DUPLICATE.contains("失效")
+        )
+        assertFalse(
+            "去重标记不得等于「校验超时」",
+            SourceCheckGroups.RSS_DUPLICATE == SourceCheckGroups.CHECK_TIMEOUT
+        )
     }
 
     @Test
