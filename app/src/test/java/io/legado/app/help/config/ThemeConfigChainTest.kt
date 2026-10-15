@@ -103,24 +103,23 @@ class ThemeConfigChainTest {
     }
 
     @Test
-    fun retiredBottomWallpaperSaveEntryStaysDeletedAndLivePathRemains() {
-        // B30 死码清理（2026-10-16）：`saveBottomWallpaperToPackage` 零调用（连族内亦无），其能力
-        // （壁纸复制进包目录 + 默认包只读拦截）已被**活路径**完整覆盖 —— UI 写绝对路径 →
-        // `addOrUpdate` 内 `normalizeWallpaperPath` 复制进包 + UI 侧只读校验
-        // （`NavigationBarManageActivity` :497/:893/:1228）⇒ 属**被取代**。
-        // **成对核对（B25 教训）**：同族 `clearBottomWallpaper` 含「物理删除包内壁纸」独有能力
-        // （活路径置 null 时不清理 ⇒ 无活替代者）⇒ **保留**，故本用例为**双侧断言**。
-        assertFalse(
-            "被取代的重复保存入口不得回潮",
+    fun bottomWallpaperPackageHelpersStayForPendingWiring() {
+        // B30 **更正**（2026-10-16）：这两个 helper 一度被按「被取代」判死（我已提交退役），复核证明**误判** ——
+        // 关键证据：`addOrUpdate`(:302) 只调 `normalizeConfig`(:1272)（纯字段归一、**不复制壁纸进包**）；
+        // 全文件唯一调「复制进包」的 `normalizeWallpaperPath`(:1298) 的活路径是 `copyEntryForMode`(:325)。
+        // ⇒ UI 现行＝**绝对路径引用**模式（裁剪产物不随包），helper＝**壁纸随包（相对名）**模式 ⇒ **存储模式不同、无活替代者**
+        // ⇒ 按「无活替代 ⇒ 保留」处置，**禁止当死码删**（B24 教训）。本用例为该结论的**永久防回退**断言。
+        assertTrue(
+            "壁纸随包模式的保存入口须保留（未接线，无活替代者）",
             navIconConfig.contains("fun saveBottomWallpaperToPackage(")
         )
         assertTrue(
-            "活单源 normalizeWallpaperPath 须仍在（壁纸入包能力的唯一实现）",
-            navIconConfig.contains("private fun normalizeWallpaperPath(")
+            "壁纸随包模式的清理入口须保留（未接线，无活替代者）",
+            navIconConfig.contains("fun clearBottomWallpaper(entry: Entry): Entry")
         )
         assertTrue(
-            "clearBottomWallpaper 含独有物理清理能力，须保留（无活替代者）",
-            navIconConfig.contains("fun clearBottomWallpaper(entry: Entry): Entry")
+            "跨日夜模式复制路径须仍在（唯一调用 normalizeWallpaperPath 的活路径）",
+            navIconConfig.contains("normalizeWallpaperPath(source.wallpaperPath, dir)")
         )
     }
 }
