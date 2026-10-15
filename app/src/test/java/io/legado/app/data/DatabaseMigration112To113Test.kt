@@ -39,16 +39,49 @@ class DatabaseMigration112To113Test {
         "`elapsedMs` INTEGER NOT NULL"
     )
 
+    /**
+     * 「版本 = 链长」不变量（R0 三查铁律之一）。
+     *
+     * 原先本用例把字面量 `version = 113` 钉死 ⇒ **每次 DB 升版都必红**（本轮 113→114 即实证）。
+     * 改为**从源码派生当前版本**后断言迁移链自洽，此后升版无需再改本用例，且仍保留
+     * 「112→113 已落地」的证据口径（`version >= 113`）。
+     */
     @Test
-    fun databaseVersionIsBumpedTo113() {
-        assertTrue("AppDatabase version 须为 113", appDatabase.contains("version = 113"))
+    fun databaseVersionMatchesMigrationChain() {
+        val match = Regex("""version\s*=\s*(\d+)""").find(appDatabase)
+        assertTrue("AppDatabase 须声明 @Database(version = N)", match != null)
+        val version = match!!.groupValues[1].toInt()
+        assertTrue("版本不可回退（须 ≥ 113）", version >= 113)
+        val migrationName = "migration_${version - 1}_$version"
+        assertTrue("版本=链长：迁移数组须登记 $migrationName", migrations.contains(migrationName))
+        assertTrue(
+            "须定义 Migration(${version - 1}, $version)",
+            migrations.contains("Migration(${version - 1}, $version)")
+        )
+        assertTrue("老库升级链须自首版 89 起完整", migrations.contains("migration_89_90"))
         assertTrue("实体须登记 McpAudit", appDatabase.contains("McpAudit::class"))
         assertTrue("DAO 须暴露 mcpAuditDao", appDatabase.contains("abstract val mcpAuditDao"))
-        assertTrue("迁移数组须登记 migration_112_113", migrations.contains("migration_112_113"))
-        assertTrue(
-            "迁移对象须为 Migration(112, 113)",
-            migrations.contains("private val migration_112_113 = object : Migration(112, 113)")
-        )
+    }
+
+    /**
+     * 当前版本 schema 快照须已导出，且含「113 已落地的 mcp_audit」与「114 新增的
+     * `highlights.chapterUrl` 锚」—— 缺任一则 Room 运行时 schema 校验无从比对。
+     */
+    @Test
+    fun schemaSnapshotForCurrentVersionIsExported() {
+        val version = Regex("""version\s*=\s*(\d+)""").find(appDatabase)!!.groupValues[1]
+        val schema = listOf(
+            File("schemas/io.legado.app.data.AppDatabase/$version.json"),
+            File("../app/schemas/io.legado.app.data.AppDatabase/$version.json"),
+            File("app/schemas/io.legado.app.data.AppDatabase/$version.json")
+        ).firstOrNull { it.isFile }
+        assertTrue("G-12 ①：$version.json 必须已由 Room 导出", schema != null)
+        val text = schema!!.readText()
+        assertTrue("schema 须含 mcp_audit 表", text.contains("mcp_audit"))
+        assertTrue("schema 须含 target 列", text.contains("target"))
+        assertTrue("schema 须含 elapsedMs 列", text.contains("elapsedMs"))
+        assertTrue("schema 须含 highlights 表", text.contains("\"tableName\": \"highlights\""))
+        assertTrue("schema 须含 chapterUrl 列（划线跨目录重排锚）", text.contains("\"chapterUrl\""))
     }
 
     @Test
@@ -71,20 +104,9 @@ class DatabaseMigration112To113Test {
 
     // 实体 / DAO 的字段级契约已迁到其**所属包**：`data/entities/McpAuditEntityTest` 与
     // `data/dao/McpAuditDaoContractTest`（改码↔测试配对要求同包有测试变更，且就近断言更易维护）。
-
-    @Test
-    fun schemaSnapshotForNewVersionIsExported() {
-        val schema = listOf(
-            File("schemas/io.legado.app.data.AppDatabase/113.json"),
-            File("../app/schemas/io.legado.app.data.AppDatabase/113.json"),
-            File("app/schemas/io.legado.app.data.AppDatabase/113.json")
-        ).firstOrNull { it.isFile }
-        assertTrue("G-12 ①：113.json 必须已由 Room 导出", schema != null)
-        val text = schema!!.readText()
-        assertTrue("schema 须含 mcp_audit 表", text.contains("mcp_audit"))
-        assertTrue("schema 须含 target 列", text.contains("target"))
-        assertTrue("schema 须含 elapsedMs 列", text.contains("elapsedMs"))
-    }
+    // 原 `schemaSnapshotForNewVersionIsExported`（钉死 113.json）已由上方**版本派生**的
+    // `schemaSnapshotForCurrentVersionIsExported` 取代 —— 后者同时断言 mcp_audit 与 chapterUrl，
+    // 且升版无需再改本文件。
 
     @Test
     fun destructiveFallbackIsNotEnabled() {
