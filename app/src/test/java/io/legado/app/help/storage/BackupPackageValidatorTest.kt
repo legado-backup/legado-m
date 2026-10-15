@@ -11,15 +11,23 @@ import java.nio.file.Files
 /**
  * core-flow-test-coverage 批次 5 —— 备份包完整性校验行为用例（G-01 配对 / G-42 行为断言）。
  *
- * 口径要点：**选择性备份合法**（只勾「书源」等部分类别时，包内缺 bookshelf.json 等条目
- * 属正常）⇒ 校验必须放行；只有"一条已知条目都没有"或"明文 JSON 被写坏"才拦。
+ * 口径要点：**选择性备份合法**（只勾部分类别时，包内会缺其余条目，属正常）⇒ 必须放行；
+ * 只有"一条已知条目都没有"或"明文 JSON 被写坏"才拦。
+ *
+ * ⚠️ 本轮两次修正均由此用例集守住（都属"自造误杀"）：
+ *  ① 只勾「书源」等 JSON 类目（包内无 `bookshelf.json`）⇒ 曾因强判必需项被整体拒绝；
+ *  ② 只勾**非 JSON** 类目（封面图集 / 背景图片 / 书籍缓存 / `config.xml`）⇒ 曾因"已知条目
+ *     只统计 `.json`"而被判空包整体拒绝。
  */
 class BackupPackageValidatorTest {
 
     private val roots = mutableListOf<File>()
 
-    /** 模拟 `BackupSelectorConfig.allItems` 派生出的已知条目清单 */
-    private val known = listOf("bookshelf.json", "bookSource.json", "highlights.json", "servers.json")
+    /** 模拟 `BackupSelectorConfig.allItems` 派生出的已知条目清单（含目录与 XML） */
+    private val known = listOf(
+        "bookshelf.json", "bookSource.json", "highlights.json", "servers.json",
+        "config.xml", "bg", "book_cache"
+    )
 
     private fun tempRoot(): File {
         val dir = Files.createTempDirectory("backup-validator").toFile()
@@ -35,7 +43,7 @@ class BackupPackageValidatorTest {
 
     @Test
     fun selectiveBackup_withoutBookshelf_passes() {
-        // 回归用例：用户「只备份书源」⇒ 包内没有 bookshelf.json，不得因此拒绝恢复
+        // 用户「只备份书源」⇒ 包内没有 bookshelf.json，不得因此拒绝恢复
         val root = tempRoot()
         File(root, "bookSource.json").writeText("""[{"bookSourceName":"源A"}]""")
 
@@ -43,6 +51,33 @@ class BackupPackageValidatorTest {
 
         assertTrue("选择性备份必须放行", report.ok)
         assertEquals(listOf("bookSource.json"), report.present)
+        assertEquals(emptyList<String>(), report.malformed)
+    }
+
+    @Test
+    fun nonJsonOnlyBackup_passes() {
+        // 用户只勾非 JSON 类目（配置 XML + 背景图片目录）⇒ 包内无任何 .json，不得判空包
+        val root = tempRoot()
+        File(root, "config.xml").writeText("<map/>")
+        File(root, "bg").mkdirs()
+
+        val report = BackupPackageValidator.validate(root, known)
+
+        assertTrue("仅非 JSON 类目的选择性备份必须放行", report.ok)
+        assertEquals(listOf("config.xml", "bg"), report.present)
+        assertEquals(emptyList<String>(), report.malformed)
+    }
+
+    @Test
+    fun directoryOnlyBackup_passes() {
+        // 仅书籍缓存目录：目录条目不得被当 JSON 解析（强判会抛异常并误判损坏）
+        val root = tempRoot()
+        File(root, "book_cache").mkdirs()
+
+        val report = BackupPackageValidator.validate(root, known)
+
+        assertTrue(report.ok)
+        assertEquals(listOf("book_cache"), report.present)
         assertEquals(emptyList<String>(), report.malformed)
     }
 
