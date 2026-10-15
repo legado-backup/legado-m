@@ -138,4 +138,83 @@ class SourceCheckFailureUnificationTest {
         )
         assertEquals(emptyList<String>(), names)
     }
+
+    // ---------- 旧服务结果 → 维度态适配器（缺口2 第二步的内核；断言口径＝旧内联语义） ----------
+
+    private fun namesOf(result: BookCheckResult, checkDomain: Boolean = false): List<String> =
+        QualityReportApplier.failureGroupNames(
+            dims = QualityReportApplier.bookResultToDimStates(result),
+            failureKind = FailureKind.NONE,
+            suspect = false,
+            checkDomain = checkDomain,
+        )
+
+    @Test
+    fun adapter_searchFailed_givesNoCatalogConclusion() {
+        // 旧内联：搜索失败时只打「搜索失效」，**不判**目录/正文（否则会同时出现 搜索失效+搜索目录失效）
+        val result = BookCheckResult(searchChecked = true, searchSuccess = false)
+        assertEquals(listOf(SourceCheckGroups.SEARCH_FAIL), namesOf(result))
+    }
+
+    @Test
+    fun adapter_searchSuccess_judgesCatalogAndContent() {
+        val result = BookCheckResult(
+            searchChecked = true,
+            searchSuccess = true,
+            searchCategorySuccess = false,
+            searchContentSuccess = true,
+        )
+        assertEquals(listOf(SourceCheckGroups.SEARCH_CATEGORY_FAIL), namesOf(result))
+    }
+
+    @Test
+    fun adapter_discoverySourced_usesDiscoveryDimNames() {
+        val result = BookCheckResult(
+            discoveryChecked = true,
+            discoverySuccess = true,
+            discoveryCategorySuccess = false,
+            discoveryContentSuccess = true,
+        )
+        assertEquals(listOf(SourceCheckGroups.DISCOVERY_CATEGORY_FAIL), namesOf(result))
+    }
+
+    @Test
+    fun adapter_discoveryFailed_doesNotEmitDiscoveryCatalogGroups() {
+        val result = BookCheckResult(discoveryChecked = true, discoverySuccess = false)
+        assertEquals(listOf(SourceCheckGroups.DISCOVERY_FAIL), namesOf(result))
+    }
+
+    @Test
+    fun adapter_ruleEmpty_takesRuleEmptyGroups() {
+        val result = BookCheckResult(
+            searchChecked = true,
+            searchUrlEmpty = true,
+            discoveryChecked = true,
+            discoveryRuleEmpty = true,
+        )
+        assertEquals(
+            listOf(SourceCheckGroups.SEARCH_URL_EMPTY, SourceCheckGroups.DISCOVERY_RULE_EMPTY),
+            namesOf(result)
+        )
+    }
+
+    @Test
+    fun adapter_domainReachable_noDomainGroupEvenWhenChecked() {
+        // 域名可达 ⇒ 不打「域名失效」；目录/正文均通过 ⇒ 三组皆无
+        val result = BookCheckResult(
+            domainReachable = true,
+            searchChecked = true,
+            searchSuccess = true,
+            searchCategorySuccess = true,
+            searchContentSuccess = true,
+        )
+        assertTrue(namesOf(result, checkDomain = true).isEmpty())
+    }
+
+    @Test
+    fun adapter_domainUnreachable_withCheckDomain_addsDomainGroup() {
+        val result = BookCheckResult(domainReachable = false)
+        assertEquals(listOf(SourceCheckGroups.DOMAIN_FAIL), namesOf(result, checkDomain = true))
+        assertTrue("域名校验关闭时不得因不可达打组", namesOf(result, checkDomain = false).isEmpty())
+    }
 }
