@@ -1,42 +1,40 @@
 package io.legado.app.ui.book.read.textweb
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 沙箱状态日志门禁行为用例（G-01 配对 / G-42 行为断言）。
+ * 沙箱状态日志限频门禁行为用例（G-01 配对 / G-42 行为断言）。
  *
- * 覆盖：状态名抽取（含逗号 / 不含逗号）+ 首次输出 / 同状态名抑制 / 状态名变化放行。
+ * 真值表：时间窗内一律抑制（含状态名变化的情形——真机实测 634 行/6 秒属两状态名交替，
+ * 故"变化就放行"的口径无效）；达到或超过间隔才放行。
  */
 class RenderStateLogGateTest {
 
     @Test
-    fun stateTag_takesTokenBeforeComma() {
-        assertEquals(
-            "settle",
-            RenderStateLogGate.stateTag("settle,shell=opening,body=0,page=0/28,h=490,slotTop=210")
-        )
+    fun zeroElapsed_isRejected() {
+        assertFalse(RenderStateLogGate.shouldLog(0L))
     }
 
     @Test
-    fun stateTag_withoutComma_returnsWhole() {
-        assertEquals("ready", RenderStateLogGate.stateTag("ready"))
+    fun justBelowInterval_isRejected() {
+        assertFalse(RenderStateLogGate.shouldLog(RenderStateLogGate.MIN_INTERVAL_MS - 1))
     }
 
     @Test
-    fun firstReport_isLogged() {
-        assertTrue(RenderStateLogGate.shouldLog(null, "settle"))
+    fun exactlyAtInterval_isAllowed() {
+        assertTrue(RenderStateLogGate.shouldLog(RenderStateLogGate.MIN_INTERVAL_MS))
     }
 
     @Test
-    fun sameStateTag_isSuppressed() {
-        assertFalse(RenderStateLogGate.shouldLog("settle", "settle"))
+    fun wellBeyondInterval_isAllowed() {
+        assertTrue(RenderStateLogGate.shouldLog(5_000L))
     }
 
     @Test
-    fun changedStateTag_isLogged() {
-        assertTrue(RenderStateLogGate.shouldLog("opening", "settle"))
+    fun customInterval_isRespected() {
+        assertTrue(RenderStateLogGate.shouldLog(100L, 100L))
+        assertFalse(RenderStateLogGate.shouldLog(99L, 100L))
     }
 }
