@@ -27,6 +27,9 @@ class BackupRestoreParityTest {
             "floatingBottomBarHideSearch",   // 2026-09-27 底栏悬浮搜索按钮裁决
             "downloadDismissedIds",          // 2026-10-15 死件普查（能力已由 DB 承载）
             "highlightRuleBuiltinMergedV2",  // 2026-10-15 死件普查（一次性迁移标志，使命已完成）
+            // NEW-52（2026-10-16）：「设置项形同虚设」审计命中 —— 两项功能已迁移，键与 XML 条目均已删
+            "cleanCache",
+            "clearWebViewData",
         ).forEach { key ->
             assertTrue("已退役键必须纳入 ignorePrefKeys（防写回）：$key", cfg.contains("\"$key\""))
         }
