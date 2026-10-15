@@ -58,4 +58,20 @@ class RetiredPreferKeyTest {
         )
         assertTrue("忽略清单须为字符串数组", backupConfig.contains("private val ignorePrefKeys = arrayOf("))
     }
+
+    @Test
+    fun deadKeysFromSweepAreFullyRetired() {
+        // 2026-10-15 死件普查（扩大测试基准第三轮）：两键**全仓零读取**（代码引用与字面量通道皆无）
+        // ⇒ 按本测试类 KDoc 的「删键三处」约定处置：删声明 + 纳入 ignorePrefKeys + 无消费点
+        listOf("downloadDismissedIds", "highlightRuleBuiltinMergedV2").forEach { key ->
+            assertFalse(
+                "已删键仍声明在 PreferKey（成为死键）：$key",
+                preferKey.contains("const val $key =")
+            )
+            assertTrue(
+                "旧备份中的已删键必须纳入 ignorePrefKeys（防写回）：$key",
+                backupConfig.contains("\"$key\"")
+            )
+        }
+    }
 }
