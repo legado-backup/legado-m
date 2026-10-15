@@ -1,7 +1,10 @@
 package io.legado.app.help.http
 
+import io.legado.app.help.globalExecutor
+import io.legado.app.help.logExecutor
 import okhttp3.Headers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -71,5 +74,16 @@ class NetworkLogTest {
         assertEquals("全局", NetworkLog.displaySource(null))
         assertEquals("全局", NetworkLog.displaySource(""))
         assertEquals("书源A", NetworkLog.displaySource("书源A"))
+    }
+
+    /**
+     * 网络日志落盘（`persist`）走的是 `logExecutor`，必须与业务执行器（`globalExecutor`）**不是同一个**：
+     * 开启网络日志后每次请求都会写盘，若与正文解析共用同一条单线程队列，会把正文处理排在后面
+     *（用户可感：开日志时阅读/搜索变慢）。本断言锁住这次职责分离不被合回。
+     */
+    @Test
+    fun logPersistExecutorIsSeparatedFromModelExecutor() {
+        assertNotSame(globalExecutor, logExecutor)
+        assertNotSame(globalExecutor, io.legado.app.help.glideExecutor)
     }
 }
