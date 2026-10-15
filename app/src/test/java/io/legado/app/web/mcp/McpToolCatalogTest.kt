@@ -98,14 +98,14 @@ class McpToolCatalogTest {
     @Test
     fun toolCount_matchesLandedScope() {
         // tasks 2.26（分期口径 · 与决策 #25 一致）：以**逐工具清单实测数**为准，禁止为凑目标数增删工具。
-        // release 面 = 19 个域文件声明的 **217** 个（三期缺口补齐新增 `legado_ping` 连通性自检探针
+        // release 面 = 19 个域文件声明的 **218** 个（三期缺口补齐新增 `legado_ping` 连通性自检探针
         // —— 见 FEATURE-MATRIX L11 / 三期 tasks 2.15.3）；debug 面另含 14 个 L3 调试工具
-        // （tasks 5.12：perf 1 + 源/订阅调试 9 + 诊断 4）⇒ 231。
-        // **口径说明（2026-09-29）**：三期补记的 7 条路由（书签删除 / 名场面 / HTTP TTS 增删）
-        // 只补 **HTTP 路由**（前端控制台接线），**未**新增 MCP 工具 ⇒ 本计数不变
-        // （`ApiRoute.mcpToolName` 仅为 REST↔MCP 对拍标注，不产生工具，故这 7 条不带该标注）。
-        val expected = if (BuildConfig.BUILD_DEBUG) 231 else 217
-        assertEquals("工具总数须与已落地域一致（release 217 / debug 231）", expected, McpToolCatalog.all().size)
+        // （tasks 5.12：perf 1 + 源/订阅调试 9 + 诊断 4）⇒ 232。
+        // **口径说明（2026-10-15，缺口4 后半）**：新增 **1 个 release 面只读工具** `source_check_report`
+        // （书源域：读最近一次「校验所选」巡检的结构化结果；REST `/getCheckSourceReport` 以
+        // `ApiRoute.mcpToolName` 与之对拍）⇒ 计数 217→218 / 231→232。
+        val expected = if (BuildConfig.BUILD_DEBUG) 232 else 218
+        assertEquals("工具总数须与已落地域一致（release 218 / debug 232）", expected, McpToolCatalog.all().size)
     }
 
     @Test
