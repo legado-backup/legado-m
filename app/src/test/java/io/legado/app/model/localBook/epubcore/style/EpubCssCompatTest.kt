@@ -82,6 +82,17 @@ class EpubCssCompatTest {
     }
 
     @Test
+    fun `被取代的 isRenderable 已退役（活替代 = resolvePropertyName）`() {
+        // NEW-86：isRenderable 全仓零引用，且有活替代 resolvePropertyName（归一 + 判定一步到位）⇒ 已删。
+        // 行为锚点 + 防回流断言：前者证明活替代可用，后者防止死判据重新长回来。
+        assertEquals("text-indent", EpubCssCompat.resolvePropertyName("duokan-text-indent", isSupported))
+        val src = io.legado.app.testkit.SourceFileProbe.sourceText(
+            "model/localBook/epubcore/style/EpubCssCompat.kt"
+        )
+        assertFalse("isRenderable 不得回流", src.contains("fun isRenderable("))
+    }
+
+    @Test
     fun `parseDeclarations 不丢弃非正文属性以支持 at-font-face`() {
         val declarations = EpubCss.parseDeclarations(
             "font-family: 'MyFont'; src: url(font.ttf); unicode-range: U+0000-00FF; font-weight: 700"

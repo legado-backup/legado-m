@@ -35,4 +35,26 @@ class EpubRetiredStyleHelperTest {
         assertEquals("活实现 boxPadding 必须保留", true,
             layout.contains("fun EpubComputedStyle.boxPadding("))
     }
+
+    @Test
+    fun `NEW-86 零引用被取代判据退役且活实现仍在`() {
+        // 分诊结论（audit_zero_ref_fun + 全仓 grep 交叉）：两条「零引用 + 有活替代」判据 ⇒ 已删。
+        // ⚠️ 本断言守护的是「死判据不得回流」，同时守住活实现不被误删。
+        val compat =
+            code("src/main/java/io/legado/app/model/localBook/epubcore/style/EpubCssCompat.kt")
+        assertEquals(
+            "被取代的 isRenderable 应退役（活替代 = resolvePropertyName 归一+判定一步到位）",
+            false,
+            compat.contains("fun isRenderable(")
+        )
+        assertEquals("活实现 resolvePropertyName 必须保留", true, compat.contains("fun resolvePropertyName("))
+
+        val dom = code("src/main/java/io/legado/app/model/localBook/EpubDom.kt")
+        assertEquals(
+            "被取代的 withoutInheritedTextIndent 应退役（活替代 = inheritedOnly）",
+            false,
+            dom.contains("fun withoutInheritedTextIndent(")
+        )
+        assertEquals("活实现 inheritedOnly 必须保留", true, dom.contains("fun inheritedOnly("))
+    }
 }
