@@ -2,6 +2,7 @@ package io.legado.app.model
 
 import com.script.ScriptException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.testkit.SourceFileProbe
 import kotlinx.coroutines.TimeoutCancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -261,5 +262,29 @@ class SourceCheckFailureUnificationTest {
         assertEquals(listOf(SourceCheckGroups.SEARCH_URL_EMPTY), clear)
         assertEquals(listOf(SourceCheckGroups.DISCOVERY_RULE_EMPTY), add)
         assertTrue("清空集与新增集必须不相交", clear.toSet().intersect(add.toSet()).isEmpty())
+    }
+
+    // ---------- 批 8：体检侧「口径漂移的旧归因分类器」退役护栏 ----------
+
+    /**
+     * 退役项＝`SourceQualityChecker.classifyCheckFailure`（公开壳）+ `classifyFailure`（私有实现）。
+     * 退役依据：两者**全仓零调用**（服务侧按 NEW-102 已改用 `QualityReportApplier.failureKindOf`），
+     * 且其口径**与唯一来源漂移** —— 缺 `NoStackTraceException` → `NONE` 分支，会把引擎侧已定性的
+     * 业务异常误判成"网络/网站失效"。
+     */
+    @Test
+    fun `体检侧漂移分类器已退役且归因唯一来源仍是failureKindOf`() {
+        val checkerSrc = SourceFileProbe.sourceText("model/SourceQualityChecker.kt")
+        assertEquals("漂移口径公开壳 classifyCheckFailure 不得回潮", false, checkerSrc.contains("classifyCheckFailure"))
+        assertEquals("漂移口径私有实现 classifyFailure 不得回潮", false, checkerSrc.contains("fun classifyFailure"))
+        val applierSrc = SourceFileProbe.sourceText("model/QualityReportApplier.kt")
+        assertTrue(
+            "归因唯一来源 failureKindOf 必须保留",
+            applierSrc.contains("fun failureKindOf(e: Throwable)")
+        )
+        assertTrue(
+            "唯一来源必须保留业务异常短路分支（防口径再漂移）",
+            applierSrc.contains("else -> FailureKind.NONE")
+        )
     }
 }
