@@ -23,6 +23,18 @@ class PhotoDialogSsivTrackTest {
     private val dialog by lazy { read("src/main/java/io/legado/app/ui/widget/dialog/PhotoDialog.kt") }
     private val layout by lazy { read("src/main/res/layout/dialog_photo_view.xml") }
 
+    /**
+     * 批 7 死码收口：`CommentWebViewSession.releaseAfterDelay(delayMillis)` 全仓零调用，其 body 仅
+     * 转调 `destroy()` 且 `delayMillis` **从未被使用**（死参数）⇒ 已退役。
+     * 双侧断言：死判据不得回潮 + 活替代 `destroy()` 必须健在（只证一侧防不住误伤活方）。
+     */
+    @Test
+    fun retiredReleaseAfterDelayStaysRemovedAndDestroyKeeps() {
+        val session = read("src/main/java/io/legado/app/ui/widget/dialog/CommentWebViewSession.kt")
+        assertFalse("死判据不得回潮", session.contains("fun releaseAfterDelay("))
+        assertTrue("活替代 destroy 必须健在", session.contains("fun destroy()"))
+    }
+
     @Test
     fun viewIsSubsamplingScaleImageViewAndNoPhotoViewLeft() {
         assertTrue("布局须换成 SSIV", layout.contains("com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView"))
