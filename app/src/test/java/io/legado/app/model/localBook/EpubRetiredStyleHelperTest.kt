@@ -57,4 +57,15 @@ class EpubRetiredStyleHelperTest {
         )
         assertEquals("活实现 inheritedOnly 必须保留", true, dom.contains("fun inheritedOnly("))
     }
+
+    @Test
+    fun `NEW-86 续批 4 —— 未用包装已退役且活实现仍在`() {
+        // `EpubCss.normalizeSupportedStyle` = `normalizeSupportedDeclarations(...).toStyleString()` 纯包装，
+        // 全仓零引用；其被包装的活实现（`normalizeSupportedDeclarations` / `toStyleString`）均在活路径。
+        val css = code("src/main/java/io/legado/app/model/localBook/EpubCss.kt")
+        assertEquals("未用包装 normalizeSupportedStyle 应退役", false,
+            css.contains("fun normalizeSupportedStyle("))
+        assertEquals("活实现 normalizeSupportedDeclarations 必须保留", true,
+            css.contains("fun normalizeSupportedDeclarations("))
+    }
 }
