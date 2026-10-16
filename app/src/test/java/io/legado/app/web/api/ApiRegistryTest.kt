@@ -41,9 +41,10 @@ class ApiRegistryTest {
         // —— 均为内核/MCP 工具已有、当时只差 HTTP 路由 ⇒ 前端只能降级）
         // + **第 5 轮 UX/IA 重构 9 条**（订阅管理补全，见 `RssRoutes.kt` / IF-20）
         // + **第 5 轮 UX/IA 重构 4 条**（应用设置域补全，见 `AppSettingsRoutes.kt` / IF-22）
-        // + **1 条**（缺口4 后半：`/getCheckSourceReport` 巡检结果读出，见 `DebugRoutes.kt` B11）= 201。
+        // + **1 条**（缺口4 后半：`/getCheckSourceReport` 巡检结果读出，见 `DebugRoutes.kt` B11）
+        // + **1 条**（B12：`/startCheckSource` 启动内置巡检，外部端到端巡检由此消费 App 统一结论）= 202。
         // 新增端点时须同步此常量（tasks 三期 §1 收尾项）。
-        assertEquals("路由总数 = 一期 28 + 二期 3 + 三期 144 + 四期 3 + 三期补记 9 + 第 5 轮 9 + 第 5 轮 4 + 缺口4 1", 201, ApiRegistry.size)
+        assertEquals("路由总数 = 一期 28 + 二期 3 + 三期 144 + 四期 3 + 三期补记 9 + 第 5 轮 9 + 第 5 轮 4 + 缺口4 1 + B12 1", 202, ApiRegistry.size)
         assertTrue(ApiRouteBootstrap.isInstalled)
     }
 
@@ -64,7 +65,7 @@ class ApiRegistryTest {
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
         ApiRouteBootstrap.install()
-        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 201, ApiRegistry.size)
+        assertEquals("重复调用不得重复注册（5.10 幂等要求）", 202, ApiRegistry.size)
     }
 
     @Test
@@ -146,7 +147,7 @@ class ApiRegistryTest {
             ApiRoute(Method.GET, probePath, Level.READONLY) { ReturnData().setData("ok") }
         )
 
-        assertEquals("新增 1 条须叠加在原 201 条之上（互不干扰）", 202, ApiRegistry.size)
+        assertEquals("新增 1 条须叠加在原 202 条之上（互不干扰）", 203, ApiRegistry.size)
         val route = ApiRegistry.find(Method.GET, probePath)
         assertNotNull("声明即注册 ⇒ 查表立即可达", route)
 
