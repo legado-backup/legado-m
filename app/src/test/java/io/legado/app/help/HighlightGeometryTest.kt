@@ -68,4 +68,21 @@ class HighlightGeometryTest {
         assertTrue("显式设形状即非矩形",
             HighlightStyle(fill = 1, fillShape = HighlightStyle.FillShape.PILL).hasNonRectFillShape)
     }
+
+    @Test
+    fun `退役判据不得回流（NEW-86 续）`() {
+        // 两条「零引用 + 有活替代」判据已删（audit_zero_ref_fun 分诊）：
+        //   HighlightPalette.colorOrZero（纯别名，活替代 = color）
+        //   HighlightGeometry.emphasisDots（被 R1a 填充带取代，同族 fillBand/pillRadiusX 活跃）
+        // 断言 = 死判据不得回流 + 活实现必须保留。
+        val geometry =
+            io.legado.app.testkit.SourceFileProbe.sourceText("help/HighlightGeometry.kt")
+        assertEquals("emphasisDots 不得回流", false, geometry.contains("fun emphasisDots("))
+        assertEquals("活实现 fillBand 必须保留", true, geometry.contains("fun fillBand("))
+
+        val palette =
+            io.legado.app.testkit.SourceFileProbe.sourceText("help/HighlightPalette.kt")
+        assertEquals("colorOrZero 不得回流", false, palette.contains("fun colorOrZero("))
+        assertEquals("活实现 color 必须保留", true, palette.contains("fun color(slot: String?"))
+    }
 }
