@@ -1,6 +1,8 @@
 package io.legado.app.help.readaloud.speech
 
+import io.legado.app.testkit.SourceFileProbe
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +68,40 @@ class SpeechRouteResolveTest {
     fun unknownEngineTypeFallsBackToDefault() {
         val raw = """{"engineType":"quantum","engineValue":"x"}"""
         assertEquals(SpeechRoute.ENGINE_DEFAULT, SpeechRoute.resolveSpeechRoute(raw).engineType)
+    }
+
+    /**
+     * 批 7（D 档单源化收口）：`SpeechVoiceCatalogParser.flattenSpeakers` 曾被两处**逐字手写复刻**
+     * （`SpeechVoiceGroupRepository` / `SpeechRouteSanitizer` 的 `parseSpeakerGroups(..).flatMap { it.items }`）
+     * ⇒ 零引用分诊判 D（调用点漏用封装，删封装会把「3 处副本」变成「2 处副本 + 无主运算」）。
+     * 本断言锁定封装语义（含无效项剔除与分组归属透传），文本探针锁定手写复刻不得回潮。
+     */
+    @Test
+    fun flattenSpeakers_flattensValidItemsAndKeepsGroupInfo() {
+        val json = """[{"groupId":"g1","groupName":"分组一","items":[
+            {"speakerName":"甲","toneID":"t1"},
+            {"speakerName":"乙","toneId":"t2"},
+            {"speakerName":"","toneID":"t3"}
+        ]}]"""
+        val speakers = SpeechVoiceCatalogParser.flattenSpeakers(json)
+        assertEquals("须剔除 speakerName 为空的无效项", 2, speakers.size)
+        assertEquals(listOf("甲", "乙"), speakers.map { it.speakerName })
+        assertEquals(listOf("t1", "t2"), speakers.map { it.toneID })
+        assertEquals("分组归属须透传", "g1", speakers.first().groupId)
+        assertEquals(
+            "空/畸形 JSON 不得抛异常",
+            emptyList<SpeechSpeaker>(),
+            SpeechVoiceCatalogParser.flattenSpeakers("{"),
+        )
+    }
+
+    @Test
+    fun handWrittenSpeakerFlatteningStaysRetiredAtBothCallSites() {
+        val repository = SourceFileProbe.sourceText("help/readaloud/speech/SpeechVoiceGroupRepository.kt")
+        assertFalse("调用点手写复刻不得回潮", repository.contains(".flatMap { it.items }"))
+        val sanitizer = SourceFileProbe.sourceText("help/readaloud/speech/SpeechRouteSanitizer.kt")
+        assertFalse("调用点手写复刻不得回潮", sanitizer.contains(".flatMap { it.items }"))
+        assertTrue("须改走单源封装", sanitizer.contains("flattenSpeakers(httpTTS.speakersJson)"))
+        assertTrue("须改走单源封装", repository.contains("flattenSpeakers(httpTts.speakersJson)"))
     }
 }
