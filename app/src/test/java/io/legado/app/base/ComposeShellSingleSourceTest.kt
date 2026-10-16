@@ -131,6 +131,32 @@ class ComposeShellSingleSourceTest {
     }
 
     /**
+     * NEW-72（2026-10-16）：工厂**单点注入主题作用域** —— attach 宿主不再逐个自包 `LegadoTheme`。
+     *
+     * 背景：G-37 全量普查在批 A/B 收敛后**仍有 41 个 `attachComposeContent` 宿主**顶层无主题作用域
+     * （`LegadoTheme` 只包顶栏 / 完全裸内容）⇒ 其子树 `MaterialTheme.colorScheme` 回落 M3 默认亮色基线，
+     * 夜间/主题包/自定义主题色下文字与光标不随主题。逐点改写需 N 处重排缩进且会再漏 ⇒ 收口到**工厂单点**，
+     * 该类缺陷在结构上不可能再出现。
+     *
+     * 本测试锁三件事：
+     *   ①`setContent` 内必须包 `LegadoTheme`（否则共享壳内 N 页同时回退）；
+     *   ②工厂内 **所有** `setContent` 调用都经该包装（不允许再有裸 `setContent(content)` 通道绕过）；
+     *   ③与门禁 G-37 的**自校验豁免**成对：移除本包装 ⇒ 41 个 attach 宿主立即重新按违规计（已实证：
+     *     `--all` 由 69 文件/71 处 回弹到 110 文件/114 处、豁免公示转为「不生效」）。
+     */
+    @Test
+    fun attachFactoryInjectsThemeScope() {
+        val factory = stripped(File(mainJavaRoot(), "io/legado/app/base/ComposeBindingShells.kt"))
+        val wrapped = Regex("setContent\\s*\\{\\s*LegadoTheme\\s*\\{").findAll(factory).count()
+        val setContentCalls = Regex("setContent\\s*[({]").findAll(factory).count()
+        assertEquals("工厂内 `setContent { LegadoTheme { … } }` 包装数量必须为 1", 1, wrapped)
+        assertEquals(
+            "工厂内所有 setContent 调用都必须经 LegadoTheme 包装（否则存在绕过通道）",
+            setContentCalls, wrapped
+        )
+    }
+
+    /**
      * `clearExistingChildren` 契约（2026-09-26 真机实测新增）。
      *
      * 背景：`SwipeRefreshLayout` 在**构造期**就把下拉指示器作为子视图加入（`refreshLayout.childCount`
