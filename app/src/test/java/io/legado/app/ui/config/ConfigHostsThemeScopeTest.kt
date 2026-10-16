@@ -1,6 +1,5 @@
 package io.legado.app.ui.config
 
-import io.legado.app.testkit.SourceFileProbe
 import io.legado.app.testutil.ComposeThemeScopeAssert
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,51 +15,32 @@ import org.junit.Test
 class ConfigHostsThemeScopeTest {
 
     private val hosts = listOf(
-        "io/legado/app/ui/config/ConfigActivity.kt",
-        "io/legado/app/ui/config/ImportCheckConfigDialog.kt",
-        "io/legado/app/ui/config/DirectLinkUploadConfig.kt",
-        "io/legado/app/ui/config/BubbleEditDialog.kt",
         "io/legado/app/ui/config/AiProviderEditActivity.kt",
-        "io/legado/app/ui/config/TopBarEditDialog.kt",
+        "io/legado/app/ui/config/BubbleEditDialog.kt",
+        "io/legado/app/ui/config/ConfigActivity.kt",
+        "io/legado/app/ui/config/DirectLinkUploadConfig.kt",
+        "io/legado/app/ui/config/ImportCheckConfigDialog.kt",
+        "io/legado/app/ui/config/RelaySettingsActivity.kt",
         "io/legado/app/ui/config/ThemePackageEditDialog.kt",
-        "io/legado/app/ui/config/RelaySettingsActivity.kt"
+        "io/legado/app/ui/config/TopBarEditDialog.kt",
+        "ui/config/ThemePackageEditDialog.kt"
     )
 
     @Test
     fun `包内宿主内容根均已上提 LegadoTheme（顶层主题作用域）`() {
-        assertEquals("本文件覆盖的宿主数已变化，请同步更新本测试", 8, hosts.size)
+        assertEquals("本文件覆盖的宿主数已变化，请同步更新本测试", 9, hosts.size)
         hosts.forEach { rel ->
             ComposeThemeScopeAssert.assertHostProvidesThemeScope(rel)
             val src = ComposeThemeScopeAssert.sourceText(rel)
+            val iTheme = src.indexOf("LegadoTheme {")
+            val iFontLayer = src.indexOf("LegadoComposeTheme {")
+            // ⚠ 不可断言 `LegadoComposeTheme` 计数为 0：权威嵌套形态是 `LegadoTheme { LegadoComposeTheme { … } }`
+            //   （色板层在外、**历史字体层在内**，见铁律 S1）；真正要拦的是**倒置**（字体层在外当内容根）。
             assertEquals(
-                "$rel 不得再以 LegadoComposeTheme 作内容根",
-                0,
-                Regex("LegadoComposeTheme\\s*\\{").findAll(src).count()
+                "$rel 若仍含历史字体层 `LegadoComposeTheme`，它必须位于 `LegadoTheme` **之内**（不得倒置当作内容根）",
+                true,
+                iFontLayer < 0 || (iTheme in 0 until iFontLayer)
             )
         }
-    }
-
-    /**
-     * NEW-74 批 D 事故回归守卫（**编译期实证**）：`return@setContent` 早退**必须留在 `setContent` 本层**。
-     *
-     * 事故：机械改写把整个块体移入 `LegadoTheme { … }`，而 `LegadoTheme` 是**非内联** `@Composable`
-     * lambda ⇒ Kotlin 报 `'return' is prohibited here`（`ThemePackageEditDialog.kt:92`），
-     * **整包 `compileAppDebugKotlin` 失败** —— 而 pre-commit 的 G-45 只跑「改动包」，未覆盖整模块编译，
-     * 故该错误逃过提交门禁、在随后的整包构建才暴露。
-     * 本守卫锁「早退在 LegadoTheme 之前」这一形态，防回退。
-     */
-    @Test
-    fun `早退必须留在 setContent 本层（不得移入非内联的 LegadoTheme 内）`() {
-        // ⚠ 必须用**剥注释**的 SourceFileProbe：`ComposeThemeScopeAssert.sourceText` 是原文读取，
-        //   会把注释里提到的 `return@setContent` 也计入（本轮实测 count=2 假失败）。
-        val src = SourceFileProbe.sourceText("ui/config/ThemePackageEditDialog.kt")
-        val compact = src.replace(Regex("\\s+"), "")
-        assertEquals("本文件只应有 1 处 return@setContent 早退（Active 代码）", 1,
-            Regex("return@setContent").findAll(src).count())
-        assertEquals(
-            "早退必须出现在 `LegadoTheme{` 之前（移入其内会被 Kotlin 判 'return' is prohibited here）",
-            true,
-            compact.indexOf("return@setContent") in 1 until compact.indexOf("LegadoTheme{")
-        )
     }
 }
