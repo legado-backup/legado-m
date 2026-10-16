@@ -22,13 +22,12 @@ class ConfigHostsThemeScopeTest {
         "io/legado/app/ui/config/ImportCheckConfigDialog.kt",
         "io/legado/app/ui/config/RelaySettingsActivity.kt",
         "io/legado/app/ui/config/ThemePackageEditDialog.kt",
-        "io/legado/app/ui/config/TopBarEditDialog.kt",
-        "ui/config/ThemePackageEditDialog.kt"
+        "io/legado/app/ui/config/TopBarEditDialog.kt"
     )
 
     @Test
     fun `包内宿主内容根均已上提 LegadoTheme（顶层主题作用域）`() {
-        assertEquals("本文件覆盖的宿主数已变化，请同步更新本测试", 9, hosts.size)
+        assertEquals("本文件覆盖的宿主数已变化，请同步更新本测试", 8, hosts.size)
         hosts.forEach { rel ->
             ComposeThemeScopeAssert.assertHostProvidesThemeScope(rel)
             val src = ComposeThemeScopeAssert.sourceText(rel)
