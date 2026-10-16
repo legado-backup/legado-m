@@ -111,4 +111,23 @@ class RetiredPreferKeyTest {
             )
         }
     }
+
+    @Test
+    fun deadResourceStringsStayRemoved() {
+        // NEW-91（2026-10-16）：`audit_dead_resource.py` 零引用扫描命中 ——
+        // `clear_cache_summary` / `clear_webview_data`(+`_summary`) 是 NEW-52 迁移（清除缓存并入缓存管理）
+        // 的**字符串残留**（当时只删了 pref 键与 XML 条目）；`folder_view` 属历史遗留。四者全仓零消费 ⇒ 退役。
+        listOf(
+            "src/main/res/values/strings.xml",
+            "src/main/res/values-zh/strings.xml"
+        ).forEach { rel ->
+            val res = read(rel)
+            listOf("clear_cache_summary", "clear_webview_data", "folder_view").forEach { name ->
+                assertFalse(
+                    "已退役字符串不得回流：$rel / $name",
+                    Regex("""name="$name"""").containsMatchIn(res)
+                )
+            }
+        }
+    }
 }

@@ -170,8 +170,8 @@ class ReadBookTemplateRoutingTest {
             s.contains("ReaderTemplateManager.templatesEnabled()")
         )
         assertTrue(
-            "文本类格式闸门须排除 EPUB 与音视频/图片/PDF（对齐 archive isOrdinaryText）",
-            s.contains("if (book.isEpub || book.isAudio || book.isVideo || book.isImage || book.isPdf) return false")
+            "文本类格式闸门须排除 EPUB 与音视频/图片/PDF（对齐 archive isOrdinaryText；判据已收口为单源）",
+            s.contains("if (!ReaderTemplateManager.isTextLikeContent(book)) return false")
         )
         assertTrue(
             "在线正文须先读内容缓存、未缓存时**按需下载**（archive 同口径；只读缓存会让冷启在线书回落 canvas）",

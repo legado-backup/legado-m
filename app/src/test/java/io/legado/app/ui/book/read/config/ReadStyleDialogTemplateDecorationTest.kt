@@ -52,8 +52,8 @@ class ReadStyleDialogTemplateDecorationTest {
         assertTrue("必须有作用域判定", s.contains("private fun templateTakesOverTypography()"))
         assertTrue("必须有与总开关无关的作用域判据", s.contains("private fun templateInScope()"))
         assertTrue(
-            "作用域须对齐 archive 的 isOrdinaryText：非 EPUB、非音视频/图片/PDF（文本类 = 在线正文/txt/md/UMD/MOBI）",
-            s.contains("if (book.isEpub || book.isAudio || book.isVideo || book.isImage || book.isPdf) return false")
+            "作用域须对齐 archive 的 isOrdinaryText（非 EPUB、非音视频/图片/PDF）：现由判据单源 `ReaderTemplateManager.isTextLikeContent` 承担",
+            s.contains("ReaderTemplateManager.isTextLikeContent(ReadBook.book)")
         )
         assertTrue("必须先过总开关", s.contains("if (!ReaderTemplateManager.templatesEnabled()) return false"))
         // 字号/字距/行距/段距四块 + 字重 + 三个入口（字体/缩进/版面）都要按锁置灰
@@ -73,7 +73,10 @@ class ReadStyleDialogTemplateDecorationTest {
             s.contains("\"启用页面模板\"") && s.contains("ReaderTemplateManager.setTemplatesEnabled(enable)")
         )
         assertTrue("必须有管理页直达入口", s.contains("startActivity<ReaderTemplateManageActivity>()"))
-        assertTrue("不支持的内容形态不得出现入口", s.contains("if (book.isEpub || book.isAudio || book.isVideo || book.isImage || book.isPdf) return false"))
+        assertTrue(
+            "不支持的内容形态不得出现入口（判定走单源 `ReaderTemplateManager.isTextLikeContent`）",
+            s.contains("ReaderTemplateManager.isTextLikeContent(ReadBook.book)")
+        )
         assertTrue("未启用时不渲染装饰档位/专注开关", s.contains("if (!enabled) return@ReaderSectionCard"))
         assertTrue("就地启用后必须立刻重渲染", s.contains("reloadAfterTemplatePreferenceChanged()"))
     }
