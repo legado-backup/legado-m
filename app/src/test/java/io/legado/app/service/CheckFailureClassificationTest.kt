@@ -5,6 +5,7 @@ import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.RegexTimeoutException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.model.FailureKind
 import io.legado.app.model.QualityReportApplier
 import io.legado.app.model.SourceCheckGroups
 import kotlinx.coroutines.TimeoutCancellationException
@@ -81,5 +82,31 @@ class CheckFailureClassificationTest {
         // 目录取样空曾抛出的 NoSuchElementException 属"非业务异常" ⇒ 仍判网站失效；
         // 该情形已由 sampleProbeChapters 的空守卫消除（NEW-21），本断言锁定"异常类型→归因"映射本身
         assertEquals(SourceCheckGroups.SITE_FAIL, checkFailureGroupName(NoSuchElementException("List is empty.")))
+    }
+
+    /**
+     * NEW-102：**任务态归因字段**（`CheckSourceItemState.failureKind`）所依赖的映射 ——
+     * `CheckSourceService.checkSource` 的失败分支正是用 `failureKindOf(e)` 喂入任务态，
+     * 故本断言同时锁定「异常族 → 归因计数」四分类语义（超时 / 脚本 / 站点 / 规则）。
+     */
+    @Test
+    fun failureKindOf_mapsExceptionFamiliesForTaskAttribution() {
+        val timeout = kotlinx.coroutines.runBlocking {
+            try {
+                kotlinx.coroutines.withTimeout(1) { kotlinx.coroutines.delay(80) }
+                null
+            } catch (t: TimeoutCancellationException) {
+                t
+            }
+        }
+        assertEquals(FailureKind.TIMEOUT, QualityReportApplier.failureKindOf(timeout!!))
+        assertEquals(FailureKind.SCRIPT, QualityReportApplier.failureKindOf(ScriptException("s")))
+        assertEquals(FailureKind.NETWORK, QualityReportApplier.failureKindOf(IOException("reset")))
+        // 业务异常（NoStackTraceException 家族）→ NONE ⇒ 计入「规则」，不得误判为站点 / 脚本 / 超时
+        assertEquals(FailureKind.NONE, QualityReportApplier.failureKindOf(TocEmptyException("目录为空")))
+        assertEquals(
+            FailureKind.NONE,
+            QualityReportApplier.failureKindOf(NoStackTraceException("搜索链接规则为空")),
+        )
     }
 }

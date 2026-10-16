@@ -7,7 +7,8 @@ import org.junit.Test
 /**
  * 巡检报告导出（`formatCheckSourceReportCsv`）行为护栏 —— 缺口4 的"结果可留存/可上报"能力。
  *
- * 关键不变量：①汇总行计数与任务态一致；②单源行映射到列（含状态/阶段/耗时/评分/消息）；
+ * 关键不变量：①汇总行计数与任务态一致（含 NEW-102 的**归因摘要 / 存疑计数**）；
+ * ②单源行映射到列（含状态/阶段/耗时/评分/**归因**/消息）；
  * ③CSV 转义（逗号/引号/换行）；④**空任务也导出表头**（避免"空文件"假象）。
  */
 class CheckSourceReportFormatterTest {
@@ -20,6 +21,8 @@ class CheckSourceReportFormatterTest {
         message: String = "",
         duration: Long = 1234L,
         score: Int = 95,
+        failureKind: FailureKind = FailureKind.NONE,
+        suspect: Boolean = false,
     ) = CheckSourceItemState(
         origin = origin,
         sourceName = name,
@@ -29,6 +32,8 @@ class CheckSourceReportFormatterTest {
         message = message,
         durationMillis = duration,
         score = score,
+        failureKind = failureKind,
+        suspect = suspect,
     )
 
     private fun state(vararg items: CheckSourceItemState) = CheckSourceTaskState(
@@ -43,8 +48,13 @@ class CheckSourceReportFormatterTest {
             state(
                 item(status = CheckSourceItemStatus.PASSED, score = 90),
                 item(status = CheckSourceItemStatus.PASSED, score = 100),
-                item(status = CheckSourceItemStatus.BLOCKED, message = "存疑（登录依赖）", score = 0),
-                item(status = CheckSourceItemStatus.FAILED, message = "校验失败", score = 0),
+                item(status = CheckSourceItemStatus.BLOCKED, message = "存疑（登录依赖）", score = 0, suspect = true),
+                item(
+                    status = CheckSourceItemStatus.FAILED,
+                    message = "校验失败",
+                    score = 0,
+                    failureKind = FailureKind.NETWORK,
+                ),
             ),
             generatedAtMillis = 42L,
         )
@@ -55,15 +65,36 @@ class CheckSourceReportFormatterTest {
         assertTrue("失败须为 1", summary.contains("失败=1"))
         assertTrue("跳过须为 1", summary.contains("跳过=1"))
         assertTrue("平均分须为 95", summary.contains("平均分=95"))
+        // NEW-102：归因摘要与存疑计数（与页内横幅同一份单源口径）
+        assertTrue("归因须按站点类目汇总", summary.contains("归因=站点 1"))
+        assertTrue("存疑跳过须单独计数", summary.contains("存疑=1"))
     }
 
     @Test
     fun itemRow_mapsAllColumns() {
         val csv = formatCheckSourceReportCsv(state(item()), generatedAtMillis = 1L)
         val rows = csv.trimEnd('\n').split('\n')
-        assertEquals("序号,书源名称,书源地址,状态,阶段,耗时(ms),评分,消息", rows[1])
-        assertEquals("1,源A,http://a.example,通过,正文,1234,95,", rows[2])
+        assertEquals("序号,书源名称,书源地址,状态,阶段,耗时(ms),评分,归因,消息", rows[1])
+        assertEquals("1,源A,http://a.example,通过,正文,1234,95,,", rows[2])
         assertEquals(3, rows.size)
+    }
+
+    @Test
+    fun itemRow_carriesFailureAttributionOnlyForFailedItems() {
+        val csv = formatCheckSourceReportCsv(
+            state(
+                item(status = CheckSourceItemStatus.FAILED, score = 0, failureKind = FailureKind.TIMEOUT),
+                item(status = CheckSourceItemStatus.FAILED, score = 0, failureKind = FailureKind.SCRIPT),
+                item(status = CheckSourceItemStatus.FAILED, score = 0, failureKind = FailureKind.NONE),
+                item(status = CheckSourceItemStatus.PASSED, failureKind = FailureKind.NETWORK),
+            ),
+            generatedAtMillis = 1L,
+        )
+        val rows = csv.trimEnd('\n').split('\n')
+        assertTrue("超时类目: ${rows[2]}", rows[2].contains(",超时,"))
+        assertTrue("脚本类目: ${rows[3]}", rows[3].contains(",脚本,"))
+        assertTrue("规则类目: ${rows[4]}", rows[4].contains(",规则,"))
+        assertTrue("通过行不得产出归因: ${rows[5]}", rows[5].contains(",95,,"))
     }
 
     @Test
@@ -108,7 +139,7 @@ class CheckSourceReportFormatterTest {
         assertEquals(2, rows.size)
         assertTrue(rows[0].contains("状态=未开始"))
         assertTrue(rows[0].contains("总数=0"))
-        assertEquals("序号,书源名称,书源地址,状态,阶段,耗时(ms),评分,消息", rows[1])
+        assertEquals("序号,书源名称,书源地址,状态,阶段,耗时(ms),评分,归因,消息", rows[1])
     }
 
     @Test

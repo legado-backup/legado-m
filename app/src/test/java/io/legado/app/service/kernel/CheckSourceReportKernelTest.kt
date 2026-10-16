@@ -3,6 +3,7 @@ package io.legado.app.service.kernel
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.model.CheckSourceItemStatus
 import io.legado.app.model.CheckSourceTaskStore
+import io.legado.app.model.FailureKind
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,5 +61,41 @@ class CheckSourceReportKernelTest {
         @Suppress("UNCHECKED_CAST")
         assertTrue("空跑 items 为空表", (report["items"] as List<*>).isEmpty())
         assertEquals(0, report["averageScore"] ?: 0)
+    }
+
+    /**
+     * NEW-102：报告出参须携带**失败归因计数**（超时 / 脚本 / 站点 / 规则 + 存疑）——
+     * 与页内横幅、导出 CSV 同一份单源口径 ⇒ 外部巡检脚本可直接消费本出参做统计，不必自建归类。
+     */
+    @Test
+    fun report_projectsFailureAttributionCounts() = runBlocking {
+        CheckSourceTaskStore.finish(cancelled = true)
+        CheckSourceTaskStore.begin(
+            listOf(
+                BookSourcePart(bookSourceUrl = "t"),
+                BookSourcePart(bookSourceUrl = "n"),
+                BookSourcePart(bookSourceUrl = "b"),
+            )
+        )
+        CheckSourceTaskStore.markRunning("t", "t", 0)
+        CheckSourceTaskStore.markFailed("t", "timeout", 1L, failureKind = FailureKind.TIMEOUT)
+        CheckSourceTaskStore.markRunning("n", "n", 0)
+        CheckSourceTaskStore.markFailed("n", "site", 1L, failureKind = FailureKind.NETWORK)
+        CheckSourceTaskStore.markRunning("b", "b", 0)
+        CheckSourceTaskStore.markBlocked("b", 1L, message = "存疑（登录依赖）")
+        CheckSourceTaskStore.finish(cancelled = false)
+
+        val report = SourceDebugKernel.checkSourceReport()
+        assertEquals("超时计数", 1, report["timeout"])
+        assertEquals("脚本计数", 0, report["scriptFail"])
+        assertEquals("站点计数", 1, report["siteFail"])
+        assertEquals("规则计数", 0, report["ruleFail"])
+        assertEquals("存疑跳过计数", 1, report["suspect"])
+        assertEquals("归因摘要须与计数同源", "超时 1 · 站点 1", report["failureBreakdown"])
+
+        @Suppress("UNCHECKED_CAST")
+        val items = report["items"] as List<Map<String, Any?>>
+        assertEquals("TIMEOUT", items.first { it["name"] == "t" }["failureKind"])
+        assertEquals("跳过项须标记存疑（不误杀口径）", true, items.first { it["name"] == "b" }["suspect"])
     }
 }
