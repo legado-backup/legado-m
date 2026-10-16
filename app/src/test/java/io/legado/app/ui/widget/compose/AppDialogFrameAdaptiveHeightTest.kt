@@ -81,4 +81,33 @@ class AppDialogFrameAdaptiveHeightTest {
             code.contains("selectFileState = item")
         )
     }
+
+    /**
+     * NEW-73（2026-10-16）：`AppDialogFrame` **单点注入主题作用域**。
+     *
+     * 背景：全仓 40 个弹窗宿主以 `setContent { AppDialogFrame(…) }` 为内容根，框架此前只提供直色
+     * （`rememberAppDialogStyle`），其内部使用的 M3 组件（`TextField` / `Switch` / `DropdownMenu` /
+     * `Icon`）读 `MaterialTheme.colorScheme` ⇒ 夜间/主题包/自定义主题色下回落 **M3 默认亮色基线**
+     * （浅色输入框、白底菜单）。
+     * 修法：框架外**包一层 `LegadoTheme`**，原实现体保留为私有 `AppDialogFrameContent`（避免 85 行重排缩进）。
+     * 与门禁 G-37 的「框架提供作用域」**自校验豁免**成对：移除该包装 ⇒ 20 处框架宿主立即重新按违规计
+     * （已实证：`--all` 由 50 文件/51 处 回弹到 69 文件/71 处、豁免公示转为「不生效」）。
+     */
+    @Test
+    fun frameInjectsThemeScopeAtSinglePoint() {
+        val code = SourceFileProbe.sourceText(frameRel)
+        val compact = code.replace(Regex("\\s+"), "")
+        assertTrue(
+            "AppDialogFrame 必须在 LegadoTheme 内调用实现体（否则框架内 M3 组件回落默认色板）",
+            compact.contains("LegadoTheme{AppDialogFrameContent(")
+        )
+        assertTrue(
+            "原实现体必须保留为私有函数（『保留原体 + 外包一层』的零重排口径）",
+            code.contains("private fun AppDialogFrameContent(")
+        )
+        assertTrue(
+            "入参必须逐项同名透传（拆分前后行为逐字一致）",
+            compact.contains("actions=actions)")
+        )
+    }
 }
