@@ -117,12 +117,14 @@ class RetiredPreferKeyTest {
         // NEW-91（2026-10-16）：`audit_dead_resource.py` 零引用扫描命中 ——
         // `clear_cache_summary` / `clear_webview_data`(+`_summary`) 是 NEW-52 迁移（清除缓存并入缓存管理）
         // 的**字符串残留**（当时只删了 pref 键与 XML 条目）；`folder_view` 属历史遗留。四者全仓零消费 ⇒ 退役。
+        // NEW-99（2026-10-17）：`clear_cache_title` 与上者**同族残留**（同一次缓存管理迁移；仅 values-zh 有定义）
+        // ⇒ 经 `apply_dead_resource_cleanup.py`（地面真值门通过：名字未在任何未剥离源码中出现）退役。
         listOf(
             "src/main/res/values/strings.xml",
             "src/main/res/values-zh/strings.xml"
         ).forEach { rel ->
             val res = read(rel)
-            listOf("clear_cache_summary", "clear_webview_data", "folder_view").forEach { name ->
+            listOf("clear_cache_summary", "clear_cache_title", "clear_webview_data", "folder_view").forEach { name ->
                 assertFalse(
                     "已退役字符串不得回流：$rel / $name",
                     Regex("""name="$name"""").containsMatchIn(res)
