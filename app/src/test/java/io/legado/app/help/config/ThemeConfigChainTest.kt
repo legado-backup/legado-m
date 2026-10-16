@@ -122,4 +122,24 @@ class ThemeConfigChainTest {
             navIconConfig.contains("normalizeWallpaperPath(source.wallpaperPath, dir)")
         )
     }
+
+    @Test
+    fun ghostReplyFollowSettingChainIsFullyRetired() {
+        // NEW-87 第二部分（2026-10-16）：「回复栏跟随圆角」无可感效果 ⇒ 存储链退役。
+        // 钉住「配置模型 / 主题包模型 / 默认值 / 属性」四处不得回流（残留即悬空配置，编译期不可见）。
+        val themeConfig = read("src/main/java/io/legado/app/help/config/ThemeConfig.kt")
+        val pkgManager = read("src/main/java/io/legado/app/help/config/ThemePackageManager.kt")
+        assertFalse(
+            "ThemeConfig 不得再保留 uiCornerReplyFollow（字段/写回/默认/合并/比对/导出共 8 处已删）",
+            themeConfig.contains("uiCornerReplyFollow")
+        )
+        assertFalse(
+            "ThemePackageManager 主题包默认值不得再置 uiCornerReplyFollow",
+            pkgManager.contains("uiCornerReplyFollow")
+        )
+        assertFalse(
+            "AppConfig 不得再暴露 uiCornerReplyFollow 属性",
+            appConfig.contains("uiCornerReplyFollow")
+        )
+    }
 }

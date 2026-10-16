@@ -30,6 +30,10 @@ class BackupRestoreParityTest {
             // NEW-52（2026-10-16）：「设置项形同虚设」审计命中 —— 两项功能已迁移，键与 XML 条目均已删
             "cleanCache",
             "clearWebViewData",
+            // NEW-87（2026-10-16）：幽灵设置「回复栏跟随圆角」存储链退役（消费点 `UiCorner.replyRadius`
+            // 零调用、仓内无「回复栏」视图）⇒ 日/夜两键防旧备份写回
+            "uiCornerReplyFollow",
+            "uiCornerReplyFollowNight",
         ).forEach { key ->
             assertTrue("已退役键必须纳入 ignorePrefKeys（防写回）：$key", cfg.contains("\"$key\""))
         }

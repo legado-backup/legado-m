@@ -1,6 +1,7 @@
 package io.legado.app.lib.theme
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +44,25 @@ class ThemeRuntimeKeysAutoApplyMigrationTest {
         assertTrue(
             "App.attachBaseContext 必须调用回填（否则存量用户升级后首启被覆盖一次）",
             code.contains("migrateAppearanceKitAutoApplyFlag(")
+        )
+    }
+
+    @Test
+    fun ghostReplyFollowKeyIsRetiredAcrossThemeHelpers() {
+        // NEW-87 第二部分（2026-10-16）：「回复栏跟随圆角」幽灵设置 —— 键函数 / 昼夜键对 / allKeys 清单
+        // 与 ThemeUiPalette 形态键清单必须整体退役（半退役会留下悬空引用，属编译期不可见的配置漂移）。
+        listOf(
+            "ThemeRuntimeKeys.kt" to source("src/main/java/io/legado/app/lib/theme/ThemeRuntimeKeys.kt"),
+            "ThemeUiPalette.kt" to source("src/main/java/io/legado/app/lib/theme/ThemeUiPalette.kt")
+        ).forEach { (name, code) ->
+            assertFalse(
+                "$name 不得再引用 uiCornerReplyFollow（含夜间键）",
+                code.contains("uiCornerReplyFollow")
+            )
+        }
+        assertFalse(
+            "UiCorner.replyRadius 必须已退役（该符号零调用 ⇒ 幽灵设置的唯一功能消费点）",
+            source("src/main/java/io/legado/app/lib/theme/UiCorner.kt").contains("fun replyRadius")
         )
     }
 }
