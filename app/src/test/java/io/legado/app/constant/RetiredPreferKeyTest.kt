@@ -82,6 +82,23 @@ class RetiredPreferKeyTest {
     }
 
     @Test
+    fun ghostSettingReplyFollowChainFullyRetired() {
+        // NEW-87 第二部分（2026-10-16）：「回复栏跟随圆角」幽灵设置 —— 键有 UI / 有存储 / 有引用，
+        // 但开关**无可感效果**（唯一功能消费点 `UiCorner.replyRadius` 零调用、仓内无「回复栏」视图，
+        // 上游 Archive 亦零消费）⇒ 按「删键三处」约定整体退役（日/夜两键一并）。
+        listOf("uiCornerReplyFollow", "uiCornerReplyFollowNight").forEach { key ->
+            assertFalse(
+                "已退役的幽灵设置键仍声明在 PreferKey：$key",
+                Regex("""const val $key =""").containsMatchIn(preferKey)
+            )
+            assertTrue(
+                "旧备份中的幽灵设置键必须纳入 ignorePrefKeys（防写回）：$key",
+                backupConfig.contains("\"$key\"")
+            )
+        }
+    }
+
+    @Test
     fun xmlDeadEntriesStayRemoved() {
         // NEW-52：XML 片段（页面已 Compose 化、不再渲染该 XML）仍被 `MySettingsData` 的
         // `buildPreferenceXmlSearchItems` 解析为**搜索项** ⇒ XML 里残留的已迁移条目会变成
