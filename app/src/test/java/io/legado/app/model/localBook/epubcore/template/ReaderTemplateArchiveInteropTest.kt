@@ -40,8 +40,11 @@ class ReaderTemplateArchiveInteropTest {
 
     @Test
     fun `内置模板满足 archive 侧解析与校验规则`() {
+        // 本测试钉的是**单套模板**对 archive 解析/校验规则的合规性（逐文件断言），
+        // 因此不绑数量：内置从 11 套改为 1 套（2026-10-17 用户裁定）后判据不变。
+        // "内置到底有几套 / 与目录清单是否一致"由 `ReaderBuiltinTemplateCatalogTest` 负责。
         val files = builtinJsonFiles()
-        assertTrue("未找到内置模板（路径=${builtinDir.absolutePath}）", files.size >= 11)
+        assertTrue("未找到任何内置模板（路径=${builtinDir.absolutePath}）", files.isNotEmpty())
         files.forEach { file ->
             val json: JsonObject = JsonParser.parseString(file.readText()).asJsonObject
             val where = file.parentFile.name

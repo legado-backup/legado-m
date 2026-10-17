@@ -90,25 +90,32 @@ class ReaderTemplateManagerTest {
 
     @Test
     fun `选定策略与模板策略单源一致`() {
-        val available = listOf("builtin.minimal-ink", "builtin.neon-night")
-        // 显式应用且存在 ⇒ 用应用的
+        // 2026-10-17：内置换血为单套「幽夜回廊」⇒ 偏好序列只认它；
+        // 未命中序列时按"可用集首个"兜底（这条兜底正是老用户只留用户模板时不会白屏的原因）。
+        val available = listOf("builtin.dungeon-hud", "user.abc")
         assertEquals(
-            "builtin.neon-night",
-            ReaderTemplateManager.resolveEffectiveId("builtin.neon-night", false, available)
+            "builtin.dungeon-hud",
+            ReaderTemplateManager.resolveEffectiveId("builtin.dungeon-hud", false, available)
         )
-        // 跟随主题 ⇒ 浅色取素笺、暗色取霓虹夜行
         assertEquals(
-            "builtin.minimal-ink",
+            "builtin.dungeon-hud",
             ReaderTemplateManager.resolveEffectiveId(ReaderTemplateSelection.FollowTheme, false, available)
         )
         assertEquals(
-            "builtin.neon-night",
+            "builtin.dungeon-hud",
             ReaderTemplateManager.resolveEffectiveId(ReaderTemplateSelection.FollowTheme, true, available)
         )
         // 应用的模板已被删除 ⇒ 回落主题默认（而不是"白屏无模板"）
         assertEquals(
-            "builtin.minimal-ink",
+            "builtin.dungeon-hud",
             ReaderTemplateManager.resolveEffectiveId("builtin.removed", false, available)
+        )
+        // 只有用户模板时：偏好序列全落空 ⇒ 取可用集首个
+        assertEquals(
+            "user.z",
+            ReaderTemplateManager.resolveEffectiveId(
+                ReaderTemplateSelection.FollowTheme, true, listOf("user.z", "user.a")
+            )
         )
         // 无任何可用模板 ⇒ null（调用方据此给提示）
         assertNull(ReaderTemplateManager.resolveEffectiveId(ReaderTemplateSelection.FollowTheme, false, emptyList()))
