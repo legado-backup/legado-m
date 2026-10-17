@@ -91,6 +91,50 @@ class ReaderBuiltinTemplateCatalogTest {
     }
 
     @Test
+    fun `段落语义类由脚本供给且与样式双向闭合`() {
+        // 2026-10-17（用户报「唯一内置主题的段落元素是不是缺失」）实证：本主题此前**只在 CSS 里**声明了
+        // `.reader-paragraph.dh-lead`，却没有任何代码给它加类 ⇒ 该规则恒空（**死规则**）。
+        // 对照 archive 侧 6 套主题：它们无一例外都在 `beforeLayout` 里按**正文文本**给段落打语义类
+        // （首段 / 对白段 / 场景分隔段）—— 那才是"分段正文样式"的可见主体。故此处钉两条不变量：
+        // ①三类**都由脚本供给**且与样式**双向闭合**（有类必有样式、有样式必有 toggle，防死规则回潮）；
+        // ②分类阈值与 archive **同口径**（同一段正文在两边分类一致 ⇒ 换主题/导入导出观感连续）。
+        load().templates.forEach { builtin ->
+            val js = builtin.template.javascript
+            val css = plainCss(builtin.template.css)
+            val source = builtin.template.resourceSource()
+            assertTrue(
+                "${builtin.id} 段落分类必须读正文根（与 archive 的 readerTemplate.source 同义）",
+                js.contains("rt.source") && js.contains("'.reader-paragraph'")
+            )
+            // 换壳（C1）会整块替换根壳并重新注入正文 ⇒ `beforePage` 上必须再分类一次，否则续页丢类
+            listOf("beforeLayout", "beforePage").forEach { hook ->
+                assertTrue(
+                    "${builtin.id} 段落分类须挂在 $hook 上（只挂 beforeLayout 时换壳后段落丢类）",
+                    js.contains("'$hook', classifyParagraphs")
+                )
+            }
+            PARAGRAPH_CLASSES.forEach { semantic ->
+                assertTrue("${builtin.id} 段落语义类 $semantic 必须由脚本 toggle", js.contains("'$semantic'"))
+                assertTrue(
+                    "${builtin.id} 段落语义类 $semantic 必须同时有样式（否则 toggle 是空动作 ⇒ 观感无变化）",
+                    css.contains(".$semantic")
+                )
+                assertTrue(
+                    "${builtin.id} 段落语义类 $semantic 必须被正文契约覆盖（源里的段落带 .reader-paragraph）",
+                    source.contains("reader-paragraph") || css.contains(".reader-paragraph")
+                )
+            }
+            PARAGRAPH_THRESHOLDS.forEach { pattern ->
+                assertTrue(
+                    "${builtin.id} 段落分类判据须与 archive 逐字同口径：$pattern",
+                    js.contains(pattern)
+                )
+            }
+            assertEquals("段落语义类固定为 3 类（首段 / 对白段 / 场景分隔段）", 3, PARAGRAPH_CLASSES.size)
+        }
+    }
+
+    @Test
     fun `派生字段槽位确有消费者`() {
         // 4.15 C2：`page`/`pageCount`/`percent`/`time`/`battery` 是**沙箱派生**字段。
         // 若内置模板一套都不用它们，运行时的派生实现就成了死代码 —— 这条确保它被真实消费。
@@ -336,6 +380,15 @@ class ReaderBuiltinTemplateCatalogTest {
         const val MAX_KEYFRAMES = 8
         const val MAX_ANIMATION_DECLARATIONS = 12
         const val MAX_ELEMENTS = 120
+
+        /** 段落语义类（与 archive 主题 as-lead / as-dialogue / as-scene 同构的三类）。 */
+        val PARAGRAPH_CLASSES = listOf("dh-lead", "dh-dialogue", "dh-scene")
+
+        /** 段落分类判据（**与 archive 主题逐字同口径**：场景分隔段 / 对白段）。 */
+        val PARAGRAPH_THRESHOLDS = listOf(
+            """/^[*＊※·•—_\-\s]{3,}$/""",
+            """/^[“「『"]/"""
+        )
 
         /** 第三方 IP 关键词（合规红线：不得内置 IP 原作素材）。 */
         val FORBIDDEN_IP_KEYWORDS = listOf(
