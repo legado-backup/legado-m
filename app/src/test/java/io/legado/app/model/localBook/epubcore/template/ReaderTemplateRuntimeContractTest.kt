@@ -925,4 +925,73 @@ class ReaderTemplateRuntimeContractTest {
             runtime.contains("shellEl.setAttribute('data-reader-entry', 'pending');")
         )
     }
+
+    /** 契约变量清单（`--reader-*` = archive `EpubTemplateDocument.baseCss` 同口径的 16 项）。 */
+    private val expectedReaderVars = mapOf(
+        "--reader-text-color" to "#222",
+        "--reader-page-background" to "#fff",
+        "--reader-accent" to "#555",
+        "--reader-font-size" to "18px",
+        "--reader-line-height" to "1.7",
+        "--reader-font-family" to "serif",
+        "--reader-paragraph-indent" to "2em",
+        "--reader-paragraph-spacing" to ".65em",
+        "--reader-padding-left" to "0px",
+        "--reader-padding-top" to "0px",
+        "--reader-padding-right" to "0px",
+        "--reader-padding-bottom" to "0px",
+        "--reader-safe-left" to "0px",
+        "--reader-safe-top" to "0px",
+        "--reader-safe-right" to "0px",
+        "--reader-safe-bottom" to "0px",
+        "--reader-selection-color" to "rgba(70,138,255,.2)"
+    )
+
+    /** 从运行时资产里解出 `READER_VAR_DEFAULTS` 表（只认单引号字面量条目；注释里的反引号提及不算）。 */
+    private fun parseReaderVarDefaults(js: String): Map<String, String> {
+        val start = js.indexOf("var READER_VAR_DEFAULTS = {")
+        assertTrue("未找到契约变量默认值表 READER_VAR_DEFAULTS", start >= 0)
+        val end = js.indexOf("};", start)
+        assertTrue("契约变量默认值表未闭合", end > start)
+        return Regex("""'(--reader-[a-z-]+)':\s*'([^']*)'""")
+            .findAll(js.substring(start, end))
+            .associate { it.groupValues[1] to it.groupValues[2] }
+    }
+
+    /**
+     * 契约变量（`--reader-*`）的**落点**：必须由 `:root{}` **样式表**给出，**不得**写 `<html>` 内联 style。
+     *
+     * 实证（2026-10-17 用户报「archive 主题的分段正文样式在我方不兼容展示」）：内联声明的优先级高于
+     * **任何**没有 `!important` 的作者样式表规则 ⇒ archive 主题在 `:root{}` 里声明的
+     * `--reader-line-height` / `--reader-font-family` / `--reader-paragraph-spacing` / `--reader-page-background`
+     * 会被我方默认值**全部压掉**，而主题正是靠这些变量排版（其正文流容器声明
+     * `font: var(--reader-font-size)/var(--reader-line-height) var(--reader-font-family)`、
+     * 段落声明 `margin-bottom: var(--reader-paragraph-spacing)`）⇒ 行高/字体族/段距/纸色一起走样。
+     * 离线 A/B（真实 Chromium）实测：内联写法下 computed = `1.7` / `serif` / `.65em` / `#fff`；
+     * 改走样式表后 = 主题声明值（`1.84` / 主题字体族 / `.72em` / 主题纸色）。
+     * archive 同口径：默认值放在**作者样式表之前**的 `baseCss` 样式表里，同为 `:root{}` 声明时"后到即胜"。
+     *
+     * 为什么只能做**资产文本契约**断言（而非 JVM 行为断言）：本 JS 只在 `sandbox="allow-scripts"` 的
+     * WebView 沙箱里执行，JVM 单测没有 DOM/CSSOM ⇒ 无法在测试进程内复现级联；真机侧由 L2 自证
+     * `rvars=…,src=css` 兜底（见 `template-runtime.js` 的 `domFacts()`）。
+     */
+    @Test
+    fun `契约变量须由样式表给出而非 html 内联`() {
+        val runtime = asset("template-runtime.js")
+        val defaults = parseReaderVarDefaults(runtime)
+        assertEquals("契约变量条数须与 archive 兼容口径一致", expectedReaderVars.keys, defaults.keys)
+        expectedReaderVars.forEach { (name, value) ->
+            assertEquals("$name 的默认值", value, defaults[name])
+        }
+        assertTrue("默认值须拼成 :root 样式表", runtime.contains("':root{' + css + '}'"))
+        assertTrue("须以样式表文本落位", runtime.contains("style.textContent = css;"))
+        assertTrue(
+            "变量样式表须先于作者样式表落位（否则作者的 :root 覆盖不到）",
+            runtime.contains("head.insertBefore(style, head.firstChild);")
+        )
+        assertFalse(
+            "不得把 --reader-* 写回 <html> 内联：内联优先级高于作者样式表 ⇒ 主题的 :root 声明静默失效",
+            runtime.contains("root.style.setProperty(name, String(value));")
+        )
+    }
 }
