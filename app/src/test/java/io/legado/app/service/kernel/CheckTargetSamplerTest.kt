@@ -61,7 +61,11 @@ class CheckTargetSamplerTest {
     @Test
     fun `启动入口必须委托内置巡检服务并回传生效口径`() {
         val src = SourceFileProbe.sourceText("service/kernel/SourceDebugKernel.kt")
-        assertEquals("须委托内置服务（否则外部巡检无法消费统一结论）", true, src.contains("CheckSource.start(appCtx, targets)"))
+        assertEquals(
+            "须委托内置服务并下发运行期覆盖（否则外部巡检无法消费统一结论 / 深度与超时参数静默失效）",
+            true,
+            src.contains("CheckSource.start(appCtx, targets, runConfig)")
+        )
         assertEquals("须回传实际生效口径（域名探测开关）", true, src.contains("\"checkDomain\" to CheckSource.checkDomain"))
         assertEquals("选源须走受测纯函数", true, src.contains("val targets = sampleCheckTargets("))
     }

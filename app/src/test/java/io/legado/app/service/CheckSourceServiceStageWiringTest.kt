@@ -85,4 +85,16 @@ class CheckSourceServiceStageWiringTest {
             occurrences >= 2
         )
     }
+
+    @Test
+    fun runConfigOverridesAreWired() {
+        val t = code()
+        // 程序化启动（REST /startCheckSource）下发的运行期覆盖必须被消费：超时与下游三维
+        // 一律走「任务级覆盖优先、缺省沿用单例现值」的生效值，否则参数静默失效（调用方以为已生效）
+        assertTrue("须消费运行期配置", t.contains("CheckSourceRunConfig.INTENT_KEY"))
+        assertTrue("单源超时须走生效值", t.contains("withTimeout(effTimeout)"))
+        listOf("effCheckInfo", "effCheckCategory", "effCheckContent").forEach {
+            assertTrue("下游维度须走生效值：$it", t.contains("!$it"))
+        }
+    }
 }
