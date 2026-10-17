@@ -23,7 +23,8 @@ class AppComposeDialogsTipTemplateTest {
 
     @Test
     fun dialogSupportsVisualPlaceholderInsertAndPreview() {
-        val src = code("ui/widget/compose/AppComposeDialogs.kt")
+        // 2026-10-17 拆分：`ComposeTipTemplateDialog` 已迁出聚合文件 ⇒ 断言须读取**新家**
+        val src = code("ui/widget/compose/AppComposeTemplateDialogs.kt")
         assertTrue("必须存在模板编辑器弹窗", src.contains("class ComposeTipTemplateDialog"))
         assertTrue(
             "占位符必须由变量白名单生成可点选 chip（可视化插入）",
