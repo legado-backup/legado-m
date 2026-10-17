@@ -132,4 +132,50 @@ class RetiredPreferKeyTest {
             }
         }
     }
+
+    /**
+     * 2026-10-17（批 11）：**「与代码标识符 / 更长键撞名」的 6 个死字符串**退役不变量。
+     *
+     * 这 6 个键的名字被更长的键（如 `rss_source_empty_title`）或 Kotlin 常量
+     * （`SourceGroupCover.KEY_TYPE_TEXT = "type_text"`）**包含** ⇒ `apply_dead_resource_cleanup.py`
+     * 的**地面真值门**（名字出现在未剥离源码即保守不删）会拦下它们。本轮逐条取证：
+     * `@string/<key>` 与 `R.string.<key>` 全仓 **0 命中** ⇒ 以人工确证清单 + `--force` 退役。
+     */
+    @Test
+    fun collisionNamedDeadStringsStayRemoved() {
+        val targets = mapOf(
+            "src/main/res/values/strings.xml" to listOf(
+                "rss_source", "share_note_template", "type_audio", "type_file", "type_text", "video_play"
+            ),
+            "src/main/res/values-zh/strings.xml" to listOf(
+                "type_audio", "type_file", "type_text", "video_play"
+            ),
+            "src/main/res/values-zh-rTW/strings.xml" to listOf("rss_source"),
+            "src/main/res/values-zh-rHK/strings.xml" to listOf("rss_source"),
+            "src/main/res/values-es-rES/strings.xml" to listOf("rss_source"),
+            "src/main/res/values-ja-rJP/strings.xml" to listOf("rss_source"),
+            "src/main/res/values-pt-rBR/strings.xml" to listOf("rss_source"),
+            "src/main/res/values-vi/strings.xml" to listOf("rss_source"),
+        )
+        targets.forEach { (rel, names) ->
+            val res = read(rel)
+            names.forEach { name ->
+                assertFalse("已退役字符串不得回流：$rel / $name", res.contains("name=\"$name\""))
+            }
+        }
+        // 防误删**邻居**：同族更长的键必须健在（地面真值门保守口径的正向价值）
+        assertTrue(
+            "同族键 rss_source_empty_title 必须保留",
+            read("src/main/res/values-zh/strings.xml").contains("name=\"rss_source_empty_title\"")
+        )
+        assertTrue(
+            "同族键 share_note_template_manage 必须保留",
+            read("src/main/res/values/strings.xml").contains("name=\"share_note_template_manage\"")
+        )
+        assertTrue(
+            "Kotlin 常量面（SourceGroupCover 键常量）不属资源退役范围，必须保留",
+            read("src/main/java/io/legado/app/data/entities/SourceGroupCover.kt")
+                .contains("KEY_TYPE_TEXT = \"type_text\"")
+        )
+    }
 }
