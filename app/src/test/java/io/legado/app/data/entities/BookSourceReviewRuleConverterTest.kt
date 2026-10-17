@@ -5,6 +5,7 @@ import io.legado.app.data.entities.rule.ReviewRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,5 +60,20 @@ class BookSourceReviewRuleConverterTest {
     @Test
     fun nullRuleWritesJsonNull() {
         assertEquals("null", conv.reviewRuleToString(null))
+    }
+
+    /**
+     * 段评编辑链**恢复**（2026-10-17 用户裁定）后，实体入口 `getReviewRule()` 的语义：
+     * 与 `getContentRule` 同构——未配置时新建空规则并**挂回实体**（保证编辑页保存链可回填），
+     * 且二次调用幂等返回同一实例。
+     */
+    @Test
+    fun getReviewRule_createsAndPinsThenIdempotent() {
+        val source = BookSource()
+        assertNull("初始无段评规则", source.ruleReview)
+        val first = source.getReviewRule()
+        assertEquals("新建规则各字段为空默认", "", first.reviewUrl.orEmpty())
+        assertSame("必须挂回实体（供保存链回填）", first, source.ruleReview)
+        assertSame("二次调用必须返回同一实例（幂等）", first, source.getReviewRule())
     }
 }
