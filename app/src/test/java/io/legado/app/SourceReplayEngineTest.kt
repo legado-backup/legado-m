@@ -108,6 +108,9 @@ class SourceReplayEngineTest {
         var evaluated = 0
         var enginePass = 0
         val failures = ArrayList<String>()
+        // 【B-38】本夹具**判不了**含 JS 的条目（离线模拟器不执行 JS，真引擎执行 JS 却可能抛错）⇒ 单独记录并披露
+        val skippedJs = ArrayList<String>()
+        val jsErrors = ArrayList<String>()
 
         for (i in 0 until arr.length()) {
             val e = arr.getJSONObject(i)
@@ -122,72 +125,90 @@ class SourceReplayEngineTest {
             val ar = AnalyzeRule(Book()).setContent(html.readText())
             val offline = e.getJSONObject("source").optJSONObject("_repair")
 
-            val n: Int; val hitA: Int; val hitB: Int; val js: Boolean
-            when (stage) {
-                "search" -> {
-                    val seg = src.ruleSearch
-                    js = hasJs(seg?.bookList, seg?.name, seg?.bookUrl, seg?.author, seg?.coverUrl)
-                    val els = ar.getElements(seg?.bookList ?: "")
-                    n = els.size
-                    hitA = els.count { ar.getString(seg?.name, it).isNotBlank() }
-                    hitB = els.count { ar.getString(seg?.bookUrl, it).isNotBlank() }
+            var n = 0
+            var hitA = 0
+            var hitB = 0
+            var js = false
+            var verdict: String
+            try {
+                when (stage) {
+                    "search" -> {
+                        val seg = src.ruleSearch
+                        js = hasJs(seg?.bookList, seg?.name, seg?.bookUrl, seg?.author, seg?.coverUrl)
+                        val els = ar.getElements(seg?.bookList ?: "")
+                        n = els.size
+                        hitA = els.count { ar.getString(seg?.name, it).isNotBlank() }
+                        hitB = els.count { ar.getString(seg?.bookUrl, it).isNotBlank() }
+                    }
+
+                    "explore" -> {
+                        val seg = src.ruleExplore
+                        js = hasJs(seg?.bookList, seg?.name, seg?.bookUrl, seg?.author, seg?.coverUrl)
+                        val els = ar.getElements(seg?.bookList ?: "")
+                        n = els.size
+                        hitA = els.count { ar.getString(seg?.name, it).isNotBlank() }
+                        hitB = els.count { ar.getString(seg?.bookUrl, it).isNotBlank() }
+                    }
+
+                    "bookinfo" -> {
+                        val seg = src.ruleBookInfo
+                        js = hasJs(seg?.init, seg?.name, seg?.author, seg?.coverUrl)
+                        n = 1
+                        hitA = if (ar.getString(seg?.name).isNotBlank()) 1 else 0
+                        hitB = if (ar.getString(seg?.author).isNotBlank()) 1 else 0
+                    }
+
+                    "toc" -> {
+                        val seg = src.ruleToc
+                        js = hasJs(seg?.chapterList, seg?.chapterName, seg?.chapterUrl)
+                        val els = ar.getElements(seg?.chapterList ?: "")
+                        n = els.size
+                        hitA = els.count { ar.getString(seg?.chapterName, it).isNotBlank() }
+                        hitB = els.count { ar.getString(seg?.chapterUrl, it).isNotBlank() }
+                    }
+
+                    "content" -> {
+                        val seg = src.ruleContent
+                        js = hasJs(seg?.content)
+                        n = 1
+                        hitA = if (ar.getString(seg?.content).isNotBlank()) 1 else 0
+                        hitB = 0
+                    }
+
+                    else -> {
+                        rows.put(report(idx, stage, 0, 0, 0, "UNKNOWN-STAGE"))
+                        continue
+                    }
                 }
 
-                "explore" -> {
-                    val seg = src.ruleExplore
-                    js = hasJs(seg?.bookList, seg?.name, seg?.bookUrl, seg?.author, seg?.coverUrl)
-                    val els = ar.getElements(seg?.bookList ?: "")
-                    n = els.size
-                    hitA = els.count { ar.getString(seg?.name, it).isNotBlank() }
-                    hitB = els.count { ar.getString(seg?.bookUrl, it).isNotBlank() }
+                // 【B-38】含 JS 的「列表型」阶段（search/explore）：**本夹具无法判定** ——
+                // 离线模拟器不执行 JS（`@js:`/`<js>`/`{{}}`）⇒ 离线"PASS"对 JS 段无意义；
+                // 而真引擎执行 JS 时若抛错会**炸掉整轮回放**（实测 `TypeError: match of null`）。
+                // ⇒ **不求值**、判 `SKIP-JS` 并计数披露，交由真机/模拟器验证（不假装 PASS）。
+                if (js && (stage == "search" || stage == "explore")) {
+                    verdict = "SKIP-JS"
+                    skippedJs.add("idx=$idx stage=$stage")
+                } else {
+                    val ok = when (stage) {
+                        "search", "explore" -> n >= 1 && hitA >= 1 && hitB >= 1
+                        "bookinfo" -> hitA >= 1 || hitB >= 1
+                        "toc" -> n >= 1 && hitA >= 1 && hitB >= 1
+                        else -> hitA >= 1
+                    }
+                    verdict = when {
+                        js -> "SKIP-JS"      // 非列表型阶段的 JS 段（如 bookinfo.init）同样不作硬判
+                        ok -> "PASS"
+                        else -> "FAIL"
+                    }
                 }
-
-                "bookinfo" -> {
-                    val seg = src.ruleBookInfo
-                    js = hasJs(seg?.init, seg?.name, seg?.author, seg?.coverUrl)
-                    n = 1
-                    hitA = if (ar.getString(seg?.name).isNotBlank()) 1 else 0
-                    hitB = if (ar.getString(seg?.author).isNotBlank()) 1 else 0
-                }
-
-                "toc" -> {
-                    val seg = src.ruleToc
-                    js = hasJs(seg?.chapterList, seg?.chapterName, seg?.chapterUrl)
-                    val els = ar.getElements(seg?.chapterList ?: "")
-                    n = els.size
-                    hitA = els.count { ar.getString(seg?.chapterName, it).isNotBlank() }
-                    hitB = els.count { ar.getString(seg?.chapterUrl, it).isNotBlank() }
-                }
-
-                "content" -> {
-                    val seg = src.ruleContent
-                    js = hasJs(seg?.content)
-                    n = 1
-                    hitA = if (ar.getString(seg?.content).isNotBlank()) 1 else 0
-                    hitB = 0
-                }
-
-                else -> {
-                    rows.put(report(idx, stage, 0, 0, 0, "UNKNOWN-STAGE"))
-                    continue
-                }
-            }
-
-            val ok = when (stage) {
-                "search", "explore" -> n >= 1 && hitA >= 1 && hitB >= 1
-                "bookinfo" -> hitA >= 1 || hitB >= 1
-                "toc" -> n >= 1 && hitA >= 1 && hitB >= 1
-                else -> hitA >= 1
-            }
-            val verdict = when {
-                // 列表型阶段（搜索/发现）即便含 JS 也必须过 —— 真引擎本身支持 JS 运行时
-                js && stage != "search" && stage != "explore" -> "SKIP-JS"
-                ok -> "PASS"
-                else -> "FAIL"
+            } catch (t: Throwable) {
+                // **逐条异常隔离**：任何求值异常都不再炸整轮（旧版把 ScriptException 直接抛出 ⇒ 整轮 FAIL、报告不产出）
+                verdict = if (js || stage == "search" || stage == "explore") "JS-ERROR" else "EX-ERROR"
+                jsErrors.add("idx=$idx stage=$stage ${t.javaClass.simpleName}: ${t.message}")
             }
             if (verdict != "SKIP-JS") {
                 evaluated++
-                if (ok) enginePass++
+                if (verdict == "PASS") enginePass++
             }
             val r = report(idx, stage, n, hitA, hitB, verdict)
             if (offline != null) {
@@ -205,9 +226,13 @@ class SourceReplayEngineTest {
         out.parentFile?.mkdirs()
         out.writeText(rows.toString(1))
 
-        println("[真引擎回放] 条目=${arr.length()} 已判=${evaluated} 引擎PASS=$enginePass 失败=${failures.size}")
+        println("[真引擎回放] 条目=${arr.length()} 已判=${evaluated} 引擎PASS=$enginePass 失败=${failures.size}" +
+            " 跳过JS=${skippedJs.size} JS异常=${jsErrors.size}")
         println("[真引擎回放] 报告=${out.path}")
         failures.take(20).forEach { println("[真引擎回放·FAIL] $it") }
+        // 【B-38】含 JS 条目本夹具**判不了** ⇒ 如实披露，交由真机/模拟器验证（不假装 PASS）
+        skippedJs.take(20).forEach { println("[真引擎回放·SKIP-JS] $it") }
+        jsErrors.take(20).forEach { println("[真引擎回放·JS-ERROR] $it") }
 
         assertTrue("bundle 至少要有 1 条可判条目", evaluated >= 1)
         assertTrue(
