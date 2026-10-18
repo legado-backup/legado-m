@@ -34,6 +34,49 @@ class QualityReportApplierTest {
 
     // === 书源映射 ===
 
+    // === AD-09 零能力源不得「真空 PASS」（2026-10-18）===
+
+    @Test
+    fun `零能力源（搜索URL空+发现整维跳过）必须产生失效分组`() {
+        // 复刻真机场景：`searchUrl` 为空 ⇒ `CheckSourceService` 置 `searchChecked=true, searchUrlEmpty=true`；
+        // `exploreUrl` 为空 ⇒ 发现维度整维跳过（`discoveryChecked=false` ⇒ NOT_CHECKED）。
+        // 若两类"空"都不写失效组，四维度将全是「不适用/未校验」⇒ 无失败 ⇒ 报告判 PASSED（实测 178 条空壳被洗白）。
+        val result = BookCheckResult(
+            domainReachable = true,
+            searchChecked = true,
+            searchUrlEmpty = true,
+            discoveryChecked = false
+        )
+        val dims = QualityReportApplier.bookResultToDimStates(result)
+        assertEquals(DimState.NOT_APPLICABLE, dims[QualityDim.SEARCH])
+        assertEquals(DimState.NOT_CHECKED, dims[QualityDim.DISCOVERY])
+        val groups = QualityReportApplier.failureGroupNames(
+            dims, FailureKind.NONE, suspect = false, checkDomain = true
+        )
+        assertTrue(
+            "零能力源必须产生失效分组，否则会被判 PASSED（真空 PASS）",
+            groups.isNotEmpty()
+        )
+    }
+
+    @Test
+    fun `正常可用源不产生失效分组（正对照）`() {
+        val result = BookCheckResult(
+            domainReachable = true,
+            searchChecked = true,
+            searchSuccess = true,
+            searchResultCount = 10,
+            searchInfoSuccess = true,
+            searchCategorySuccess = true,
+            searchContentSuccess = true
+        )
+        val dims = QualityReportApplier.bookResultToDimStates(result)
+        val groups = QualityReportApplier.failureGroupNames(
+            dims, FailureKind.NONE, suspect = false, checkDomain = true
+        )
+        assertEquals(emptyList<String>(), groups)
+    }
+
     @Test
     fun `全PASS报告映射全true且weight满分`() {
         val report = bookReport(
