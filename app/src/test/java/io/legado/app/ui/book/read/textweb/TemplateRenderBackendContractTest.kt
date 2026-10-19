@@ -23,6 +23,30 @@ class TemplateRenderBackendContractTest {
     private fun text(): String = SourceFileProbe.sourceText(src)
 
     @Test
+    fun `页框自证必须绕开日志限频（它是几何判据唯一数据源）`() {
+        // 2026-10-19 真机实证：`page-frame` 原与稳态状态共用 `else` 分支 ⇒ 在稳态日志洪峰下被
+        // 300ms 时间窗限频**饿死**（表现：`stable:` 行持续出现而 `page-frame` 整轮缺失）⇒ L2 判据
+        // "未取到样本"**假 FAIL**（产品其实完全正常）。故它必须有**独立分支**且**不经过限频门**。
+        val s = text()
+        assertEquals(
+            "须有 page-frame 前缀常量",
+            true,
+            s.contains("StatePageFramePrefix = \"page-frame\"")
+        )
+        assertEquals(
+            "page-frame 须有独立分支",
+            true,
+            s.contains("state.startsWith(StatePageFramePrefix) -> {")
+        )
+        // **限频门只能有一处**（= 仅稳态 `else` 分支）⇒ 页框自证分支必然未被限频
+        assertEquals(
+            "限频门 `RenderStateLogGate.shouldLog(` 必须只出现一次（否则 page-frame 仍可能被限频饿死）",
+            1,
+            Regex("RenderStateLogGate\\.shouldLog\\(").findAll(s).count()
+        )
+    }
+
+    @Test
     fun `进度往返须走内容比例且与宿主同归一化`() {
         // 2026-10-12（顾问判定必须根治）：模板面双壳页数不同（17 / 12）⇒ 按"页号"折算恢复必偏 1~2 页。
         // 契约：①恢复用**比例指令** `goto-page{ratio}`；②保存用沙箱自报的 `progressRatio`
