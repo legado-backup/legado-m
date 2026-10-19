@@ -81,6 +81,11 @@ class ReaderTemplateGeometryContractTest {
         )
         assertEquals("自证串须给出上占位 ctop（R2 取证）", true, js.contains("ctop="))
         assertEquals("自证串须给出下占位 cbot（R2 取证）", true, js.contains("cbot="))
+        // 翻页状态并入 `page-frame`（2026-10-19 真机实证）：宿主侧 `render state: settle,...` 行
+        // **不出现在真机 logcat** ⇒ 翻页判据必须能从 `page-frame` 取到页数/偏移/步长，否则判据无数据源。
+        assertEquals("自证串须给出页数 pg（翻页判据数据源）", true, js.contains("pg="))
+        assertEquals("自证串须给出正文偏移 off（前进/回退的判据量）", true, js.contains("off="))
+        assertEquals("自证串须给出页步长 last（页码折算分母）", true, js.contains("last="))
     }
 
     @Test
