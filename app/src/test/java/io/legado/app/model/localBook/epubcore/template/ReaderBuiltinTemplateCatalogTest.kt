@@ -159,6 +159,17 @@ class ReaderBuiltinTemplateCatalogTest {
             )
             val elements = Regex("<[a-zA-Z][^>]*>").findAll(source).count()
             assertTrue("${builtin.id} 结构元素 $elements 个超预算（≤$MAX_ELEMENTS）", elements <= MAX_ELEMENTS)
+
+            // **死规则清零**（reader-theme-family-rework spec R4 Scenario）：CSS 里声明的 `.dh-*` 类
+            // 必须全部在 HTML 或 JS 中有供给。旧任务正是漏了两条（`dh-c-bl` / `dh-c-tr`：CSS 声明、
+            // HTML 从不出现）⇒ 角饰只画了两角，而这类缺陷**不报错**，只表现为"规则恒空"。
+            val declaredClasses = Regex("\\.(dh-[a-z0-9_-]+)").findAll(css).map { it.groupValues[1] }.toSet()
+            val suppliedClasses = Regex("dh-[a-z0-9_-]+").findAll(source).map { it.value }.toSet()
+            assertEquals(
+                "${builtin.id} 存在死规则（CSS 声明了却无供给）：${(declaredClasses - suppliedClasses).sorted()}",
+                emptyList<String>(),
+                (declaredClasses - suppliedClasses).sorted()
+            )
         }
     }
 
@@ -376,10 +387,14 @@ class ReaderBuiltinTemplateCatalogTest {
         /** 视口高尺寸声明（用于装饰带高度预算校验）。 */
         val VH_LENGTH = Regex("""(\d+(?:\.\d+)?)vh""")
 
-        /** 4.19 / NFR-08 元素与动效预算（提交期静态门禁）。 */
-        const val MAX_KEYFRAMES = 8
-        const val MAX_ANIMATION_DECLARATIONS = 12
-        const val MAX_ELEMENTS = 120
+        /** 4.19 / NFR-08 元素与动效预算（提交期静态门禁）。
+         *  ⚠️ 2026-10-19（reader-theme-family-rework R4）：用户明确要求「怪物/特效多引、页眉密度上去」
+         *  ⇒ 元素/动效规模必然上升。引擎运行时的元素上限是 `MAX_ELEMENTS = 3000`（`md/template-runtime.js`），
+         *  本门禁只是**提交期静态门禁**，故按"仍远离运行时上限"上调（原 8 / 12 / 120）。
+         *  实测现值：keyframes 12 / animation 声明 14 / 结构元素 172（均留余量）。 */
+        const val MAX_KEYFRAMES = 14
+        const val MAX_ANIMATION_DECLARATIONS = 20
+        const val MAX_ELEMENTS = 200
 
         /** 段落语义类（与 archive 主题 as-lead / as-dialogue / as-scene 同构的三类）。 */
         val PARAGRAPH_CLASSES = listOf("dh-lead", "dh-dialogue", "dh-scene")
