@@ -69,7 +69,18 @@ class BadIpSelfHealTest {
         }
     }
 
-    private fun clientWith(tail: FlakyTail): OkHttpClient =
+    /** 每次都抛指定异常（用于验证「重试仍失败 ⇒ 原样上抛且只重试一次」）。 */
+    private class AlwaysFailTail(private val e: Throwable) : Interceptor {
+        var calls = 0
+            private set
+
+        override fun intercept(chain: Interceptor.Chain): Response {
+            calls++
+            throw e
+        }
+    }
+
+    private fun clientWith(tail: Interceptor): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(BadIpSelfHealInterceptor)
             .addInterceptor(tail)
@@ -104,6 +115,35 @@ class BadIpSelfHealTest {
         assertTrue("读超时应原样抛出", thrown is SocketTimeoutException)
         assertEquals(1, tail.calls)   // 不重试
         assertFalse(HostAccessStrategy.isSystemDnsPreferred("host-a.example"))
+    }
+
+    @Test
+    fun socketReset_alsoRetriesOnce() {
+        // 连接被重置（SocketException 家族）同样属**连接层**失败 ⇒ 应上报 + 重试一次
+        HostAccessStrategy.clearHost("host-a.example")
+        val tail = FlakyTail(SocketException("Connection reset by peer"))
+        val resp = call(clientWith(tail))
+        assertEquals(200, resp.code)
+        resp.close()
+        assertEquals(2, tail.calls)
+        assertTrue(HostAccessStrategy.isSystemDnsPreferred("host-a.example"))
+        HostAccessStrategy.clearHost("host-a.example")
+    }
+
+    @Test
+    fun retryFailsAgain_exceptionPropagates() {
+        // 重试仍失败 ⇒ 异常原样上抛（不吞错、不无限重试：恰好 2 次）
+        HostAccessStrategy.clearHost("host-a.example")
+        val tail = AlwaysFailTail(ConnectException("refused"))
+        var thrown: Throwable? = null
+        try {
+            call(clientWith(tail)).close()
+        } catch (t: Throwable) {
+            thrown = t
+        }
+        assertTrue(thrown is ConnectException)
+        assertEquals(2, tail.calls)   // 首次 + 重试（末位拦截器每次 `proceed` 各调用 1 次）
+        HostAccessStrategy.clearHost("host-a.example")
     }
 
     @Test
