@@ -136,4 +136,35 @@ class LoadingTemplateOverlayViewContractTest {
         assertTrue("文本面判定须排除图片书/漫画（!it.isImage）", sync.contains("!it.isImage"))
         assertTrue("文本面判定须排除 EPUB（!it.isEpub）", sync.contains("!it.isEpub"))
     }
+
+    @Test
+    fun `首屏模板须每轮都显示且不闪一下`() {
+        // 2026-10-20 用户第二轮实测：「首屏加载模板开启后，只有第一次才有，并且时间太短了，退出阅读再进就没有了」。
+        // 根因：`ReadBook` 是常驻单例 ⇒「退出再进」时 `curTextChapter` 已就绪，而旧判据是
+        // "`curTextChapter == null` 才显示" ⇒ 该场景永不显示；且内容一到就 `hide()` ⇒ 只闪一下。
+        // 本契约锁死三件事（防回退到旧行为）：
+        //  ① **不得**再用"无内容页"当"是否显示"的判据（`sync` 的显示分支里不得出现该条件）；
+        //  ② 必须**按轮次开新轮**（用 `ReadBook.durChapterIndex` 判定），保证每次进入/切章都显示；
+        //  ③ 必须有**最短展示时长**常量 + 使用，且延迟收尾带**轮次戳守卫**（防新轮被旧定时器收掉）。
+        val sync = bodyOf(activity, "private fun syncTextLoadingOverlay()")
+        assertTrue(
+            "开轮判据须用 ReadBook.durChapterIndex（进入阅读页/切章即开轮）",
+            sync.contains("val index = ReadBook.durChapterIndex")
+        )
+        assertTrue(
+            "须按轮次开新轮（否则「退出再进」看不到首屏）",
+            sync.contains("if (index != textLoadingRoundChapter)")
+        )
+        assertTrue("开轮时须真的 show()（注入模板 + 文案）", sync.contains(".show("))
+        assertFalse(
+            "显示判据不得再用 `curTextChapter == null`（那是「退出再进看不到」的根因）",
+            sync.contains("curTextChapter == null")
+        )
+        assertTrue("须使用最短展示时长常量", sync.contains("TEXT_LOADING_MIN_MS"))
+        assertTrue("延迟收尾须带轮次戳守卫（防新轮被旧定时器收掉）", sync.contains("textLoadingRoundAt == stamp"))
+        assertTrue(
+            "最短展示时长须为常量定义（900ms）",
+            Regex("private const val TEXT_LOADING_MIN_MS = 900L").containsMatchIn(activity)
+        )
+    }
 }
