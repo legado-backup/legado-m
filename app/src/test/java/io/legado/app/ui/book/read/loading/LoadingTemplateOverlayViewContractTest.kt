@@ -116,4 +116,24 @@ class LoadingTemplateOverlayViewContractTest {
             finishRegion.contains("syncTextLoadingOverlay()")
         )
     }
+
+    @Test
+    fun `同书重开切章路径与图片书排除须各有一处结构保证`() {
+        // 3.13 收口（2026-10-20，复核 + 真机缺口实测）：
+        // ①`ReadBook.upData(book)`（同书重开且保存的章节号变了）只 `clearTextChapter()`、**不回调 `upContent`**
+        //   ⇒ 该切章路径的加载期覆盖层不会出现（真实缺口）；而 `upData` 必经 `callBack.upMenuView()`
+        //   ⇒ 在 `upMenuView` 覆写里补一个同步点即闭合（模型层零改动、无重复加载风险）。
+        val menuStart = activity.indexOf("override fun upMenuView() {")
+        val menuEnd = activity.indexOf("override fun loadChapterList", menuStart)
+        assertTrue("upMenuView 覆写须存在", menuStart >= 0 && menuEnd > menuStart)
+        assertTrue(
+            "upMenuView 须同步文本面首屏（闭合 upData 切章缺口）",
+            activity.substring(menuStart, menuEnd).contains("syncTextLoadingOverlay()")
+        )
+        // ②图片书/漫画的内容不进 `curTextChapter`（走 `ReadManga`）⇒ 若纳入"文本面"判定，
+        //   `curTextChapter == null` 恒真 ⇒ 覆盖层常驻不消失（真实回归风险）⇒ 必须显式排除 `isImage`。
+        val sync = bodyOf(activity, "private fun syncTextLoadingOverlay()")
+        assertTrue("文本面判定须排除图片书/漫画（!it.isImage）", sync.contains("!it.isImage"))
+        assertTrue("文本面判定须排除 EPUB（!it.isEpub）", sync.contains("!it.isEpub"))
+    }
 }
