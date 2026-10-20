@@ -92,16 +92,59 @@ class TextRichContentProbeTest {
 
         val plain = TextRichContentProbe.prepare("第一段\n\n第二段\n同一段内换行", allowPlainText = true)
         requireNotNull(plain)
-        assertEquals("<p>第一段</p>\n<p>第二段 同一段内换行</p>", plain.html)
+        // **一行一段**（与 archive / TextReaderDocument 的 lineSequence 同口径）：空行丢弃，
+        // 段内换行不再折叠成空格（旧口径会把整章塌成一个 <p>，段落语义装饰随之全失效）
+        assertEquals(
+            "<p class=\"reader-paragraph\">第一段</p>\n" +
+                "<p class=\"reader-paragraph\">第二段</p>\n" +
+                "<p class=\"reader-paragraph\">同一段内换行</p>",
+            plain.html
+        )
         assertFalse(plain.hasMermaid)
         assertFalse(plain.hasMath)
+    }
+
+    /**
+     * 真机形态回归守卫（2026-10-20 铁证）。
+     *
+     * 真机抽检 47 个章节缓存**全部**是「每行一段、行间无空行、无任何标签」的纯文本形态。
+     * 旧实现按"空行"切段 ⇒ 这类正文**整章塌成一个 `<p>`** ⇒ archive 的 `as-*` 与自研的 `dh-*`
+     * 段落语义装饰（都只点 `.reader-paragraph`）只剩首段可命中 ⇒ 用户报「段落效果全没了」，
+     * 且**同时**打在 archive 主题与自研主题两套上。本用例把该形态钉死。
+     */
+    @Test
+    fun `真机纯文本形态必须逐行成段不得塌成一个段落`() {
+        val chapter = "第一段正文\n第二段正文\n第三段正文"
+        val prepared = TextRichContentProbe.prepare(chapter, allowPlainText = true)
+        requireNotNull(prepared)
+        assertEquals(
+            "非空行数 = 段数（3 行 ⇒ 3 段），不得塌成一个 <p>",
+            3,
+            Regex("<p ").findAll(prepared.html).count()
+        )
+        assertTrue("每段必须带 archive 段落契约类", prepared.html.contains("<p class=\"reader-paragraph\">"))
+        assertFalse("整章不得只产出一个段落", prepared.html.trim().startsWith("<p class=\"reader-paragraph\">第一段正文 第二段正文"))
+    }
+
+    @Test
+    fun `段首全角空格缩进被 trim 不与 CSS 首行缩进叠加`() {
+        val prepared = TextRichContentProbe.prepare("\u3000\u3000正文一\n\u3000正文二", allowPlainText = true)
+        requireNotNull(prepared)
+        assertEquals(
+            "<p class=\"reader-paragraph\">正文一</p>\n<p class=\"reader-paragraph\">正文二</p>",
+            prepared.html
+        )
     }
 
     @Test
     fun `纯文本段落化必须转义且空输入不可用`() {
         val escaped = TextRichContentProbe.prepare("a < b & c > d", allowPlainText = true)
         requireNotNull(escaped)
-        assertEquals("纯文本必须转义（与 md 路线安全模式同口径）", "<p>a &lt; b &amp; c &gt; d</p>", escaped.html)
+        assertEquals(
+            "纯文本必须转义（与 md 路线安全模式同口径）",
+            "<p class=\"reader-paragraph\">a &lt; b &amp; c &gt; d</p>",
+            escaped.html
+        )
 
         assertNull("空白内容不可用 ⇒ 回落 canvas", TextRichContentProbe.prepare("   \n  ", allowPlainText = true))
         assertNull(TextRichContentProbe.prepare(null, allowPlainText = true))
