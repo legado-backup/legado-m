@@ -72,4 +72,34 @@ class OtherConfigLoadingTemplateEntryTest {
         assertEquals("三类心智词须全部覆盖（可搜索到）", 3, hasKey)
         assertTrue("入口 Key 与主题设置侧保持同名（便于回归定位）", other.contains("\"epub_loading_template_manage\""))
     }
+
+    @Test
+    fun `设置项与说明页须明示适用范围与回落口径`() {
+        // 背景（2026-10-20 用户实测 + 用户裁定）：用户先报「首屏加载模板设置已应用却没生效」——
+        // 真机取证（`loading overlay mode=` 正式自证串）证实：EPUB 冷加载走模板；**在线文本小说 0 条样本**
+        // （模板注入点只在 EPUB 内核加载面）。用户随后的裁定是「这玩意应该适配更多阅读格式，在线/离线小说
+        // 文本都要支持，就跟主题模式一样」⇒ 已把模板扩到**文本阅读面**（见
+        // `ui/book/read/loading/LoadingTemplateOverlayView.kt` + `activity_book_read.xml`）。
+        // 故文案必须同步成"EPUB 与文本书均适用"，并写明回落口径（防再次出现"设置了却没反应"的误解）。
+        val screen = SourceFileProbe.sourceText("ui/config/EpubLoadingTemplateManageScreen.kt")
+        assertTrue("管理页说明须写明 EPUB 与文本书均适用", screen.contains("EPUB 与在线/离线文本书均适用"))
+        assertTrue("管理页说明须写明回落口径（已有内容页/模板不可用）", screen.contains("自动回落原有加载态"))
+
+        val strings = stringsXml()
+        assertTrue(
+            "设置项摘要须写成两种格式都生效（否则列表里看不出覆盖面）",
+            strings.contains("<string name=\"epub_loading_template_manage_summary\">当前：%1\$s（EPUB 与文本书")
+        )
+    }
+
+    /** 读 `strings.xml`（`SourceFileProbe` 只覆盖 java 源码根 ⇒ 这里自行三候选回退）。 */
+    private fun stringsXml(): String {
+        val candidates = listOf(
+            "src/main/res/values/strings.xml",
+            "../app/src/main/res/values/strings.xml",
+            "app/src/main/res/values/strings.xml",
+        )
+        return candidates.map { java.io.File(it) }.firstOrNull { it.isFile }?.readText()
+            ?: throw AssertionError("未找到 strings.xml（工作目录=${java.io.File(".").absolutePath}）")
+    }
 }
