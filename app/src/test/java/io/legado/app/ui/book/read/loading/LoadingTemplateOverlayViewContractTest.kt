@@ -118,16 +118,16 @@ class LoadingTemplateOverlayViewContractTest {
     }
 
     @Test
-    fun `同书重开切章路径与图片书排除须各有一处结构保证`() {
-        // 3.13 收口（2026-10-20，复核 + 真机缺口实测）：
-        // ①`ReadBook.upData(book)`（同书重开且保存的章节号变了）只 `clearTextChapter()`、**不回调 `upContent`**
-        //   ⇒ 该切章路径的加载期覆盖层不会出现（真实缺口）；而 `upData` 必经 `callBack.upMenuView()`
-        //   ⇒ 在 `upMenuView` 覆写里补一个同步点即闭合（模型层零改动、无重复加载风险）。
+    fun `图片书排除与保留的同步点须各有一处结构保证`() {
+        // 3.13 收口（2026-10-20）：
+        // ①`ReadBook.upData(book)` 必经 `callBack.upMenuView()`，`upMenuView` 里的同步点保留 ——
+        //   它的职责是"内容就绪即收尾隐藏"（**不再**是开轮依据：切章/翻页不得再弹首屏模板，
+        //   见下一个用例的第三轮裁定）。
         val menuStart = activity.indexOf("override fun upMenuView() {")
         val menuEnd = activity.indexOf("override fun loadChapterList", menuStart)
         assertTrue("upMenuView 覆写须存在", menuStart >= 0 && menuEnd > menuStart)
         assertTrue(
-            "upMenuView 须同步文本面首屏（闭合 upData 切章缺口）",
+            "upMenuView 须保留同步点（用于就绪收尾）",
             activity.substring(menuStart, menuEnd).contains("syncTextLoadingOverlay()")
         )
         // ②图片书/漫画的内容不进 `curTextChapter`（走 `ReadManga`）⇒ 若纳入"文本面"判定，
@@ -138,22 +138,26 @@ class LoadingTemplateOverlayViewContractTest {
     }
 
     @Test
-    fun `首屏模板须每轮都显示且不闪一下`() {
-        // 2026-10-20 用户第二轮实测：「首屏加载模板开启后，只有第一次才有，并且时间太短了，退出阅读再进就没有了」。
-        // 根因：`ReadBook` 是常驻单例 ⇒「退出再进」时 `curTextChapter` 已就绪，而旧判据是
-        // "`curTextChapter == null` 才显示" ⇒ 该场景永不显示；且内容一到就 `hide()` ⇒ 只闪一下。
-        // 本契约锁死三件事（防回退到旧行为）：
-        //  ① **不得**再用"无内容页"当"是否显示"的判据（`sync` 的显示分支里不得出现该条件）；
-        //  ② 必须**按轮次开新轮**（用 `ReadBook.durChapterIndex` 判定），保证每次进入/切章都显示；
-        //  ③ 必须有**最短展示时长**常量 + 使用，且延迟收尾带**轮次戳守卫**（防新轮被旧定时器收掉）。
+    fun `首屏模板须只在进入阅读页展示一次且不闪一下`() {
+        // 需求沿革（两轮用户口径都要满足）：
+        //  · 第二轮（2026-10-20）：「只有第一次才有，并且时间太短了，退出阅读再进就没有了」
+        //    ⇒ 根因：`ReadBook` 是常驻单例 ⇒「退出再进」时 `curTextChapter` 已就绪，而旧判据是
+        //    "`curTextChapter == null` 才显示" ⇒ 该场景永不显示；内容一到就 `hide()` ⇒ 只闪一下。
+        //  · 第三轮（2026-10-20）：「只有打开一本书看书的时候，第一次才展示，为什么现在翻页到这个内置主题
+        //    一个轮次后再次出现？」⇒ 上一版按 `ReadBook.durChapterIndex` 变化开轮 ⇒ **翻页/切章重复弹**。
+        // 故本轮收窄为「**每个"进入阅读页"只展示一次**」：
+        //  ① 显示判据不得再用"无内容页"；
+        //  ② 开轮判据须是"本轮是否已展示过"，且**不得**再依赖章节序号；
+        //  ③ 轮次须在**两个入口点**武装：`onPostCreate`（首次进入）/ `onNewIntent`（`singleTask` 复用实例再进）；
+        //  ④ 最短展示时长常量 + 延迟收尾的轮次戳守卫。
         val sync = bodyOf(activity, "private fun syncTextLoadingOverlay()")
         assertTrue(
-            "开轮判据须用 ReadBook.durChapterIndex（进入阅读页/切章即开轮）",
-            sync.contains("val index = ReadBook.durChapterIndex")
+            "开轮判据须是「本轮是否已展示过」",
+            sync.contains("if (!textLoadingRoundOpened)")
         )
-        assertTrue(
-            "须按轮次开新轮（否则「退出再进」看不到首屏）",
-            sync.contains("if (index != textLoadingRoundChapter)")
+        assertFalse(
+            "不得再按章节序号开轮（翻页/切章重复弹的根因）",
+            sync.contains("ReadBook.durChapterIndex")
         )
         assertTrue("开轮时须真的 show()（注入模板 + 文案）", sync.contains(".show("))
         assertFalse(
@@ -165,6 +169,20 @@ class LoadingTemplateOverlayViewContractTest {
         assertTrue(
             "最短展示时长须为常量定义（900ms）",
             Regex("private const val TEXT_LOADING_MIN_MS = 900L").containsMatchIn(activity)
+        )
+        assertTrue(
+            "须定义轮次武装点 private fun armTextLoadingRound()",
+            Regex("private fun armTextLoadingRound\\(\\)").containsMatchIn(activity)
+        )
+        assertTrue(
+            "首次进入（onPostCreate）须武装轮次",
+            bodyOf(activity, "override fun onPostCreate(savedInstanceState: Bundle?)")
+                .contains("armTextLoadingRound()")
+        )
+        assertTrue(
+            "singleTask 复用实例再进（onNewIntent）须武装轮次",
+            bodyOf(activity, "override fun onNewIntent(intent: Intent)")
+                .contains("armTextLoadingRound()")
         )
     }
 }
