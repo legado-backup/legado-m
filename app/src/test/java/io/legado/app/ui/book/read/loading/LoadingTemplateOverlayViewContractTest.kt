@@ -1,0 +1,119 @@
+package io.legado.app.ui.book.read.loading
+
+import io.legado.app.testkit.SourceFileProbe
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * 「文本面首屏加载模板覆盖层」契约单测（reader-theme-family 3.13 配对，2026-10-20）。
+ *
+ * 背景（用户诉求）：「首屏加载模板」此前**只有 EPUB 首屏**能看到；要求它像主题模式一样适配
+ * **所有阅读格式**（在线/离线文本小说 + EPUB）。真机取证（`loading overlay mode=` 正式自证串）：
+ * 在线/离线文本书 **0 条样本**（epub 路径根本不注入）⇒ 文本面无任何覆盖层。
+ *
+ * 本契约锁死四件事（均可在文本层机检，无需设备；行为侧由真机自证串覆盖）：
+ *  ①布局中覆盖层存在、id 正确、**位于 `text_rich_read_view` 之后**（保证叠在文本面之上）；
+ *  ②覆盖层**不吃手势**（不设 clickable/focusable），且默认 `gone`；
+ *  ③**绘制失败即透明**：`onDraw` 只有一次绘制调用（`overlay.draw`），无任何其他 canvas 绘制
+ *    ⇒ `draw` 返回 false 时本层什么都不画（"最弱也不比改造前差"，与 EPUB 侧同一不变量）；
+ *  ④Activity 接线：`syncTextLoadingOverlay` 在 `upContent` 与 `contentLoadFinish` **各至少调用一次**。
+ *
+ * ⚠️【局限】`ReadBookActivity.upContent` / `LoadingTemplateOverlayView.onDraw` 是 Android 实例方法，
+ * 依赖 Activity/View 宿主，纯 JVM 无法调用（与本仓既有 `OtherConfigLoadingTemplateEntryTest` 同族局限）
+ * ⇒ 这里用源码文本探针锁结构事实；**真机行为**由 `logLoadingOverlayMode` 的正式自证串覆盖。
+ */
+class LoadingTemplateOverlayViewContractTest {
+
+    private val layout = SourceFileProbe.layoutDir().resolve("activity_book_read.xml").readText()
+    private val overlayView = SourceFileProbe.sourceText("ui/book/read/loading/LoadingTemplateOverlayView.kt")
+    private val activity = SourceFileProbe.sourceText("ui/book/read/ReadBookActivity.kt")
+
+    private val overlayId = "@+id/loading_template_overlay"
+    private val textRichId = "@+id/text_rich_read_view"
+
+    /** 提取布局里承载该 id 的整个元素块（自 `<...LoadingTemplateOverlayView` 到其 `/>`）。 */
+    private fun overlayElementBlock(): String {
+        val match = Regex(
+            "<io\\.legado\\.app\\.ui\\.book\\.read\\.loading\\.LoadingTemplateOverlayView[\\s\\S]*?/>"
+        ).find(layout)
+        return match?.value ?: throw AssertionError("布局中未找到 LoadingTemplateOverlayView 元素（含 id $overlayId）")
+    }
+
+    /** 提取一个方法体（自 `signature` 后到下一个 4 空格缩进的 `}`）。 */
+    private fun bodyOf(source: String, signature: String): String {
+        val start = source.indexOf(signature)
+        if (start < 0) throw AssertionError("未找到方法签名：$signature")
+        val bodyStart = source.indexOf('{', start)
+        val end = source.indexOf("\n    }", bodyStart)
+        if (end < 0) throw AssertionError("未找到方法体结束：$signature")
+        return source.substring(bodyStart, end)
+    }
+
+    @Test
+    fun `布局覆盖层须存在且层叠在文本面之上`() {
+        val block = overlayElementBlock()
+        assertTrue("元素须带 id=$overlayId", block.contains("android:id=\"$overlayId\""))
+        val textRichIndex = layout.indexOf(textRichId)
+        val overlayIndex = layout.indexOf(overlayId)
+        assertTrue("text_rich_read_view 须在布局中", textRichIndex >= 0)
+        assertTrue("覆盖层须在布局中", overlayIndex >= 0)
+        // 后出现的子视图绘制在上层 ⇒ 覆盖层必须排在文本面之后，否则模板会被文本页盖住（等于没生效）
+        assertTrue("覆盖层必须位于 text_rich_read_view 之后（否则被文本面遮盖）", overlayIndex > textRichIndex)
+    }
+
+    @Test
+    fun `覆盖层默认隐藏且不吃手势`() {
+        val block = overlayElementBlock()
+        assertTrue("默认须 gone（未加载时不得占屏）", block.contains("android:visibility=\"gone\""))
+        assertFalse("不得设 clickable（会吃掉翻页手势）", block.contains("clickable"))
+        assertFalse("不得设 focusable（会抢焦点）", block.contains("focusable"))
+    }
+
+    @Test
+    fun `绘制失败即透明 全类不得有任何其他 canvas 绘制`() {
+        val onDraw = bodyOf(overlayView, "override fun onDraw(canvas: Canvas)")
+        // 行为事实①：本层唯一绘制入口是 overlay.draw（返回 false ⇒ 它自身没画 ⇒ 本层没画别的东西 ⇒ 透明）
+        assertEquals(
+            "onDraw 只能有一次绘制调用（overlay.draw）",
+            1,
+            Regex("overlay\\.draw\\(canvas,").findAll(onDraw).count()
+        )
+        assertEquals(
+            "onDraw 不得出现第二次绘制调用（任何 draw(）",
+            1,
+            Regex("draw\\(").findAll(onDraw).count()
+        )
+        // 行为事实②：显式分支 —— draw 返回 false 时直接返回（不补画底色/文字）
+        assertTrue(
+            "须有显式回落分支 if (!drewTemplate) return",
+            Regex("if \\(!drewTemplate\\) return").containsMatchIn(onDraw)
+        )
+        // 行为事实③：全类都不得有 canvas 绘制（否则"返回 false 即透明"不成立）
+        assertEquals("全类不得出现 canvas.draw 调用", 0, Regex("canvas\\.draw").findAll(overlayView).count())
+    }
+
+    @Test
+    fun `Activity 须在内容更新与加载完成两处各同步一次文本面首屏`() {
+        assertTrue(
+            "须定义同步点 syncTextLoadingOverlay",
+            Regex("private fun syncTextLoadingOverlay\\(\\)").containsMatchIn(activity)
+        )
+        val upContentRegion = activity.substring(
+            activity.indexOf("override fun upContent("),
+            activity.indexOf("override suspend fun upContentAwait(")
+        )
+        assertTrue(
+            "upContent 进入时须同步文本面首屏（切章时 curTextChapter 置 null 后正是此回调）",
+            upContentRegion.contains("syncTextLoadingOverlay()")
+        )
+        val finishStart = activity.indexOf("override fun contentLoadFinish() {")
+        val finishEnd = activity.indexOf("private fun consumeOpenReadAloudPanelIntent", finishStart)
+        val finishRegion = activity.substring(finishStart, finishEnd)
+        assertTrue(
+            "contentLoadFinish 须同步（保证内容就绪即隐藏）",
+            finishRegion.contains("syncTextLoadingOverlay()")
+        )
+    }
+}
