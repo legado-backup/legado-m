@@ -99,22 +99,54 @@ class ReaderTemplateGeometryContractTest {
     @Test
     fun `主题行高必须满足页眉加页脚不超过两成视口`() {
         val css = themeCss()
-        val rows = Regex("\\.dh-page\\s*\\{[^}]*grid-template-rows:\\s*([^;]+);")
-            .find(css)?.groupValues?.get(1)?.trim()
-        assertTrue("必须能解析 .dh-page 的 grid-template-rows", rows != null)
-        val tracks = Regex("clamp\\([^)]*\\)|minmax\\([^)]*\\)|[\\d.]+px")
-            .findAll(rows!!).map { it.value }.toList()
-        assertTrue("行轨道至少三项（页眉 / 正文 / 页脚）", tracks.size >= 3)
+        val pageRule = Regex("\\.dh-page\\s*\\{([^}]*)}").find(css)?.groupValues?.get(1)
+        assertTrue("必须能解析 .dh-page 规则块", pageRule != null)
 
-        // 参考视口 854 CSS px（本轮 MEmu 口径）：`clamp(min, Nvh, max)` 取实际生效值
+        // ① 行高**单一来源**（2026-10-20 回归点）：grid-template-rows 必须**引用变量**，不得再各写一份。
+        //    旧版"变量与 grid 行各写一份"正是"带宽变矮而角色没跟着缩"（页眉角色被裁）的漂移根源。
+        val rows = Regex("grid-template-rows:\\s*([^;]+);").find(pageRule!!)?.groupValues?.get(1)?.trim()
+        assertTrue("必须能解析 .dh-page 的 grid-template-rows", rows != null)
+        assertTrue(
+            "行轨道必须引用 --dh-band-h / --dh-foot-h（与变量各写一份 ⇒ 必然漂移）",
+            rows!!.contains("var(--dh-band-h)") && rows.contains("var(--dh-foot-h)")
+        )
+
+        // ② 带宽变量必须在 .dh-page 上定义，且 `--dh-band-cur` 指向 `--dh-band-h`
+        //    （`.dh-stage` 的 `font-size: calc(var(--dh-band-cur)/100)` ⇒ 1em = 1% 带高，页眉内 em 缩放的基准）
+        val band = Regex("--dh-band-h:\\s*(clamp\\([^)]*\\))").find(pageRule)?.groupValues?.get(1)
+        val foot = Regex("--dh-foot-h:\\s*(clamp\\([^)]*\\))").find(pageRule)?.groupValues?.get(1)
+        assertTrue("必须定义 --dh-band-h（页眉带宽单一来源）", band != null)
+        assertTrue("必须定义 --dh-foot-h（页脚带宽单一来源）", foot != null)
+        assertTrue(
+            "--dh-band-cur 必须指向 --dh-band-h（页眉 em 缩放基准单源）",
+            pageRule.contains("--dh-band-cur: var(--dh-band-h)")
+        )
+
+        // ③ 参考视口 854 CSS px（本轮 MEmu 竖屏口径）：页眉 + 页脚 ≤ 0.2×视口
         val referenceVp = 854.0
-        val header = trackValue(tracks.first(), referenceVp)
-        val footer = trackValue(tracks.last(), referenceVp)
+        val header = trackValue(band!!, referenceVp)
+        val footer = trackValue(foot!!, referenceVp)
         val limit = 0.2 * referenceVp
         assertEquals("参考视口须为 854（本轮实测口径）", 170.8, limit, 0.001)
         assertTrue(
             "页眉行(%.1f) + 页脚行(%.1f) 必须 ≤ 0.2×视口(%.1f)（保正文区 ≥80%%）".format(header, footer, limit),
             header + footer <= limit
+        )
+
+        // ④ 矮屏/横屏档（真机 853×533 口径，2026-10-19 实测发现）：媒体查询内必须另收一档，
+        //    且该档同样满足 ≤ 0.2×533（否则横屏正文区仅 78.2%，跌破 ≥80% 硬指标）。
+        val media = Regex(
+            "@media\\s*\\(max-height:\\s*600px\\)\\s*\\{[\\s\\S]*?" +
+                "--dh-band-h:\\s*(clamp\\([^)]*\\))[\\s\\S]*?--dh-foot-h:\\s*(clamp\\([^)]*\\))"
+        ).find(css)
+        assertTrue("必须存在 max-height:600px 矮屏档（否则 853×533 正文区跌破 80%）", media != null)
+        val landscapeVp = 533.0
+        val header2 = trackValue(media!!.groupValues[1], landscapeVp)
+        val footer2 = trackValue(media.groupValues[2], landscapeVp)
+        val limit2 = 0.2 * landscapeVp
+        assertTrue(
+            "矮屏档 页眉(%.1f) + 页脚(%.1f) 必须 ≤ 0.2×%.0f(%.1f)".format(header2, footer2, landscapeVp, limit2),
+            header2 + footer2 <= limit2
         )
     }
 
