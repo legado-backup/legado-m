@@ -9,14 +9,15 @@ import io.legado.app.data.entities.rule.BookListRule
  * 移植自上游 `help/source/BookSourceConfiguration.kt`（NG 分支），用途：导入时把「没有任何抓取配置」
  * 的空壳源标记为无效并**硬阻断**（不可勾选、不导入），避免导入后书架满面却什么也搜不到。
  *
- * 三条设计约束（照抄上游语义，勿随意放宽）：
+ * 四条设计约束（照抄上游语义，勿随意放宽）：
  * 1. **只判配置全空**，不把「缺少某个入口」或「联网失败」当作无效 —— 源站临时不可达 ≠ 源无效；
  * 2. **不执行脚本**、不调用会创建默认规则对象的 getter、**不修改书源**（保持纯函数）；
  * 3. `eventListener` / `customButton` / `canReName` / `imageStyle` 等**显示/行为开关**不算抓取配置，
  *    但 `eventListener`/`customButton` 一旦开启说明源有自定义行为 ⇒ 不算全空。
+ * 4. JS 单文件书源（`mainJs` 非空）**自带全部抓取逻辑**，规则字段为空也属正常 ⇒ 不算全空。
  */
 fun BookSource.isEmptyConfiguration(): Boolean {
-    if (eventListener || customButton || !blank(
+    if (eventListener || customButton || !mainJs.isNullOrBlank() || !blank(
             searchUrl, exploreUrl, jsLib, loginUrl, loginUi, loginCheckJs,
             bookUrlPattern, coverDecodeJs, header, exploreScreen,
         )

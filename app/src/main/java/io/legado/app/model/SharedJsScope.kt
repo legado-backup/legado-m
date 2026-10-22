@@ -101,6 +101,16 @@ object SharedJsScope {
         }
     }
 
+    /**
+     * 把 CryptoJS 注入指定脚本作用域。
+     * 单文件 JS 书源导入期需在临时作用域解析 `config`（含加密字段），此时缓存作用域不可复用。
+     */
+    fun installCryptoJs(scope: Scriptable, coroutineContext: CoroutineContext?) {
+        loadCryptoJs()?.let {
+            runCatching { RhinoScriptEngine.eval(it, scope, coroutineContext) }
+        }
+    }
+
     fun getScope(jsLib: String?, coroutineContext: CoroutineContext?): Scriptable? {
         if (jsLib.isNullOrBlank()) {
             return null
@@ -117,31 +127,41 @@ object SharedJsScope {
                 }
             }
             if (jsLib.isJsonObject()) {
-                val jsMap: Map<String, String> = GSON.fromJson(
-                    jsLib,
-                    TypeToken.getParameterized(
-                        Map::class.java,
-                        String::class.java,
-                        String::class.java
-                    ).type
-                )
-                jsMap.values.forEach { value ->
-                    if (value.isAbsUrl()) {
-                        val fileName = MD5Utils.md5Encode(value)
-                        var js = aCache.getAsString(fileName)
-                        if (js == null) {
-                            js = runBlocking {
-                                okHttpClient.newCallStrResponse {
-                                    url(value)
-                                }.body
+                // ng-js-source-port：新版 JSON jsLib 支持「内联资源包」
+                // （format=legado.js.library/1 + scripts + resources），与旧
+                // 「Map<String,String>（值为 URL）」语义并存：识别成功走资源包，否则保持原逻辑。
+                val bundle = JsLibraryBundle.parse(jsLib)
+                if (bundle != null) {
+                    bundle.scripts.forEach { script ->
+                        RhinoScriptEngine.eval(script, scope, coroutineContext)
+                    }
+                } else {
+                    val jsMap: Map<String, String> = GSON.fromJson(
+                        jsLib,
+                        TypeToken.getParameterized(
+                            Map::class.java,
+                            String::class.java,
+                            String::class.java
+                        ).type
+                    )
+                    jsMap.values.forEach { value ->
+                        if (value.isAbsUrl()) {
+                            val fileName = MD5Utils.md5Encode(value)
+                            var js = aCache.getAsString(fileName)
+                            if (js == null) {
+                                js = runBlocking {
+                                    okHttpClient.newCallStrResponse {
+                                        url(value)
+                                    }.body
+                                }
+                                if (js != null) {
+                                    aCache.put(fileName, js)
+                                } else {
+                                    throw NoStackTraceException("下载jsLib-${value}失败")
+                                }
                             }
-                            if (js != null) {
-                                aCache.put(fileName, js)
-                            } else {
-                                throw NoStackTraceException("下载jsLib-${value}失败")
-                            }
+                            RhinoScriptEngine.eval(js, scope, coroutineContext)
                         }
-                        RhinoScriptEngine.eval(js, scope, coroutineContext)
                     }
                 }
             } else {
@@ -163,18 +183,22 @@ object SharedJsScope {
             return
         }
         if (jsLib.isJsonObject()) {
-            val jsMap: Map<String, String> = GSON.fromJson(
-                jsLib,
-                TypeToken.getParameterized(
-                    Map::class.java,
-                    String::class.java,
-                    String::class.java
-                ).type
-            )
-            jsMap.values.forEach { value ->
-                if (value.isAbsUrl()) {
-                    val fileName = MD5Utils.md5Encode(value)
-                    aCache.remove(fileName)
+            // 资源包（legado.js.library/1）没有 URL 缓存项，只需清作用域缓存；
+            // 不能按 Map<String,String> 解析（值是数组/对象会抛异常并中断删除流程）。
+            if (runCatching { JsLibraryBundle.parse(jsLib) }.getOrNull() == null) {
+                val jsMap: Map<String, String> = GSON.fromJson(
+                    jsLib,
+                    TypeToken.getParameterized(
+                        Map::class.java,
+                        String::class.java,
+                        String::class.java
+                    ).type
+                )
+                jsMap.values.forEach { value ->
+                    if (value.isAbsUrl()) {
+                        val fileName = MD5Utils.md5Encode(value)
+                        aCache.remove(fileName)
+                    }
                 }
             }
         }

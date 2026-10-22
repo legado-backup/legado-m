@@ -156,6 +156,20 @@ object BookChapterList {
                 }
             }
         }
+        updateBookTocInfo(book, list)
+        // M4 SourcePreconnectHelper 统一预连接（目录加载后预连接前3章，借鉴 RssSource F-P1-F 机制）
+        SourcePreconnectHelper.preconnectTopN(list.map { it.url }, 3)
+        return list
+    }
+
+    /**
+     * 目录信息回填（当前读进度标题 / 章节总数 / 最新章 / 字数统计）。
+     *
+     * 声明式目录链与 JS 单文件书源（`JsSourceBook.getChapterListAwait`）共用此段逻辑，
+     * 避免两条链路各写一份导致「最新章 / 总章数」口径漂移。
+     */
+    suspend fun updateBookTocInfo(book: Book, list: ArrayList<BookChapter>) {
+        if (list.isEmpty()) return
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
         val replaceBook = book.toReplaceBook()
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
@@ -179,9 +193,6 @@ object BookChapterList {
                 )
         currentCoroutineContext().ensureActive()
         upChapterInfo(list, book)
-        // M4 SourcePreconnectHelper 统一预连接（目录加载后预连接前3章，借鉴 RssSource F-P1-F 机制）
-        SourcePreconnectHelper.preconnectTopN(list.map { it.url }, 3)
-        return list
     }
 
     private suspend fun analyzeChapterList(

@@ -1,0 +1,316 @@
+package io.legado.app.model.jsSource
+
+import androidx.collection.LruCache
+import android.os.SystemClock
+import cn.hutool.core.codec.Base64
+import com.google.gson.JsonObject
+import com.script.CompiledScript
+import com.script.ScriptBindings
+import com.script.buildScriptBindings
+import com.script.rhino.RhinoContext
+import com.script.rhino.RhinoScriptEngine
+import io.legado.app.data.entities.BaseSource
+import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.JsExtensions
+import io.legado.app.help.http.CookieStore
+import io.legado.app.help.http.addHeaders
+import io.legado.app.help.http.networkLogSource
+import io.legado.app.help.http.newCallResponse
+import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.http.text
+import io.legado.app.help.source.getShareScope
+import io.legado.app.help.source.scriptCacheObject
+import io.legado.app.help.source.withBookSourceClassPolicy
+import io.legado.app.model.SharedJsScope
+import io.legado.app.model.JsLibraryBundle
+import io.legado.app.model.Debug
+import io.legado.app.quickjs.QuickJsSandboxBridge
+import io.legado.app.quickjs.QuickJsSandboxExecution
+import io.legado.app.quickjs.V8SandboxBridge
+import io.legado.app.quickjs.V8SandboxExecution
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.Function
+import org.mozilla.javascript.NativeJSON
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.Undefined
+import org.mozilla.javascript.Wrapper
+import splitties.init.appCtx
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import java.util.zip.InflaterInputStream
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+
+/**
+ * 纯 JavaScript 单文件书源执行器。
+ *
+ * 每次业务调用创建独立局部作用域，复用当前主线按书源隔离的 Cookie、源共享缓存、共享 jsLib
+ * 与 Rhino 类访问策略。仅此 java 宿主对象额外提供字符串输入输出的 QuickJS 窄门面；
+ * 声明式书源继续走原有 AnalyzeRule 链，两种书源只在 WebBook 入口分流。
+ */
+class JsSourceEngine(
+    private val source: BookSource,
+    coroutineContext: CoroutineContext? = null,
+) : JsExtensions {
+
+    // Synchronous JS bridges must not dispatch back into the pool they are blocking.
+    // Keep the caller's Job and source interaction policy for cancellation and isolation.
+    private val coroutineContext = coroutineContext?.withoutScriptDispatcher()
+
+    private val quickJsSandboxBridge by lazy { QuickJsSandboxBridge(appCtx) }
+    private val quickJsExecution = ThreadLocal<Lazy<QuickJsSandboxExecution>>()
+    private val v8SandboxBridge by lazy { V8SandboxBridge(appCtx) }
+    private val v8Execution = ThreadLocal<Lazy<V8SandboxExecution>>()
+    private val libraryBundle by lazy { JsLibraryBundle.parse(source.jsLib) }
+
+    override fun getSource(): BaseSource = source
+
+    override fun getTag(): String = source.getTag()
+
+    /** Read-only access to this source's inline data; no files, URLs or host objects. */
+    fun getJsLibResource(name: String): String? = libraryBundle?.resources?.get(name)
+
+    /** Bounded archive data already owned by the source; never opens a URL or file. */
+    fun getArchiveByteArrayContent(base64: String, entryName: String): ByteArray? =
+        MemoryArchiveReader.read(base64, entryName)
+
+    /** 仅单文件 JS 运行时可达；QuickJS 本体不暴露给 Rhino。 */
+    fun getQuickJsSandbox(): QuickJsSandboxBridge {
+        val execution = quickJsExecution.get()?.value ?: return quickJsSandboxBridge
+        // The source can acquire its bridge before HTTP work. Only the isolated
+        // service connection starts here; no script or user data is evaluated.
+        execution.prepare()
+        return execution.bridge
+    }
+
+    /** System engine stays behind the same string-only isolation boundary. */
+    fun getV8Sandbox(): V8SandboxBridge {
+        val execution = v8Execution.get()?.value ?: return v8SandboxBridge
+        execution.prepare()
+        return execution.bridge
+    }
+
+    private fun <T> withQuickJsExecution(block: () -> T): T {
+        val previous = quickJsExecution.get()
+        val previousV8 = v8Execution.get()
+        val execution = lazy { QuickJsSandboxExecution(appCtx) }
+        val systemExecution = lazy { V8SandboxExecution(appCtx) }
+        quickJsExecution.set(execution)
+        v8Execution.set(systemExecution)
+        return try {
+            block()
+        } finally {
+            if (previous == null) quickJsExecution.remove() else quickJsExecution.set(previous)
+            if (previousV8 == null) v8Execution.remove() else v8Execution.set(previousV8)
+            try {
+                if (execution.isInitialized()) execution.value.close()
+            } finally {
+                if (systemExecution.isInitialized()) systemExecution.value.close()
+            }
+        }
+    }
+
+    /**
+     * 仅单文件 JS 运行时可达。用于协议确实要求原始二进制正文的请求；调用方以 Base64
+     * 传入，避免把任意字节先转换成 UTF-8 字符串而损坏内容。
+     */
+    fun postBase64Body(url: String, bodyBase64: String, headersJson: String?): String {
+        val httpUrl = url.toHttpUrl()
+        require(httpUrl.isHttps) { "二进制请求只允许 HTTPS" }
+        val body = Base64.decode(bodyBase64)
+        require(body.isNotEmpty()) { "二进制请求正文不能为空" }
+        require(body.size <= MAX_BINARY_REQUEST_BYTES) { "二进制请求正文过大" }
+        val headers = headersJson
+            ?.let { GSON.fromJsonObject<Map<String, String>>(it).getOrNull() }
+            ?: emptyMap()
+        val contentType = headers.entries
+            .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+            ?.value
+            ?.toMediaTypeOrNull()
+        val response = runBlocking(coroutineContext ?: EmptyCoroutineContext) {
+            okHttpClient.newCallResponse {
+                url(httpUrl)
+                addHeaders(headers)
+                networkLogSource(source.getTag())
+                post(body.toRequestBody(contentType))
+            }
+        }
+        response.use {
+            return JsonObject().apply {
+                addProperty("code", it.code)
+                addProperty("body", it.body.text())
+            }.toString()
+        }
+    }
+
+    /** 仅单文件 JS 运行时可达；把 UTF-8 文本压成可安全跨 Rhino 边界传递的 Base64。 */
+    fun gzipUtf8ToBase64(value: String): String {
+        val output = ByteArrayOutputStream()
+        GZIPOutputStream(output).use { it.write(value.toByteArray(Charsets.UTF_8)) }
+        return Base64.encode(output.toByteArray())
+    }
+
+    /**
+     * 仅单文件 JS 运行时可达；解开 Base64 中的 gzip/zlib 数据。未压缩输入按 UTF-8 原样返回。
+     */
+    fun decompressBase64ToUtf8(value: String): String {
+        val input = Base64.decode(value)
+        val stream = when {
+            input.size >= 2 && input[0] == 0x1f.toByte() && input[1] == 0x8b.toByte() ->
+                GZIPInputStream(ByteArrayInputStream(input))
+
+            input.size >= 2 && input[0] == 0x78.toByte() ->
+                InflaterInputStream(ByteArrayInputStream(input))
+
+            else -> ByteArrayInputStream(input)
+        }
+        return stream.use { it.readBytes().toString(Charsets.UTF_8) }
+    }
+
+    fun callFunction(name: String, args: List<Pair<String, Any?>>): String? {
+        return withQuickJsExecution {
+            source.withBookSourceClassPolicy {
+                val scope = buildScope(args)
+                if (ScriptableObject.getProperty(scope, name) !is Function) {
+                    throw NoStackTraceException("JS源缺少函数 $name")
+                }
+                val expression = "$name(${args.joinToString(", ") { it.first }})"
+                normalizeJsResult(compile(expression).eval(scope, coroutineContext), coroutineContext)
+            }
+        }
+    }
+
+    fun callFunctionIfExists(name: String, args: List<Pair<String, Any?>>): String? {
+        return callOptionalFunction(name, args).value
+    }
+
+    internal fun callOptionalFunction(
+        name: String,
+        args: List<Pair<String, Any?>>,
+    ): OptionalCallResult {
+        return withQuickJsExecution {
+            source.withBookSourceClassPolicy {
+                val scope = buildScope(args)
+                if (ScriptableObject.getProperty(scope, name) !is Function) {
+                    return@withBookSourceClassPolicy OptionalCallResult(false, null)
+                }
+                val expression = "$name(${args.joinToString(", ") { it.first }})"
+                OptionalCallResult(
+                    exists = true,
+                    value = normalizeJsResult(
+                        compile(expression).eval(scope, coroutineContext),
+                        coroutineContext,
+                    ),
+                )
+            }
+        }
+    }
+
+    internal data class OptionalCallResult(
+        val exists: Boolean,
+        val value: String?,
+    )
+
+    private fun buildScope(args: List<Pair<String, Any?>>): Scriptable {
+        val profiling = Debug.isDebugging(source.getKey())
+        val started = if (profiling) SystemClock.elapsedRealtime() else 0L
+        val script = source.mainJs?.takeIf { it.isNotBlank() }
+            ?: throw NoStackTraceException("mainJs 为空，不是 JS 书源")
+        val bindings = buildScriptBindings { values ->
+            values["java"] = this
+            values["source"] = source
+            values["sourceApi"] = source
+            values["baseUrl"] = source.getKey()
+            values["cookie"] = CookieStore
+            values["cache"] = source.scriptCacheObject()
+            args.forEach { (key, value) -> values[key] = value }
+        }
+        val sharedScope = source.getShareScope(coroutineContext)
+            ?: SharedJsScope.getCryptoScope(coroutineContext)
+        val sharedReady = if (profiling) SystemClock.elapsedRealtime() else 0L
+        val scope = if (sharedScope == null) {
+            RhinoScriptEngine.getRuntimeScope(bindings)
+        } else {
+            // 本地 Rhino 版本无 NG 的 chainTo：以共享库作用域为原型链，等价复用 jsLib/CryptoJS
+            bindings.apply { prototype = sharedScope }
+        }
+        compile(script).eval(scope, coroutineContext)
+        if (profiling) {
+            Debug.log(source.getKey(), "JS初始化：共享库 ${sharedReady - started}ms，主脚本 ${SystemClock.elapsedRealtime() - sharedReady}ms")
+        }
+        return scope
+    }
+
+    companion object {
+
+        private const val MAX_BINARY_REQUEST_BYTES = 512 * 1024
+        private val scriptCache = LruCache<String, CompiledScript>(64)
+
+        private fun compile(script: String): CompiledScript {
+            scriptCache[script]?.let { return it }
+            return RhinoScriptEngine.compile(script).also { scriptCache.put(script, it) }
+        }
+
+        fun normalizeJsResult(
+            result: Any?,
+            coroutineContext: CoroutineContext? = null,
+        ): String? {
+            var value = result
+            if (value is Wrapper) value = value.unwrap()
+            return when {
+                value == null || value is Undefined -> null
+                value is String -> value
+                value is CharSequence -> value.toString()
+                value is Scriptable -> stringifyScriptable(value, coroutineContext)
+                    ?: GSON.toJson(value)
+                else -> GSON.toJson(value)
+            }
+        }
+
+        private fun stringifyScriptable(
+            value: Scriptable,
+            coroutineContext: CoroutineContext?,
+        ): String? {
+            val topScope = value.parentScope?.let(ScriptableObject::getTopLevelScope)
+                ?: return null
+            val context = Context.enter() as RhinoContext
+            val previousCoroutineContext = context.coroutineContext
+            val previousAllowScriptRun = context.allowScriptRun
+            if (coroutineContext != null && coroutineContext[Job] != null) {
+                context.coroutineContext = coroutineContext
+            }
+            context.allowScriptRun = true
+            context.recursiveCount++
+            try {
+                context.checkRecursive()
+                val raw = try {
+                    NativeJSON.stringify(context, topScope, value, null, null)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw NoStackTraceException(
+                        "JS返回值 JSON.stringify 失败: ${error.message}"
+                    )
+                }
+                return RhinoScriptEngine.unwrapReturnValue(raw) as? String
+            } finally {
+                context.recursiveCount--
+                context.allowScriptRun = previousAllowScriptRun
+                context.coroutineContext = previousCoroutineContext
+                Context.exit()
+            }
+        }
+    }
+}

@@ -1,5 +1,7 @@
 package io.legado.app.web.mcp.tools
 
+import io.legado.app.data.entities.BookSource
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.service.kernel.BookSourceKernel
 import io.legado.app.service.kernel.SourceDebugKernel
 import io.legado.app.service.kernel.SourceTempKernel
@@ -27,7 +29,9 @@ object SourceTools {
             name = "source_get",
             title = "读取书源",
             description = "读取书源：带 url 返回单条书源完整 JSON（含规则字段）；不带 url 返回全部书源数组。" +
-                "AI 修改规则前应先读一次拿到当前规则原文。",
+                "AI 修改规则前应先读一次拿到当前规则原文。" +
+                "**JS 单文件书源的脚本正文不下发**（仅返回 isJsSource/mainJsLength 标记），" +
+                "取脚本请用 `js_source_export`（MANAGE 级）。",
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.READONLY,
             readOnlyHint = true,
@@ -37,7 +41,11 @@ object SourceTools {
             ),
         ) { args ->
             val url = args.str("url")?.trim().orEmpty()
-            if (url.isEmpty()) BookSourceKernel.sources() else BookSourceKernel.source(url)
+            if (url.isEmpty()) {
+                BookSourceKernel.sources().map { it.withoutScript() }
+            } else {
+                BookSourceKernel.source(url)?.withoutScript()
+            }
         },
 
         McpTool(
@@ -268,4 +276,19 @@ object SourceTools {
             BookSourceKernel.qualityReport(args.strList("urls"), args.str("apply"))
         },
     )
+}
+
+/**
+ * `source_get` 的输出裁剪：JS 源不下发脚本正文（凭据级内容），只保留判定标记与长度。
+ * 取完整脚本请走 `js_source_export`（MANAGE 级）。
+ */
+private fun BookSource.withoutScript(): com.google.gson.JsonObject {
+    val obj = com.google.gson.JsonParser
+        .parseString(io.legado.app.utils.GSON.toJson(this))
+        .asJsonObject
+    val script = mainJs
+    obj.remove("mainJs")
+    obj.addProperty("isJsSource", isJsSource())
+    obj.addProperty("mainJsLength", script?.length ?: 0)
+    return obj
 }

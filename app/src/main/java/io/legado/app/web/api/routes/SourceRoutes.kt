@@ -32,6 +32,13 @@ object SourceRoutes {
         ApiRoute(Method.POST, "/deleteBookSources", Level.MANAGE, mcpToolName = "source_delete") { ctx ->
             BookSourceController.deleteSources(ctx.postData)
         },
+        // JS 单文件书源脚本（凭据级内容独立端点：普通 getBookSource 不下发脚本）
+        ApiRoute(Method.GET, "/getBookSourceScript", Level.MANAGE, mcpToolName = "js_source_export") { ctx ->
+            BookSourceController.getScript(ctx.parameters)
+        },
+        ApiRoute(Method.POST, "/saveBookSourceScript", Level.MANAGE, mcpToolName = "js_source_save") { ctx ->
+            BookSourceController.saveScript(ctx.postData)
+        },
 
         // ---- 订阅源 ----
         ApiRoute(Method.GET, "/getRssSource", Level.READONLY, mcpToolName = "rss_source_get") { ctx ->

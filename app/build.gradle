@@ -319,6 +319,8 @@ dependencies {
     //kotlin
     //noinspection GradleDependency,DifferentStdlibGradleVersion
     implementation(libs.kotlin.stdlib)
+    // NG JS 书源沙箱（ng-js-source-port）：QuickJS + AndroidX JavaScriptEngine 独立进程
+    implementation(project(':modules:quickjs-sandbox'))
     //Kotlin反射
     //noinspection GradleDependency,DifferentStdlibGradleVersion
     //implementation(libs.kotlin.reflect)

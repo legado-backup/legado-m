@@ -71,6 +71,10 @@ import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.model.login.LoginUiV2
+import io.legado.app.model.login.evalLoginActionV2
+import io.legado.app.model.login.evalLoginUiV2
+import io.legado.app.model.login.isLoginUiV2
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.compose.AppDialogFrame
@@ -125,6 +129,16 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
     /** 优化4（F165）：登录执行态与失败详情——执行期按钮转圈禁点，失败留在表单内可复制/重试 */
     private var loginRunning by mutableStateOf(false)
     private var loginError by mutableStateOf<String?>(null)
+
+    // ---- 动态登录 V2（单文件 JS 书源 loginUi 函数 / 标记）----
+    private var isV2 by mutableStateOf(false)
+    private var v2StateJson by mutableStateOf("{}")
+    private var v2Rows by mutableStateOf<List<RowUi>>(emptyList())
+    /** V2 表单值：按 row.key 提交（与老版按 name 区分） */
+    private var v2Values by mutableStateOf<Map<String, String>>(emptyMap())
+    private var v2Errors by mutableStateOf<Map<String, String>>(emptyMap())
+    private var v2Countdowns by mutableStateOf<Map<String, Int>>(emptyMap())
+    private var v2EnabledActions by mutableStateOf<Map<String, Boolean>>(emptyMap())
 
     private val sourceLoginJsExtensions by lazy {
         SourceLoginJsExtensions(
@@ -318,7 +332,20 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
                                 }
                             },
                             content = {
-                                LoginRowsContent(source, style)
+                                if (isV2) {
+                                    LoginV2RowsContent(
+                                        style = style,
+                                        rows = v2Rows,
+                                        values = v2Values,
+                                        errors = v2Errors,
+                                        countdowns = v2Countdowns,
+                                        enabledActions = v2EnabledActions,
+                                        onValueChange = ::onV2ValueChange,
+                                        onAction = ::onV2RowAction
+                                    )
+                                } else {
+                                    LoginRowsContent(source, style)
+                                }
                                 // 优化4（F165）：失败不再只弹 2 秒 toast——错误卡留在表单内，
                                 // 异常全文可滚动可复制，处理完（或重试成功）才消失
                                 loginError?.let { detail ->
@@ -343,8 +370,13 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
                                     enabled = !loginRunning,
                                     loading = loginRunning,
                                     onClick = {
-                                        oKToClose = true
-                                        source?.let(::login)
+                                        // V2：登录动作由脚本通过按钮驱动，确认仅关闭弹窗
+                                        if (isV2) {
+                                            dismiss()
+                                        } else {
+                                            oKToClose = true
+                                            source?.let(::login)
+                                        }
                                     },
                                     primary = true,
                                     cornerRadius = style.actionRadius
@@ -561,6 +593,12 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
         super.onViewCreated(view, savedInstanceState)
         val source = viewModel.source ?: return
         loginUrl = source.getLoginJs()
+        // 单文件 JS 书源：loginUi 为 {"version":2} 标记或函数，走动态渲染分支（老表单路径零改动）
+        if (source.isLoginUiV2()) {
+            isV2 = true
+            renderV2()
+            return
+        }
         val loginUiStr = source.loginUi ?: return
         val codeStr = loginUiStr.let {
             when {
@@ -623,6 +661,149 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
         return viewModel.loginInfo.toMutableMap().apply { putAll(loginData) }
     }
 
+    /**
+     * V2 渲染：脚本返回 rows（key/type/value/options/countdown），状态由脚本维护的 state 驱动。
+     * 渲染失败时保留上一份表单并提示，不把异常堆栈直接铺进弹窗（老表单错误卡不受影响）。
+     */
+    private fun renderV2(
+        candidateState: String = v2StateJson,
+        commandErrors: Map<String, String> = emptyMap(),
+        restoreAction: String? = null
+    ) {
+        val source = viewModel.source ?: return
+        val sessionValues = v2Values
+        lifecycleScope.launch(IO) {
+            val result = runCatching {
+                LoginUiV2.parseRender(source.evalLoginUiV2(candidateState))
+                    ?.let { it to source.getLoginInfoMap() }
+            }.onFailure { ensureActive() }
+            withContext(Main) {
+                val pair = result.getOrNull()
+                if (pair?.first == null) {
+                    restoreAction?.let { v2EnabledActions = v2EnabledActions + (it to true) }
+                    result.exceptionOrNull()?.let {
+                        AppLog.put("登录 UI v2 渲染出错", it)
+                    } ?: AppLog.put("登录 UI v2 渲染结果格式错误")
+                    if (v2Rows.isEmpty()) {
+                        v2Rows = listOf(
+                            RowUi(
+                                name = getString(R.string.login_ui_v2_render_error),
+                                type = Type.label
+                            )
+                        )
+                    } else {
+                        context?.toastOnUi(R.string.login_ui_v2_render_error)
+                        v2Errors = commandErrors
+                    }
+                    return@withContext
+                }
+                val rows = pair.first
+                val stored = pair.second
+                val newValues = linkedMapOf<String, String>()
+                rows.forEach { row ->
+                    if (row.type == Type.text || row.type == Type.password ||
+                        row.type == Type.select || row.type == Type.toggle
+                    ) {
+                        val key = row.key ?: return@forEach
+                        val options = row.options.orEmpty()
+                        newValues[key] = LoginUiV2.resolveFieldValue(
+                            row.value,
+                            sessionValues[key],
+                            stored[key]
+                        )?.takeIf { row.type != Type.select || it in options }
+                            ?: options.firstOrNull().orEmpty()
+                    }
+                }
+                v2StateJson = candidateState
+                v2Values = newValues
+                v2Rows = rows
+                v2Errors = commandErrors
+                restoreAction?.let { v2EnabledActions = v2EnabledActions + (it to true) }
+            }
+        }
+    }
+
+    /** V2 按钮/开关/下拉动作：脚本返回 state/error/login/close 四种命令。 */
+    private fun dispatchV2(action: String, countdownSeconds: Int?) {
+        val source = viewModel.source ?: return
+        if ((v2Countdowns[action] ?: 0) > 0 || v2EnabledActions[action] == false) return
+        v2Errors = emptyMap()
+        v2EnabledActions = v2EnabledActions + (action to false)
+        val formJson = GSON.toJson(v2Values)
+        lifecycleScope.launch(IO) {
+            val result = runCatching {
+                source.evalLoginActionV2(action, v2StateJson, formJson)
+            }.onFailure { ensureActive() }
+            withContext(Main) {
+                val error = result.exceptionOrNull()
+                if (error != null) {
+                    v2EnabledActions = v2EnabledActions + (action to true)
+                    AppLog.put("登录 UI v2 动作 $action 出错", error)
+                    context?.toastOnUi(
+                        getString(
+                            R.string.login_ui_v2_action_error,
+                            error.localizedMessage ?: error.toString()
+                        )
+                    )
+                    return@withContext
+                }
+                val command = LoginUiV2.parseActionResult(result.getOrNull())
+                if (command.malformed) {
+                    v2EnabledActions = v2EnabledActions + (action to true)
+                    AppLog.put("登录 UI v2 动作 $action 返回了无效指令")
+                    context?.toastOnUi(R.string.login_ui_v2_invalid_action)
+                    return@withContext
+                }
+                command.unknownKeys.forEach {
+                    AppLog.put("登录 UI v2 动作 $action 返回未知命令 $it，已忽略")
+                }
+                command.loginJson?.let { loginJson ->
+                    if (!source.putLoginInfo(loginJson)) {
+                        v2EnabledActions = v2EnabledActions + (action to true)
+                        context?.toastOnUi(R.string.login_ui_v2_save_error)
+                        return@withContext
+                    }
+                }
+                if (command.close) {
+                    dismiss()
+                    return@withContext
+                }
+                if (command.stateJson == null) {
+                    v2EnabledActions = v2EnabledActions + (action to true)
+                }
+                if (command.error.isNullOrEmpty() && countdownSeconds != null && countdownSeconds > 0) {
+                    startCountdown(action, countdownSeconds)
+                }
+                if (command.stateJson != null) {
+                    renderV2(command.stateJson, command.error.orEmpty(), action)
+                } else {
+                    v2Errors = command.error.orEmpty()
+                }
+            }
+        }
+    }
+
+    private fun startCountdown(action: String, seconds: Int) {
+        lifecycleScope.launch {
+            for (left in seconds downTo 1) {
+                v2Countdowns = v2Countdowns + (action to left)
+                delay(1000L)
+            }
+            v2Countdowns = v2Countdowns - action
+            v2EnabledActions = v2EnabledActions + (action to true)
+        }
+    }
+
+    private fun onV2ValueChange(row: RowUi, value: String) {
+        val key = row.key ?: return
+        v2Values = v2Values + (key to value)
+    }
+
+    private fun onV2RowAction(row: RowUi) {
+        val action = row.action ?: return
+        dispatchV2(action, row.countdown)
+    }
+
     private fun login(source: BaseSource) {
         val currentRows = rowUis
         if (loginRunning) return
@@ -673,7 +854,8 @@ class SourceLoginDialog() : ComposeDialogFragment(), SourceLoginJsExtensions.Cal
     }
 
     override fun onDismiss(dialog: DialogInterface) {
-        if (!oKToClose && hasChange) {
+        // V2 的登录信息由 loginAction 的 login 命令写入，不走老版「关闭时持久化表单」
+        if (!isV2 && !oKToClose && hasChange) {
             val loginInfo = viewModel.loginInfo
             if (loginInfo.isEmpty()) {
                 viewModel.source?.removeLoginInfo()
@@ -920,6 +1102,153 @@ private fun LoginPressRow(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+private fun LoginV2RowsContent(
+    style: AppDialogStyle,
+    rows: List<RowUi>,
+    values: Map<String, String>,
+    errors: Map<String, String>,
+    countdowns: Map<String, Int>,
+    enabledActions: Map<String, Boolean>,
+    onValueChange: (RowUi, String) -> Unit,
+    onAction: (RowUi) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        rows.forEach { rowUi ->
+            when (rowUi.type) {
+                Type.label -> Text(
+                    text = rowUi.name,
+                    color = style.secondaryText,
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                )
+
+                Type.text, Type.password -> {
+                    val key = rowUi.key ?: ""
+                    val value = values[key].orEmpty()
+                    val countdown = countdowns[rowUi.action.orEmpty()]
+                    val isLoading = countdown != null || enabledActions[rowUi.action.orEmpty()] == false
+                    val isField = enabledActions[rowUi.action.orEmpty()] != false
+                    val error = errors[key]
+                    when {
+                        countdown != null -> V2ActionLabel(rowUi.name, stringResource(R.string.login_ui_v2_sending, countdown), style)
+                        isField -> LoginV2TextField(
+                            label = rowUi.name,
+                            value = value,
+                            isPassword = rowUi.type == Type.password,
+                            error = error,
+                            style = style,
+                            onValueChange = { onValueChange(rowUi, it) }
+                        )
+
+                        isLoading -> V2ActionLabel(rowUi.name, "...", style)
+                    }
+                }
+
+                Type.button -> {
+                    val countdown = countdowns[rowUi.action.orEmpty()]
+                    val enabled = enabledActions[rowUi.action.orEmpty()] != false
+                    if (countdown != null) {
+                        V2ActionLabel(rowUi.name, stringResource(R.string.login_ui_v2_sending, countdown), style)
+                    } else {
+                        LoginPressRow(
+                            text = if (enabled) rowUi.name else stringResource(R.string.logging_in),
+                            style = style,
+                            onPress = { _, _ -> if (enabled) onAction(rowUi) }
+                        )
+                    }
+                }
+
+                Type.select -> {
+                    val options = rowUi.options.orEmpty()
+                    if (options.isEmpty()) return@forEach
+                    LoginSelectRow(
+                        label = rowUi.name,
+                        selected = values[rowUi.key.orEmpty()].orEmpty(),
+                        options = options,
+                        palette = style.toMiuixPalette(),
+                        onSelected = { onValueChange(rowUi, it) }
+                    )
+                }
+
+                Type.toggle -> {
+                    val countdown = countdowns[rowUi.action.orEmpty()]
+                    val enabled = enabledActions[rowUi.action.orEmpty()] != false
+                    if (countdown != null) {
+                        V2ActionLabel(rowUi.name, stringResource(R.string.login_ui_v2_sending, countdown), style)
+                    } else {
+                        val current = values[rowUi.key.orEmpty()] == "true"
+                        LoginPressRow(
+                            text = (if (current) "✓ " else "") + rowUi.name,
+                            style = style,
+                            onPress = { _, _ ->
+                                onValueChange(rowUi, (!current).toString())
+                                if (enabled) onAction(rowUi)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun V2ActionLabel(text: String, hint: String, style: AppDialogStyle) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = text,
+            color = style.primaryText,
+            fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = hint,
+            color = style.secondaryText,
+            fontSize = MaterialTheme.typography.bodySmall.fontSize
+        )
+    }
+}
+
+@Composable
+private fun LoginV2TextField(
+    label: String,
+    value: String,
+    isPassword: Boolean,
+    error: String?,
+    style: AppDialogStyle,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = isPassword,
+        supportingText = error?.let { { Text(it) } },
+        isError = !error.isNullOrEmpty(),
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text
+        ),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = style.primaryText),
+        shape = RoundedCornerShape(style.actionRadius),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = style.primaryText,
+            unfocusedTextColor = style.primaryText,
+            focusedContainerColor = style.fieldSurface,
+            unfocusedContainerColor = style.fieldSurface,
+            cursorColor = style.accent,
+            focusedBorderColor = style.accent.copy(alpha = 0.55f),
+            unfocusedBorderColor = style.stroke,
+            focusedLabelColor = style.secondaryText,
+            unfocusedLabelColor = style.secondaryText
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 /**

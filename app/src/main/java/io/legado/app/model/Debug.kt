@@ -77,6 +77,12 @@ object Debug {
         _events.value = emptyList()
     }
 
+    /** 当前是否正在调试指定书源（单文件 JS 源据此决定是否输出初始化耗时摘要） */
+    @Synchronized
+    fun isDebugging(sourceUrl: String): Boolean {
+        return callback != null && debugSource == sourceUrl
+    }
+
     @Synchronized
     fun log(
         sourceUrl: String?,

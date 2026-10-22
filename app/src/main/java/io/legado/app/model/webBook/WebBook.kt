@@ -22,6 +22,8 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
+import io.legado.app.model.jsSource.JsSourceBook
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -76,6 +78,10 @@ object WebBook {
         filter: ((name: String, author: String, kind: String?) -> Boolean)? = null,
         shouldBreak: ((size: Int) -> Boolean)? = null
     ): ArrayList<SearchBook> {
+        // JS 单文件书源：前置分流到脚本引擎，未命中则走原声明式链路（老源零回归）
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.searchAwait(bookSource, key, page, filter)
+        }
         val searchUrl = bookSource.searchUrl
         if (searchUrl.isNullOrBlank()) {
             throw NoStackTraceException("搜索url不能为空")
@@ -134,6 +140,10 @@ object WebBook {
         webViewPoolScope: WebViewPool.Scope = WebViewPool.Scope.GLOBAL,
         shouldBreak: ((size: Int) -> Boolean)? = null,
     ): ArrayList<SearchBook> {
+        // JS 单文件书源：前置分流（发现页 URL 由脚本 explore 处理）
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.exploreAwait(bookSource, url, page)
+        }
         val ruleData = RuleData()
         AppLog.putDebugWithTag(AppLog.TAG_WEB_BOOK, "发现页请求开始 page=$page", level = AppLog.Level.INFO)
         val sourceUrl = bookSource.bookSourceUrl
@@ -185,6 +195,10 @@ object WebBook {
         book: Book,
         canReName: Boolean = true,
     ): Book {
+        // JS 单文件书源：详情由 getBookInfo 脚本产出（未定义时沿用搜索字段）
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.getBookInfoAwait(bookSource, book, canReName)
+        }
         AppLog.putDebugWithTag(AppLog.TAG_WEB_BOOK, "获取书籍信息开始", level = AppLog.Level.INFO)
         book.removeAllBookType()
         book.addType(bookSource.getBookType())
@@ -259,6 +273,10 @@ object WebBook {
         runPerJs: Boolean = false,
         isFromBookInfo : Boolean = false
     ): Result<List<BookChapter>> {
+        // JS 单文件书源：目录由 getChapters 脚本产出，跳过声明式去重/视频分流
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.getChapterListAwait(bookSource, book)
+        }
         val key = chapterListLoadKey(bookSource, book, runPerJs)
         val job = CoroutineScope(currentCoroutineContext()).async(start = CoroutineStart.LAZY) {
             loadChapterListAwait(bookSource, book, runPerJs, isFromBookInfo)
@@ -513,6 +531,10 @@ object WebBook {
         nextChapterUrl: String? = null,
         needSave: Boolean = true
     ): String {
+        // JS 单文件书源：正文由 getContent 脚本产出（无声明式正文规则）
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.getContentAwait(bookSource, book, bookChapter, nextChapterUrl, needSave)
+        }
         AppLog.putDebugWithTag(AppLog.TAG_WEB_BOOK, "获取正文开始", level = AppLog.Level.INFO)
         val contentRule = bookSource.getContentRule()
         if (contentRule.content.isNullOrEmpty()) {

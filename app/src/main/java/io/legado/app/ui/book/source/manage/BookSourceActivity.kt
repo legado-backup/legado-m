@@ -1,10 +1,12 @@
 package io.legado.app.ui.book.source.manage
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
@@ -56,6 +58,7 @@ import io.legado.app.model.CheckSourceTaskStatus
 import io.legado.app.model.CheckSourceTaskStore
 import io.legado.app.model.Debug
 import io.legado.app.model.ImportCheck
+import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.model.QualityCheckSession
 import io.legado.app.model.bannerText
 import io.legado.app.model.formatCheckSourceReportCsv
@@ -66,6 +69,7 @@ import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.config.CheckSourceConfig
 import io.legado.app.ui.config.ImportCheckConfigDialog
 import io.legado.app.ui.file.HandleFileContract
@@ -121,6 +125,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 书源管理界面
@@ -1162,6 +1167,13 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
                 add(AppManagementMenuAction(getString(R.string.to_top)) { toTop(bookSource) })
                 add(AppManagementMenuAction(getString(R.string.to_bottom)) { toBottom(bookSource) })
             }
+            if (bookSource.hasJs) {
+                add(
+                    AppManagementMenuAction(getString(R.string.js_source_edit_script)) {
+                        editJsSource(bookSource)
+                    }
+                )
+            }
             if (bookSource.hasLoginUrl) {
                 add(
                     AppManagementMenuAction(getString(R.string.login)) {
@@ -1209,8 +1221,52 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
     }
 
     private fun edit(bookSource: BookSourcePart) {
+        // JS 单文件书源没有声明式规则页：直接进脚本编辑器，避免规则页面误导
+        if (bookSource.hasJs) {
+            editJsSource(bookSource)
+            return
+        }
         startActivity<BookSourceEditActivity> {
             putExtra("sourceUrl", bookSource.bookSourceUrl)
+        }
+    }
+
+    /** 正在编辑脚本的书源 URL（编辑器返回后据此保存） */
+    private var jsEditSourceUrl: String? = null
+
+    private val jsScriptLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val text = result.data?.getStringExtra("text")
+        val sourceUrl = jsEditSourceUrl
+        jsEditSourceUrl = null
+        if (result.resultCode != RESULT_OK || text.isNullOrBlank() || sourceUrl == null) {
+            return@registerForActivityResult
+        }
+        lifecycleScope.launch {
+            runCatching { JsSourceUpsert.save(text, sourceUrl) }
+                .onSuccess { toastOnUi(R.string.success) }
+                .onFailure {
+                    AppLog.put("JS 书源保存失败", it)
+                    toastOnUi(it.localizedMessage ?: getString(R.string.js_source_save_error))
+                }
+        }
+    }
+
+    private fun editJsSource(bookSource: BookSourcePart) {
+        lifecycleScope.launch {
+            val script = withContext(IO) {
+                appDb.bookSourceDao.getMainJs(bookSource.bookSourceUrl)
+            }
+            if (script.isNullOrBlank()) {
+                toastOnUi(R.string.js_source_script_empty)
+                return@launch
+            }
+            jsEditSourceUrl = bookSource.bookSourceUrl
+            jsScriptLauncher.launch(Intent(this@BookSourceActivity, CodeEditActivity::class.java).apply {
+                putExtra("text", script)
+                putExtra("title", getString(R.string.js_source_script))
+            })
         }
     }
 
@@ -1245,6 +1301,7 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
             old.respondTime == new.respondTime &&
             old.weight == new.weight &&
             old.hasExploreUrl == new.hasExploreUrl &&
+            old.hasJs == new.hasJs &&
             old.eventListener == new.eventListener &&
             old.bookSourceType == new.bookSourceType
     }

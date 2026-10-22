@@ -14,6 +14,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.GSON
@@ -250,7 +251,7 @@ object SourceQualityChecker {
             structFail = true
             dims[QualityDim.DOMAIN] = DimResult(DimState.FAIL, evidence = "源地址为空")
         } else {
-            val hasSearch = !source.searchUrl.isNullOrBlank()
+            val hasSearch = !source.searchUrl.isNullOrBlank() || source.isJsSource()
             val hasDiscovery = source.enabledExplore && !source.exploreUrl.isNullOrBlank()
             if (!hasSearch && !hasDiscovery) {
                 structFail = true
@@ -476,7 +477,8 @@ object SourceQualityChecker {
         dims: MutableMap<QualityDim, DimResult>,
         suspectReasons: MutableList<SuspectReason>
     ): io.legado.app.data.entities.Book? {
-        if (source.searchUrl.isNullOrBlank()) {
+        // JS 单文件书源无 searchUrl，但 search 脚本即搜索能力
+        if (source.searchUrl.isNullOrBlank() && !source.isJsSource()) {
             // 纯发现源合法：搜索维度 NOT_APPLICABLE
             dims[QualityDim.SEARCH] = DimResult(DimState.NOT_APPLICABLE, evidence = "无搜索规则")
             return null

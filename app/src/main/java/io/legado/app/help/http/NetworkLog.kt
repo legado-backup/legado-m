@@ -189,6 +189,10 @@ object NetworkLog {
         return value?.takeIf { it.isNotBlank() }?.let { SourceLabel(it) }
     }
 
+    /** 任意自由文本的日志脱敏（JS 源调试摘要 / 异常信息对外展示前统一走这里） */
+    fun redactFreeTextForLog(text: String): String =
+        redactUrlForLog(redactCredentialsForLog(text))
+
     private fun Request.networkLogSource(): String? {
         return tag(SourceLabel::class.java)?.value?.takeIf { it.isNotBlank() }
     }
@@ -340,4 +344,12 @@ object NetworkLog {
             append(value)
         }
     }
+}
+
+/**
+ * 给请求挂上来源标签（纯日志用途）：单文件 JS 书的脚本发起请求时无 AnalyzeUrl，
+ * 需显式标注才能在网络日志里归类到对应书源。
+ */
+fun Request.Builder.networkLogSource(sourceTag: String?): Request.Builder = apply {
+    NetworkLog.sourceLabel(sourceTag)?.let { tag(it) }
 }

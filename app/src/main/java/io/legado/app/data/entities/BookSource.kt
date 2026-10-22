@@ -8,6 +8,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.google.gson.annotations.SerializedName
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.rule.BookInfoRule
@@ -100,6 +101,9 @@ data class BookSource(
     var eventListener: Boolean = false, // 是否监听事件来执行回调规则
     @ColumnInfo(defaultValue = "0")
     var customButton: Boolean = false, //由书源控制的自定义按钮
+    // NG JS 单文件书源脚本（非空即视为 JS 源，走 JsSourceEngine 分流）
+    @SerializedName("mainJs")
+    var mainJs: String? = null,
     // AnalyzeUrl解析后的真实域名(host),校验时回填,UI分组用此字段优先于源URL截取
     // 解决: sourceUrl含jslib/注释/#规避等复杂情况,getSourceHost(sourceUrl)提取域名不准
     var lastHost: String? = null

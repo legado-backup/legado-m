@@ -975,6 +975,16 @@
     <string name="disable_source_confirm">将停止「%1$s」的服务，已保存的验证结果会失效。之后可在源管理中重新启用。</string>
     <string name="finish_login">完成登录</string>
     <string name="logging_in">正在登录…</string>
+    <string name="login_ui_v2_render_error">登录界面渲染失败</string>
+    <string name="login_ui_v2_action_error">登录操作失败：%1$s</string>
+    <string name="login_ui_v2_invalid_action">登录操作返回了无效指令</string>
+    <string name="login_ui_v2_save_error">登录信息保存失败</string>
+    <string name="login_ui_v2_sending">请稍候… %1$d</string>
+    <string name="js_source_edit_script">编辑脚本</string>
+    <string name="js_source_script">JS 书源脚本</string>
+    <string name="js_source_script_empty">该书源没有脚本内容</string>
+    <string name="js_source_save_error">JS 书源保存失败</string>
+    <string name="js_source_use_script_editor">这是 JS 书源，请从「编辑脚本」修改</string>
     <string name="login_error">登录出错</string>
     <string name="copy_error_detail">复制错误详情</string>
     <string name="password_show">显示密码</string>
