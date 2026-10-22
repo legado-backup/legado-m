@@ -26,13 +26,23 @@ object BookSourceController {
 
     val sources: ReturnData
         get() {
-            val bookSources = runBlocking { BookSourceKernel.sources() }
+            // 列表剥离 mainJs（单源可达 889KB）：脚本全文走 getBookSourceScript
+            val bookSources = runBlocking { BookSourceKernel.sources() }.map { projectListEntry(it) }
             return if (bookSources.isEmpty()) {
                 ReturnData().setErrorMsg("设备源列表为空")
             } else {
                 ReturnData().setData(bookSources)
             }
         }
+
+    /**
+     * 列表条目投影（单测直接验证的契约）：剥离 `mainJs`、附 `isJsSource/mainJsLength`。
+     *
+     * 配合 [BookSourceKernel.saveSource] 的「缺字段=保持原脚本」语义：
+     * 列表对象回填保存不会覆盖真实脚本。
+     */
+    internal fun projectListEntry(source: BookSource): Map<String, Any?> =
+        with(BookSourceKernel) { source.toListEntry() }
 
     fun saveSource(postData: String?): ReturnData {
         postData ?: return ReturnData().setErrorMsg("数据不能为空")

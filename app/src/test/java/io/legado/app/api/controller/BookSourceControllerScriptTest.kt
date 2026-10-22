@@ -43,4 +43,22 @@ class BookSourceControllerScriptTest {
     fun scriptExportLimitIsUnlimitedForEditor() {
         assertEquals(Int.MAX_VALUE, BookSourceController.SCRIPT_EXPORT_LIMIT)
     }
+
+    /**
+     * 列表投影契约（C16）：JS 源条目必须剥掉脚本全文、保留摘要。
+     *
+     * 若列表继续携带 `mainJs`（单源可达 889KB），`/getBookSources` 会随 JS 源数量膨胀；
+     * 而且列表对象回填保存时字段缺失会覆盖真实脚本。
+     */
+    @Test
+    fun listEntryStripsScriptAndKeepsSummary() {
+        val source = io.legado.app.data.entities.BookSource(
+            bookSourceUrl = "https://example.test/source",
+            bookSourceName = "源A",
+        ).apply { mainJs = "function search(){ return '[]' }" }
+        val entry = BookSourceController.projectListEntry(source)
+        assertTrue("列表不得携带脚本全文", !entry.containsKey("mainJs"))
+        assertEquals(true, entry["isJsSource"])
+        assertEquals(source.mainJs!!.length, entry["mainJsLength"])
+    }
 }

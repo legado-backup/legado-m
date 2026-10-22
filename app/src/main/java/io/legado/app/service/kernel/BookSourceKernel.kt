@@ -37,8 +37,23 @@ object BookSourceKernel {
         withContext(IO) { appDb.bookSourceDao.getBookSource(url) }
 
     suspend fun saveSource(source: BookSource) {
-        withContext(IO) { appDb.bookSourceDao.insert(source) }
+        withContext(IO) {
+            // 列表/历史来源的对象可能不含 mainJs（null）：视为「未改动」，保留库中脚本。
+            // 显式传空串（""）才表示清除脚本。
+            if (source.mainJs == null) {
+                source.mainJs = resolveScriptForSave(null, appDb.bookSourceDao.getMainJs(source.bookSourceUrl))
+            }
+            appDb.bookSourceDao.insert(source)
+        }
     }
+
+    /**
+     * 保存时的脚本取值：`null` = 未携带（保持库中值）；`""` = 显式清除；其余 = 覆盖。
+     *
+     * 这是 Web 列表剥离 `mainJs` 后「列表回填不丢脚本」的关键契约，由单测锁定。
+     */
+    internal fun resolveScriptForSave(incoming: String?, existing: String?): String? =
+        if (incoming == null) existing else incoming
 
     /**
      * 批量保存**有效**源，返回实际写入的源（与原 Controller 的 `okSources` 语义一致）。
@@ -69,6 +84,25 @@ object BookSourceKernel {
      */
     internal fun hasValidIdentity(source: BookSource): Boolean =
         source.bookSourceName.isNotBlank() && source.bookSourceUrl.isNotBlank()
+
+    /**
+     * 列表条目投影（剥离脚本）。
+     *
+     * 保留实体全部声明式字段（老 Vue 编辑页依赖），仅把 `mainJs` 换成
+     * `isJsSource` + `mainJsLength` 摘要；`mainJs` 字段本身不出现，
+     * 配合 [saveSource] 的「缺字段=保持不变」避免列表回填覆盖脚本。
+     */
+    internal fun BookSource.toListEntry(): Map<String, Any?> {
+        val scriptLength = mainJs?.length ?: 0
+        // 先摘脚本再序列化：避免把 889KB 脚本 stringify 一遍（列表 N 条会放大成分钟级）
+        val light = copy(mainJs = null)
+        @Suppress("UNCHECKED_CAST")
+        val map = GSON.fromJson(GSON.toJson(light), Map::class.java) as Map<String, Any?>
+        return map + mapOf(
+            "isJsSource" to (scriptLength != 0),
+            "mainJsLength" to scriptLength,
+        )
+    }
 
     // ============================================================ 导入校验链（2.2.2）
 
