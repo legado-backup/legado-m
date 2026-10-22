@@ -15,11 +15,14 @@ import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonObject
 import kotlinx.coroutines.runBlocking
+import org.mozilla.javascript.BaseFunction
+import org.mozilla.javascript.Context
 import org.mozilla.javascript.Scriptable
 import org.mozilla.javascript.ScriptableObject
 import splitties.init.appCtx
 import java.io.File
 import java.lang.ref.WeakReference
+import java.security.SecureRandom
 import kotlin.coroutines.CoroutineContext
 
 object SharedJsScope {
@@ -36,6 +39,61 @@ object SharedJsScope {
     private var cryptoScope: WeakReference<Scriptable>? = null
     private val cryptoLock = Any()
     private const val CRYPTO_JS_ERROR_KEY = "cryptojs_load_error"
+
+    /**
+     * CryptoJS 的 `WordArray.random` 依赖浏览器 `crypto.getRandomValues`；Rhino 无该宿主 API，
+     * 直接调用会抛 "Native crypto module could not be used to get secure random"。
+     * 这里把 Java SecureRandom 以临时全局函数注入，替换 `WordArray.random` 后立即删除绑定
+     * （与 NG 原版一致；脚本侧不会看到额外全局符号）。
+     */
+    private fun evalCryptoJs(scope: Scriptable, coroutineContext: CoroutineContext?) {
+        val js = loadCryptoJs() ?: return
+        RhinoScriptEngine.eval(js, scope, coroutineContext)
+        CryptoRandomPatch.install(scope, coroutineContext)
+    }
+
+    /**
+     * 补丁本体。刻意做成**嵌套 object**：不依赖 appCtx/assets，
+     * 单测可直接引用而不触发 SharedJsScope 初始化（后者会访问 appCtx）。
+     */
+    internal object CryptoRandomPatch {
+
+        private const val SECURE_RANDOM_BINDING = "__legadoSecureRandomInt"
+        private val secureRandom by lazy { SecureRandom() }
+
+        /** 用宿主 SecureRandom 回填 CryptoJS 的随机数入口。 */
+        private const val SECURE_RANDOM_PATCH = """
+            CryptoJS.lib.WordArray.random = (function(nextInt) {
+                return function(nBytes) {
+                    var words = [];
+                    for (var i = 0; i < nBytes; i += 4) {
+                        words.push(nextInt());
+                    }
+                    return CryptoJS.lib.WordArray.create(words, nBytes);
+                };
+            })(__legadoSecureRandomInt);
+        """
+
+        fun install(scope: Scriptable, coroutineContext: CoroutineContext?) {
+            val secureRandomFunction = object : BaseFunction() {
+                override fun call(
+                    cx: Context?,
+                    callScope: Scriptable?,
+                    thisObj: Scriptable?,
+                    args: Array<Any?>?
+                ): Any = secureRandom.nextInt().toDouble()
+            }.apply {
+                parentScope = scope
+                prototype = ScriptableObject.getFunctionPrototype(scope)
+            }
+            ScriptableObject.putProperty(scope, SECURE_RANDOM_BINDING, secureRandomFunction)
+            try {
+                RhinoScriptEngine.eval(SECURE_RANDOM_PATCH, scope, coroutineContext)
+            } finally {
+                scope.delete(SECURE_RANDOM_BINDING)
+            }
+        }
+    }
 
     private fun loadCryptoJs(): String? {
         val cached = cryptoJsText
@@ -80,10 +138,10 @@ object SharedJsScope {
         synchronized(cryptoLock) {
             val second = cryptoScope?.get()
             if (second != null) return second
-            val js = loadCryptoJs() ?: return null
+            loadCryptoJs() ?: return null
             val scope = RhinoScriptEngine.getRuntimeScope(ScriptBindings())
             try {
-                RhinoScriptEngine.eval(js, scope, coroutineContext)
+                evalCryptoJs(scope, coroutineContext)
             } catch (e: Throwable) {
                 AppLog.putDebugWithTag(
                     AppLog.TAG_CRYPTO_SCOPE,
@@ -106,9 +164,7 @@ object SharedJsScope {
      * 单文件 JS 书源导入期需在临时作用域解析 `config`（含加密字段），此时缓存作用域不可复用。
      */
     fun installCryptoJs(scope: Scriptable, coroutineContext: CoroutineContext?) {
-        loadCryptoJs()?.let {
-            runCatching { RhinoScriptEngine.eval(it, scope, coroutineContext) }
-        }
+        runCatching { evalCryptoJs(scope, coroutineContext) }
     }
 
     fun getScope(jsLib: String?, coroutineContext: CoroutineContext?): Scriptable? {
@@ -122,9 +178,7 @@ object SharedJsScope {
                 getRuntimeScope(ScriptBindings())
             }
             loadCryptoJs()?.let {
-                runCatching {
-                    RhinoScriptEngine.eval(it, scope, coroutineContext)
-                }
+                runCatching { evalCryptoJs(scope, coroutineContext) }
             }
             if (jsLib.isJsonObject()) {
                 // ng-js-source-port：新版 JSON jsLib 支持「内联资源包」

@@ -15,6 +15,8 @@ import io.legado.app.model.SourceQualityChecker
 import io.legado.app.model.SourceQualityReport
 import io.legado.app.model.SourceQualitySession
 import io.legado.app.model.failureBreakdownText
+import io.legado.app.model.jsSource.hasSearchCapability
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.CancellationException
@@ -174,7 +176,7 @@ object SourceDebugKernel {
      */
     suspend fun searchTest(sourceUrl: String, key: String, page: Int = 1): Map<String, Any?> {
         val source = resolveBookSource(sourceUrl) ?: return fail("source", "书源不存在：${DiagKernel.maskUrl(sourceUrl)}")
-        if (source.searchUrl.isNullOrBlank()) return fail("source", "书源未配置搜索 url")
+        if (!source.hasSearchCapability()) return fail("source", "书源未配置搜索 url")
         val start = System.currentTimeMillis()
         val result = probe { WebBook.searchBookAwait(source, key, page) }
         val cost = elapsedSince(start)
@@ -196,17 +198,25 @@ object SourceDebugKernel {
     suspend fun infoTest(sourceUrl: String): Map<String, Any?> {
         val start = System.currentTimeMillis()
         val source = resolveBookSource(sourceUrl) ?: return fail("source", "书源不存在：${DiagKernel.maskUrl(sourceUrl)}")
+        // 单文件 JS 源没有声明式规则：静态只确认脚本存在，链路是否可用由 js_source_debug 实跑判定
+        val isJs = source.isJsSource()
         val ruleFields = mapOf(
-            "searchUrl" to !source.searchUrl.isNullOrBlank(),
+            "searchUrl" to source.hasSearchCapability(),
             "exploreUrl" to !source.exploreUrl.isNullOrBlank(),
             "ruleSearch" to (source.ruleSearch != null),
             "ruleBookInfo" to (source.ruleBookInfo != null),
             "ruleToc" to (source.ruleToc != null),
             "ruleContent" to (source.ruleContent != null),
+            "isJsSource" to isJs,
+            "mainJsLength" to (source.mainJs?.length ?: 0),
         )
-        // 基础齐备近似判定：存在检索入口（搜索或发现）且声明了目录 + 正文规则。
-        val complete = (ruleFields["searchUrl"] == true || ruleFields["exploreUrl"] == true) &&
-            ruleFields["ruleToc"] == true && ruleFields["ruleContent"] == true
+        // 基础齐备近似判定：JS 源以「脚本非空」为准；声明式源要求入口 + 目录 + 正文规则。
+        val complete = if (isJs) {
+            ruleFields["mainJsLength"] != 0
+        } else {
+            (ruleFields["searchUrl"] == true || ruleFields["exploreUrl"] == true) &&
+                ruleFields["ruleToc"] == true && ruleFields["ruleContent"] == true
+        }
         val detail = mapOf(
             "bookSourceUrl" to DiagKernel.maskUrl(source.bookSourceUrl),
             "name" to source.bookSourceName,

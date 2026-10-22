@@ -45,16 +45,27 @@ object JsSourceKernel {
         return summary(source) + ("saved" to true)
     }
 
-    /** 导出脚本正文（超长截断，完整内容请走文件下载语义）。 */
-    suspend fun export(sourceUrl: String): Map<String, Any?> = withContext(IO) {
+    /**
+     * 导出脚本正文。
+     *
+     * - MCP 工具用默认 [MAX_RETURN_CHARS] 做「预览」（大脚本如 800KB+ 不适合塞进 AI 上下文）
+     * - Web 编辑器必须传 `limit = Int.MAX_VALUE` 拿全文：否则前端拿到截断文本再保存
+     *   会**覆盖真实脚本造成数据丢失**（2026-10-22 真机源 889KB 实测暴露）
+     */
+    suspend fun export(sourceUrl: String, limit: Int = MAX_RETURN_CHARS): Map<String, Any?> = withContext(IO) {
         val script = appDb.bookSourceDao.getMainJs(sourceUrl)
             ?: throw IllegalArgumentException("该书源没有脚本内容")
-        val truncated = script.length > MAX_RETURN_CHARS
-        mapOf(
+        exportPayload(sourceUrl, script, limit)
+    }
+
+    /** 导出载荷构造（纯函数，供单测覆盖截断边界；不触库）。 */
+    internal fun exportPayload(sourceUrl: String, script: String, limit: Int): Map<String, Any?> {
+        val truncated = limit in 0 until script.length
+        return mapOf(
             "url" to sourceUrl,
             "length" to script.length,
             "truncated" to truncated,
-            "script" to if (truncated) script.take(MAX_RETURN_CHARS) else script,
+            "script" to if (truncated) script.take(limit) else script,
         )
     }
 

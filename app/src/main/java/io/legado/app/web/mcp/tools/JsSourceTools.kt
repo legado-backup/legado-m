@@ -59,7 +59,7 @@ object JsSourceTools {
         McpTool(
             name = "js_source_export",
             title = "导出 JS 书源脚本",
-            description = "导出书源脚本正文（超 20000 字符截断并给出 truncated）。要求 MANAGE（脚本属凭据级内容）。",
+            description = "导出书源脚本正文预览（超 20000 字符截断并给出 truncated）。要求 MANAGE（脚本属凭据级内容）。需要完整脚本时请用书源备份或 Web 控制台的脚本编辑入口。",
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             inputSchema = McpJsonSchema.of(

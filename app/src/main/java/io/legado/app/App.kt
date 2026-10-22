@@ -110,6 +110,10 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (isIsolatedSandboxProcess(currentProcessName())) {
+            // 隔离进程只承载 quickjs 沙箱（DB/通知/网络/CrashHandler 在该进程均不可用或无意义）
+            return
+        }
         CrashHandler(this)
         // MCP 内腿服务（8765）· debug 变体专属（release 为空实现）：web-mcp-productization 二期 tasks 5.1
         DebugAppHook.onAppCreate()
@@ -260,6 +264,13 @@ class App : Application() {
     }
 
     override fun attachBaseContext(base: Context) {
+        if (isIsolatedSandboxProcess(currentProcessName())) {
+            // 隔离进程（quickjs_sandbox）只承载 JS 沙箱：
+            // 该进程的 ContextImpl 拿不到 UserManager ⇒ defaultSharedPreferences 直接 NPE
+            // （2026-10-22 真机实测：进程启动即 FATAL，绑定超时 → BIND_TIMEOUT）。
+            super.attachBaseContext(base)
+            return
+        }
         runCatching {
             ThemeRuntimeKeys.migrateLegacyNightValues(base)
             ThemeRuntimeKeys.migrateThemeFirstInstallFlag(base)
@@ -268,6 +279,22 @@ class App : Application() {
             ThemeRuntimeKeys.migrateAppearanceKitAutoApplyFlag(base)
         }
         super.attachBaseContext(AppContextWrapper.wrap(base))
+    }
+
+    /** 当前进程名（API 28+ 直接取；更低版本读 /proc/self/cmdline，与沙箱模块同一口径）。 */
+    private fun currentProcessName(): String? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return Application.getProcessName()
+        }
+        return runCatching {
+            java.io.FileInputStream("/proc/self/cmdline").use { input ->
+                val bytes = ByteArray(256)
+                val length = input.read(bytes)
+                if (length <= 0) return@use null
+                val end = bytes.indexOf(0).let { if (it in 0 until length) it else length }
+                String(bytes, 0, end, Charsets.UTF_8)
+            }
+        }.getOrNull()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -545,3 +572,16 @@ class App : Application() {
     }
 
 }
+
+/**
+ * 是否为隔离沙箱进程（`quickjs-sandbox` 的 `android:isolatedProcess` 服务进程）。
+ *
+ * 隔离进程没有 UserManager / SharedPreferences（读配置直接 NPE），且只应承载 quickjs-kt，
+ * 因此 [App.attachBaseContext]（语言包装）与 [App.onCreate]（DB/通知/网络）都必须短路。
+ * 2026-10-22 真机实测：未短路时沙箱进程启动即 FATAL → 宿主绑定等待 5s 超时（BIND_TIMEOUT）。
+ */
+internal fun isIsolatedSandboxProcess(processName: String?): Boolean =
+    processName != null && processName.contains(SANDBOX_PROCESS_SUFFIX)
+
+/** 与 `quickjs-sandbox` 模块的 `QuickJsSandboxProtocol.PROCESS_SUFFIX` 保持一致（模块内为 internal）。 */
+internal const val SANDBOX_PROCESS_SUFFIX = ":quickjs_sandbox"

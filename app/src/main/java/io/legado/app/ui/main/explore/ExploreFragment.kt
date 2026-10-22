@@ -85,6 +85,7 @@ import io.legado.app.lib.theme.themeCardColorOrDefault
 import io.legado.app.lib.theme.themeMutedColorOrDefault
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.model.jsSource.hasSearchCapability
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.explore.ExploreShowBookCallback
@@ -1894,7 +1895,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun updateDiscoverSearchButtonState() {
-        val canSearch = !selectedDiscoverSource?.searchUrl.isNullOrBlank()
+        val canSearch = selectedDiscoverSource?.hasSearchCapability() == true
         // topbar-search-entry-align：胶囊已关闭，regular 风格下也显示搜索按钮（保证搜索入口可达）
         binding.topBar.searchButton.isVisible = canSearch
         binding.topBar.searchButton.isEnabled = canSearch
@@ -1904,7 +1905,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun openDiscoverSearch() {
         val source = selectedDiscoverSource ?: return
-        if (source.searchUrl.isNullOrBlank()) {
+        if (!source.hasSearchCapability()) {
             context?.toastOnUi(R.string.search_book_key)
             return
         }

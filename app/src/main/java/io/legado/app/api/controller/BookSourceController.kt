@@ -18,6 +18,12 @@ import kotlinx.coroutines.runBlocking
  */
 object BookSourceController {
 
+    /**
+     * Web 编辑器读取脚本的上限：必须为全文（不截断）。
+     * 截断文本一旦被前端保存会覆盖真实脚本 ⇒ 数据丢失，故锁成常量并由单测守护。
+     */
+    internal const val SCRIPT_EXPORT_LIMIT = Int.MAX_VALUE
+
     val sources: ReturnData
         get() {
             val bookSources = runBlocking { BookSourceKernel.sources() }
@@ -84,7 +90,7 @@ object BookSourceController {
 
     /**
      * 单文件 JS 书源脚本读取（独立端点：脚本属凭据级内容，与 `getBookSource` 的只读面分离）。
-     * 超 20000 字符截断并在返回里标注 `truncated`。
+     * 返回**完整脚本**（`truncated=false`）：Web 编辑器保存的是整段文本，截断会覆盖真实脚本。
      */
     fun getScript(parameters: Map<String, List<String>>): ReturnData {
         val url = parameters["url"]?.firstOrNull()
@@ -92,7 +98,8 @@ object BookSourceController {
             return ReturnData().setErrorMsg("参数url不能为空，请指定源地址")
         }
         return kotlin.runCatching {
-            runBlocking { JsSourceKernel.export(url) }
+            // Web 编辑器需要完整脚本：截断内容一旦被保存会覆盖真实脚本（数据丢失）
+            runBlocking { JsSourceKernel.export(url, SCRIPT_EXPORT_LIMIT) }
         }.fold(
             { ReturnData().setData(it) },
             { ReturnData().setErrorMsg(it.localizedMessage ?: "读取脚本失败") }

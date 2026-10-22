@@ -16,6 +16,7 @@ import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.model.jsSource.hasSearchCapability
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.GSON
@@ -176,7 +177,7 @@ object ContentKernel {
             } else {
                 sourceUrls.mapNotNull { appDb.bookSourceDao.getBookSource(it) }
             }
-            all.filter { it.bookSourceUrl != book.origin && !it.searchUrl.isNullOrBlank() }
+            all.filter { it.bookSourceUrl != book.origin && it.hasSearchCapability() }
                 .take(maxSources.coerceIn(1, 64))
         }
         val result = ArrayList<Map<String, Any?>>()
