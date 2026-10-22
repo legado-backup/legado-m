@@ -4,6 +4,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.jsSource.hasSearchCapability
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CompletableDeferred
@@ -284,19 +286,23 @@ object AiBookSourceTool {
             put("count", sources.size)
             put("sources", JSONArray().apply {
                 sources.forEach { source ->
-                    put(JSONObject().apply {
-                        put("bookSourceUrl", source.bookSourceUrl)
-                        put("bookSourceName", source.bookSourceName)
-                        put("bookSourceGroup", source.bookSourceGroup)
-                        put("enabled", source.enabled)
-                        put("enabledExplore", source.enabledExplore)
-                        put("hasSearchUrl", !source.searchUrl.isNullOrBlank())
-                        put("hasExploreUrl", !source.exploreUrl.isNullOrBlank())
-                        put("comment", source.bookSourceComment)
-                    })
+                    put(sourceBriefJson(source))
                 }
             })
         }.toString()
+    }
+
+    /** 列表条目的稳定投影：JS 源没有 `searchUrl`，`hasSearchUrl` 必须用搜索能力判据。 */
+    internal fun sourceBriefJson(source: BookSource): JSONObject = JSONObject().apply {
+        put("bookSourceUrl", source.bookSourceUrl)
+        put("bookSourceName", source.bookSourceName)
+        put("bookSourceGroup", source.bookSourceGroup)
+        put("enabled", source.enabled)
+        put("enabledExplore", source.enabledExplore)
+        put("hasSearchUrl", source.hasSearchCapability())
+        put("hasJs", source.isJsSource())
+        put("hasExploreUrl", !source.exploreUrl.isNullOrBlank())
+        put("comment", source.bookSourceComment)
     }
 
     private fun updateBookSource(args: JSONObject?): String {

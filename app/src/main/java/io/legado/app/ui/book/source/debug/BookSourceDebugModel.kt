@@ -27,6 +27,10 @@ class BookSourceDebugModel(application: Application) : BaseViewModel(application
         private set
 
     fun init(sourceUrl: String?, finally: () -> Unit) {
+        // 切换源（onNewIntent）时必须先清掉旧绑定，避免读库失败后仍调试上一个源
+        bookSource = null
+        sourceName = ""
+        examples = emptyList()
         sourceUrl?.let {
             execute {
                 bookSource = appDb.bookSourceDao.getBookSource(sourceUrl)

@@ -14,6 +14,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
+import io.legado.app.model.jsSource.hasSearchCapability
 import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
@@ -965,7 +966,7 @@ object SourceQualityChecker {
         )
         val template = SourceQualityScorer.selectBookTemplate(
             source.bookSourceType,
-            hasSearch = !source.searchUrl.isNullOrBlank(),
+            hasSearch = source.hasSearchCapability(),
             hasDiscovery = source.enabledExplore && !source.exploreUrl.isNullOrBlank()
         )
         return SourceQualityScorer.score(report, template)

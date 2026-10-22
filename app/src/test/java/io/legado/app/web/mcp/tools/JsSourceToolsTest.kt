@@ -44,4 +44,15 @@ class JsSourceToolsTest {
             assertFalse("${it.name} 非 READONLY 级 ⇒ readOnlyHint 必须为 false", it.readOnlyHint)
         }
     }
+
+    /**
+     * 导出工具只给预览（20000 字符），必须把「完整脚本去哪取」写清楚；
+     * 否则 AI 会把截断脚本当全文回写造成数据丢失。
+     */
+    @Test
+    fun exportToolDescriptionPointsToFullScriptChannel() {
+        val description = byName.getValue("js_source_export").description
+        assertTrue("导出描述必须声明截断预览", description.contains("截断"))
+        assertTrue("必须指出完整脚本获取通道", description.contains("完整脚本"))
+    }
 }

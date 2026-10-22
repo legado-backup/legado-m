@@ -123,4 +123,23 @@ class BookSourceDebugActivity : VMBaseActivity<ViewBinding, BookSourceDebugModel
             toastOnUi(it.localizedMessage)
         }
     }
+
+    /**
+     * launchMode=singleTop：从书源列表/外部 Intent 再次打开调试页时会复用本实例，
+     * 只走 onNewIntent。必须按新 key 重新绑定源，否则页面一直调试上一个源。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val key = rebindKey(intent) ?: return
+        viewModel.stopDebug()
+        viewModel.clearLogs()
+        viewModel.init(key) { toastOnUi("未获取到书源") }
+    }
+
+    companion object {
+        /** 复用实例时是否应重新绑定源：仅接受非空白 key（空 Intent 不改动当前调试会话）。 */
+        internal fun rebindKey(intent: Intent): String? =
+            intent.getStringExtra("key")?.takeIf { it.isNotBlank() }
+    }
 }
