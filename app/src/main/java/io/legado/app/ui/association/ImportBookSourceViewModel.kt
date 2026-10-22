@@ -20,9 +20,11 @@ import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.plainImportClient
 import io.legado.app.help.source.BookSourceIncrementalParser
+import io.legado.app.help.source.BookSourceScriptImport
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.isEmptyConfiguration
 import io.legado.app.model.ImportCheck
+import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.model.QualityCheckSession
 import io.legado.app.model.RuleUpdate
 import io.legado.app.model.SourceQualityChecker
@@ -40,8 +42,14 @@ import io.legado.app.utils.splitNotBlank
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeout
+import java.io.PushbackInputStream
+
+/** 单文件 JS 书源导入期执行脚本配置的上限（与 NG 一致 30s） */
+private const val JS_IMPORT_TIMEOUT = 30_000L
 
 /**
  * 导入校验：被过滤源（复核窗口展示项）
@@ -223,9 +231,27 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                 mText.isUri() -> {
                     val uri = Uri.parse(mText)
                     uri.inputStream(context).getOrThrow().use { inputS ->
-                        BookSourceIncrementalParser
-                            .parseBookSourcesIncrementalInto(inputS, allSources)
+                        val input = PushbackInputStream(inputS, BookSourceScriptImport.SNIFF_BYTES)
+                        if (BookSourceScriptImport.isScriptStream(input)) {
+                            // 单文件 JS 书源：完整脚本在导入期解析出 BookSource（不落库）
+                            val script = BookSourceScriptImport.readScript(input)
+                            val source = withTimeout(JS_IMPORT_TIMEOUT) {
+                                JsSourceConfig.extract(script, currentCoroutineContext())
+                            }
+                            allSources.add(source)
+                        } else {
+                            BookSourceIncrementalParser
+                                .parseBookSourcesIncrementalInto(input, allSources)
+                        }
                     }
+                }
+
+                // 单文件 JS 书源（粘贴/剪贴板）：脚本本体在导入期解析为 BookSource
+                BookSourceScriptImport.isScriptText(mText) -> {
+                    val source = withTimeout(JS_IMPORT_TIMEOUT) {
+                        JsSourceConfig.extract(mText, currentCoroutineContext())
+                    }
+                    allSources.add(source)
                 }
 
                 else -> throw NoStackTraceException(context.getString(R.string.wrong_format))
@@ -286,11 +312,20 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                 url(url)
             }
         }.decompressed().byteStream().use { stream ->
+            // 链接也可能直接指向单文件 JS 书源：先嗅探首字符，再决定脚本/JSON
+            val input = PushbackInputStream(stream, BookSourceScriptImport.SNIFF_BYTES)
+            if (BookSourceScriptImport.isScriptStream(input)) {
+                val script = BookSourceScriptImport.readScript(input)
+                val source = withTimeout(JS_IMPORT_TIMEOUT) {
+                    JsSourceConfig.extract(script, currentCoroutineContext())
+                }
+                return listOf(source)
+            }
             // REQ-05 / AD-13：增量解析替代一次性整表反序列化。
             // 本方法按原设计**返回 List 供上层并发聚合**（allSources 非线程安全，禁止并行写），
             // 故此处保留一个本地列表；消除的是「原始字节 + 整表反序列化中间副本」双份常驻。
             val list = arrayListOf<BookSource>()
-            val count = BookSourceIncrementalParser.parseBookSourcesIncrementalInto(stream, list)
+            val count = BookSourceIncrementalParser.parseBookSourcesIncrementalInto(input, list)
             // 语义与原实现一致：空表 / 首条 URL 为空均抛「不是书源」
             if (count == 0) throw NoStackTraceException("不是书源")
             list

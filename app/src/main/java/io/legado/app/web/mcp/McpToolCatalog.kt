@@ -13,6 +13,7 @@ import io.legado.app.web.mcp.tools.CacheTaskTools
 import io.legado.app.web.mcp.tools.CharacterTools
 import io.legado.app.web.mcp.tools.DiagTools
 import io.legado.app.web.mcp.tools.ExploreTools
+import io.legado.app.web.mcp.tools.JsSourceTools
 import io.legado.app.web.mcp.tools.MultiformTools
 import io.legado.app.web.mcp.tools.ReadingTools
 import io.legado.app.web.mcp.tools.RssTools
@@ -28,7 +29,8 @@ import io.legado.app.web.mcp.tools.TtsTools
  * **只做聚合 / 裁剪 / 查找，不含任何工具实现** —— 工具元数据与 `invoke` 都在按域拆分的
  * `web/mcp/tools/` 下按域拆分的文件里（禁止 232 个工具挤一个文件）。
  *
- * **规模口径**：release = `declared`（218）；debug = `declared` + `DebugToolProvider.tools`（+14 = 232）。
+ * **规模口径**：release = `declared`（222）；debug = `declared` +
+ `DebugToolProvider.tools`（+14 = 236）。
  * `DebugToolProvider` 按**变体拆 sourceSet**（`src/debug/` 真实实现 / `src/release/` 空实现，
  * `src/main` 不放该符号 —— 见 design §1.6.2 的修正口径），故 release 包内 L3 工具**物理不存在**
  * （REQ-2-403；不依赖运行时开关，也不依赖 R8 裁剪）。
@@ -50,6 +52,7 @@ object McpToolCatalog {
             addAll(ReadingTools.tools)
             addAll(BookmarkTools.tools)
             addAll(SourceTools.tools)
+            addAll(JsSourceTools.tools)
             addAll(RssTools.tools)
             addAll(RuleTools.tools)
             addAll(BackupTools.tools)

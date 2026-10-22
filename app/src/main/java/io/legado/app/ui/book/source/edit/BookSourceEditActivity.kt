@@ -38,6 +38,7 @@ import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.data.entities.rule.TocRule
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
@@ -130,6 +131,12 @@ class BookSourceEditActivity :
         initView()
         initRuleHelpGuide()
         viewModel.initData(intent) {
+            // JS 单文件书源没有声明式规则可编辑：避免误改/误存规则页，引导到脚本编辑入口
+            if (viewModel.bookSource?.isJsSource() == true) {
+                toastOnUi(R.string.js_source_use_script_editor)
+                finish()
+                return@initData
+            }
             upSourceView(viewModel.bookSource)
         }
     }

@@ -4,14 +4,18 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SourceRecycleBin
 import io.legado.app.help.source.BookSourceIncrementalParser
+import io.legado.app.help.source.BookSourceScriptImport
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.SourceRecycleBinHelp
 import io.legado.app.model.DimState
 import io.legado.app.model.SourceQualityChecker
+import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.utils.GSON
 import io.legado.app.utils.QRCodeUtils
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
@@ -93,6 +97,21 @@ object BookSourceKernel {
      * @throws Exception 解析失败（非法 JSON / 非书源格式）—— 由门面转 "转换源失败"
      */
     suspend fun parseAndValidate(json: String): ValidatedSources {
+        // 单文件 JS 书源：整段文本即脚本（与 App 导入页同一分流口径），先解析 config 再走同一校验
+        if (BookSourceScriptImport.isScriptText(json)) {
+            val scriptSource = withTimeout(30_000L) {
+                JsSourceConfig.extract(json, currentCoroutineContext())
+            }
+            val reason = skipReason(scriptSource)
+            return if (reason == null) {
+                ValidatedSources(listOf(scriptSource), emptyList())
+            } else {
+                ValidatedSources(
+                    emptyList(),
+                    listOf(SkippedSource(scriptSource.bookSourceName, scriptSource.bookSourceUrl, reason))
+                )
+            }
+        }
         val parsed = ArrayList<BookSource>()
         BookSourceIncrementalParser.parseBookSourcesIncrementalInto(
             ByteArrayInputStream(json.toByteArray(Charsets.UTF_8)),

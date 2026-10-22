@@ -5,6 +5,7 @@ import io.legado.app.api.ReturnData
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BookSource
 import io.legado.app.service.kernel.BookSourceKernel
+import io.legado.app.service.kernel.JsSourceKernel
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
@@ -79,5 +80,38 @@ object BookSourceController {
             return ReturnData().setErrorMsg(it.localizedMessage ?: "数据格式错误")
         }
         return ReturnData().setData("已执行"/*okSources*/)
+    }
+
+    /**
+     * 单文件 JS 书源脚本读取（独立端点：脚本属凭据级内容，与 `getBookSource` 的只读面分离）。
+     * 超 20000 字符截断并在返回里标注 `truncated`。
+     */
+    fun getScript(parameters: Map<String, List<String>>): ReturnData {
+        val url = parameters["url"]?.firstOrNull()
+        if (url.isNullOrEmpty()) {
+            return ReturnData().setErrorMsg("参数url不能为空，请指定源地址")
+        }
+        return kotlin.runCatching {
+            runBlocking { JsSourceKernel.export(url) }
+        }.fold(
+            { ReturnData().setData(it) },
+            { ReturnData().setErrorMsg(it.localizedMessage ?: "读取脚本失败") }
+        )
+    }
+
+    /** 单文件 JS 书源脚本保存（`{script, openedSourceUrl}`）。 */
+    fun saveScript(postData: String?): ReturnData {
+        if (postData.isNullOrBlank()) return ReturnData().setErrorMsg("数据不能为空")
+        val body = GSON.fromJsonObject<com.google.gson.JsonObject>(postData).getOrNull()
+            ?: return ReturnData().setErrorMsg("数据格式错误")
+        val script = body.get("script")?.takeIf { it.isJsonPrimitive }?.asString
+            ?: return ReturnData().setErrorMsg("缺少 script")
+        val openedUrl = body.get("openedSourceUrl")?.takeIf { it.isJsonPrimitive }?.asString
+        return kotlin.runCatching {
+            runBlocking { JsSourceKernel.save(script, openedUrl) }
+        }.fold(
+            { ReturnData().setData(it) },
+            { ReturnData().setErrorMsg(it.localizedMessage ?: "转换源失败") }
+        )
     }
 }

@@ -43,6 +43,9 @@ class WebApiRoutesTest {
         "POST /saveBookSource" to Level.MANAGE,
         "POST /saveBookSources" to Level.MANAGE,
         "POST /deleteBookSources" to Level.MANAGE,
+        // JS 单文件书源脚本（凭据级内容独立端点）
+        "GET /getBookSourceScript" to Level.MANAGE,
+        "POST /saveBookSourceScript" to Level.MANAGE,
         "GET /getRssSource" to Level.READONLY,
         "GET /getRssSources" to Level.READONLY,
         "POST /saveRssSource" to Level.MANAGE,
@@ -59,17 +62,17 @@ class WebApiRoutesTest {
     )
 
     @Test
-    fun fourGroups_declareExactly28Routes() {
+    fun fourGroups_declareExactly30Routes() {
         assertEquals("书源/书籍域", 12, BookRoutes.routes.size)
-        assertEquals("源域", 10, SourceRoutes.routes.size)
+        assertEquals("源域", 12, SourceRoutes.routes.size)
         assertEquals("规则域", 4, RuleRoutes.routes.size)
         assertEquals("备份域", 2, BackupRoutes.routes.size)
-        assertEquals("合计须等于改造前的 28 个旧端点", 28, allRoutes.size)
+        assertEquals("合计须等于改造前 28 个旧端点 + JS 源脚本 2 个", 30, allRoutes.size)
     }
 
     @Test
     fun everyRouteLevel_matchesDesignTable_exhaustively() {
-        assertEquals("设计表须覆盖全部 28 条", 28, expectedLevels.size)
+        assertEquals("设计表须覆盖全部 30 条", 30, expectedLevels.size)
         val actual = allRoutes.associate { it.key to it.level }
         assertEquals("端点集合须与设计表完全一致", expectedLevels.keys, actual.keys)
         expectedLevels.forEach { (key, expected) ->

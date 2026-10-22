@@ -39,12 +39,12 @@ class ImportBookSourceStreamingTest {
             viewModel.contains("parseBookSourcesIncrementalInto(mText.byteInputStream(), allSources)")
         )
         assertTrue(
-            "uri/本地流分支须流式解析",
-            viewModel.contains("parseBookSourcesIncrementalInto(inputS, allSources)")
+            "uri/本地流分支须流式解析（先嗅探脚本，再交增量解析）",
+            viewModel.contains("parseBookSourcesIncrementalInto(input, allSources)")
         )
         assertTrue(
-            "网络流分支须流式解析（返回 List 供并发聚合）",
-            viewModel.contains("parseBookSourcesIncrementalInto(stream, list)")
+            "网络流分支须流式解析（先嗅探脚本，返回 List 供并发聚合）",
+            viewModel.contains("parseBookSourcesIncrementalInto(input, list)")
         )
     }
 

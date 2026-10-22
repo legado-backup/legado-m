@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.legado.app.R
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.ui.widget.components.EmptyStateAction
@@ -145,6 +146,7 @@ internal fun BookSourceScreen(
             title = source.getDisPlayNameGroup(),
             enabled = source.enabled,
             hasExploreUrl = source.hasExploreUrl,
+            hasJs = source.hasJs,
             enabledExplore = source.enabledExplore,
             debugMessage = subtitle,
             debugInProgress = (message.isNotBlank() &&
@@ -375,6 +377,7 @@ private fun BookSourceItemRow(
     title: String,
     enabled: Boolean,
     hasExploreUrl: Boolean,
+    hasJs: Boolean,
     enabledExplore: Boolean,
     debugMessage: String,
     debugInProgress: Boolean,
@@ -424,6 +427,14 @@ private fun BookSourceItemRow(
                         color = palette.settings.accent,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(18.dp)
+                    )
+                } else if (hasJs) {
+                    // JS 单文件书源标识（无声明式规则，编辑入口走脚本编辑器）
+                    Text(
+                        text = "JS",
+                        color = palette.settings.accent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

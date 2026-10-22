@@ -292,6 +292,14 @@ interface BookSourceDao {
     @Query("select * from book_sources where bookSourceUrl = :key")
     fun getBookSource(key: String): BookSource?
 
+    /** JS 单文件书源脚本（纯脚本导入/调试/导出用，零规则书源读取） */
+    @Query("select mainJs from book_sources where bookSourceUrl = :key")
+    fun getMainJs(key: String): String?
+
+    /** 是否 JS 单文件书源（巡检/统计用，避免整行加载） */
+    @Query("select exists(select 1 from book_sources where bookSourceUrl = :key and mainJs is not null and trim(mainJs) <> '')")
+    fun hasJsSource(key: String): Boolean
+
     @Query("select * from book_sources_part where bookSourceUrl = :key")
     fun getBookSourcePart(key: String): BookSourcePart?
 

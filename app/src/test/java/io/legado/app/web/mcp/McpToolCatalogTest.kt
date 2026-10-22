@@ -104,8 +104,10 @@ class McpToolCatalogTest {
         // **口径说明（2026-10-15，缺口4 后半）**：新增 **1 个 release 面只读工具** `source_check_report`
         // （书源域：读最近一次「校验所选」巡检的结构化结果；REST `/getCheckSourceReport` 以
         // `ApiRoute.mcpToolName` 与之对拍）⇒ 计数 217→218 / 231→232。
-        val expected = if (BuildConfig.BUILD_DEBUG) 232 else 218
-        assertEquals("工具总数须与已落地域一致（release 218 / debug 232）", expected, McpToolCatalog.all().size)
+        // **2026-10-22（ng-js-source-port）**：书源域新增 4 个 JS 源工具（validate/save/export/debug，
+        // 见 JsSourceTools）⇒ 222 / 236。
+        val expected = if (BuildConfig.BUILD_DEBUG) 236 else 222
+        assertEquals("工具总数须与已落地域一致（release 222 / debug 236）", expected, McpToolCatalog.all().size)
     }
 
     @Test

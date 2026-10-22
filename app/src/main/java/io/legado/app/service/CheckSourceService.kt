@@ -35,6 +35,7 @@ import io.legado.app.model.SuspectReason
 import io.legado.app.model.sampleProbeChapters
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
+import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.utils.activityPendingIntent
@@ -333,7 +334,8 @@ class CheckSourceService : BaseService() {
                 if (CheckSource.checkSearch) {
                     markStage(source, CheckSourceStage.SEARCH)
                     val searchWord = source.getCheckKeyword(CheckSource.keyword)
-                    if (source.searchUrl.isNullOrBlank()) {
+                    // JS 单文件书源无 searchUrl，但具备 search 脚本能力，不能判为「搜索URL为空」
+                    if (source.searchUrl.isNullOrBlank() && !source.isJsSource()) {
                         BookCheckResult(searchChecked = true, searchUrlEmpty = true)
                     } else {
                         val searchBooks = WebBook.searchBookAwait(source, searchWord)

@@ -27,8 +27,40 @@ object DatabaseMigrations {
             migration_101_102, migration_102_103, migration_103_104, migration_104_105,
             migration_105_106, migration_106_107, migration_107_108, migration_108_109,
             migration_109_110, migration_110_111, migration_111_112, migration_112_113,
-            migration_113_114
+            migration_113_114, migration_114_115
         )
+    }
+
+    /**
+     * 114 → 115（ng-js-source-port）：`book_sources` 新增 `mainJs`（NG 单文件 JS 书源脚本），
+     * 并重建 `book_sources_part` 视图：`hasLoginUrl` 并入 JS 源判定、新增 `hasSearchUrl`/`hasJs`。
+     *
+     * 只 `ADD COLUMN`（nullable，零数据风险）+ DROP/CREATE VIEW；视图 SQL 必须与
+     * `BookSourcePart` 的 `@DatabaseView` 注解逐字一致（含反引号与缩进），否则 Room schema 校验失败。
+     */
+    private val migration_114_115 = object : Migration(114, 115) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            kotlin.runCatching {
+                db.execSQL("ALTER TABLE `book_sources` ADD COLUMN `mainJs` TEXT")
+                db.execSQL("DROP VIEW IF EXISTS `book_sources_part`")
+                db.execSQL(
+                    """CREATE VIEW `book_sources_part` AS select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore,
+    (loginUrl is not null and trim(loginUrl) <> ''
+     or (mainJs is not null and trim(mainJs) <> ''
+         and loginUi is not null
+         and replace(replace(replace(replace(loginUi, ' ', ''), char(9), ''), char(10), ''), char(13), '') not in ('', '[]'))) hasLoginUrl,
+    lastUpdateTime, respondTime, weight,
+    (searchUrl is not null and trim(searchUrl) <> ''
+     or mainJs is not null and trim(mainJs) <> '') hasSearchUrl,
+    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, eventListener, bookSourceType,
+    (mainJs is not null and trim(mainJs) <> '') hasJs, lastHost
+    from book_sources"""
+                )
+                AppLog.put("AppDatabase Migration 114→115: book_sources 新增 mainJs + 重建 book_sources_part view 完成")
+            }.onFailure {
+                AppLog.put("migration_114_115 failed", it)
+            }
+        }
     }
 
     /**

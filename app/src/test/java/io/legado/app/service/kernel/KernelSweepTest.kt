@@ -60,6 +60,8 @@ class KernelSweepTest {
         "SourceStepTracer.kt",
         // 四期（S7 一键断电）新增业务内核
         "RelayKernel.kt",
+        // ng-js-source-port：单文件 JS 书源校验/落库/调试内核
+        "JsSourceKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =

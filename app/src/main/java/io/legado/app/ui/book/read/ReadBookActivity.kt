@@ -130,10 +130,13 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
+import io.legado.app.model.jsSource.JsSourceEngine
+import io.legado.app.model.jsSource.shouldDeferImageClick
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJsonObject
+import kotlin.coroutines.CoroutineContext
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.epubcore.facade.EpubCoreProvider
 import io.legado.app.help.book.isMarkdown
@@ -5470,12 +5473,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex) ?: throw Exception("no find chapter")
                     ensureCurrentChapterCacheForClick(book, chapter)
                     runScriptWithContext {
-                        source.evalJS(click) {
-                            put("java", java)
-                            put("book", book)
-                            put("chapter", chapter)
-                            put("result", src)
-                        }
+                        evalImageClick(source, java, book, chapter, click, src, coroutineContext)
                     }
                 }.onError {
                     AppLog.put("执行图片链接click键值出错\n${it.localizedMessage}", it, true)
@@ -5511,16 +5509,49 @@ class ReadBookActivity : BaseReadBookActivity(),
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex) ?: throw Exception("no find chapter")
             ensureCurrentChapterCacheForClick(book, chapter)
             runScriptWithContext {
-                source.evalJS(click) {
-                    put("java", java)
-                    put("book", book)
-                    put("chapter", chapter)
-                    put("result", src)
-                }
+                evalImageClick(source, java, book, chapter, click, src, coroutineContext)
             }
         }.onError {
             AppLog.put("执行图片链接click键值出错\n${it.localizedMessage}", it, true)
         }
+    }
+
+    /**
+     * 图片点击脚本执行：普通 JS 结果原样返回；返回 [MAIN_JS_IMAGE_CLICK_DEFERRED] 时
+     * 交给单文件 JS 源顶层 `onImageClick(click, result, book, chapter, uiJava)` 处理。
+     * 老书源（无 mainJs）行为与改造前完全一致（哨兵值不会被返回）。
+     */
+    private fun evalImageClick(
+        source: BookSource,
+        java: SourceLoginJsExtensions,
+        book: Book,
+        chapter: BookChapter,
+        click: String,
+        src: String,
+        coroutineContext: CoroutineContext,
+    ): Any? {
+        val result = source.evalJS(click) {
+            put("java", java)
+            put("book", book)
+            put("chapter", chapter)
+            put("result", src)
+        }
+        if (source.shouldDeferImageClick(result)) {
+            val handled = JsSourceEngine(source, coroutineContext).callFunctionIfExists(
+                "onImageClick",
+                listOf(
+                    "click" to click,
+                    "result" to src,
+                    "book" to book,
+                    "chapter" to chapter,
+                    "uiJava" to java,
+                ),
+            ).toString().trim() == "true"
+            if (!handled) {
+                throw NoStackTraceException("单文件JS源未处理延迟图片点击")
+            }
+        }
+        return result
     }
 
 

@@ -72,6 +72,11 @@ commonsText = "1.13.1"
 #noinspection GradleDependency
 rhino = "1.8.1"
 
+# NG JS 书源运行时（ng-js-source-port）：QuickJS 沙箱 + AndroidX JavaScriptEngine
+# 来源：NG 上游 3f7d58e2（modules/quickjs-sandbox）；升级前需回归 5 个 JS 源与沙箱单测
+quickjsKt = "1.0.4"
+javascriptEngine = "1.1.1"
+
 media3 = "1.10.1"
 #noinspection GradleDependency
 gsyvideoplayer = "11.3.0"
@@ -245,6 +250,8 @@ liveeventbus = { module = "com.github.michaellee123:LiveEventBus", version.ref =
 material = { module = "com.google.android.material:material", version.ref = "material" }
 
 mozilla-rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
+quickjs-kt = { module = "io.github.dokar3:quickjs-kt", version.ref = "quickjsKt" }
+javascript-engine = { module = "androidx.javascriptengine:javascriptengine", version.ref = "javascriptEngine" }
 
 renderscript-intrinsics-replacement-toolkit = { module = "com.github.TomasValenta:renderscript-intrinsics-replacement-toolkit", version = "8eaa829ddd" }
 zxing-lite = { module = "com.github.jenly1314:zxing-lite", version.ref = "zxingLite" }

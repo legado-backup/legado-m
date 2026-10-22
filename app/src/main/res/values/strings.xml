@@ -1026,6 +1026,16 @@
     <string name="disable_source_confirm">\"%1$s\" will stop working and its saved verification result will be discarded. You can re-enable it in source management later.</string>
     <string name="finish_login">Finish login</string>
     <string name="logging_in">Logging in…</string>
+    <string name="login_ui_v2_render_error">Login form could not be rendered</string>
+    <string name="login_ui_v2_action_error">Login action failed: %1$s</string>
+    <string name="login_ui_v2_invalid_action">Login action returned an invalid command</string>
+    <string name="login_ui_v2_save_error">Failed to save login information</string>
+    <string name="login_ui_v2_sending">Please wait… %1$d</string>
+    <string name="js_source_edit_script">Edit script</string>
+    <string name="js_source_script">JS source script</string>
+    <string name="js_source_script_empty">This source has no script</string>
+    <string name="js_source_save_error">Failed to save JS source</string>
+    <string name="js_source_use_script_editor">This is a JS source; edit it from "Edit script"</string>
     <string name="login_error">Login failed</string>
     <string name="copy_error_detail">Copy error detail</string>
     <string name="password_show">Show password</string>

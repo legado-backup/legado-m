@@ -11,8 +11,15 @@ import kotlinx.coroutines.runBlocking
 
 @DatabaseView(
     """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore,
-    (loginUrl is not null and trim(loginUrl) <> '') hasLoginUrl, lastUpdateTime, respondTime, weight,
-    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, eventListener, bookSourceType, lastHost
+    (loginUrl is not null and trim(loginUrl) <> ''
+     or (mainJs is not null and trim(mainJs) <> ''
+         and loginUi is not null
+         and replace(replace(replace(replace(loginUi, ' ', ''), char(9), ''), char(10), ''), char(13), '') not in ('', '[]'))) hasLoginUrl,
+    lastUpdateTime, respondTime, weight,
+    (searchUrl is not null and trim(searchUrl) <> ''
+     or mainJs is not null and trim(mainJs) <> '') hasSearchUrl,
+    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, eventListener, bookSourceType,
+    (mainJs is not null and trim(mainJs) <> '') hasJs, lastHost
     from book_sources""",
     viewName = "book_sources_part"
 )
@@ -29,7 +36,7 @@ data class BookSourcePart(
     var enabled: Boolean = true,
     // 启用发现
     var enabledExplore: Boolean = true,
-    // 是否有登录地址
+    // 是否有登录地址（含 JS 源按 loginUi 判定）
     var hasLoginUrl: Boolean = false,
     // 最后更新时间，用于排序
     var lastUpdateTime: Long = 0,
@@ -37,12 +44,16 @@ data class BookSourcePart(
     var respondTime: Long = 180000L,
     // 智能排序的权重
     var weight: Int = 0,
+    // 是否有搜索能力（含 JS 源）
+    var hasSearchUrl: Boolean = false,
     // 是否有发现url
     var hasExploreUrl: Boolean = false,
     // 是否启用事件监听
     var eventListener: Boolean = false,
     // 书源类型
     var bookSourceType: Int = 0,
+    // 是否为单文件 JS 书源
+    var hasJs: Boolean = false,
     // AnalyzeUrl解析后的真实域名(host),校验时回填,UI分组用此字段优先于源URL截取
     var lastHost: String? = null
 ) {
