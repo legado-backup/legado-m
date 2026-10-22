@@ -14,6 +14,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.http.NetworkLog
 import io.legado.app.help.http.addHeaders
 import io.legado.app.help.http.networkLogSource
 import io.legado.app.help.http.newCallResponse
@@ -182,12 +183,16 @@ class JsSourceEngine(
     fun callFunction(name: String, args: List<Pair<String, Any?>>): String? {
         return withQuickJsExecution {
             source.withBookSourceClassPolicy {
-                val scope = buildScope(args)
-                if (ScriptableObject.getProperty(scope, name) !is Function) {
-                    throw NoStackTraceException("JS源缺少函数 $name")
+                try {
+                    val scope = buildScope(args)
+                    if (ScriptableObject.getProperty(scope, name) !is Function) {
+                        throw NoStackTraceException("JS源缺少函数 $name")
+                    }
+                    val expression = "$name(${args.joinToString(", ") { it.first }})"
+                    normalizeJsResult(compile(expression).eval(scope, coroutineContext), coroutineContext)
+                } catch (e: Throwable) {
+                    throw scriptFailure(name, e)
                 }
-                val expression = "$name(${args.joinToString(", ") { it.first }})"
-                normalizeJsResult(compile(expression).eval(scope, coroutineContext), coroutineContext)
             }
         }
     }
@@ -202,20 +207,35 @@ class JsSourceEngine(
     ): OptionalCallResult {
         return withQuickJsExecution {
             source.withBookSourceClassPolicy {
-                val scope = buildScope(args)
-                if (ScriptableObject.getProperty(scope, name) !is Function) {
-                    return@withBookSourceClassPolicy OptionalCallResult(false, null)
+                try {
+                    val scope = buildScope(args)
+                    if (ScriptableObject.getProperty(scope, name) !is Function) {
+                        return@withBookSourceClassPolicy OptionalCallResult(false, null)
+                    }
+                    val expression = "$name(${args.joinToString(", ") { it.first }})"
+                    OptionalCallResult(
+                        exists = true,
+                        value = normalizeJsResult(
+                            compile(expression).eval(scope, coroutineContext),
+                            coroutineContext,
+                        ),
+                    )
+                } catch (e: Throwable) {
+                    throw scriptFailure(name, e)
                 }
-                val expression = "$name(${args.joinToString(", ") { it.first }})"
-                OptionalCallResult(
-                    exists = true,
-                    value = normalizeJsResult(
-                        compile(expression).eval(scope, coroutineContext),
-                        coroutineContext,
-                    ),
-                )
             }
         }
+    }
+
+    /**
+     * 脚本异常转可定位的白话（Rhino 的 `at line number 1` / `<Unknown Source>` 对用户毫无信息量）：
+     * 带上**契约函数名** + **脚本字符数**，并脱敏消息中的凭据/URL query。
+     */
+    private fun scriptFailure(functionName: String, error: Throwable): Throwable {
+        if (error is CancellationException || error is NoStackTraceException) return error
+        return NoStackTraceException(
+            describeScriptFailure(functionName, source.mainJs?.length ?: 0, error)
+        )
     }
 
     internal data class OptionalCallResult(
@@ -261,6 +281,24 @@ class JsSourceEngine(
         private fun compile(script: String): CompiledScript {
             scriptCache[script]?.let { return it }
             return RhinoScriptEngine.compile(script).also { scriptCache.put(script, it) }
+        }
+
+        /**
+         * 脚本异常的对外文案（纯函数，单测锁定）：函数名 + 脚本规模 + 脱敏后的原始消息。
+         *
+         * Rhino 抛出的 `ScriptException` 只有 `at line number 1` / `<Unknown Source>`，
+         * 用户/AI 无法判断是哪个契约函数、哪份脚本出的错。
+         */
+        internal fun describeScriptFailure(
+            functionName: String,
+            scriptLength: Int,
+            error: Throwable,
+        ): String {
+            val raw = error.message.orEmpty()
+            val detail = NetworkLog.redactFreeTextForLog(raw)
+                .ifBlank { error::class.java.simpleName }
+                .take(300)
+            return "JS源 ${functionName}() 执行失败：${error::class.java.simpleName}: $detail（脚本 $scriptLength 字符）"
         }
 
         fun normalizeJsResult(
