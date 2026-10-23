@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.legado.app.ui.book.info.compose.VideoCacheBar
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -295,6 +296,34 @@ class BookInfoActivity :
         initViewEvent()
         initComposeTopBar()
         initComposeBottomBar()
+        initVideoCacheBar()
+    }
+
+    /**
+     * video-cache-and-multiep R2 / V2b：经典详情页快速缓存条（分组/书源/目录下方）。
+     *
+     * 与沉浸式/现代两套详情页共用同一个 [VideoCacheBar]；非视频书由组件内部策略空渲染。
+     * 搜索书（未入架）也展示：点击缓存会先入架并等待入库，再启动缓存服务。
+     */
+    private fun initVideoCacheBar() {
+        binding.composeVideoCacheBar?.setViewCompositionStrategy(
+            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+        )
+        binding.composeVideoCacheBar?.setContent {
+            LegadoTheme {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val bookUrl = viewModel.getBook()?.bookUrl
+                    ?: intent.getStringExtra("bookUrl").orEmpty()
+                VideoCacheBar(
+                    bookUrl = bookUrl,
+                    accent = androidx.compose.ui.graphics.Color(context.accentColor),
+                    inShelf = viewModel.inBookshelf,
+                    onAddShelf = {
+                        if (!viewModel.inBookshelf) viewModel.addToBookshelf { upTvBookshelf() }
+                    }
+                )
+            }
+        }
     }
 
     private fun initComposeTopBar() {

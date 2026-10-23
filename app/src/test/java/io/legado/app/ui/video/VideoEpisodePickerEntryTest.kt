@@ -1,5 +1,6 @@
 package io.legado.app.ui.video
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,5 +27,27 @@ class VideoEpisodePickerEntryTest {
         assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(1, 0))
         assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(0, 1))
         assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(0, 0))
+    }
+
+    @Test
+    fun indicatorIndexFollowsSessionKind() {
+        // 书源会话：章节索引是唯一权威（与左下角标题同源），不得用 rss 索引
+        assertEquals(
+            3,
+            episodeIndicatorIndex(
+                bookSession = true,
+                chapterInVolumeIndex = 3,
+                rssEpisodeIndex = 7,
+            ),
+        )
+        // 订阅源会话：用集索引
+        assertEquals(
+            7,
+            episodeIndicatorIndex(
+                bookSession = false,
+                chapterInVolumeIndex = 3,
+                rssEpisodeIndex = 7,
+            ),
+        )
     }
 }
