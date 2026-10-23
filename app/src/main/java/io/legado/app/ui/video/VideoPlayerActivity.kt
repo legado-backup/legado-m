@@ -172,6 +172,17 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
          * 代价是新画面已回来后提示还会滞留 1~2s——顶栏第二行属非侵入位，可接受。
          */
         private const val LAYOUT_SWITCH_NOTICE_MS = 4000L
+
+        /**
+         * 刷新入口可见性（纯策略，单测锁定）：
+         * 订阅源文章会话与书源章节会话都具备"重新采集"能力，均可刷新；
+         * 单 URL 直链会话无采集链，不显示。
+         */
+        internal fun shouldShowRefresh(
+            sourceIsRss: Boolean,
+            sourceIsBookSource: Boolean,
+            hasBook: Boolean,
+        ): Boolean = sourceIsRss || (sourceIsBookSource && hasBook)
     }
 
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
@@ -1336,7 +1347,13 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
      */
     private fun updateSourceDependentMenu() {
         showCustomBtn = (VideoPlay.source as? BookSource)?.customButton == true
-        showRefresh = VideoPlay.source is RssSource
+        // video-cache-and-multiep AD-08：刷新按"能力"而非源类型——订阅源文章会话与
+        // 书源章节会话都能重新采集，故两者均显示刷新
+        showRefresh = shouldShowRefresh(
+            sourceIsRss = VideoPlay.source is RssSource,
+            sourceIsBookSource = VideoPlay.source is BookSource,
+            hasBook = VideoPlay.book != null,
+        )
         showLogin = !VideoPlay.source?.loginUrl.isNullOrBlank()
         showChangeSource = (RssSearchSourceHolder.articles?.size ?: 0) > 1
     }

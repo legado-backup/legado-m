@@ -22,6 +22,8 @@ object NotificationId {
     // add-dlna-cast：投屏会话前台服务通知
     const val DlnaCastService = 114
     const val WebDavTask = 111
+    // video-cache-and-multiep：书源视频缓存前台服务
+    const val VideoCacheService = 115
     const val AutoTaskBookUpdateBase = 20000
     const val AutoTaskNotifyBase = 21000
     const val Download = 10000
