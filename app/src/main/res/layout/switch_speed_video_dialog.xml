@@ -1,23 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 倍速面板容器：靠右垂直居中，wrap_content 高度。
-     video-player-theme-unify：背景改透明，由 ChoiceSpeedDialog 动态设
-     ThemeStore.backgroundColor + UiCorner.panelRadius 圆角，跟随整体主题 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    video-cache-and-multiep R9 / V5：倍速选择改为底部上浮单排（原先靠右竖排弹框）。
+
+    - 一排 5 个可见（单个宽度 = (屏宽 - 左右留白) / 5，由 ChoiceSpeedDialog 运行时计算）
+    - 档位不足/超出时横向滑动查看，不换行 ⇒ 高度恒为一行，不会挤压/裁剪视频
+    - 背景仍为透明，由 ChoiceSpeedDialog 动态设 ThemeStore.backgroundColor + UiCorner.panelRadius
+-->
+<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/speed_scroll"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@null"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:overScrollMode="never"
+    android:scrollbars="none">
 
-    <ListView
-        android:id="@+id/switch_dialog_list"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:id="@+id/speed_row"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@null"
-        android:cacheColorHint="#00000000"
-        android:divider="#00000000"
-        android:dividerHeight="4dp"
-        android:listSelector="#00000000"
-        android:scrollbars="none" />
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp" />
 
-</FrameLayout>
+</HorizontalScrollView>

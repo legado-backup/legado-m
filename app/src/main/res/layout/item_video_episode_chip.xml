@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    video-cache-and-multiep R7 / V4：选集网格单元（5 列）。
+    选中/未选中样式由 EpisodeGridAdapter 经 applyVideoChoiceItemStyle 运行时按主题设置。
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:gravity="center"
+    android:maxLines="1"
+    android:ellipsize="end"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:textSize="@dimen/text_13sp">
+</TextView>

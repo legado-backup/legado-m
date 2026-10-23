@@ -59,4 +59,19 @@ class ExploreShowLayoutTest {
         assertEquals(ExploreShowLayout.WATERFALL, ExploreShowLayout.DEFAULT)
         assertTrue(ExploreShowLayout.isGrid(ExploreShowLayout.DEFAULT))
     }
+
+    @Test
+    fun pickerValuesFollowRequirementOrder() {
+        // 需求 R11：列表 / 瀑布 / 双列 / 三列（设置项与页内切换共用此顺序）
+        assertEquals(
+            listOf(
+                ExploreShowLayout.LIST,
+                ExploreShowLayout.WATERFALL,
+                ExploreShowLayout.DUAL,
+                ExploreShowLayout.TRIPLE,
+            ),
+            ExploreShowLayout.pickerValues,
+        )
+        assertEquals(4, ExploreShowLayout.pickerValues.size)
+    }
 }

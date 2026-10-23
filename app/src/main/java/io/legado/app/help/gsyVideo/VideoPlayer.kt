@@ -26,10 +26,12 @@ import com.shuyu.gsyvideoplayer.video.base.GSYVideoPlayer
 import androidx.core.graphics.ColorUtils
 import io.legado.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.EventBus
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.video.ImageEnhanceController
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.model.VideoPlay
+import io.legado.app.utils.postEvent
 import master.flame.danmaku.controller.DrawHandler
 import master.flame.danmaku.danmaku.loader.IllegalDataException
 import master.flame.danmaku.danmaku.loader.android.DanmakuLoaderFactory
@@ -698,24 +700,50 @@ class VideoPlayer: StandardGSYVideoPlayer {
         return parser
     }
 
+    /**
+     * 选集弹框（video-cache-and-multiep R7 / V4 统一入口）。
+     *
+     * 书源目录与订阅源集数**共用**同一分组弹框；选择后立即切集播放，
+     * 订阅源分支额外 postEvent 通知页内选集高亮刷新。
+     */
     private fun showEpisodeDialog() {
-        if (!mHadPlay || VideoPlay.episodes.isNullOrEmpty()) {
-            return
+        if (!mHadPlay) return
+        val bookEpisodes = VideoPlay.episodes
+        val rssEpisodes = VideoPlay.rssEpisodes
+        val titles: List<String>
+        val currentIndex: Int
+        when {
+            !bookEpisodes.isNullOrEmpty() -> {
+                titles = bookEpisodes.map { it.title }
+                currentIndex = VideoPlay.chapterInVolumeIndex
+            }
+            !rssEpisodes.isNullOrEmpty() -> {
+                titles = rssEpisodes.map { it.title }
+                currentIndex = VideoPlay.rssEpisodeIndex
+            }
+            else -> return
         }
         isChanging = true
         val choiceEpisodeDialog = ChoiceEpisodeDialog(mContext)
-        choiceEpisodeDialog.initList(VideoPlay.episodes!!, object :
+        choiceEpisodeDialog.initListByTitles(titles, object :
             ChoiceEpisodeDialog.OnListItemClickListener {
             override fun onItemClick(position: Int) {
-                VideoPlay.chapterInVolumeIndex = position
-                VideoPlay.saveRead(0)
-                VideoPlay.startPlay(this@VideoPlayer)
+                if (!bookEpisodes.isNullOrEmpty()) {
+                    VideoPlay.chapterInVolumeIndex = position
+                    VideoPlay.saveRead(0)
+                    VideoPlay.startPlay(this@VideoPlayer)
+                } else {
+                    val episodes = VideoPlay.rssEpisodes ?: return
+                    VideoPlay.rssEpisodeIndex = position
+                    VideoPlay.playRssEpisode(this@VideoPlayer, episodes[position])
+                    postEvent(EventBus.UP_VIDEO_INFO, arrayListOf(1))
+                }
             }
 
             override fun finishDialog() {
                 isChanging = false
             }
-        }, VideoPlay.chapterInVolumeIndex)
+        }, currentIndex)
         choiceEpisodeDialog.show()
     }
 
@@ -725,7 +753,9 @@ class VideoPlayer: StandardGSYVideoPlayer {
         }
         isChanging = true
         val choiceSpeedDialog = ChoiceSpeedDialog(mContext)
-        choiceSpeedDialog.initList(listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f, 5.0f, 10.0f, 15.0f).reversed(), object :
+        // video-cache-and-multiep R9 / V5：档位来源收敛到 ChoiceSpeedDialog.SPEED_VALUES
+        // （去掉 0.5x，常用档位正好一排 5 个；更高档位横向滑动可达）
+        choiceSpeedDialog.initList(ChoiceSpeedDialog.SPEED_VALUES, object :
             ChoiceSpeedDialog.OnListItemClickListener {
             @SuppressLint("SetTextI18n")
             override fun onItemClick(value: Float) {

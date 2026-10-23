@@ -266,3 +266,6 @@ git_log.txt
 *.bak_*
 # brooks-lint 本地运行历史（工具状态，非项目产物）
 /.brooks-lint-history.json
+
+# brooks-lint / 设备联调本地状态（工具产物，非项目产物，2026-10-24）
+/.trae-aicc/

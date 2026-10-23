@@ -1,0 +1,30 @@
+package io.legado.app.ui.video
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * video-cache-and-multiep R7 / V4：选集弹框入口可见性。
+ *
+ * 书源与订阅源双轨都必须能进分组选集；单集不展示入口（避免无操作的空弹框）。
+ */
+class VideoEpisodePickerEntryTest {
+
+    @Test
+    fun bookSourceMultiEpisodeShowsEntry() {
+        assertTrue(VideoPlayerActivity.shouldOfferEpisodePicker(bookEpisodeCount = 24, rssEpisodeCount = 0))
+    }
+
+    @Test
+    fun rssMultiEpisodeShowsEntry() {
+        assertTrue(VideoPlayerActivity.shouldOfferEpisodePicker(bookEpisodeCount = 0, rssEpisodeCount = 36))
+    }
+
+    @Test
+    fun singleEpisodeHidesEntry() {
+        assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(1, 0))
+        assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(0, 1))
+        assertFalse(VideoPlayerActivity.shouldOfferEpisodePicker(0, 0))
+    }
+}
