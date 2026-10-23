@@ -270,6 +270,20 @@
 
             <!-- video-gesture-overhaul: 快退按钮已移除，改为左右滑动 seek（R2/R3） -->
 
+            <!-- video-cache-and-multiep R10 / V6：听视频模式（全屏按钮下方）
+                 开启后隐藏画面继续播放，支持退后台/锁屏续播；再次点击恢复画面 -->
+            <ImageButton
+                android:id="@+id/btn_listen"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_overlay_button"
+                android:contentDescription="@string/video_listen_mode"
+                android:src="@drawable/ic_headphone"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:tint="#FFFFFF" />
+
             <!-- video-cache-and-multiep R9 / V5：沉浸式倍速入口（全屏按钮下方）
                  点击弹出底部上浮单排 5 档面板（ChoiceSpeedDialog，去掉 0.5x） -->
             <ImageButton

@@ -72,6 +72,14 @@ internal fun episodeIndicatorIndex(
     rssEpisodeIndex: Int,
 ): Int = if (bookSession) chapterInVolumeIndex else rssEpisodeIndex
 
+/**
+ * 次要入口（倍速/收藏/下载）可见性（纯策略，单测锁定）。
+ *
+ * 右侧按钮增至 7 个后，横屏全屏可视高度（约 360dp）不足以完整容纳，
+ * 故全屏时只保留「全屏 / 听视频 / 设置」三个核心入口。
+ */
+internal fun secondaryEntriesVisible(isFullscreen: Boolean): Boolean = !isFullscreen
+
 class VideoFragment : Fragment() {
 
     // ==================== 播放状态枚举 ====================
@@ -136,6 +144,8 @@ class VideoFragment : Fragment() {
     private var btnSettings: ImageButton? = null
     private var btnFullscreen: ImageButton? = null
     private var btnDownload: ImageButton? = null
+    /** video-cache-and-multiep R10 / V6：听视频模式入口（全屏下方耳机） */
+    private var btnListen: ImageButton? = null
     /** video-cache-and-multiep R9 / V5：沉浸式倍速入口（底部上浮单排面板） */
     private var btnSpeed: ImageButton? = null
     /** 弹幕开关（沉浸式悬浮层入口，与传统模式 GSY 控制条 toggle_danmaku 同状态源） */
@@ -248,6 +258,7 @@ class VideoFragment : Fragment() {
         btnSettings = null
         btnFullscreen = null
         btnDownload = null
+        btnListen = null
         btnSpeed = null
         btnBackOverlay = null
         gestureDetector = null
@@ -504,6 +515,8 @@ class VideoFragment : Fragment() {
             // 4.8 横屏布局适配：全屏按钮始终可见（显示退出图标）
             btnFullscreen?.visible()
             updateFullscreenButtonIcon(true)
+            // R10 / V6：横屏可视高度有限（7 个 48dp 按钮会超框）⇒ 隐藏次要入口，保留全屏/听视频/设置
+            applySecondaryButtonsVisibility(show = false)
             // B1+ 修复：全屏模式下显示悬浮返回按钮（titleBarNew 已被 gone() 隐藏）
             btnBackOverlay?.visible()
             // video-player-ux-fixes P4: 全屏态标题移到左上角（返回按钮右侧），左下角标题隐藏
@@ -519,6 +532,8 @@ class VideoFragment : Fragment() {
             controlsVisibleInFullscreen = true
             applyState(PlayState.NORMAL)
             updateFullscreenButtonIcon(false)
+            // R10 / V6：退出全屏恢复次要入口（倍速/收藏/下载；弹幕由数据态单独控制）
+            applySecondaryButtonsVisibility(show = true)
             // B1+ 修复：退出全屏时隐藏悬浮返回按钮（titleBarNew 恢复显示提供返回按钮）
             btnBackOverlay?.gone()
             // video-player-ux-fixes P4: 退出全屏恢复左下角标题，隐藏全屏态标题
@@ -533,6 +548,45 @@ class VideoFragment : Fragment() {
             }
             scheduleAutoHide()  // F2: 显示控件后 3 秒自动隐藏
         }
+    }
+
+    /**
+     * 听视频模式开关（video-cache-and-multiep R10 / V6）。
+     *
+     * 开启：画面隐藏（alpha=0）但播放器继续播放 ⇒ 可锁屏/退后台继续听；
+     *       Activity 侧同时持有 PARTIAL_WAKE_LOCK，避免息屏后 CPU 休眠断流。
+     */
+    private fun toggleListenMode() {
+        val enable = !VideoPlay.listenMode
+        VideoPlay.listenMode = enable
+        applyListenModeUi(enable)
+        (activity as? VideoPlayerActivity)?.onListenModeChanged(enable)
+        toastOnUi(if (enable) R.string.video_listen_mode_on else R.string.video_listen_mode_off)
+    }
+
+    /** 应用听视频 UI：画面隐藏/恢复；隐藏态下若暂停则自动续播（听模式语义是"一直在播"） */
+    private fun applyListenModeUi(enable: Boolean) {
+        val pv = _playerView ?: return
+        pv.alpha = if (enable) 0f else 1f
+        btnListen?.alpha = if (enable) 0.55f else 1f
+        if (enable && pv.currentState == GSYVideoView.CURRENT_STATE_PAUSE) {
+            pv.onVideoResume()
+        }
+    }
+
+    /**
+     * 次要入口显隐（R10 / V6）：横屏全屏可视高度不足以容纳 7 个按钮，
+     * 全屏时只保留「全屏 / 听视频 / 设置」三个核心入口。
+     */
+    private fun applySecondaryButtonsVisibility(show: Boolean) {
+        val visibility = if (show && secondaryEntriesVisible(currentState == PlayState.FULLSCREEN)) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        btnSpeed?.visibility = visibility
+        btnStar?.visibility = visibility
+        btnDownload?.visibility = visibility
     }
 
     /**
@@ -802,6 +856,11 @@ class VideoFragment : Fragment() {
         btnSettings = view.findViewById(R.id.btn_settings)
         btnFullscreen = view.findViewById(R.id.btn_fullscreen)
         btnDownload = view.findViewById(R.id.btn_download)
+        // R10 / V6：听视频模式（隐藏画面继续播，支持后台/锁屏续播）
+        btnListen = view.findViewById(R.id.btn_listen)
+        btnListen?.setOnClickListener { toggleListenMode() }
+        // 每次进入播放器默认「看视频」（会话级内存态，不沿用上次听模式）
+        applyListenModeUi(VideoPlay.listenMode)
         btnSpeed = view.findViewById(R.id.btn_speed)
         // R9 / V5：沉浸式倍速（底部上浮单排 5 档，当前档高亮）
         btnSpeed?.setOnClickListener {
