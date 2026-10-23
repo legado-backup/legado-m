@@ -29,4 +29,11 @@ class VideoPlayLastEpisodePolicyTest {
         assertFalse("空目录不得前进", VideoPlay.shouldAdvanceEpisode(0, 0))
         assertFalse("负总数不得前进", VideoPlay.shouldAdvanceEpisode(0, -3))
     }
+
+    @Test
+    fun onlyListenModeKeepsPlayingInBackground() {
+        // R10 / V6：默认（看视频）离屏必须暂停；听视频模式才允许后台续播
+        assertTrue(VideoPlay.shouldContinueInBackground(listenMode = true))
+        assertFalse(VideoPlay.shouldContinueInBackground(listenMode = false))
+    }
 }

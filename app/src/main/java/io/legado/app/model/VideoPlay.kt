@@ -119,6 +119,20 @@ object VideoPlay : CoroutineScope by MainScope(){
             videoPrefs.edit { putInt("seekSensitivity", value) }
         }
 
+    /**
+     * 听视频模式（video-cache-and-multiep R10 / V6）。
+     *
+     * 开启后隐藏画面但**继续播放**（音频照常、自动连播不中断），并允许退到后台/锁屏继续播。
+     * 会话级内存态：每次进入播放器默认「看视频」（避免上次听模式导致进来无画面）；
+     * 进度仍由 `saveRead` 持久化 ⇒ 看/听都续播。
+     */
+    var listenMode: Boolean = false
+
+    /**
+     * 后台继续播放判据（纯策略，单测锁定）：仅听视频模式允许 Activity 离屏后不停播。
+     */
+    internal fun shouldContinueInBackground(listenMode: Boolean): Boolean = listenMode
+
     // ==================== add-dlna-cast：DLNA/UPnP 投屏偏好（AD-10） ====================
     // 全部落 video_config，零 DB 迁移；读取不到键即取默认值，覆盖安装天然兼容。
 

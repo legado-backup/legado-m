@@ -6,7 +6,9 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Build
+import android.content.Context
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
@@ -177,6 +179,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         /** R7 / V4：选集标题可点击提示（多集时追加在「第X集 · 共Y集」之后） */
         private const val EPISODE_PICKER_ARROW = " >"
 
+        /** R10 / V6：听视频模式 CPU 唤醒锁（仅保持 CPU，不亮屏） */
+        private const val LISTEN_WAKE_LOCK_TAG = "legado:videoListen"
+        private const val LISTEN_WAKE_LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
+
         /**
          * 刷新入口可见性（纯策略，单测锁定）：
          * 订阅源文章会话与书源章节会话都具备"重新采集"能力，均可刷新；
@@ -217,6 +223,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     // F182（2026-09-21）：布局切换过渡反馈状态（顶栏第二行「正在切换布局…」）
     private var layoutSwitching by mutableStateOf(false)
     private var showRefresh by mutableStateOf(false)
+    /** R10 / V6：听视频模式 CPU 唤醒锁（开=持有，关/销毁=释放） */
+    private var listenWakeLock: PowerManager.WakeLock? = null
     private var showLogin by mutableStateOf(false)
     private var showChangeSource by mutableStateOf(false)
 
@@ -2756,13 +2764,50 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         super.onStop()
         // T2.12: Activity 切到后台时暂停视频播放（解决 Bug-26：onStop 后视频仍播放导致资源泄漏+音频泄漏）
         // 注：deactivatePlayer 内部会判断 isActivated，仅在活跃时暂停
-        currentFragment?.deactivatePlayer()
+        //
+        // video-cache-and-multiep R10 / V6：**听视频模式例外**——用户要求锁屏/退后台继续听，
+        // 故保留播放；同时持有 PARTIAL_WAKE_LOCK 防止息屏后 CPU 休眠断流。
+        if (VideoPlay.shouldContinueInBackground(VideoPlay.listenMode)) {
+            acquireListenWakeLock()
+        } else {
+            currentFragment?.deactivatePlayer()
+        }
         if (initGetter) {
             glideImageGetter.stop()
         }
     }
 
+    /**
+     * 听视频模式开关回调（R10 / V6）：开则持锁保证后台不断播，关则立即释放。
+     */
+    internal fun onListenModeChanged(enable: Boolean) {
+        if (enable) acquireListenWakeLock() else releaseListenWakeLock()
+    }
+
+    /** PARTIAL_WAKE_LOCK：仅保持 CPU 唤醒（不亮屏），最长 6 小时自动过期兜底 */
+    private fun acquireListenWakeLock() {
+        if (listenWakeLock?.isHeld == true) return
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+        listenWakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            LISTEN_WAKE_LOCK_TAG
+        ).apply {
+            setReferenceCounted(false)
+            acquire(LISTEN_WAKE_LOCK_TIMEOUT_MS)
+        }
+        AppLog.put("ListenMode: wakeLock acquired")
+    }
+
+    private fun releaseListenWakeLock() {
+        listenWakeLock?.let {
+            if (it.isHeld) it.release()
+            AppLog.put("ListenMode: wakeLock released")
+        }
+        listenWakeLock = null
+    }
+
     override fun onDestroy() {
+        releaseListenWakeLock()
         // app-stability-round2 P2-2: 先取消抓取协程（含嗅探 WebView），再释放播放器资源
         // 根因：原顺序 destroyWeb 先执行、stopLoading 后置，嗅探协程取消时序混乱，且 runCatching 误捕获 CancellationException
         // 修复：stopLoading 提前到最前，协程取消后 BackstageWebView.invokeOnCancellation 主动销毁嗅探 WebView

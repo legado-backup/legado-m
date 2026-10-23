@@ -31,4 +31,8 @@
     <string name="video_episode_last_toast">已是最后一集</string>
     <!-- R8 / V4：书源视频的下载入口改为「缓存本剧」 -->
     <string name="video_cache_started">开始缓存本剧</string>
+    <!-- R10 / V6：听视频模式（全屏下方耳机） -->
+    <string name="video_listen_mode">听视频</string>
+    <string name="video_listen_mode_on">听视频模式：画面已隐藏，可锁屏或退后台继续听</string>
+    <string name="video_listen_mode_off">已恢复画面</string>
 </resources>

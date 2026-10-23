@@ -50,4 +50,11 @@ class VideoEpisodePickerEntryTest {
             ),
         )
     }
+
+    @Test
+    fun secondaryEntriesHiddenInFullscreen() {
+        // R10 / V6：右侧 7 个按钮在横屏全屏放不下 ⇒ 全屏只保留全屏/听视频/设置
+        assertFalse(secondaryEntriesVisible(isFullscreen = true))
+        assertTrue(secondaryEntriesVisible(isFullscreen = false))
+    }
 }
