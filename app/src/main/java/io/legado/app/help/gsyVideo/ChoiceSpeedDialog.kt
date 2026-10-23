@@ -10,25 +10,37 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.ListView
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.content.ContextCompat
-import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.theme.themeDividerColorOrDefault
-import io.legado.app.utils.ColorUtils
 import io.legado.app.R
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.themeDividerColorOrDefault
+import io.legado.app.utils.ColorUtils
+import kotlin.math.roundToInt
 
+/**
+ * 倍速选择弹框（video-cache-and-multiep R9 / V5 改版）。
+ *
+ * 形态由「靠右竖排列表」改为「**底部上浮单排**」：
+ *  - 一排固定展示 [VISIBLE_COUNT] 个档位，超出部分横向滑动（不换行 ⇒ 高度恒为一行，不裁剪视频）
+ *  - 当前倍速高亮并自动滚到可见位置
+ *  - 容器宽度 = 屏宽减左右留白，圆角/底色跟随主题（ThemeStore）
+ */
 class ChoiceSpeedDialog(private val mContext: Context) : Dialog(
     mContext, R.style.dialog_style
 ) {
-    private var listView: ListView? = null
-    private var adapter: SpeedAdapter? = null
+    private var scrollView: HorizontalScrollView? = null
+    private var row: LinearLayout? = null
     private var onItemClickListener: OnListItemClickListener? = null
     private var data: List<Float>? = null
+
+    /** 单排可见档位数（需求：剩余正好一排 5 个） */
+    private val visibleCount = VISIBLE_COUNT
+    /** 横向留白（左右各 16dp） */
+    private val sideMarginPx = (16 * mContext.resources.displayMetrics.density).roundToInt()
 
     interface OnListItemClickListener {
         fun onItemClick(value: Float)
@@ -45,10 +57,10 @@ class ChoiceSpeedDialog(private val mContext: Context) : Dialog(
     }
 
     /**
-     * 初始化倍速列表
-     * @param data 倍速值列表（显示顺序，如 reversed 后的 [15.0, 10.0, ..., 0.5]）
+     * 初始化倍速列表（横向单排，顺序即显示顺序）。
+     * @param data 倍速值列表
      * @param onItemClickListener 点击回调
-     * @param currentSpeed 当前播放倍速，用于高亮选中项（默认 1.0f，向后兼容）
+     * @param currentSpeed 当前播放倍速，用于高亮选中项
      */
     fun initList(
         data: List<Float>,
@@ -57,148 +69,127 @@ class ChoiceSpeedDialog(private val mContext: Context) : Dialog(
     ) {
         this.onItemClickListener = onItemClickListener
         this.data = data
-        val inflater = LayoutInflater.from(mContext)
-        val view: View = inflater.inflate(R.layout.switch_speed_video_dialog, null)
-        listView = view.findViewById(R.id.switch_dialog_list)
+        val view: View = LayoutInflater.from(mContext)
+            .inflate(R.layout.switch_speed_video_dialog, null)
+        scrollView = view.findViewById(R.id.speed_scroll)
+        row = view.findViewById(R.id.speed_row)
         setContentView(view)
-        // video-player-theme-unify：弹框容器动态设色（ThemeStore.backgroundColor + panelRadius 圆角），
-        // show 前读取最新主题，替代静态深色 speed_dialog_panel_bg
         val radius = UiCorner.panelRadius(mContext).toFloat()
         view.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = radius
             setColor(ThemeStore.backgroundColor(mContext))
         }
-        val displayData = buildDisplayData(data)
-        adapter = SpeedAdapter(mContext, displayData, currentSpeed)
-        listView!!.adapter = adapter
-        listView!!.onItemClickListener = this@ChoiceSpeedDialog.OnItemClickListener()
-        val dialogWindow = window
-        val lp = dialogWindow!!.attributes
+        buildRow(data, currentSpeed)
+        val dialogWindow = window ?: return
         val d = mContext.resources.displayMetrics
-        lp.width = (d.widthPixels * 0.34).toInt()
+        val lp = dialogWindow.attributes
+        // 底部上浮：宽度铺满（留左右 8dp 呼吸位），高度随内容（单排）
+        lp.width = d.widthPixels - sideMarginPx
         lp.height = WindowManager.LayoutParams.WRAP_CONTENT
-        lp.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        lp.verticalMargin = 0f
         dialogWindow.setAttributes(lp)
+        dialogWindow.setDimAmount(0f)
     }
 
     /**
-     * 构造显示数据：在极速区(>=5.0)与常用区(<5.0)之间插入 SEPARATOR 标记
-     * 数据顺序为显示顺序（已 reversed，顶部最大）。
+     * 构建单排档位按钮。
+     *
+     * 单项宽度 = (弹框宽度 - 行内左右 padding) / visibleCount，
+     * 档位数 > visibleCount 时由 HorizontalScrollView 承担横向滑动。
      */
-    private fun buildDisplayData(data: List<Float>): List<Any> {
-        val result = ArrayList<Any>(data.size + 1)
-        var inserted = false
-        for (value in data) {
-            if (!inserted && value < 5.0f) {
-                result.add(SEPARATOR)
-                inserted = true
-            }
-            result.add(value)
-        }
-        return result
-    }
-
-    private inner class OnItemClickListener : AdapterView.OnItemClickListener {
-        override fun onItemClick(
-            adapterView: AdapterView<*>?,
-            view: View?,
-            position: Int,
-            id: Long
-        ) {
-            val item = adapter?.getItem(position)
-            if (item === SEPARATOR) return
-            dismiss()
-            onItemClickListener!!.onItemClick(item as? Float ?: 1.0f)
-        }
-    }
-
-    /**
-     * 倍速列表适配器（ChoiceSpeedDialog 专用，不影响 SwitchVideoAdapter/ChoiceEpisodeDialog）
-     * - 支持分隔项 [SEPARATOR]
-     * - 支持当前倍速高亮（主题色 primary + 加粗 + 浅色背景）
-     * - 倍速文本格式化：1.0→"1x"，15.0→"15x"，1.25→"1.25x"
-     */
-    private inner class SpeedAdapter(
-        context: Context,
-        private val displayData: List<Any>,
-        private val currentSpeed: Float
-    ) : ArrayAdapter<Any>(context, 0, displayData) {
-
-        override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
-            val item = displayData[position]
-            return when {
-                item === SEPARATOR -> {
-                    // 分隔项：复用 convertView 时需确认类型匹配
-                    val view = if (convertView?.tag == TAG_SEPARATOR) convertView
-                        else LayoutInflater.from(context)
-                            .inflate(R.layout.switch_video_dialog_item_separator, parent, false)
-                            .also { it.tag = TAG_SEPARATOR }
-                    view
+    private fun buildRow(data: List<Float>, currentSpeed: Float) {
+        val rowView = row ?: return
+        rowView.removeAllViews()
+        val d = mContext.resources.displayMetrics
+        val rowInnerPaddingPx = (12 * 2 * d.density).roundToInt()
+        val available = (d.widthPixels - sideMarginPx) - rowInnerPaddingPx
+        val itemWidth = (available / visibleCount).coerceAtLeast((56 * d.density).roundToInt())
+        val itemHeight = (44 * d.density).roundToInt()
+        val gapPx = (6 * d.density).roundToInt()
+        var currentView: TextView? = null
+        data.forEachIndexed { index, value ->
+            val textView = TextView(mContext).apply {
+                layoutParams = LinearLayout.LayoutParams(itemWidth, itemHeight).also {
+                    if (index > 0) it.marginStart = gapPx
                 }
-                else -> {
-                    // 普通倍速项：复用 convertView 时需确认类型匹配
-                    val view = if (convertView?.tag == TAG_NORMAL) convertView
-                        else LayoutInflater.from(context)
-                            .inflate(R.layout.speed_dialog_item, parent, false)
-                            .also { it.tag = TAG_NORMAL }
-                    val textView = view.findViewById<TextView>(R.id.text1)
-                    val value = item as Float
-                    textView.text = formatSpeed(value)
-                    if (value == currentSpeed) {
-                        // video-player-theme-unify：选中高亮动态取 ThemeStore.accentColor + 20% 透明圆角背景
-                        val accentColor = ThemeStore.accentColor(context)
-                        textView.setTextColor(accentColor)
-                        textView.setTypeface(textView.typeface, Typeface.BOLD)
-                        val radius = UiCorner.panelRadius(context).toFloat()
-                        val rounded = GradientDrawable().apply {
-                            cornerRadius = radius
-                            setColor(
-                                Color.argb(
-                                    0x33,
-                                    Color.red(accentColor),
-                                    Color.green(accentColor),
-                                    Color.blue(accentColor)
-                                )
-                            )
-                        }
-                        textView.background = rounded
-                    } else {
-                        // 未选中文字用 ThemeStore.textColorPrimary（日/夜自适应），避免日间亮底白字不可读
-                        textView.setTextColor(ThemeStore.textColorPrimary(context))
-                        textView.setTypeface(textView.typeface, Typeface.NORMAL)
-                        // video-player-image-enhance 样式专项：未选中背景动态取色（替换静态 card_video_background
-                        // water 色板），fieldSurface=背景色混 accent + UiCorner.actionRadius + divider 描边，主题联动
-                        val surface = ThemeStore.backgroundColor(context)
-                        val accent = ThemeStore.accentColor(context)
-                        val field = ColorUtils.blendColors(
-                            surface,
-                            accent,
-                            if (AppConfig.isNightTheme) 0.10f else 0.05f
-                        )
-                        val radius = UiCorner.actionRadius(context).toFloat()
-                        textView.background = GradientDrawable().apply {
-                            cornerRadius = radius
-                            setColor(field)
-                            setStroke(
-                                context.resources.displayMetrics.density.toInt().coerceAtLeast(1),
-                                context.themeDividerColorOrDefault()
-                            )
-                        }
-                    }
-                    view
+                gravity = Gravity.CENTER
+                textSize = 15f
+                text = formatSpeed(value)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    dismiss()
+                    onItemClickListener?.onItemClick(value)
                 }
             }
+            applyItemStyle(textView, selected = value == currentSpeed)
+            if (value == currentSpeed) currentView = textView
+            rowView.addView(textView)
         }
+        // 当前倍速不在首屏时自动滚到可见位置（分组多时不必手动寻找）
+        scrollView?.post {
+            val target = currentView ?: return@post
+            val left = target.left - (itemWidth * (visibleCount - 1) / 2)
+            scrollView?.smoothScrollTo(left.coerceAtLeast(0), 0)
+        }
+    }
 
-        private fun formatSpeed(value: Float): String {
-            return if (value == value.toInt().toFloat()) "${value.toInt()}x" else "${value}x"
+    /** 选中/未选中样式：与改造前口径一致（accent 文字 + accent 20% 圆角底 / 主题描边底） */
+    private fun applyItemStyle(textView: TextView, selected: Boolean) {
+        val accentColor = ThemeStore.accentColor(mContext)
+        val context = mContext
+        if (selected) {
+            textView.setTextColor(accentColor)
+            textView.setTypeface(textView.typeface, Typeface.BOLD)
+            val radius = UiCorner.actionRadius(context).toFloat()
+            textView.background = GradientDrawable().apply {
+                cornerRadius = radius
+                setColor(
+                    Color.argb(
+                        0x33,
+                        Color.red(accentColor),
+                        Color.green(accentColor),
+                        Color.blue(accentColor)
+                    )
+                )
+            }
+        } else {
+            textView.setTextColor(ThemeStore.textColorPrimary(context))
+            textView.setTypeface(textView.typeface, Typeface.NORMAL)
+            val surface = ThemeStore.backgroundColor(context)
+            val field = ColorUtils.blendColors(
+                surface,
+                accentColor,
+                if (AppConfig.isNightTheme) 0.10f else 0.05f
+            )
+            val radius = UiCorner.actionRadius(context).toFloat()
+            textView.background = GradientDrawable().apply {
+                cornerRadius = radius
+                setColor(field)
+                setStroke(
+                    context.resources.displayMetrics.density.toInt().coerceAtLeast(1),
+                    context.themeDividerColorOrDefault()
+                )
+            }
         }
+    }
+
+    private fun formatSpeed(value: Float): String {
+        return if (value == value.toInt().toFloat()) "${value.toInt()}x" else "${value}x"
     }
 
     companion object {
-        private val SEPARATOR = Any()
-        private const val TAG_NORMAL = "normal"
-        private const val TAG_SEPARATOR = "separator"
+        /** 单排可见档位数（需求 R9：去掉 0.5 后常用档位正好一排 5 个） */
+        const val VISIBLE_COUNT = 5
+
+        /**
+         * 倍速档位（去掉 0.5 倍的常用档）。
+         *
+         * 顺序即显示顺序；更高档位（2.5x 起）保留在末尾，可由横向滑动到达。
+         */
+        val SPEED_VALUES: List<Float> =
+            listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f, 5.0f, 10.0f, 15.0f)
     }
 }

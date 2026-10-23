@@ -19,6 +19,13 @@ object ExploreShowLayout {
     /** 默认瀑布（需求：默认到新版本里为瀑布模式） */
     const val DEFAULT = WATERFALL
 
+    /**
+     * 布局选择器的取值顺序（列表 / 瀑布 / 双列 / 三列）。
+     *
+     * 设置项弹框与页内右上角切换共用此顺序，避免两处顺序漂移。
+     */
+    val pickerValues: List<Int> = listOf(LIST, WATERFALL, DUAL, TRIPLE)
+
     fun normalize(mode: Int): Int = mode.coerceIn(MIN, MAX)
 
     /** 网格列数：列表返回 1（仍按单列渲染，不启用网格） */

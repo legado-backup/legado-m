@@ -26,4 +26,9 @@
     <string name="video_layout_switching">正在切换布局…</string>
     <!-- F183（2026-09-21）：选集「已看」角标（与当前集 accent 态、未看默认态并列成三态） -->
     <string name="video_episode_watched_mark">" ✓"</string>
+    <!-- video-cache-and-multiep R7 / V4：多集选集弹框头部（分组 + 网格）与末集提示 -->
+    <string name="video_episode_picker_header">当前视频 · 全 %1$d 集</string>
+    <string name="video_episode_last_toast">已是最后一集</string>
+    <!-- R8 / V4：书源视频的下载入口改为「缓存本剧」 -->
+    <string name="video_cache_started">开始缓存本剧</string>
 </resources>

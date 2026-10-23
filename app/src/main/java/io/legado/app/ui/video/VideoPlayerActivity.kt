@@ -91,6 +91,7 @@ import io.legado.app.help.dlna.CastPhase
 import io.legado.app.help.dlna.DlnaCastManager
 import io.legado.app.help.dlna.PlayerControl
 import io.legado.app.help.exoplayer.FirstFramePreloader
+import io.legado.app.help.gsyVideo.ChoiceEpisodeDialog
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.player.ErrorMapper
 import io.legado.app.help.webView.PooledWebView
@@ -173,6 +174,9 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
          */
         private const val LAYOUT_SWITCH_NOTICE_MS = 4000L
 
+        /** R7 / V4：选集标题可点击提示（多集时追加在「第X集 · 共Y集」之后） */
+        private const val EPISODE_PICKER_ARROW = " ▾"
+
         /**
          * 刷新入口可见性（纯策略，单测锁定）：
          * 订阅源文章会话与书源章节会话都具备"重新采集"能力，均可刷新；
@@ -183,6 +187,15 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             sourceIsBookSource: Boolean,
             hasBook: Boolean,
         ): Boolean = sourceIsRss || (sourceIsBookSource && hasBook)
+
+        /**
+         * 选集弹框入口可见性（纯策略，单测锁定）：
+         * 书源目录与订阅源集数任一超过 1 集时可选集；单集不显示入口（无信息量）。
+         */
+        internal fun shouldOfferEpisodePicker(
+            bookEpisodeCount: Int,
+            rssEpisodeCount: Int,
+        ): Boolean = bookEpisodeCount > 1 || rssEpisodeCount > 1
     }
 
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
@@ -1863,12 +1876,72 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     /**
      * F183（2026-09-21）：选集区块标题的位置计数（「选集 · 第3集 · 共36集」）。
      * 索引越界钳制后再拼串，避免异步列表变更期间出现「第 0 集 / 超出总数」的失真文案。
+     *
+     * video-cache-and-multiep R7 / V4：多集时追加「 ▾」并把标题做成选集弹框入口
+     * （传统模式与沉浸式左下角同一交互：分组 + 集数网格，见 [showEpisodePicker]）。
      */
     private fun upEpisodeLabelPosition(episodeIndex: Int, total: Int) {
         if (total <= 0) return
         val safeIndex = episodeIndex.coerceIn(0, total - 1)
+        val indicator = getString(R.string.video_playlist_position_episode, safeIndex + 1, total)
         binding.tvEpisodeLabel.text = getString(R.string.video_section_episodes) +
-            " · " + getString(R.string.video_playlist_position_episode, safeIndex + 1, total)
+            " · " + indicator + if (total > 1) EPISODE_PICKER_ARROW else ""
+        binding.tvEpisodeLabel.isClickable = total > 1
+        binding.tvEpisodeLabel.setOnClickListener { showEpisodePicker() }
+    }
+
+    /**
+     * 多集选集弹框（video-cache-and-multiep R7 / AD-03）。
+     *
+     * 书源（目录 `episodes`）与订阅源（`rssEpisodes`）**共用**同一弹框：
+     * 顶部第一行分组（1-10 / 11-20 …）+ 组内集数网格，打开即定位当前集。
+     * 选择后书源走目录切换、订阅源走 `playRssEpisode`，并刷新页内选集高亮。
+     */
+    internal fun showEpisodePicker() {
+        val bookEpisodes = VideoPlay.episodes
+        val rssEpisodes = VideoPlay.rssEpisodes
+        val titles: List<String>
+        val currentIndex: Int
+        when {
+            !bookEpisodes.isNullOrEmpty() -> {
+                titles = bookEpisodes.map { it.title }
+                currentIndex = VideoPlay.chapterInVolumeIndex
+            }
+            !rssEpisodes.isNullOrEmpty() -> {
+                titles = rssEpisodes.map { it.title }
+                currentIndex = VideoPlay.rssEpisodeIndex
+            }
+            else -> return
+        }
+        if (!shouldOfferEpisodePicker(bookEpisodes?.size ?: 0, rssEpisodes?.size ?: 0)) return
+        val dialog = ChoiceEpisodeDialog(this)
+        dialog.initListByTitles(
+            titles,
+            object : ChoiceEpisodeDialog.OnListItemClickListener {
+                override fun onItemClick(position: Int) {
+                    if (!bookEpisodes.isNullOrEmpty()) {
+                        if (position == VideoPlay.chapterInVolumeIndex) return
+                        // add-dlna-cast REQ-08：投屏中选集先终止会话再放行
+                        endCastForLocalSwitch()
+                        VideoPlay.chapterInVolumeIndex = position
+                        VideoPlay.saveRead(0)
+                        upEpisodesView()
+                        VideoPlay.startPlay(playerView)
+                    } else {
+                        val episodes = VideoPlay.rssEpisodes ?: return
+                        if (position == VideoPlay.rssEpisodeIndex) return
+                        endCastForLocalSwitch()
+                        VideoPlay.rssEpisodeIndex = position
+                        VideoPlay.playRssEpisode(playerView, episodes[position])
+                        upRssEpisodesView()
+                    }
+                }
+
+                override fun finishDialog() = Unit
+            },
+            currentIndex
+        )
+        dialog.show()
     }
 
     /**

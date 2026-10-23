@@ -1,34 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 选集弹框容器：靠右全高。
-     video-player-theme-unify：背景改透明，由 ChoiceEpisodeDialog 动态设
-     ThemeStore.backgroundColor + UiCorner.panelRadius 圆角，跟随整体主题 -->
+<!--
+    video-cache-and-multiep R7 / V4：多集选集弹框（底部上浮 + 分组 + 集数网格）。
+
+    结构：
+      ① 头部：当前视频 · 全 N 集（并显示可关闭）
+      ② 分组行：1-10 / 11-20 …（横向滑动；组数 ≤ 10，由 EpisodePager 计算）
+      ③ 集数网格：当前分组的具体集数（5 列），当前集高亮并自动滚到可见位置
+
+    背景透明，由 ChoiceEpisodeDialog 动态设 ThemeStore.backgroundColor + UiCorner.panelRadius。
+    高度由 ChoiceEpisodeDialog 按横竖屏剩余空间计算（视频在上方必须完整可见）。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@null"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingBottom="8dp">
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="12dp">
 
     <TextView
         android:id="@+id/listCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        android:gravity="center"
-        android:minEms="2"
-        android:text="@string/video_episode_list"
-        android:textColor="@color/primaryText" />
-
-    <ListView
-        android:id="@+id/switch_dialog_list"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@null"
-        android:cacheColorHint="#00000000"
-        android:divider="#00000000"
-        android:dividerHeight="4dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="16dp"
-        android:listSelector="#00000000" />
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:textColor="@color/primaryText"
+        android:textSize="@dimen/text_14sp"
+        android:textStyle="bold" />
+
+    <HorizontalScrollView
+        android:id="@+id/group_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/group_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+
+    </HorizontalScrollView>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/episode_grid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
 
 </LinearLayout>

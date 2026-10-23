@@ -25,11 +25,14 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssEpisode
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.source.isVideoSource
+import io.legado.app.help.video.LocalMediaResolver
 import io.legado.app.model.Download
 import io.legado.app.model.VideoPlay
 import io.legado.app.service.DownloadTaskType
+import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.data.PlayHistoryStore
 import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.utils.gone
@@ -543,6 +546,9 @@ class VideoFragment : Fragment() {
      * 真值与传统布局信息区（`VideoPlayerActivity.showRssLegacyInfo`）**同源同串**（复用
      * `video_playlist_position_episode/_article`），避免双布局信息架构分叉；
      * 单集/单篇或非订阅源场景不显示（避免无信息量的噪声）。
+     *
+     * video-cache-and-multiep R7 / V4：多集时追加「 ▾」并成为选集弹框入口
+     * （与传统模式「选集 · 第X集 · 共Y集 ▾」同一交互，见 `VideoPlayerActivity.showEpisodePicker`）。
      */
     private fun updatePositionIndicator() {
         val tv = tvPositionIndicator ?: return
@@ -553,12 +559,27 @@ class VideoFragment : Fragment() {
                 getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles.size)
             !episodes.isNullOrEmpty() && episodes.size > 1 ->
                 getString(R.string.video_playlist_position_episode, VideoPlay.rssEpisodeIndex + 1, episodes.size)
+            // 书源多卷/多集目录：episodes 为当前卷子列表（与传统布局书源分支同源）
+            (VideoPlay.episodes?.size ?: 0) > 1 ->
+                getString(
+                    R.string.video_playlist_position_episode,
+                    VideoPlay.chapterInVolumeIndex + 1,
+                    VideoPlay.episodes!!.size
+                )
             else -> ""
         }
         if (text.isNotBlank()) {
-            tv.text = text
+            val multiEpisode = (!episodes.isNullOrEmpty() && episodes.size > 1) ||
+                (VideoPlay.episodes?.size ?: 0) > 1
+            tv.text = text + if (multiEpisode) EPISODE_PICKER_ARROW_SUFFIX else ""
+            tv.isClickable = multiEpisode
+            tv.setOnClickListener {
+                (activity as? VideoPlayerActivity)?.showEpisodePicker()
+            }
             tv.visible()
         } else {
+            tv.isClickable = false
+            tv.setOnClickListener(null)
             tv.gone()
         }
     }
@@ -826,7 +847,23 @@ class VideoFragment : Fragment() {
 
         // 2.8 下载按钮（video-download-manager）：用当前已解析的播放地址 + 防盗链头 + 视频标题发起下载
         // 下载目标为 app 专属外部目录（无需 MANAGE_EXTERNAL_STORAGE 特殊权限），直接发起无需先申请权限
+        //
+        // video-cache-and-multiep R8 / V4：**书源视频改走缓存管理**（按集缓存，供离线播放），
+        // 订阅源仍走既有下载链；当前集已缓存则隐藏入口（无重复缓存的意义）。
+        val videoBook = VideoPlay.book
+        val videoChapter = VideoPlay.episodes?.getOrNull(VideoPlay.chapterInVolumeIndex)
+        val isBookVideo = videoBook != null && videoBook.isVideo
+        if (isBookVideo && videoChapter != null &&
+            LocalMediaResolver.hasLocal(videoBook, videoChapter)
+        ) {
+            btnDownload?.gone()
+        }
         btnDownload?.setOnClickListener {
+            if (isBookVideo && videoBook != null) {
+                VideoCacheKernel.start(requireContext(), videoBook.bookUrl)
+                toastOnUi(R.string.video_cache_started)
+                return@setOnClickListener
+            }
             val url = VideoPlay.videoUrl
             if (url.isNullOrBlank()) {
                 toastOnUi(R.string.video_download_no_url)
@@ -1546,6 +1583,9 @@ class VideoFragment : Fragment() {
 
         /** video-booksource-align-rss AD-02：垂直 fling 最小速度阈值（px/s），低于此值不触发列表切换 */
         private const val FLING_MIN_VELOCITY = 1200f
+
+        /** R7 / V4：多集时左下角位置指示追加的可点击提示 */
+        private const val EPISODE_PICKER_ARROW_SUFFIX = " ▾"
 
         fun newInstance(index: Int): VideoFragment {
             return VideoFragment().apply {

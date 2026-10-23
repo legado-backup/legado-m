@@ -1625,6 +1625,15 @@ object VideoPlay : CoroutineScope by MainScope(){
         episodes = toc.subList(startInt + 1, endInt)
     }
 
+    /**
+     * 自动连播边界（纯策略，单测锁定）。
+     *
+     * 语义为「当前视频的下一集」：目标下标必须仍落在本剧集范围内；
+     * 末集之后再前进即越界（调用方给末集提示，不跨影片）。
+     */
+    internal fun shouldAdvanceEpisode(targetIndex: Int, total: Int): Boolean =
+        total > 0 && targetIndex in 0 until total
+
     fun upDurIndex(offset: Int, player: StandardGSYVideoPlayer): Boolean {
         val episodes = episodes ?: return false
         val index = chapterInVolumeIndex + offset
@@ -1632,10 +1641,11 @@ object VideoPlay : CoroutineScope by MainScope(){
             appCtx.toastOnUi("已到开头")
             return false
         }
-        if (index >= episodes.size) {
-            // video-booksource-align-rss REQ-9/S6：末集播完自动连播 → 列表下一影片
-            // （与上滑语义一致；无下一影片时 switchToBookFromList 内部 toast 边界提示）
-            return switchToBookFromList(offset, player)
+        if (!shouldAdvanceEpisode(index, episodes.size)) {
+            // video-cache-and-multiep R7 / V4：自动播放语义收敛为「当前视频下一集」。
+            // 末集播完**不再**跨影片自动切换（跨影片改由用户主动上/下滑手势触发 switchToBookFromList）。
+            appCtx.toastOnUi(R.string.video_episode_last_toast)
+            return false
         }
         chapterInVolumeIndex = index
         saveRead(0)
