@@ -17,6 +17,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.base.attachComposeContent
 import io.legado.app.base.composeShell
 import io.legado.app.constant.PreferKey
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.video.VideoPlaylistHolder
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.webView.WebViewPool
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Preview
 import io.legado.app.ui.widget.compose.LegadoComposeTheme
+import io.legado.app.ui.widget.compose.showComposeChoiceListDialog
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.putPrefBoolean
@@ -68,6 +70,36 @@ class ExploreShowActivity : VMBaseActivity<ViewBinding, ExploreShowViewModel>() 
     private val previewHintVisible = mutableStateOf(false)
 
     // W7.2：原 moreMenuPopup 随 ModernActionPopup 链删除（跳页入口迁 GlassTopAppBar 溢出菜单）
+
+    /**
+     * video-cache-and-multiep R11 / V7：全局布局切换（列表/瀑布/双列/三列）。
+     *
+     * 写入 `AppConfig.discoveryPageLayout` 后重建本页；该值为全局配置，
+     * 其它书源发现页与新/旧发现页下次进入同样生效。
+     */
+    private fun showLayoutPicker() {
+        val labels = listOf(
+            getString(R.string.discovery_layout_list),
+            getString(R.string.discovery_layout_waterfall),
+            getString(R.string.discovery_layout_dual),
+            getString(R.string.discovery_layout_triple),
+        )
+        showComposeChoiceListDialog(
+            title = getString(R.string.discovery_page_layout),
+            labels = labels,
+        ) { index ->
+            val mode = when (index) {
+                0 -> ExploreShowLayout.LIST
+                1 -> ExploreShowLayout.WATERFALL
+                2 -> ExploreShowLayout.DUAL
+                else -> ExploreShowLayout.TRIPLE
+            }
+            if (AppConfig.discoveryPageLayout != mode) {
+                AppConfig.discoveryPageLayout = mode
+                recreate()
+            }
+        }
+    }
 
     /** video-regression-fix-0906 AD-05：页码跳页（原三横线 pageButton 逻辑收口到三点菜单） */
     private fun showPagePicker() {
@@ -122,6 +154,10 @@ class ExploreShowActivity : VMBaseActivity<ViewBinding, ExploreShowViewModel>() 
                         actions = {
                             TopBarActionRow(
                                 listOf(
+                                    // video-cache-and-multiep R11 / V7：全局布局切换（列表/瀑布/双列/三列）
+                                    MenuAction(title = getString(R.string.discovery_page_layout)) {
+                                        showLayoutPicker()
+                                    },
                                     MenuAction(title = getString(R.string.menu_page, viewModel.pageLiveData.value ?: 1)) {
                                         showPagePicker()
                                     }

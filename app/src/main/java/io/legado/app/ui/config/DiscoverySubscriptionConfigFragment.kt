@@ -4,6 +4,7 @@ import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.book.explore.ExploreShowLayout
 import io.legado.app.ui.config.compose.ComposeSettingFragment
 import io.legado.app.ui.config.compose.SettingActionSpec
 import io.legado.app.ui.config.compose.SettingChoiceOption
@@ -54,7 +55,7 @@ class DiscoverySubscriptionConfigFragment : ComposeSettingFragment() {
                             key = PreferKey.discoveryPageLayout,
                             title = getString(R.string.discovery_page_layout),
                             summary = discoveryLayoutSummary(),
-                            visible = discoveryMode == AppConfig.DISCOVERY_PAGE_MODE_MODERN,
+                            // R11 / V7：布局为全局配置，传统与新版发现页同时生效 ⇒ 两模式均可见
                             onClick = ::showDiscoveryLayoutDialog
                         )
                     )
@@ -173,7 +174,8 @@ class DiscoverySubscriptionConfigFragment : ComposeSettingFragment() {
     private fun discoveryLayoutLabel(value: Int): String {
         return when (value) {
             2 -> getString(R.string.discovery_page_layout_waterfall)
-            3 -> getString(R.string.discovery_page_layout_grid)
+            3 -> getString(R.string.discovery_layout_triple)
+            4 -> getString(R.string.discovery_layout_dual)
             else -> getString(R.string.discovery_page_layout_list)
         }
     }
@@ -212,6 +214,7 @@ class DiscoverySubscriptionConfigFragment : ComposeSettingFragment() {
         private const val KEY_SEARCH_JUMP_MODERN_RSS_PAGE = "search_jump_modernRssPage"
         private const val KEY_SEARCH_JUMP_DISCOVERY_MODE = "search_jump_modernDiscoveryMode"
         private const val KEY_SEARCH_JUMP_RSS_MODE = "search_jump_modernRssMode"
-        private val DISCOVERY_LAYOUT_VALUES = listOf(1, 2, 3)
+        // R11 / V7：顺序即弹框标签顺序（列表 / 瀑布流 / 双列 / 三列），与页内切换共用同一来源
+        private val DISCOVERY_LAYOUT_VALUES = ExploreShowLayout.pickerValues
     }
 }
