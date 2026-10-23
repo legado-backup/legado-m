@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.info.compose
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,13 +30,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.isVideo
 import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.widget.compose.AppManagementCard
 import io.legado.app.ui.widget.compose.AppManagementPalette
+import io.legado.app.ui.widget.compose.rememberAppManagementPalette
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 纯策略（单测锁定）：缓存条仅对视频书源展示。
@@ -57,13 +67,14 @@ internal fun videoCacheBarPercent(cached: Int, total: Int): Int {
 @Composable
 fun VideoCacheBar(
     book: Book,
-    palette: AppManagementPalette,
     accent: androidx.compose.ui.graphics.Color,
     inShelf: Boolean,
     onAddShelf: () -> Unit,
+    palette: AppManagementPalette = rememberAppManagementPalette(),
 ) {
     if (!videoCacheBarVisible(book.isVideo)) return
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val states by VideoCacheKernel.states.collectAsState()
     val progress = states[book.bookUrl]
     LaunchedEffect(book.bookUrl) {
@@ -110,8 +121,11 @@ fun VideoCacheBar(
                             if (running) {
                                 VideoCacheKernel.stop(context, book.bookUrl)
                             } else {
-                                if (!inShelf) onAddShelf()
-                                VideoCacheKernel.start(context, book.bookUrl, from = 0, to = -1)
+                                // 搜索书（未入库）先入架并等待入库，再启动缓存服务
+                                // （服务要求书籍与目录都在库，直接启动会 fail-fast）
+                                scope.launch {
+                                    ensureInShelfThenStartCache(context, book, onAddShelf)
+                                }
                             }
                         }
                         .padding(horizontal = 10.dp, vertical = 4.dp),
@@ -148,3 +162,66 @@ fun VideoCacheBar(
         }
     }
 }
+
+/**
+ * 按 `bookUrl` 自取书的变体（沉浸式详情页 `BookInfoUiState` 只带 bookUrl，不持有 Book 实例）。
+ *
+ * 只在进入时查一次库；非视频书由 [videoCacheBarVisible] 策略直接空渲染。
+ */
+@Composable
+fun VideoCacheBar(
+    bookUrl: String,
+    accent: androidx.compose.ui.graphics.Color,
+    inShelf: Boolean,
+    onAddShelf: () -> Unit,
+    palette: AppManagementPalette = rememberAppManagementPalette(),
+) {
+    var book by remember(bookUrl) { mutableStateOf<Book?>(null) }
+    LaunchedEffect(bookUrl) {
+        if (bookUrl.isBlank()) return@LaunchedEffect
+        // 先查书架库；搜索书（未入架）回退 searchBook，否则详情页缓存条永远不会出现
+        book = withContext(Dispatchers.IO) {
+            appDb.bookDao.getBook(bookUrl) ?: appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()
+        }
+    }
+    book?.let { loaded ->
+        VideoCacheBar(
+            book = loaded,
+            accent = accent,
+            inShelf = inShelf,
+            onAddShelf = onAddShelf,
+            palette = palette,
+        )
+    }
+}
+
+/**
+ * 「点击缓存」前置：书未入库时先入架并等待入库（含目录加载），成功后才启动缓存服务。
+ *
+ * 为什么必须等待：`VideoCacheService` 启动即校验「书籍 + 目录 + 书源」三者都在库，
+ * 未入库直接启动会 fail-fast（缓存永远不开始，用户视为点击无效）。
+ *
+ * @return true=已启动缓存；false=入架超时（调用方无需额外提示，详情页状态会刷新）
+ */
+internal suspend fun ensureInShelfThenStartCache(
+    context: Context,
+    book: Book,
+    onAddShelf: () -> Unit,
+): Boolean {
+    val stored = withContext(Dispatchers.IO) { appDb.bookDao.getBook(book.bookUrl) }
+    if (stored == null) {
+        onAddShelf()
+        val ready = withTimeoutOrNull(IN_SHELF_WAIT_MS) {
+            while (withContext(Dispatchers.IO) { appDb.bookDao.getBook(book.bookUrl) } == null) {
+                delay(200)
+            }
+            true
+        } ?: false
+        if (!ready) return false
+    }
+    VideoCacheKernel.start(context, book.bookUrl, from = 0, to = -1)
+    return true
+}
+
+/** 入架等待上限（图书入库 + 目录加载通常 < 2s，留足弱网余量） */
+internal const val IN_SHELF_WAIT_MS = 8_000L

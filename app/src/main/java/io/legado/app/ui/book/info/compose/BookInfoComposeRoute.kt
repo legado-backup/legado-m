@@ -453,6 +453,13 @@ fun BookInfoComposeRoute(
                             metricPreviewVisible = false
                         }
                     )
+                    // video-cache-and-multiep R2：分组/书源/目录下方快速缓存条（仅视频书源展示）
+                    VideoCacheBar(
+                        bookUrl = state.bookUrl,
+                        accent = style.colors.accent,
+                        inShelf = state.inBookshelf,
+                        onAddShelf = actions.onShelf,
+                    )
                 }
             }
             BookInfoContentPanel(style = style) {

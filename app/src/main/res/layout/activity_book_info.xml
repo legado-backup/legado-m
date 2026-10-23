@@ -363,6 +363,16 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content" />
 
+                        <!-- video-cache-and-multiep R2 / V2b：经典模式视频缓存条（分组/书源/目录下方；
+                             仅视频书源渲染内容，非视频书由组件内部策略空渲染） -->
+                        <androidx.compose.ui.platform.ComposeView
+                            android:id="@+id/compose_video_cache_bar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginEnd="10dp" />
+
                     </LinearLayout>
 
                 </LinearLayout>

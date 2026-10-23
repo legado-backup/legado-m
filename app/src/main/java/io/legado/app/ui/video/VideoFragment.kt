@@ -16,7 +16,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
@@ -26,6 +25,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssEpisode
 import io.legado.app.help.book.isVideo
+import io.legado.app.help.gsyVideo.ChoiceSpeedDialog
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.source.isVideoSource
 import io.legado.app.help.video.LocalMediaResolver
@@ -60,6 +60,18 @@ import splitties.init.appCtx
  * - 双指拉伸触发全屏（scaleFactor > 1.2）
  * - 全屏按钮常显（横竖屏一致），点击切换全屏
  */
+/**
+ * 位置指示的索引来源（纯策略，单测锁定）。
+ *
+ * 书源会话（含"书源视频映射为 rssEpisodes"）以 `chapterInVolumeIndex` 为准，
+ * 与左下角标题同源；否则与本会话的 `rssEpisodeIndex` 错位一集（真机实证 2026-10-24）。
+ */
+internal fun episodeIndicatorIndex(
+    bookSession: Boolean,
+    chapterInVolumeIndex: Int,
+    rssEpisodeIndex: Int,
+): Int = if (bookSession) chapterInVolumeIndex else rssEpisodeIndex
+
 class VideoFragment : Fragment() {
 
     // ==================== 播放状态枚举 ====================
@@ -124,6 +136,8 @@ class VideoFragment : Fragment() {
     private var btnSettings: ImageButton? = null
     private var btnFullscreen: ImageButton? = null
     private var btnDownload: ImageButton? = null
+    /** video-cache-and-multiep R9 / V5：沉浸式倍速入口（底部上浮单排面板） */
+    private var btnSpeed: ImageButton? = null
     /** 弹幕开关（沉浸式悬浮层入口，与传统模式 GSY 控制条 toggle_danmaku 同状态源） */
     private var btnDanmaku: ImageButton? = null
     // B1+ 修复：全屏模式下的悬浮返回按钮（F1 的 titleBarNew.gone() 隐藏了 TitleBar 返回按钮）
@@ -234,6 +248,7 @@ class VideoFragment : Fragment() {
         btnSettings = null
         btnFullscreen = null
         btnDownload = null
+        btnSpeed = null
         btnBackOverlay = null
         gestureDetector = null
         scaleGestureDetector = null
@@ -554,23 +569,27 @@ class VideoFragment : Fragment() {
         val tv = tvPositionIndicator ?: return
         val articles = VideoPlay.rssArticles
         val episodes = VideoPlay.rssEpisodes
+        // 书源会话（含"书源视频映射为 rssEpisodes"的场景）：集索引权威是 chapterInVolumeIndex，
+        // 与左下角标题 displayEpisodeTitle 同源；否则会与 rssEpisodeIndex 错位一集（真机实证）。
+        val bookEpisodeCount = VideoPlay.episodes?.size ?: 0
+        val bookSession = VideoPlay.book != null && bookEpisodeCount > 1
+        val rssEpisodeMode = !bookSession && !episodes.isNullOrEmpty() && episodes.size > 1
+        val episodeIndex = episodeIndicatorIndex(
+            bookSession = bookSession,
+            chapterInVolumeIndex = VideoPlay.chapterInVolumeIndex,
+            rssEpisodeIndex = VideoPlay.rssEpisodeIndex,
+        )
         val text = when {
             !articles.isNullOrEmpty() && articles.size > 1 ->
                 getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles.size)
-            !episodes.isNullOrEmpty() && episodes.size > 1 ->
-                getString(R.string.video_playlist_position_episode, VideoPlay.rssEpisodeIndex + 1, episodes.size)
-            // 书源多卷/多集目录：episodes 为当前卷子列表（与传统布局书源分支同源）
-            (VideoPlay.episodes?.size ?: 0) > 1 ->
-                getString(
-                    R.string.video_playlist_position_episode,
-                    VideoPlay.chapterInVolumeIndex + 1,
-                    VideoPlay.episodes!!.size
-                )
+            bookSession ->
+                getString(R.string.video_playlist_position_episode, episodeIndex + 1, bookEpisodeCount)
+            rssEpisodeMode ->
+                getString(R.string.video_playlist_position_episode, episodeIndex + 1, episodes.size)
             else -> ""
         }
         if (text.isNotBlank()) {
-            val multiEpisode = (!episodes.isNullOrEmpty() && episodes.size > 1) ||
-                (VideoPlay.episodes?.size ?: 0) > 1
+            val multiEpisode = bookSession || rssEpisodeMode
             tv.text = text + if (multiEpisode) EPISODE_PICKER_ARROW_SUFFIX else ""
             tv.isClickable = multiEpisode
             tv.setOnClickListener {
@@ -783,6 +802,24 @@ class VideoFragment : Fragment() {
         btnSettings = view.findViewById(R.id.btn_settings)
         btnFullscreen = view.findViewById(R.id.btn_fullscreen)
         btnDownload = view.findViewById(R.id.btn_download)
+        btnSpeed = view.findViewById(R.id.btn_speed)
+        // R9 / V5：沉浸式倍速（底部上浮单排 5 档，当前档高亮）
+        btnSpeed?.setOnClickListener {
+            val pv = _playerView ?: return@setOnClickListener
+            val dialog = ChoiceSpeedDialog(requireContext())
+            dialog.initList(
+                ChoiceSpeedDialog.SPEED_VALUES,
+                object : ChoiceSpeedDialog.OnListItemClickListener {
+                    override fun onItemClick(value: Float) {
+                        pv.setVideoSpeed(value)
+                    }
+
+                    override fun finishDialog() = Unit
+                },
+                currentSpeed = pv.playSpeed
+            )
+            dialog.show()
+        }
         // 弹幕开关：显隐由 updateDanmakuButtonState 按「本集是否有弹幕数据」决定（默认 gone）
         btnDanmaku = view.findViewById(R.id.btn_danmaku)
         btnDanmaku?.setOnClickListener {
@@ -940,7 +977,7 @@ class VideoFragment : Fragment() {
             val episode = VideoPlay.switchRssRoute(newIndex)
             if (episode != null) {
                 updateRouteSelectorText()
-                updateEpisodeList()
+                updatePositionIndicator()
                 (activity as? VideoSettingsPanel.SettingsPanelCallback)?.onRouteChanged(episode)
             }
         }
@@ -963,7 +1000,7 @@ class VideoFragment : Fragment() {
                         VideoPlay.rssEpisodeIndex = episodeIndex
                     }
                     VideoPlay.playRssEpisode(pv, episode)
-                    updateEpisodeList()
+                    updatePositionIndicator()
                 }
             })
             .show(childFragmentManager, "VideoBookDetailSheet")
@@ -979,54 +1016,15 @@ class VideoFragment : Fragment() {
     // ==================== 集数选择器（REQ-18） ====================
 
     /**
-     * 初始化集数选择器
-     * 多集时显示横向滚动列表
+     * 集数入口（video-cache-and-multiep R7 / V4 收敛）。
+     *
+     * 原实现为「位置指示 + 横向集数条」上下相邻，真实机点击极易误触切集
+     * （实测 y 轴仅差 ~10px）；现统一收敛为**左下角位置指示（含 `>`）+ 分组选集弹框**，
+     * 横向集数条停用（`rv_episodes` 恒 gone，布局保留避免无用资源改动）。
      */
     private fun initEpisodeSelector() {
-        val episodes = VideoPlay.rssEpisodes
-        if (episodes == null || episodes.isEmpty()) {
-            rvEpisodes?.gone()
-            AppLog.put("VideoRoutesDiag initEpisodeSelector: episodes=${episodes?.size ?: "null"} -> gone")
-            return
-        }
-        rvEpisodes?.visible()
-        rvEpisodes?.layoutManager =
-            LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
-        updateEpisodeList()
-        AppLog.put("VideoRoutesDiag initEpisodeSelector: episodes=${episodes.size} -> visible")
-    }
-
-    /**
-     * 更新集数列表数据
-     */
-    private fun updateEpisodeList() {
-        val episodes = VideoPlay.rssEpisodes ?: return
-        val rv = rvEpisodes ?: return
-        // 沉浸式多集不显示根修（2026-09-14 用户真机 logs3 21:54/21:55 会话铁证）：
-        // initEpisodeSelector 仅在 episodes 非空的 visible 分支才设 layoutManager；
-        // 首次进入/下滑切换文章时数据异步解析中（null）→ initEpisodeSelector 走 gone 分支，
-        // 之后数据到达走 updateEpisodeSelector→本函数直接设 adapter——rv 无 layoutManager
-        // 不渲染任何 item（高度 0），多集不可见；而 tvRouteSelector 是 TextView 不受影响。
-        // 此处补 LM 兜底（幂等）：无 layoutManager 时补横向列表。
-        if (rv.layoutManager == null) {
-            rv.layoutManager =
-                LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
-        }
-        val adapter = RssEpisodeAdapter(episodes, VideoPlay.rssEpisodeIndex) { _, index ->
-            if (index != VideoPlay.rssEpisodeIndex) {
-                VideoPlay.rssEpisodeIndex = index
-                val episode = episodes.getOrNull(index)
-                val pv = _playerView
-                if (episode != null && pv != null) {
-                    VideoPlay.playRssEpisode(pv, episode)
-                    // 更新选中状态
-                    (rv.adapter as? RssEpisodeAdapter)?.updateSelectedPosition(index)
-                    // 更新标题（P4: 双控件统一同步）
-                    setTitle(episode.title)
-                }
-            }
-        }
-        rv.adapter = adapter
+        rvEpisodes?.gone()
+        AppLog.put("VideoRoutesDiag initEpisodeSelector: retired（改用分组选集弹框）")
     }
 
     /**
@@ -1036,14 +1034,8 @@ class VideoFragment : Fragment() {
      * 由 VideoPlayerActivity 在 UP_VIDEO_INFO 事件中调用 currentFragment.updateEpisodeSelector()。
      */
     fun updateEpisodeSelector() {
-        // 更新集数选择器
-        val episodes = VideoPlay.rssEpisodes
-        if (episodes.isNullOrEmpty()) {
-            rvEpisodes?.gone()
-        } else {
-            rvEpisodes?.visible()
-            updateEpisodeList()
-        }
+        // R7 / V4：集数入口由左下角位置指示 + 分组弹框承担（横向集数条已停用）
+        rvEpisodes?.gone()
         // 更新线路选择器
         val routes = VideoPlay.rssRoutes
         if (routes == null || routes.size <= 1) {
@@ -1056,8 +1048,8 @@ class VideoFragment : Fragment() {
                 showRouteSelector(anchor)
             }
         }
-        AppLog.put("VideoRoutesDiag updateEpisodeSelector: routes=${routes?.size ?: "null"}, episodes=${episodes?.size ?: "null"}")
-        // 更新标题（P4: 双控件统一同步）
+        AppLog.put("VideoRoutesDiag updateEpisodeSelector: routes=${routes?.size ?: "null"}, episodes=${VideoPlay.rssEpisodes?.size ?: "null"}")
+        // 更新标题（P4: 双控件统一同步；含位置指示刷新）
         setTitle(VideoPlay.videoTitle)
     }
 
@@ -1584,8 +1576,8 @@ class VideoFragment : Fragment() {
         /** video-booksource-align-rss AD-02：垂直 fling 最小速度阈值（px/s），低于此值不触发列表切换 */
         private const val FLING_MIN_VELOCITY = 1200f
 
-        /** R7 / V4：多集时左下角位置指示追加的可点击提示 */
-        private const val EPISODE_PICKER_ARROW_SUFFIX = " ▾"
+        /** R7 / V4：多集时左下角位置指示追加的可点击提示（用 ASCII `>` 避免 ▾ 字形缺失） */
+        private const val EPISODE_PICKER_ARROW_SUFFIX = " >"
 
         fun newInstance(index: Int): VideoFragment {
             return VideoFragment().apply {

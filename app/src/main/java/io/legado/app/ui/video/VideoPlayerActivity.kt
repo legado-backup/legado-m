@@ -175,7 +175,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         private const val LAYOUT_SWITCH_NOTICE_MS = 4000L
 
         /** R7 / V4：选集标题可点击提示（多集时追加在「第X集 · 共Y集」之后） */
-        private const val EPISODE_PICKER_ARROW = " ▾"
+        private const val EPISODE_PICKER_ARROW = " >"
 
         /**
          * 刷新入口可见性（纯策略，单测锁定）：
