@@ -6,7 +6,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
@@ -58,7 +57,6 @@ import io.legado.app.model.CheckSourceTaskStatus
 import io.legado.app.model.CheckSourceTaskStore
 import io.legado.app.model.Debug
 import io.legado.app.model.ImportCheck
-import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.model.QualityCheckSession
 import io.legado.app.model.bannerText
 import io.legado.app.model.formatCheckSourceReportCsv
@@ -69,7 +67,7 @@ import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
-import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.ui.book.source.edit.JsSourceEditActivity
 import io.legado.app.ui.config.CheckSourceConfig
 import io.legado.app.ui.config.ImportCheckConfigDialog
 import io.legado.app.ui.file.HandleFileContract
@@ -77,6 +75,7 @@ import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.source.recycle.RecycleBinActivity
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.utils.StartActivityContract
 import io.legado.app.ui.widget.compose.AppManagementAction
 import io.legado.app.ui.widget.compose.AppManagementMenuAction
 import io.legado.app.ui.widget.compose.AppManagementScaffold
@@ -232,7 +231,9 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
                         AppManagementAction(
                             text = getString(R.string.add_book_source),
                             iconRes = R.drawable.ic_add,
-                            onClick = { startActivity<BookSourceEditActivity>() }
+                            // 2026-10-23：对齐 NG —— 同一「添加」入口下拉二选一
+                            // （`AppManagementScaffold`：menuActions != null 时渲染下拉并忽略 onClick）
+                            menuActions = ::addSourceMenuActions
                         ),
                         AppManagementAction(
                             text = getString(R.string.more_menu),
@@ -440,6 +441,18 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
             SourceGroupFilterDialog.create(groups.toList()) { group ->
                 updateSearchQuery("group:$group")
             }
+        )
+    }
+
+    /** 「添加书源」下拉：新建规则书源 / 新建 JS 书源（对齐 NG `book_source_add_rules|javascript`）。 */
+    private fun addSourceMenuActions(): List<AppManagementMenuAction> {
+        return listOf(
+            AppManagementMenuAction(getString(R.string.book_source_add_rules)) {
+                startActivity<BookSourceEditActivity>()
+            },
+            AppManagementMenuAction(getString(R.string.book_source_add_javascript)) {
+                addJsSource()
+            },
         )
     }
 
@@ -1231,43 +1244,28 @@ class BookSourceActivity : VMBaseActivity<ViewBinding, BookSourceViewModel>() {
         }
     }
 
-    /** 正在编辑脚本的书源 URL（编辑器返回后据此保存） */
-    private var jsEditSourceUrl: String? = null
-
-    private val jsScriptLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val text = result.data?.getStringExtra("text")
-        val sourceUrl = jsEditSourceUrl
-        jsEditSourceUrl = null
-        if (result.resultCode != RESULT_OK || text.isNullOrBlank() || sourceUrl == null) {
-            return@registerForActivityResult
-        }
-        lifecycleScope.launch {
-            runCatching { JsSourceUpsert.save(text, sourceUrl) }
-                .onSuccess { toastOnUi(R.string.success) }
-                .onFailure {
-                    AppLog.put("JS 书源保存失败", it)
-                    toastOnUi(it.localizedMessage ?: getString(R.string.js_source_save_error))
-                }
-        }
+    /**
+     * JS 书源编辑编排入口（2026-10-23）。
+     *
+     * 编辑/新建 JS 源统一交给 [JsSourceEditActivity]：它承担「保存 → 调试 → 登录 → 回编辑器」编排，
+     * 并用会话通道承载脚本正文（零 Binder，见 `CodeEditSessionStore`）——本页不再自己拉起编辑器、
+     * 也不再自己读 `mainJs` + 回传保存。
+     */
+    private val jsSourceEditLauncher = registerForActivityResult(
+        StartActivityContract(JsSourceEditActivity::class.java)
+    ) {
+        // 列表由 book_sources 的数据库 Flow 驱动（见 updateSourceFlow），保存后自动刷新，无需手工回填
     }
 
     private fun editJsSource(bookSource: BookSourcePart) {
-        lifecycleScope.launch {
-            val script = withContext(IO) {
-                appDb.bookSourceDao.getMainJs(bookSource.bookSourceUrl)
-            }
-            if (script.isNullOrBlank()) {
-                toastOnUi(R.string.js_source_script_empty)
-                return@launch
-            }
-            jsEditSourceUrl = bookSource.bookSourceUrl
-            jsScriptLauncher.launch(Intent(this@BookSourceActivity, CodeEditActivity::class.java).apply {
-                putExtra("text", script)
-                putExtra("title", getString(R.string.js_source_script))
-            })
+        jsSourceEditLauncher.launch {
+            putExtra("sourceUrl", bookSource.bookSourceUrl)
         }
+    }
+
+    /** 新建 JS 书源（无 sourceUrl ⇒ 编排页载入内置模板）。 */
+    private fun addJsSource() {
+        jsSourceEditLauncher.launch { }
     }
 
     private fun upOrder(items: List<BookSourcePart>) {

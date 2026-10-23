@@ -1,6 +1,7 @@
 package io.legado.app.ui.rss.article.compose
 
 import android.content.res.Configuration
+import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -581,12 +582,26 @@ private fun RssArticleCardRow(
     }
 }
 
-/** 页脚：沿用 View 侧 [LoadMoreView]（三态 + 错误详情弹窗 + 重试），Compose 侧只负责托管与占位 */
+/**
+ * 页脚：沿用 View 侧 [LoadMoreView]（三态 + 错误详情弹窗 + 重试），Compose 侧只负责托管与占位。
+ *
+ * ⚠️ [loadMoreView] 是**宿主 Fragment 持有的共享单实例**（自由布局的 RecyclerView 页脚也在用它）。
+ * 若挂载瞬间旧父容器仍持有它（例如 样式5↔其它样式 切换、或上一轮组合尚未释放），
+ * `AndroidView` 挂载时会抛 `IllegalStateException: The specified child already has a parent`
+ * （2026-10-22 真机崩溃：栈经 `AndroidView` → `LazyStaggeredGrid`）。
+ * 故 factory 内**先摘父再挂载**；释放时同样摘父，避免残留影响下一次挂载。
+ */
 @Composable
 private fun LoadMoreFooter(loadMoreView: LoadMoreView) {
     AndroidView(
         modifier = Modifier.fillMaxWidth(),
-        factory = { loadMoreView }
+        factory = {
+            (loadMoreView.parent as? ViewGroup)?.removeView(loadMoreView)
+            loadMoreView
+        },
+        onRelease = {
+            (it.parent as? ViewGroup)?.removeView(it)
+        }
     )
 }
 

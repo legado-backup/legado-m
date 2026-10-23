@@ -41,6 +41,31 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     var writable = true
     var title: String? = null
 
+    /**
+     * 会话载荷 id（2026-10-23 JS 书源编排链路）。
+     *
+     * 非空 ⇒ 载荷**出入双向**都走 [CodeEditSessionStore]：进入时正文由会话文件读取（不经 Binder），
+     * 返回时结果写回同一会话，只回传 id。未传（老调用方）⇒ 行为与改造前逐字节一致。
+     */
+    var sessionId: String? = null
+        private set
+
+    /** 编辑器内是否显示「调试」动作（默认关；仅 JS 书源编排页开启）。 */
+    var showDebugSource = false
+        private set
+
+    /** 编辑器内是否显示「登录」动作（默认关；仅 JS 书源编排页开启）。 */
+    var showLoginSource = false
+        private set
+
+    /** 退出时是否对未保存内容二次确认（新建 JS 源时开启）。 */
+    var confirmSaveOnExit = false
+        private set
+
+    /** 无改动时是否也把原文回传给调用方（JS 编排页需要，用于"点保存但没改"仍走保存链）。 */
+    var returnUnchangedText = false
+        private set
+
     fun initSora() {
         //初始化sora加载
         FileProviderRegistry.getInstance().addFileProvider(
@@ -63,8 +88,15 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 initialText = cacheText
                 channel = "memory"
             } else {
+                // 会话通道优先于文件/内联：JS 书源编排页一律走它（正文零 Binder 传输，见 CodeEditSessionStore）
+                val sessionTextId = intent.getStringExtra(CodeEditSessionStore.ExtraSessionId)
                 val textFile = intent.getStringExtra(CodeEditPayloadPolicy.ExtraTextFile)
-                if (textFile != null) {
+                if (sessionTextId != null) {
+                    sessionId = sessionTextId
+                    initialText = CodeEditSessionStore.app.read(sessionTextId)
+                        ?: throw Exception("未获取到待编辑文本（编辑会话读取失败）")
+                    channel = "session"
+                } else if (textFile != null) {
                     // 大载荷（模板 CSS ≈320KB）走文件通道：不经 Intent/Binder（见 CodeEditPayloadPolicy）。
                     // 读取与删除由 store 单源承担（读侧不再各写一份 IO 逻辑）
                     initialText = CodeEditPayloadStore(context).read(textFile)
@@ -83,6 +115,12 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             language = TextMateLanguage.create(languageName, AppConfig.editAutoComplete)
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
             title = intent.getStringExtra("title")
+            // 编排页开关（老调用方不传 ⇒ 全部保持关闭，行为不变）
+            showDebugSource = intent.getBooleanExtra(CodeEditActivity.EXTRA_SHOW_DEBUG_SOURCE, false)
+            showLoginSource = intent.getBooleanExtra(CodeEditActivity.EXTRA_SHOW_LOGIN_SOURCE, false)
+            confirmSaveOnExit = intent.getBooleanExtra(CodeEditActivity.EXTRA_CONFIRM_SAVE_ON_EXIT, false)
+            returnUnchangedText =
+                intent.getBooleanExtra(CodeEditActivity.EXTRA_RETURN_UNCHANGED_TEXT, false)
             // 只记字符数/通道/耗时，**不记正文**（模板 CSS 属用户/作者内容）
             AppLog.putDebugWithTag(
                 AppLog.TAG_CODE_EDIT,
