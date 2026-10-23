@@ -105,9 +105,11 @@ class RssArticlesViewModel(application: Application) : BaseViewModel(application
         } else {
             val firstArticle = articles.first()
             val lastArticle = articles.last()
-            val firstInDb = appDb.rssArticleDao.get(firstArticle.origin, firstArticle.link, firstArticle.sort) != null
+            // 去重探针走 exists(投影)：不读 content/description/image/variable ⇒ 大字段不会
+            // 挤爆 CursorWindow，也不会为此白读四个大字段（2026-10-23 单行超窗修复配套）
+            val firstInDb = appDb.rssArticleDao.exists(firstArticle.origin, firstArticle.link, firstArticle.sort)
             // 注意：末条必须用**自身**的 sort 查库（此前误用 firstArticle.sort）；同页 sort 同名时等价，但语义应自洽
-            val lastInDb = appDb.rssArticleDao.get(lastArticle.origin, lastArticle.link, lastArticle.sort) != null
+            val lastInDb = appDb.rssArticleDao.exists(lastArticle.origin, lastArticle.link, lastArticle.sort)
             hasMore = RssLoadMoreOutcome.hasMore(
                 articlesEmpty = false,
                 firstItemInDb = firstInDb,

@@ -52,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
@@ -68,6 +69,7 @@ import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.PlayHistoryStore
@@ -1518,10 +1520,31 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             this.toastOnUi(getString(R.string.video_no_play_url))
             return
         }
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(url.toUri(), "video/*")
+        // Android 7+ 禁止把 `file://` 经 Intent 外发（StrictMode ⇒ FileUriExposedException 崩溃，
+        // 2026-10-22 真机铁证）。本地文件一律换 FileProvider 的 content:// + 读权限授予；
+        // 转换失败（路径不在 file_paths 声明范围等）时明确提示，而不是以崩溃收场。
+        val localFile = VideoExternalOpenPolicy.localFileOf(url)
+        val data = if (localFile != null) {
+            kotlin.runCatching {
+                FileProvider.getUriForFile(this, AppConst.authority, localFile)
+            }.onFailure {
+                AppLog.put("本地视频外部播放失败：无法转为 content URI", it)
+            }.getOrNull() ?: run {
+                toastOnUi(getString(R.string.video_no_play_url))
+                return
+            }
+        } else {
+            url.toUri()
         }
-        startActivity(intent)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(data, "video/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        kotlin.runCatching { startActivity(intent) }
+            .onFailure {
+                AppLog.put("本地视频外部播放失败：未找到可用的播放器", it)
+                toastOnUi(getString(R.string.video_no_play_url))
+            }
     }
 
     private fun editSource() {

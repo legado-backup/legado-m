@@ -985,6 +985,12 @@
     <string name="js_source_script_empty">该书源没有脚本内容</string>
     <string name="js_source_save_error">JS 书源保存失败</string>
     <string name="js_source_use_script_editor">这是 JS 书源，请从「编辑脚本」修改</string>
+    <string name="js_source_new">新建 JS 书源</string>
+    <string name="js_source_edit">编辑 JS 书源</string>
+    <string name="book_source_add_rules">新建规则书源</string>
+    <string name="book_source_add_javascript">新建 JS 书源</string>
+    <string name="code_edit_debug_source">调试书源</string>
+    <string name="code_edit_login_source">书源登录</string>
     <string name="login_error">登录出错</string>
     <string name="copy_error_detail">复制错误详情</string>
     <string name="password_show">显示密码</string>

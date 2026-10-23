@@ -16,7 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.FormatAlignLeft
+import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
@@ -83,6 +85,30 @@ class CodeEditActivity :
         private var findText = ""
         private var replaceText = ""
         private var isRegex = true
+
+        /** 结果 Intent extra：编辑器内请求的动作（由 JS 书源编排页解释）。 */
+        const val EXTRA_RESULT_ACTION = "resultAction"
+
+        /** 结果 Intent extra：正文是否与进入时不同（会话通道下用于决定是否提示"保存成功"）。 */
+        const val EXTRA_RESULT_TEXT_CHANGED = "resultTextChanged"
+
+        /** 动作值：保存后进入调试页。 */
+        const val RESULT_ACTION_DEBUG_SOURCE = "debugSource"
+
+        /** 动作值：保存后进入登录页。 */
+        const val RESULT_ACTION_LOGIN_SOURCE = "loginSource"
+
+        /** 入参 extra：编辑器溢出菜单显示「调试」（仅 JS 书源编排页开启）。 */
+        const val EXTRA_SHOW_DEBUG_SOURCE = "showDebugSource"
+
+        /** 入参 extra：编辑器溢出菜单显示「登录」（仅 JS 书源编排页开启）。 */
+        const val EXTRA_SHOW_LOGIN_SOURCE = "showLoginSource"
+
+        /** 入参 extra：未保存退出时二次确认（新建 JS 源开启）。 */
+        const val EXTRA_CONFIRM_SAVE_ON_EXIT = "confirmSaveOnExit"
+
+        /** 入参 extra：无改动也回传原文（JS 编排页需要，用于"点保存但没改"仍走保存链）。 */
+        const val EXTRA_RETURN_UNCHANGED_TEXT = "returnUnchangedText"
     }
 
     // CE 5.2（compose 包）：原 activity_code_edit.xml 已退役 ⇒ composeShell 合成壳 +
@@ -212,15 +238,23 @@ class CodeEditActivity :
         val cursorPos = editor.cursor?.left ?: 0
         when {
             text == viewModel.initialText -> {
-                if (cursorPos > 0) {
-                    val result = Intent().apply {
-                        putExtra("cursorPosition", cursorPos)
-                    }
+                // 会话通道 + returnUnchangedText（JS 编排页）：无改动也要回传原文，
+                // 否则「点保存但没改」在编排页侧无法区分"用户放弃"与"内容一致"
+                val carryUnchanged = viewModel.sessionId != null && viewModel.returnUnchangedText
+                if (cursorPos > 0 || carryUnchanged) {
+                    val result = buildResult(text, cursorPos)
                     setResult(RESULT_OK, result)
                 }
                 super.finish()
             }
             check -> {
+                // 二次确认仅在调用方要求时出现（新建 JS 源）；老调用方保持原有"脏态必确认"行为
+                val askConfirm = !viewModel.confirmSaveOnExit || dirtyState
+                if (!askConfirm) {
+                    setResult(RESULT_OK, buildResult(text, cursorPos))
+                    super.finish()
+                    return
+                }
                 showComposeConfirmDialog(
                     title = getString(R.string.exit),
                     message = getString(R.string.exit_no_save),
@@ -246,6 +280,22 @@ class CodeEditActivity :
     }
 
     /**
+     * 带动作返回（编辑器内的「调试」/「登录」）。
+     *
+     * 编排页据此决定"保存后进调试页 / 进登录页"；结果体与普通保存**同构**
+     * （会话通道走 sessionId，内联通道走 text），只是多带一个 action。
+     */
+    private fun finishWithAction(action: String) {
+        val text = editor.text.toString()
+        val cursorPos = editor.cursor?.left ?: 0
+        val result = buildResult(text, cursorPos).apply {
+            putExtra(EXTRA_RESULT_ACTION, action)
+        }
+        setResult(RESULT_OK, result)
+        super.finish()
+    }
+
+    /**
      * 构造回传结果（4.8c **出方向**载荷通道）。
      *
      * 真机铁证（2026-10-10）：320KB 模板 CSS 经 result Intent 回传 ⇒
@@ -253,9 +303,36 @@ class CodeEditActivity :
      * （日志里只有 `Process … has died: fore TOP`，没有 FATAL EXCEPTION ⇒ 极易被误判为"偶发闪退"）。
      * 故大载荷与入方向同口径：写临时文件、只回传路径；**仅当调用方显式开启**文件通道
      * （其它复用本页的调用方只读 `text` extra，不能改它们的数据形态）。
+     *
+     * 2026-10-23 新增**会话通道**（优先级最高）：JS 书源编排页进来时带 `textSessionId`，
+     * 结果写回同一会话只回传 id ⇒ 任意体量都不经 Binder，且编排页不必自管临时文件。
      */
     private fun buildResult(text: String, cursorPos: Int): Intent {
         val result = Intent().apply { putExtra("cursorPosition", cursorPos) }
+        // ① 会话通道（出入同键）
+        viewModel.sessionId?.let { sessionId ->
+            val written = kotlin.runCatching {
+                CodeEditSessionStore.app.write(sessionId, text)
+            }.onFailure {
+                AppLog.put("代码编辑结果写入会话失败", it)
+            }.isSuccess
+            if (written) {
+                AppLog.putDebugWithTag(
+                    AppLog.TAG_CODE_EDIT,
+                    "result payload via session: chars=${text.length}"
+                )
+                return result
+                    .putExtra(CodeEditSessionStore.ExtraSessionId, sessionId)
+                    .putExtra(EXTRA_RESULT_TEXT_CHANGED, text != viewModel.initialText)
+            }
+            // 写失败回落内联：宁可能溢出 Binder，也不能"保存了却什么都没带回去"
+            AppLog.putDebugWithTag(
+                AppLog.TAG_CODE_EDIT,
+                "result session write failed ⇒ fallback inline: chars=${text.length}"
+            )
+            return result.putExtra("text", text)
+        }
+        // ② 文件通道（模板编辑器 opt-in）
         val optIn = intent.getBooleanExtra(CodeEditPayloadPolicy.ExtraFileChannelOptIn, false)
         if (!optIn || !CodeEditPayloadPolicy.useFileChannel(text.length)) {
             return result.apply { putExtra("text", text) }
@@ -424,6 +501,26 @@ class CodeEditActivity :
     }
 
     private fun buildMenuActions(): List<MenuAction> = buildList {
+        // 调试（仅 JS 书源编排页开启）：先带脚本回编排页保存，再由编排页进调试页
+        if (viewModel.showDebugSource) {
+            add(
+                MenuAction(
+                    icon = Icons.Outlined.BugReport,
+                    title = getString(R.string.code_edit_debug_source),
+                    onClick = { finishWithAction(RESULT_ACTION_DEBUG_SOURCE) }
+                )
+            )
+        }
+        // 登录（仅 JS 书源编排页开启）：同样先回编排页保存再进登录页
+        if (viewModel.showLoginSource) {
+            add(
+                MenuAction(
+                    icon = Icons.Outlined.Login,
+                    title = getString(R.string.code_edit_login_source),
+                    onClick = { finishWithAction(RESULT_ACTION_LOGIN_SOURCE) }
+                )
+            )
+        }
         // 格式化
         add(
             MenuAction(

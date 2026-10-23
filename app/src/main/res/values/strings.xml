@@ -1036,6 +1036,12 @@
     <string name="js_source_script_empty">This source has no script</string>
     <string name="js_source_save_error">Failed to save JS source</string>
     <string name="js_source_use_script_editor">This is a JS source; edit it from "Edit script"</string>
+    <string name="js_source_new">New JS source</string>
+    <string name="js_source_edit">Edit JS source</string>
+    <string name="book_source_add_rules">New rules source</string>
+    <string name="book_source_add_javascript">New JS source</string>
+    <string name="code_edit_debug_source">Debug source</string>
+    <string name="code_edit_login_source">Source login</string>
     <string name="login_error">Login failed</string>
     <string name="copy_error_detail">Copy error detail</string>
     <string name="password_show">Show password</string>

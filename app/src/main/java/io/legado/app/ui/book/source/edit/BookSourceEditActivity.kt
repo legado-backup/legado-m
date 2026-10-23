@@ -38,7 +38,6 @@ import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.data.entities.rule.TocRule
 import io.legado.app.help.config.LocalConfig
-import io.legado.app.model.jsSource.isJsSource
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
@@ -126,17 +125,42 @@ class BookSourceEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // JS 单文件书源没有可编辑的声明式规则：**在建任何界面之前**统一重定向到 JS 编排页。
+        // 为什么收敛在这里而不是逐个改调用方：发现页/阅读页/播放器/音频页/书籍详情等 ≥6 处都会拉起本页
+        // （`ExploreFragment:3402`、`ReadBookActivity:333`、`VideoPlayerActivity:344`、`AudioPlayActivity:127` …），
+        // 逐处改必漏；且此前实现是「toast + finish()」⇒ 用户看到的是**死路**（2026-10-23 用户报障）。
+        redirectJsSourceIfNeeded()
+    }
+
+    /**
+     * 仅当带**非空** `sourceUrl` 且该 URL 命中 JS 源时重定向（新建规则书源不带 sourceUrl ⇒ 不受影响）。
+     * 因先查库再决定是否建界面，规则页内容不会被构建 ⇒ 不产生可见闪烁。
+     */
+    private fun redirectJsSourceIfNeeded() {
+        val sourceUrl = intent.getStringExtra("sourceUrl") ?: return
+        if (sourceUrl.isBlank()) return
+        lifecycleScope.launch {
+            val isJsSource = withContext(IO) {
+                runCatching { appDb.bookSourceDao.hasJsSource(sourceUrl) }.getOrDefault(false)
+            }
+            if (isJsSource) {
+                startActivity<JsSourceEditActivity> {
+                    putExtra("sourceUrl", sourceUrl)
+                }
+                finish()
+                return@launch
+            }
+            initRuleEditor()
+        }
+    }
+
+    private fun initRuleEditor() {
         softKeyboardTool.attachToWindow(window)
         initComposeContent()
         initView()
         initRuleHelpGuide()
         viewModel.initData(intent) {
-            // JS 单文件书源没有声明式规则可编辑：避免误改/误存规则页，引导到脚本编辑入口
-            if (viewModel.bookSource?.isJsSource() == true) {
-                toastOnUi(R.string.js_source_use_script_editor)
-                finish()
-                return@initData
-            }
+            // JS 源已在 [redirectJsSourceIfNeeded] 阶段被拦下（先查库再建界面）⇒ 这里只会是声明式源
             upSourceView(viewModel.bookSource)
         }
     }

@@ -159,7 +159,8 @@ class RssArticleComposeComponentsTest {
     @Test
     fun articleImageIsSingleSourced() {
         val img = codeOnly(imageSource())
-        // 取数：逐项单行 DAO（列表主查询不含 image，见 KDoc 的 CursorWindow 2MB 说明）
+        // 取数：逐项单行 DAO（列表主查询不含 image，见 KDoc 的 CursorWindow 2MB 说明；
+        // DAO 的 getImage 内部已改走 length 预判 + 分块读取，防单行超窗崩）
         assertTrue("必须逐项单行查 image", img.contains("appDb.rssArticleDao.getImage(origin, link)"))
         // Glide 必须带源站选项（漏传 ⇒ 大量源取不到图）
         assertTrue("Glide 必须带 sourceOriginOption", img.contains("OkHttpModelLoader.sourceOriginOption"))
@@ -227,8 +228,13 @@ class RssArticleComposeComponentsTest {
         val s = listSource()
         // 原条目根 View 无 selectableItemBackground ⇒ 保持零按下反馈
         assertTrue("行点击必须关闭水波（indication = null）", s.contains("indication = null"))
-        // 页脚沿用 View 侧 LoadMoreView（三态 + 错误详情弹窗 + 重试）
-        assertTrue("页脚必须托管原 LoadMoreView", s.contains("factory = { loadMoreView }"))
+        // 页脚沿用 View 侧 LoadMoreView（三态 + 错误详情弹窗 + 重试）；
+        // 2026-10-23 修复：factory 内必须先摘父（共享单实例被旧父容器持有 ⇒ IllegalStateException 崩溃）
+        assertTrue("页脚必须托管原 LoadMoreView", s.contains("loadMoreView"))
+        assertTrue(
+            "页脚挂载前必须先摘父（防 child already has a parent）",
+            s.contains("(loadMoreView.parent as? ViewGroup)?.removeView(loadMoreView)")
+        )
     }
 
     @Test
