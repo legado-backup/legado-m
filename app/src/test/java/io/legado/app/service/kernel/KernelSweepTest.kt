@@ -62,6 +62,8 @@ class KernelSweepTest {
         "RelayKernel.kt",
         // ng-js-source-port：单文件 JS 书源校验/落库/调试内核
         "JsSourceKernel.kt",
+        // video-cache-and-multiep：书源视频缓存状态与任务编排内核
+        "VideoCacheKernel.kt",
     )
 
     private fun kernelFiles(): List<File> =

@@ -17,6 +17,7 @@ import io.legado.app.help.book.CacheCloudIndexItem
 import io.legado.app.help.book.CacheCloudIndexStore
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.BookVideoCache
 import io.legado.app.help.book.CacheBookManifest
 import io.legado.app.help.book.CacheManifestHelper
 import io.legado.app.help.book.cacheGroupKey
@@ -27,6 +28,8 @@ import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isVideo
+import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.model.CacheBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaRequest
@@ -792,6 +795,9 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
         cacheDirNames: Set<String> = emptySet()
     ): CacheBookItem? {
         val taskState = AudioCacheTaskManager.snapshot(book.bookUrl)
+        if (mode == CacheManageMode.VIDEO) {
+            return buildVideoCacheBookItem(book, cacheDirNames)
+        }
         if (mode == CacheManageMode.AUDIO) {
             return buildAudioCacheBookItem(book, knownManifest, taskState)
         }
@@ -834,6 +840,44 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
             taskState = taskState,
             manifest = manifest,
             localUpdatedAt = resolveLocalUpdatedAt(book, manifest),
+            inBookshelf = true,
+            sourceAvailable = book.isLocal || book.getBookSource() != null
+        )
+    }
+
+    /**
+     * 视频缓存条目（video-cache-and-multiep V1）。
+     *
+     * 视频没有云端包与 manifest（本期不做），缓存态以 `.mp4` 文件与
+     * [VideoCacheKernel] 的运行期进度共同表达。
+     */
+    private fun buildVideoCacheBookItem(
+        book: Book,
+        cacheDirNames: Set<String>
+    ): CacheBookItem? {
+        val progress = VideoCacheKernel.progressOf(book.bookUrl)
+        val hasDir = cacheDirNames.contains(book.getFolderName())
+        if (!hasDir && !progress.running) return null
+        val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        val episodes = chapters.filter { !it.isVolume }
+        if (episodes.isEmpty()) return null
+        val cacheNames = getCacheFileNames(book)
+        val cachedCount = episodes.count { chapter ->
+            BookVideoCache.cacheFileNames(book, chapter).any(cacheNames::contains)
+        }
+        if (cachedCount <= 0 && !progress.running) return null
+        return CacheBookItem(
+            book = book,
+            mode = CacheManageMode.VIDEO,
+            cacheKey = book.cacheRemoteKey(CacheManageMode.VIDEO.name),
+            groupKey = book.cacheGroupKey(CacheManageMode.VIDEO.name),
+            sourceKey = book.cacheSourceKey(),
+            sourceName = book.cacheSourceName(),
+            cachedCount = cachedCount,
+            totalChapterCount = episodes.size,
+            localCachedCount = cachedCount,
+            videoProgress = progress.takeIf { it.running || it.finished },
+            manifest = null,
             inBookshelf = true,
             sourceAvailable = book.isLocal || book.getBookSource() != null
         )
@@ -973,6 +1017,11 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
         validateImageContent: Boolean = true
     ): Boolean {
         if (book.isLocal) return false
+        if (book.isVideo) {
+            // video-cache-and-multiep：视频集以 .mp4 后缀落盘，卷行不计入
+            if (chapter.isVolume) return false
+            return BookVideoCache.cacheFileNames(book, chapter).any(cacheNames::contains)
+        }
         if (book.isAudio) return ExoPlayerHelper.isMediaCached(chapter.resourceUrl)
         val hasContent = BookHelp.getChapterCacheFileNames(book, chapter).any(cacheNames::contains)
         return if (validateImageContent && book.isImage && hasContent) {
@@ -987,6 +1036,7 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
             CacheManageMode.BOOK -> appDb.bookDao.getByTypeOnLine(BookType.text)
             CacheManageMode.AUDIO -> appDb.bookDao.getByTypeOnLine(BookType.audio)
             CacheManageMode.MANGA -> appDb.bookDao.getByTypeOnLine(BookType.image)
+            CacheManageMode.VIDEO -> appDb.bookDao.getByTypeOnLine(BookType.video)
         }
     }
 
@@ -1594,11 +1644,13 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
 enum class CacheManageMode(@StringRes val titleRes: Int, val bookType: Int) {
     BOOK(R.string.cache_manage_books, BookType.text),
     AUDIO(R.string.cache_manage_audio, BookType.audio),
-    MANGA(R.string.cache_manage_manga, BookType.image)
+    MANGA(R.string.cache_manage_manga, BookType.image),
+    VIDEO(R.string.cache_manage_video, BookType.video)
 }
 
 private fun cacheModeForBook(book: Book): CacheManageMode {
     return when {
+        book.isVideo -> CacheManageMode.VIDEO
         book.isAudio -> CacheManageMode.AUDIO
         book.isImage -> CacheManageMode.MANGA
         else -> CacheManageMode.BOOK
@@ -1658,6 +1710,8 @@ data class CacheBookItem(
     val remoteCachedCount: Int = 0,
     val localUpdatedAt: Long = 0L,
     val taskState: AudioCacheTaskState? = null,
+    /** 视频缓存运行期进度（仅 VIDEO 模式使用） */
+    val videoProgress: VideoCacheKernel.Progress? = null,
     val manifest: CacheBookManifest? = null,
     val inBookshelf: Boolean = true,
     val sourceAvailable: Boolean = true,

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
 import io.legado.app.data.entities.Book
+import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.theme.bodySecondary
 import io.legado.app.ui.widget.compose.AppManagementAction
 import io.legado.app.ui.widget.compose.AppManagementPalette
@@ -49,7 +50,9 @@ import androidx.compose.ui.draw.alpha
  * 数据安全边界（L3）：删除/上传/恢复全部经宿主回调链（确认弹框前置），Screen 不直接触达 VM/文件。
  */
 enum class CacheItemAction {
-    OPEN_CHAPTERS, UPLOAD, DOWNLOAD, SELECT_SYNC, RESTORE_BOOKSHELF, DELETE, STOP_AUDIO, SELECT_SOURCE
+    OPEN_CHAPTERS, UPLOAD, DOWNLOAD, SELECT_SYNC, RESTORE_BOOKSHELF, DELETE, STOP_AUDIO, SELECT_SOURCE,
+    /** 书源视频：开始缓存未缓存集（video-cache-and-multiep V1） */
+    START_CACHE
 }
 
 @Composable
@@ -60,6 +63,7 @@ fun CacheManageScreen(
     loading: Boolean,
     audioTaskStates: Map<String, AudioCacheTaskState>,
     webDavTaskStates: Map<String, WebDavTaskState>,
+    videoTaskStates: Map<String, VideoCacheKernel.Progress> = emptyMap(),
     containerVisible: Boolean,
     onModeSwitch: (CacheManageMode) -> Unit,
     onSearch: () -> Unit,
@@ -122,6 +126,7 @@ fun CacheManageScreen(
                                 palette = palette,
                                 audioTaskStates = audioTaskStates,
                                 webDavTaskStates = webDavTaskStates,
+                                videoTaskStates = videoTaskStates,
                                 onAction = onItemAction
                             )
                         }
@@ -143,7 +148,8 @@ private fun CacheModeTabs(
         listOf(
             CacheManageMode.BOOK to R.string.cache_manage_books,
             CacheManageMode.AUDIO to R.string.cache_manage_audio,
-            CacheManageMode.MANGA to R.string.cache_manage_manga
+            CacheManageMode.MANGA to R.string.cache_manage_manga,
+            CacheManageMode.VIDEO to R.string.cache_manage_video
         )
     }
     Row(
@@ -220,15 +226,18 @@ private fun CacheManageListItem(
     palette: AppManagementPalette,
     audioTaskStates: Map<String, AudioCacheTaskState>,
     webDavTaskStates: Map<String, WebDavTaskState>,
+    videoTaskStates: Map<String, VideoCacheKernel.Progress>,
     onAction: (CacheBookItem, CacheItemAction) -> Unit
 ) {
     val context = LocalContext.current
     val audioState = item.taskStateFor(audioTaskStates)
     val webDavState = item.webDavTaskStateFor(webDavTaskStates)
+    val videoProgress = videoTaskStates[item.book.bookUrl] ?: item.videoProgress
+    val videoRunning = videoProgress?.running == true
     val isCaching = audioState?.active == true
     val isPaused = audioState?.status == CacheTaskStatus.PAUSED
     val webDavActive = webDavState?.active == true
-    val taskLocked = isCaching || isPaused || webDavActive
+    val taskLocked = isCaching || isPaused || webDavActive || videoRunning
     val hasCache = item.hasLocalCache()
     val canSync = hasCache || item.hasRemoteCache()
     val canDelete = canSync && !taskLocked
@@ -290,8 +299,21 @@ private fun CacheManageListItem(
                 )
             }
         }
-        // 任务态行（音频/WebDav 进度消息 + 暂停/继续）
+        // 任务态行（视频/音频/WebDav 进度消息 + 暂停/继续）
         val taskMessage = when {
+            videoRunning && videoProgress != null -> {
+                val base = stringResource(
+                    R.string.cache_manage_video_caching,
+                    videoProgress.cached,
+                    videoProgress.total
+                )
+                if (videoProgress.failed > 0) {
+                    base + stringResource(R.string.cache_manage_video_failed_suffix, videoProgress.failed)
+                } else {
+                    base
+                }
+            }
+
             isCaching || isPaused -> audioState?.message
             webDavActive -> webDavState?.message
             else -> webDavState?.takeIf { it.status != WebDavTaskStatus.COMPLETED }?.message
@@ -308,7 +330,7 @@ private fun CacheManageListItem(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                if (isCaching || isPaused) {
+                if (isCaching || isPaused || videoRunning) {
                     Text(
                         text = stringResource(if (isPaused) R.string.resume else R.string.pause),
                         color = palette.settings.accent,
@@ -318,35 +340,48 @@ private fun CacheManageListItem(
                 }
             }
         }
-        // 动作按钮行（章节/同步/书架/删除）
+        // 动作按钮行（章节/缓存/同步/书架/删除）
         Row(
             modifier = Modifier.padding(top = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CacheActionChip(
-                text = stringResource(R.string.cache_manage_chapters),
-                enabled = hasCache,
-                palette = palette,
-                accent = true,
-                onClick = { onAction(item, CacheItemAction.OPEN_CHAPTERS) }
-            )
-            val uploadLabel = when {
-                hasCache && item.hasRemoteCache() -> stringResource(R.string.cache_manage_sync_action)
-                item.hasRemoteCache() && !hasCache -> stringResource(R.string.action_download)
-                else -> stringResource(R.string.cache_manage_upload)
+            if (item.mode == CacheManageMode.VIDEO) {
+                // 视频：本地缓存入口（已全部缓存则禁用）
+                CacheActionChip(
+                    text = stringResource(R.string.cache_manage_video_start),
+                    enabled = !taskLocked && item.cachedCount < item.totalChapterCount,
+                    palette = palette,
+                    accent = true,
+                    onClick = { onAction(item, CacheItemAction.START_CACHE) }
+                )
+            } else {
+                CacheActionChip(
+                    text = stringResource(R.string.cache_manage_chapters),
+                    enabled = hasCache,
+                    palette = palette,
+                    accent = true,
+                    onClick = { onAction(item, CacheItemAction.OPEN_CHAPTERS) }
+                )
             }
-            CacheActionChip(
-                text = uploadLabel,
-                enabled = canSync && !taskLocked,
-                palette = palette,
-                onClick = {
-                    when {
-                        hasCache && item.hasRemoteCache() -> onAction(item, CacheItemAction.SELECT_SYNC)
-                        item.hasRemoteCache() && !hasCache -> onAction(item, CacheItemAction.DOWNLOAD)
-                        else -> onAction(item, CacheItemAction.UPLOAD)
-                    }
+            if (item.mode != CacheManageMode.VIDEO) {
+                val uploadLabel = when {
+                    hasCache && item.hasRemoteCache() -> stringResource(R.string.cache_manage_sync_action)
+                    item.hasRemoteCache() && !hasCache -> stringResource(R.string.action_download)
+                    else -> stringResource(R.string.cache_manage_upload)
                 }
-            )
+                CacheActionChip(
+                    text = uploadLabel,
+                    enabled = canSync && !taskLocked,
+                    palette = palette,
+                    onClick = {
+                        when {
+                            hasCache && item.hasRemoteCache() -> onAction(item, CacheItemAction.SELECT_SYNC)
+                            item.hasRemoteCache() && !hasCache -> onAction(item, CacheItemAction.DOWNLOAD)
+                            else -> onAction(item, CacheItemAction.UPLOAD)
+                        }
+                    }
+                )
+            }
             if (item.manifest != null && hasCache) {
                 CacheActionChip(
                     text = stringResource(if (item.inBookshelf) R.string.cache_manage_use_cache else R.string.cache_manage_add_bookshelf),

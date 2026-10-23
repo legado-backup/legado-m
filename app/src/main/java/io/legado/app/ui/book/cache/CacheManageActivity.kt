@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import io.legado.app.base.composeShell
 import io.legado.app.help.AppCloudStorage
 import io.legado.app.lib.cloud.CloudStorageType
 import io.legado.app.lib.cloud.S3ContainerScope
+import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.compose.showComposeChoiceListDialog
 import io.legado.app.ui.widget.compose.showComposeConfirmDialog
@@ -93,6 +95,8 @@ class CacheManageActivity :
     private fun initComposeHost() {
         binding.root.attachComposeContent {
             LegadoTheme {
+                // 视频缓存进度由内核 StateFlow 提供（零额外 IO，避免逐集 reload）
+                val videoTaskStates by VideoCacheKernel.states.collectAsState()
                 CacheManageScreen(
                     mode = modeState,
                     items = displayItems,
@@ -100,6 +104,7 @@ class CacheManageActivity :
                     loading = loadingState,
                     audioTaskStates = audioStates,
                     webDavTaskStates = webDavStates,
+                    videoTaskStates = videoTaskStates,
                     containerVisible = containerActionVisible,
                     onModeSwitch = ::switchMode,
                     onSearch = ::showSearchDialog,
@@ -122,8 +127,25 @@ class CacheManageActivity :
             CacheItemAction.SELECT_SYNC -> selectSyncAction(item)
             CacheItemAction.RESTORE_BOOKSHELF -> restoreToBookshelf(item)
             CacheItemAction.DELETE -> deleteBookCache(item)
-            CacheItemAction.STOP_AUDIO -> stopAudioCache(item)
+            CacheItemAction.STOP_AUDIO -> stopItemTask(item)
             CacheItemAction.SELECT_SOURCE -> selectSource(item)
+            CacheItemAction.START_CACHE -> startVideoCache(item)
+        }
+    }
+
+    /**
+     * video-cache-and-multiep V1：视频缓存启动/停止。
+     * 音频仍走既有 AudioCacheTaskManager；视频走独立 VideoCacheService。
+     */
+    private fun startVideoCache(item: CacheBookItem) {
+        VideoCacheKernel.start(this, item.book.bookUrl, from = 0, to = -1)
+    }
+
+    private fun stopItemTask(item: CacheBookItem) {
+        if (item.mode == CacheManageMode.VIDEO) {
+            VideoCacheKernel.stop(this, item.book.bookUrl)
+        } else {
+            stopAudioCache(item)
         }
     }
 

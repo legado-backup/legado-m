@@ -45,6 +45,7 @@ import io.legado.app.help.gsyVideo.ExoVideoManager
 import io.legado.app.help.gsyVideo.ExoVideoManager.Companion.FULLSCREEN_ID
 import io.legado.app.help.gsyVideo.FloatingPlayer
 import io.legado.app.help.gsyVideo.VideoPlayer
+import io.legado.app.help.video.LocalMediaResolver
 import io.legado.app.help.video.VideoFavoriteResolver
 import io.legado.app.help.video.VideoPlaybackPipeline
 import io.legado.app.help.video.VideoPlaylistHolder
@@ -1422,7 +1423,15 @@ object VideoPlay : CoroutineScope by MainScope(){
         // 运行时写入 book.type"的自定义源恒为假，导致目录永不加载（死锁式"未找到章节"）。
         // 现仅解耦该条件：源为 BookSource 且目录为空即触发即时加载；是否按视频链路处理交由
         // 后续映射环节的 AD-02 helper 判定（保留 BookSource 非空守卫，避免订阅源/单 URL 会话误入）。
-        if (bsVideoForToc != null && bookForToc != null && toc.isNullOrEmpty()) {
+        // video-cache-and-multiep AD-06：视频书源且目标集未缓存 ⇒ 强制刷新目录（不复用旧目录）
+        val targetChapter = chapter
+        val forceRefreshToc = bsVideoForToc != null && bookForToc != null && targetChapter != null &&
+                bsVideoForToc.isVideoSource(bookForToc.type) &&
+                !LocalMediaResolver.hasLocal(bookForToc, targetChapter)
+        if (bsVideoForToc != null && bookForToc != null && (toc.isNullOrEmpty() || forceRefreshToc)) {
+            if (forceRefreshToc) {
+                AppLog.put("VideoRoutesDiag tocSource: forcedRefresh=true（目标集未缓存，重新拉目录）")
+            }
             // MacCMS detail 接口响应本身含 vod_play_url，tocUrl 空时用 bookUrl 直接当目录地址
             if (bookForToc.tocUrl.isBlank()) {
                 bookForToc.tocUrl = bookForToc.bookUrl
@@ -1908,6 +1917,27 @@ object VideoPlay : CoroutineScope by MainScope(){
     }
 
     /**
+     * video-cache-and-multiep AD-06：视频书源且目标集**无本地缓存**时为真。
+     *
+     * 为真表示不得复用旧的解析地址（`resolvedChapterUrl`）与旧目录，必须重新采集。
+     * 已缓存时由 [LocalMediaResolver.localUri] 直接播本地，本判定不参与。
+     */
+    private fun shouldForceRefreshBookVideo(book: Book, chapter: BookChapter): Boolean {
+        val bs = source as? BookSource ?: return false
+        return shouldForceRefreshVideo(
+            isVideoSource = bs.isVideoSource(book.type),
+            hasLocal = LocalMediaResolver.hasLocal(book, chapter),
+        )
+    }
+
+    /**
+     * 纯策略（单测锁定）：视频书源且该集无本地缓存 ⇒ 必须刷新，禁止复用旧地址。
+     */
+    internal fun shouldForceRefreshVideo(isVideoSource: Boolean, hasLocal: Boolean): Boolean {
+        return isVideoSource && !hasLocal
+    }
+
+    /**
      * video-booksource-multiroute：书源章节播放采集链（video-booksource-align-rss task 2.2 委托）
      *
      * 瘦身为状态准备（历史键/标题/token）+ 委托 VideoPlaybackPipeline.playBookChapter：
@@ -1917,10 +1947,42 @@ object VideoPlay : CoroutineScope by MainScope(){
         // 4.8b（Z9）：嗅探前捕获原始 URL（书源正文链接可重嗅），作为播放历史键
         originalPlayUrl = chapter.url
         videoTitle = chapter.title
+        // video-cache-and-multiep AD-11：本地缓存命中优先，直接播本地（零网络）
+        val localUri = LocalMediaResolver.localUri(book, chapter)
+        if (localUri != null) {
+            AppLog.put("startPlayBookChapter: 本地缓存命中, 直接播放")
+            val token = switchTokenCounter.incrementAndGet()
+            currentSwitchToken = token
+            hasPlayedSuccessfully = false
+            videoUrl = localUri
+            resolvedChapterUrl = chapter.url
+            VideoPlaybackPipeline.replayBookChapter(
+                VideoPlaybackPipeline.PipelineContext(
+                    scope = loadScope,
+                    player = player,
+                    source = source,
+                    token = token,
+                    title = chapter.title,
+                    refererFallback = chapter.url,
+                    ruleData = book,
+                    book = book,
+                    chapter = chapter
+                )
+            )
+            return
+        }
+        // video-cache-and-multiep AD-06：视频书源且该集未缓存 ⇒ 禁止复用旧解析地址，
+        // 必须重新拉目录/正文并重新嗅探（站点策略变化后旧地址可能已失效）
+        val forceRefresh = shouldForceRefreshBookVideo(book, chapter)
+        if (forceRefresh) {
+            AppLog.put("startPlayBookChapter: FORCE_REFRESH_VIDEO, 丢弃旧解析地址")
+            videoUrl = null
+            resolvedChapterUrl = null
+        }
         // video-regression-fix-0906 AD-03：短路重采集——布局切换等场景当前章节已解析出视频地址
         // 时复用直起播，免 getContent/三层嗅探死窗（对齐订阅源切布局丝滑体验）
         val cachedUrl = videoUrl
-        if (!cachedUrl.isNullOrBlank() && resolvedChapterUrl == chapter.url) {
+        if (!forceRefresh && !cachedUrl.isNullOrBlank() && resolvedChapterUrl == chapter.url) {
             AppLog.put("startPlayBookChapter: 短路重采集, 复用已解析地址, urlEnd=${cachedUrl.takeLast(24)}")
             val token = switchTokenCounter.incrementAndGet()
             currentSwitchToken = token

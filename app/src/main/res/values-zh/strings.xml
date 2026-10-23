@@ -2443,6 +2443,10 @@ bookUrl：%7$s
 <string name="cache_manage_title">缓存管理</string>
 <string name="cache_manage_summary">统一管理书籍、音频和漫画缓存。</string>
 <string name="cache_manage_books">书籍</string>
+<string name="cache_manage_video">视频</string>
+<string name="cache_manage_video_start">缓存</string>
+<string name="cache_manage_video_caching">缓存中 %1$d/%2$d</string>
+<string name="cache_manage_video_failed_suffix"> · 失败 %1$d</string>
 <string name="cache_manage_audio">音频</string>
 <string name="cache_manage_manga">漫画</string>
 <string name="cache_manage_search_book">搜索缓存</string>

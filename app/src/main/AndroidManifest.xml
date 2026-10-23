@@ -760,6 +760,9 @@
             android:name=".service.CacheBookService"
             android:foregroundServiceType="dataSync" />
         <service
+            android:name=".service.VideoCacheService"
+            android:foregroundServiceType="dataSync" />
+        <service
             android:name=".service.WebDavTaskService"
             android:foregroundServiceType="dataSync" />
         <service
