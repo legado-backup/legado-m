@@ -187,12 +187,26 @@ fun BookInfoModernRoute(
                             accents = accents
                         )
 
-                        BookInfoComponentType.META -> ModernMetaCard(
-                            state = state,
-                            actions = actions,
-                            palette = palette,
-                            accents = accents
-                        )
+                        BookInfoComponentType.META -> Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ModernMetaCard(
+                                state = state,
+                                actions = actions,
+                                palette = palette,
+                                accents = accents
+                            )
+                            // video-cache-and-multiep R2：分组/书源/目录下方快速缓存条（仅视频源展示）
+                            book?.let { boundBook ->
+                                VideoCacheBar(
+                                    book = boundBook,
+                                    palette = palette,
+                                    accent = accents.accent,
+                                    inShelf = state.inBookshelf,
+                                    onAddShelf = actions.onShelf,
+                                )
+                            }
+                        }
 
                         BookInfoComponentType.DETAIL -> ModernDetailCard(
                             state = state,
