@@ -56,6 +56,7 @@ import io.legado.app.R
 import io.legado.app.base.mainBottomBarContentPadding
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.book.explore.ExploreShowLayout
 import io.legado.app.ui.book.explore.exploreListIntro
 import io.legado.app.ui.main.bookshelf.compose.BookListCardSurface
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItemStyle
@@ -87,9 +88,11 @@ fun ExploreModernListScreen(
     lifecycle: Lifecycle,
     modifier: Modifier = Modifier
 ) {
-    if (layoutMode == 3) {
+    // video-cache-and-multiep R11 / V7：3=三列、4=双列，同一网格组件按列数参数化
+    if (layoutMode == ExploreShowLayout.TRIPLE || layoutMode == ExploreShowLayout.DUAL) {
         ExploreModernGridScreen(
             books = books,
+            spanCount = ExploreShowLayout.columns(layoutMode),
             topPaddingPx = topPaddingPx,
             scrollToTopSignal = scrollToTopSignal,
             isLoading = isLoading,
@@ -227,6 +230,7 @@ fun ExploreModernListScreen(
 @Composable
 private fun ExploreModernGridScreen(
     books: List<SearchBook>,
+    spanCount: Int,
     topPaddingPx: Int,
     scrollToTopSignal: Int,
     isLoading: Boolean,
@@ -279,7 +283,7 @@ private fun ExploreModernGridScreen(
             .clipToBounds()
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Fixed(spanCount),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = mainBottomBarContentPadding(

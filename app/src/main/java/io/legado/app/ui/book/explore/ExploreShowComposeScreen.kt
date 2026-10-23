@@ -85,6 +85,26 @@ fun ExploreShowComposeScreen(
     onLoadPrevious: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // video-cache-and-multiep R11 / V7：全局布局模式（1=列表走既有路径，2/3/4=网格/瀑布）
+    val layoutMode = ExploreShowLayout.normalize(AppConfig.discoveryPageLayout)
+    if (ExploreShowLayout.isGrid(layoutMode)) {
+        ExploreShowGridScreen(
+            books = books,
+            layoutMode = layoutMode,
+            isLoading = isLoading,
+            hasMore = hasMore,
+            errorMessage = errorMessage,
+            scrollToTopSignal = scrollToTopSignal,
+            bookshelfTick = bookshelfTick,
+            isInBookshelf = isInBookshelf,
+            lifecycle = lifecycle,
+            onBookClick = onBookClick,
+            onBookMore = onBookMore,
+            onLoadMore = onLoadMore,
+            modifier = modifier,
+        )
+        return
+    }
     val renderConfig = rememberBookshelfListRenderConfig()
     val palette = renderConfig.palette
     val rounded = AppConfig.bookshelfListItemStyle == BookshelfListItemStyle.RoundedCard
@@ -273,7 +293,7 @@ private fun ExploreShowPreviewHintRow(
 }
 
 @Composable
-private fun ExploreShowStatusRow(
+internal fun ExploreShowStatusRow(
     loading: Boolean,
     message: String?,
     palette: BookshelfListPalette,

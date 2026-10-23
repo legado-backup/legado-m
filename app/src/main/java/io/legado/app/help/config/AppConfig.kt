@@ -446,9 +446,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.modernRssPage, true)
 
     var discoveryPageLayout: Int
-        get() = appCtx.getPrefInt(PreferKey.discoveryPageLayout, 1).coerceIn(1, 3)
+        get() = appCtx.getPrefInt(PreferKey.discoveryPageLayout, 2).coerceIn(1, 4)
         set(value) {
-            appCtx.putPrefInt(PreferKey.discoveryPageLayout, value.coerceIn(1, 3))
+            appCtx.putPrefInt(PreferKey.discoveryPageLayout, value.coerceIn(1, 4))
         }
 
     val mergeDiscoveryRss: Boolean

@@ -2449,6 +2449,10 @@ bookUrl：%7$s
 <string name="cache_manage_video_failed_suffix"> · 失败 %1$d</string>
 <string name="book_info_video_cache_count">已缓存 %1$d/%2$d</string>
 <string name="book_info_video_cache_empty">尚未缓存，可离线观看</string>
+<string name="discovery_layout_list">列表</string>
+<string name="discovery_layout_waterfall">瀑布</string>
+<string name="discovery_layout_dual">双列</string>
+<string name="discovery_layout_triple">三列</string>
 <string name="cache_manage_audio">音频</string>
 <string name="cache_manage_manga">漫画</string>
 <string name="cache_manage_search_book">搜索缓存</string>
