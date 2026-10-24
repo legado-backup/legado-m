@@ -155,6 +155,15 @@ object PlaybackErrorPolicy {
     const val NO_ROUTE_SELF_HEAL = -1
 
     /**
+     * 播放失败提示里「系统浏览器」兜底地址（纯函数，单测锁定）。
+     *
+     * 失败后 `VideoPlay.videoUrl` 可能已被清空；**无地址时仍必须提示**（只保留"重试"），
+     * 否则用户看到的是永久黑屏无任何反馈（真机实证：自动连播到某集后全降级失败 → 播放器释放，
+     * 界面停在黑屏）。地址仅用于"系统浏览器"按钮，不得成为弹框的前置条件。
+     */
+    fun browserFallbackUrl(url: String?): String? = url?.takeIf { it.isNotBlank() }
+
+    /**
      * 「首线路失败自动换线」裁决（design 3.1 验收 / AD-04）。
      *
      * 规则：

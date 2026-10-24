@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.sp
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isVideo
+import io.legado.app.help.source.isVideoSource
 import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.widget.compose.AppManagementCard
 import io.legado.app.ui.widget.compose.AppManagementPalette
@@ -44,7 +46,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 纯策略（单测锁定）：缓存条仅对视频书源展示。
+ * 纯策略（单测锁定）：缓存条仅对视频书展示。
+ *
+ * 传入的 `isVideo` 是**复合身份**：`Book.type` 的视频位 或 书源类型为视频（JS 源常见）。
  */
 internal fun videoCacheBarVisible(isVideo: Boolean): Boolean = isVideo
 
@@ -55,6 +59,15 @@ internal fun videoCacheBarPercent(cached: Int, total: Int): Int {
     if (total <= 0) return 0
     return (cached * 100 / total).coerceIn(0, 100)
 }
+
+/**
+ * 纯策略（单测锁定）：是否已全部缓存完（完成态）。
+ *
+ * 完成态时右侧动作不再提供「缓存」：全集已落盘，重复点击只会空跑一轮，
+ * 用户看到「缓存」按钮会误以为上次失败。清理入口仍在缓存管理页（R3）。
+ */
+internal fun videoCacheBarDone(cached: Int, total: Int, running: Boolean): Boolean =
+    !running && total > 0 && cached >= total
 
 /**
  * 详情页「快速缓存条」（video-cache-and-multiep R2 / AD-10）。
@@ -72,7 +85,17 @@ fun VideoCacheBar(
     onAddShelf: () -> Unit,
     palette: AppManagementPalette = rememberAppManagementPalette(),
 ) {
-    if (!videoCacheBarVisible(book.isVideo)) return
+    // 视频身份双判：`Book.type` 位（静态声明源/运行时已写入）或**书源类型为视频**
+    // （JS 单文件源常 `bookSourceType=0`，视频身份在运行时才写入 book.type ⇒ 只看 type 会漏）
+    var isVideoBook by remember(book.bookUrl) { mutableStateOf(book.isVideo) }
+    LaunchedEffect(book.bookUrl) {
+        if (!book.isVideo) {
+            isVideoBook = withContext(Dispatchers.IO) {
+                book.getBookSource()?.isVideoSource(book.type) == true
+            }
+        }
+    }
+    if (!videoCacheBarVisible(isVideoBook)) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val states by VideoCacheKernel.states.collectAsState()
@@ -85,6 +108,8 @@ fun VideoCacheBar(
     val cached = progress?.cached ?: 0
     val running = progress?.running == true
     val percent = videoCacheBarPercent(cached, total)
+    val done = videoCacheBarDone(cached, total, running)
+    val failed = progress?.failed ?: 0
 
     AppManagementCard(
         palette = palette,
@@ -96,28 +121,31 @@ fun VideoCacheBar(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (total > 0) {
+                    text = (if (total > 0) {
                         stringResource(R.string.book_info_video_cache_count, cached, total)
                     } else {
                         stringResource(R.string.book_info_video_cache_empty)
-                    },
+                    }) + if (failed > 0) {
+                        // R2「可看进度与结果」：失败集数必须可见，否则用户只看到进度停滞
+                        stringResource(R.string.cache_manage_video_failed_suffix, failed)
+                    } else "",
                     color = palette.settings.primaryText,
                     fontSize = 13.sp,
                     fontFamily = palette.settings.bodyFontFamily,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = if (running) {
-                        stringResource(R.string.pause)
-                    } else {
-                        stringResource(R.string.cache_manage_video_start)
+                    text = when {
+                        running -> stringResource(R.string.pause)
+                        done -> stringResource(R.string.book_info_video_cache_done)
+                        else -> stringResource(R.string.cache_manage_video_start)
                     },
-                    color = accent,
+                    color = if (done) palette.settings.secondaryText else accent,
                     fontSize = 13.sp,
                     fontFamily = palette.settings.bodyFontFamily,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable {
+                        .clickable(enabled = running || !done) {
                             if (running) {
                                 VideoCacheKernel.stop(context, book.bookUrl)
                             } else {

@@ -1899,6 +1899,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     /**
+     * 当前播放页索引（诊断用：区分 ViewPager2 邻页销毁与当前页销毁）。
+     */
+    internal fun currentEpisodeIndex(): Int =
+        if (useViewPagerMode) binding.viewPager.currentItem else -1
+
+    /**
      * 多集选集弹框（video-cache-and-multiep R7 / AD-03）。
      *
      * 书源（目录 `episodes`）与订阅源（`rssEpisodes`）**共用**同一弹框：
@@ -2615,9 +2621,13 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
      */
     private fun showVideoPlayErrorDialog(errorInfo: String) {
         if (errorDialog?.isShowing == true) return
-        // 无播放地址则不弹窗（仅记录日志）
-        val url = VideoPlay.videoUrl ?: return
+        // 无播放地址也必须提示（只保留"重试"）：自动连播失败后 videoUrl 可能已被清空，
+        // 此时若直接 return，用户看到的是永久黑屏无反馈（2026-10-24 真机实证）。
+        val browserUrl = PlaybackErrorPolicy.browserFallbackUrl(VideoPlay.videoUrl)
         val title = VideoPlay.videoTitle ?: ""
+        AppLog.put(
+            "PlaybackErrorDialog: show, hasBrowserUrl=${browserUrl != null}, errorLen=${errorInfo.length}"
+        )
         // AD-03: 接入 ErrorMapper 获取用户友好错误提示
         val userError = ErrorMapper.map(errorInfo)
         errorDialog = alert(title = getString(userError.titleResId), message = getString(userError.messageResId)) {
@@ -2626,11 +2636,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 AppLog.put("降级决策: ExoPlayer 重试(user choice), title=$title")
                 retryCurrentPlayback()
             }
-            negativeButton(getString(R.string.open_in_browser)) {
-                // F2 决策日志：用户选择系统浏览器（系统浏览器天然具备完整 Cookie/JS 环境，
-                // 能力等价覆盖原 WebView 播放页且无维护成本）
-                AppLog.put("降级决策: ExoPlayer→系统浏览器(user choice), title=$title, urlLen=${url.length}")
-                openInSystemBrowser(url)
+            if (browserUrl != null) {
+                negativeButton(getString(R.string.open_in_browser)) {
+                    AppLog.put("降级决策: ExoPlayer→系统浏览器(user choice), title=$title, urlLen=${browserUrl.length}")
+                    openInSystemBrowser(browserUrl)
+                }
             }
         }
     }

@@ -211,6 +211,11 @@ class BackstageWebView(
         settings.blockNetworkImage = true
         settings.userAgentString = headerMap?.get(AppConst.UA_NAME, true) ?: AppConfig.userAgent
         settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+        // 2026-10-24：视频嗅探会话允许**程序化播放**——WebView 默认要求用户手势，
+        // 未关闭时注入的 nudge `video.play()` 会被拒绝，页面永远不发 m3u8（真机实测 0 命中）。
+        if (!videoSniffJs.isNullOrEmpty()) {
+            settings.mediaPlaybackRequiresUserGesture = false
+        }
         if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
             webView.webViewClient = HtmlWebViewClient()
         } else {
@@ -610,6 +615,18 @@ class BackstageWebView(
             // 优化1+2：videoSniffJs 非空时，delayTime 后读取 window.__videoUrls__
             // delayTime 从 onPageFinished 开始计时（自适应慢站点，页面加载时间不计入 delayTime）
             if (!videoSniffJs.isNullOrEmpty()) {
+                // 2026-10-24：先「轻推播放」再读取——采集站播放页需点击才发 m3u8（无手势则 0 命中）
+                val webRef = WeakReference(webView)
+                mHandler.postDelayed({
+                    if (closed || callback == null) return@postDelayed
+                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS, null)
+                    AppLog.putInfo("R5网络抓包: 已注入自动播放 nudge")
+                }, 300L)
+                // 慢渲染页面：加载完成后 2/3 处再补一次（只对含 video 的播放器区域动作）
+                mHandler.postDelayed({
+                    if (closed || callback == null) return@postDelayed
+                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS, null)
+                }, 300L + (delayTime * 2 / 3))
                 val readRunnable = ReadVideoUrlsRunnable(webView, sourceRegex)
                 mHandler.postDelayed(readRunnable, 200L + delayTime)  // 200L 确保 JS hook 已执行
             }
@@ -693,6 +710,43 @@ class BackstageWebView(
 
         /** video-sniff-403-and-rss-classic-fix Phase 4 (5.3)：候选缓冲容量上限（防极端页面膨胀） */
         private const val MAX_SNIFF_CANDIDATES = 8
+
+        /**
+         * 播放页「自动播放轻推」脚本（2026-10-24 真机实证新增）。
+         *
+         * 背景：大量采集站播放页必须**先点播放**才发 m3u8 请求。后台嗅探没有用户手势，
+         * 只挂 fetch/XHR 钩子会 0 命中（实测 160 次嗅探 0 命中 ⇒ 播放/缓存双双失败）。
+         * 该脚本仅在页面内**含 video 元素**的播放器区域内动作（muted + playsinline + click），
+         * 且最多点 3 个，避免误触广告；失败静默，不影响原嗅探链。
+         */
+        private val VIDEO_PLAY_NUDGE_JS = """
+            (function(){
+              try{
+                var vs=document.querySelectorAll('video');
+                for(var i=0;i<vs.length;i++){
+                  var v=vs[i];
+                  try{ v.muted=true; v.setAttribute('playsinline',''); var p=v.play(); if(p&&p.catch){p.catch(function(){});} }catch(e){}
+                  try{ v.click(); }catch(e){}
+                }
+                var all=document.querySelectorAll('[class*="play"],[id*="play"],.vjs-big-play-button,button');
+                var n=0;
+                for(var j=0;j<all.length&&n<3;j++){
+                  var el=all[j];
+                  if(!el) continue;
+                  var inPlayer=false;
+                  try{
+                    inPlayer=!!( (el.querySelector&&el.querySelector('video')) ||
+                                 (el.closest&&el.closest('video')) ||
+                                 (el.parentElement&&el.parentElement.querySelector('video')) );
+                  }catch(e){}
+                  if(inPlayer){ try{ el.click(); n++; }catch(e){} }
+                }
+              }catch(e){}
+            })();
+        """.trimIndent()
+
+        /** 供单测锁定脚本行为特征（muted + playsinline + 限流点击） */
+        internal fun playNudgeScript(): String = VIDEO_PLAY_NUDGE_JS
     }
 
     abstract class Callback {

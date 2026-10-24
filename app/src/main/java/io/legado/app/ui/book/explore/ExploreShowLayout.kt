@@ -26,6 +26,13 @@ object ExploreShowLayout {
      */
     val pickerValues: List<Int> = listOf(LIST, WATERFALL, DUAL, TRIPLE)
 
+    /**
+     * 布局切换入口的顶栏分级：true=一级图标直出（需求 R11「右上角加按钮」）。
+     *
+     * 置 false 会把入口退化为 ⋮ 二级菜单；需求原文要求一键可见，故锁定为 true。
+     */
+    const val TOP_BAR_ACTION_ALWAYS_SHOW = true
+
     fun normalize(mode: Int): Int = mode.coerceIn(MIN, MAX)
 
     /** 网格列数：列表返回 1（仍按单列渲染，不启用网格） */
