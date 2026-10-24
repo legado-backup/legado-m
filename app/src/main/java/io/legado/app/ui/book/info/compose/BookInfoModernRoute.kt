@@ -196,9 +196,9 @@ fun BookInfoModernRoute(
                                 palette = palette,
                                 accents = accents
                             )
-                            // video-cache-and-multiep R2：分组/书源/目录下方快速缓存条（仅视频源展示）
+                            // book-info-unified-cache：详情页统一缓存条（视频/音频/小说/漫画/文件）
                             book?.let { boundBook ->
-                                VideoCacheBar(
+                                BookCacheBar(
                                     book = boundBook,
                                     palette = palette,
                                     accent = accents.accent,

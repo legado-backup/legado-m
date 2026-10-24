@@ -59,7 +59,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
 import androidx.viewpager2.widget.ViewPager2
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -69,6 +68,13 @@ import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import io.legado.app.R
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.CachedChapterResolver
+import io.legado.app.help.book.getBookSource
+import io.legado.app.help.book.isVideo
+import io.legado.app.help.source.isVideoSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppConst
@@ -428,13 +434,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 VideoPlay.chapterInVolumeIndex = it[4] as Int
                 VideoPlay.upEpisodes()
                 VideoPlay.saveRead(durChapterPos)
-                if (VideoPlay.episodes.isNullOrEmpty()) {
-                    binding.chapters.visibility = View.GONE
-                } else {
-                    binding.chapters.visibility = View.VISIBLE
-                    val adapter = binding.chapters.adapter as? ChapterAdapter
-                    adapter?.updateData(VideoPlay.episodes)
-                }
+                // AD-01：平铺列表已移除，目录返回后只同步选集计数
+                binding.chapters.gone()
+                upEpisodeLabelPosition(
+                    VideoPlay.chapterInVolumeIndex,
+                    VideoPlay.episodes?.size ?: 0
+                )
                 upView()
                 VideoPlay.startPlay(playerView)
             }
@@ -932,7 +937,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 }
                 if (!VideoPlay.episodes.isNullOrEmpty()) {
                     binding.chaptersContainer.visible()
-                    binding.chapters.visible()
+                    binding.chapters.gone()
                     showToc(VideoPlay.episodes!!)
                 } else {
                     binding.chapters.gone()
@@ -952,7 +957,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     binding.volumes.gone()
                     val episodes = VideoPlay.rssEpisodes
                     if (!episodes.isNullOrEmpty()) {
-                        binding.chapters.visible()
+                        binding.chapters.gone()
                         showRssEpisodes(episodes)
                     } else {
                         binding.chapters.gone()
@@ -1805,33 +1810,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     private fun showToc(toc: List<BookChapter>) {
-        // video-player-dual-layout W2-B3（用户反馈③）：去掉 iv_chapter 二级目录页入口，
-        // 选集直接页内平铺（tocActivityResult 保留给未来页内展开复用）
-        // 2026-09-14 布局重排二轮：多集网格平铺（一行 N 个按集名平均分配宽度，列数屏宽自适应）
-        val recyclerView = binding.chapters
-        recyclerView.layoutManager = GridLayoutManager(this, episodeGridSpanCount())
-        val adapter = ChapterAdapter(toc, VideoPlay.chapterInVolumeIndex, false,
-            R.layout.item_video_chapter_vertical) { chapter, index ->
-            if (index != VideoPlay.chapterInVolumeIndex) {
-                // add-dlna-cast REQ-08：投屏中选集先终止会话再放行
-                endCastForLocalSwitch()
-                VideoPlay.chapterInVolumeIndex = index
-                VideoPlay.saveRead(0)
-                upEpisodesView()
-                VideoPlay.startPlay(playerView)
-            }
-        }
-        recyclerView.adapter = adapter
-        scrollToDurChapter(recyclerView, VideoPlay.chapterInVolumeIndex)
-    }
-
-    /**
-     * 2026-09-14 布局重排二轮：多集网格列数自适应
-     * 按屏宽/110dp（item 目标最小宽度）估算，钳制 [3,6]，横竖屏旋转后重进页面自动重算
-     */
-    private fun episodeGridSpanCount(): Int {
-        val screenWidthDp = resources.configuration.screenWidthDp
-        return (screenWidthDp / 110).coerceIn(3, 6)
+        // video-legacy-parity-hls AD-01（2026-10-24 用户裁定）：传统模式选集统一走分组弹框
+        //（ChoiceEpisodeDialog，含分组 / 倒序 / 当前集高亮），不再渲染平铺集数列表；
+        // 信息区「选集 · 第X集 · 共Y集 ▾」是唯一入口（tvEpisodeLabel 已绑定 showEpisodePicker）。
+        binding.chaptersContainer.visible()
+        binding.chapters.gone()
+        upEpisodeLabelPosition(VideoPlay.chapterInVolumeIndex, toc.size)
     }
 
     /**
@@ -1907,25 +1891,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
      */
     private fun showRssEpisodes(episodes: List<RssEpisode>) {
         binding.tvEpisodeLabel.visible()
-        val recyclerView = binding.chapters
-        // 2026-09-14 布局重排二轮：多集网格平铺（一行 N 个按集名平均分配宽度）
-        recyclerView.layoutManager = GridLayoutManager(this, episodeGridSpanCount())
-        val adapter = RssEpisodeAdapter(
-            episodes, VideoPlay.rssEpisodeIndex, true
-        ) { episode, index ->
-            if (index != VideoPlay.rssEpisodeIndex) {
-                // add-dlna-cast REQ-08：投屏中选集先终止会话再放行
-                endCastForLocalSwitch()
-                VideoPlay.rssEpisodeIndex = index
-                VideoPlay.playRssEpisode(playerView, episode)
-                upRssEpisodesView()
-            }
-        }
-        recyclerView.adapter = adapter
+        // video-legacy-parity-hls AD-01：订阅源多集同样改分组弹框（与书源同一组件），
+        // 停用 RssEpisodeAdapter 平铺渲染（原为 GridLayoutManager 平铺"一大片"）。
+        binding.chapters.gone()
         // F183：区块标题补位置计数（与信息区 video_playlist_position_episode 同源同串）
         upEpisodeLabelPosition(VideoPlay.rssEpisodeIndex, episodes.size)
-        loadWatchedEpisodes(adapter)
-        scrollToDurChapter(recyclerView, VideoPlay.rssEpisodeIndex)
     }
 
     /**
@@ -1975,16 +1945,51 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             else -> return
         }
         if (!shouldOfferEpisodePicker(bookEpisodes?.size ?: 0, rssEpisodes?.size ?: 0)) return
-        val dialog = ChoiceEpisodeDialog(this)
         // 自动连播推进时高亮必须跟随（真机实证：标题到第 81 集，弹框仍高亮第 74 集）
         val liveIndex = {
             if (!bookEpisodes.isNullOrEmpty()) VideoPlay.chapterInVolumeIndex
             else VideoPlay.rssEpisodeIndex
         }
+        // AD-05：已缓存集集合在 IO 线程计算（列举缓存目录 + .mp4 名比对），算完再弹框
+        lifecycleScope.launch {
+            val cached = withContext(Dispatchers.IO) {
+                computeCachedEpisodeIndexes(bookEpisodes)
+            }
+            showEpisodePickerDialog(titles, currentIndex, liveIndex, cached)
+        }
+    }
+
+    /**
+     * 已缓存集下标（全集下标语义）：书源章节按 `.mp4` 双名比对，订阅源集数不参与（无章节缓存产物）。
+     */
+    private suspend fun computeCachedEpisodeIndexes(
+        bookEpisodes: List<BookChapter>?
+    ): Set<Int> = withContext(Dispatchers.IO) {
+        val book = VideoPlay.book
+        if (book == null || bookEpisodes.isNullOrEmpty()) return@withContext emptySet()
+        val sourceVideo = !book.isVideo &&
+            (book.getBookSource()?.isVideoSource(book.type) == true)
+        val names = BookHelp.getChapterFiles(book)
+        CachedChapterResolver.cachedIndexes(
+            book = book,
+            chapters = bookEpisodes,
+            cacheFileNames = names,
+            sourceIsVideo = sourceVideo,
+        )
+    }
+
+    private fun showEpisodePickerDialog(
+        titles: List<String>,
+        currentIndex: Int,
+        liveIndex: () -> Int,
+        cachedIndexes: Set<Int>,
+    ) {
+        val dialog = ChoiceEpisodeDialog(this)
         dialog.initListByTitles(
             titles,
             object : ChoiceEpisodeDialog.OnListItemClickListener {
                 override fun onItemClick(position: Int) {
+                    val bookEpisodes = VideoPlay.episodes
                     if (!bookEpisodes.isNullOrEmpty()) {
                         if (position == VideoPlay.chapterInVolumeIndex) return
                         // add-dlna-cast REQ-08：投屏中选集先终止会话再放行
@@ -2006,26 +2011,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 override fun finishDialog() = Unit
             },
             currentIndex,
-            liveIndex
+            liveIndex,
+            cachedIndexes,
         )
         dialog.show()
-    }
-
-    /**
-     * F183（2026-09-21）：异步补「已看」态。
-     *
-     * 键为 `PlayHistoryStore` 存的集原始 URL（= `VideoPlay.historyKeyUrl`，多线路多集模式下即
-     * `RssEpisode.url`）⇒ 可直接与选集列表的 `episode.url` 比对。查询失败/历史关闭时返回空集，
-     * 列表退回既有两态（当前 / 未看），不产生视觉回退。
-     */
-    private fun loadWatchedEpisodes(adapter: RssEpisodeAdapter) {
-        val articleUrl = getCurrentArticleUrl()
-        if (articleUrl.isBlank()) return
-        lifecycleScope.launch {
-            val watched = PlayHistoryStore.watchedVideoUrls(articleUrl)
-            if (watched.isEmpty()) return@launch
-            adapter.watchedUrls = watched
-        }
     }
 
     /**
@@ -2034,11 +2023,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private fun upRssEpisodesView() {
         val episodes = VideoPlay.rssEpisodes
         if (!episodes.isNullOrEmpty()) {
-            val adapter = binding.chapters.adapter as? RssEpisodeAdapter
-            adapter?.updateSelectedPosition(VideoPlay.rssEpisodeIndex)
-            // F183：切集同步刷新位置计数
+            // video-legacy-parity-hls AD-01：平铺列表已移除（选集走分组弹框），此处只刷新位置计数
             upEpisodeLabelPosition(VideoPlay.rssEpisodeIndex, episodes.size)
-            scrollToDurChapter(binding.chapters, VideoPlay.rssEpisodeIndex)
         }
     }
 
@@ -2055,13 +2041,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 VideoPlay.durVolumeIndex = index
                 VideoPlay.chapterInVolumeIndex = 0
                 VideoPlay.upEpisodes()
-                if (VideoPlay.episodes.isNullOrEmpty()) {
-                    binding.chapters.visibility = View.GONE
-                } else {
-                    binding.chapters.visibility = View.VISIBLE
-                    val adapter = binding.chapters.adapter as? ChapterAdapter
-                    adapter?.updateData(VideoPlay.episodes)
-                }
+                // AD-01：平铺列表已移除，切卷后只同步「选集 · 第X集 · 共Y集」计数
+                binding.chapters.gone()
+                upEpisodeLabelPosition(
+                    VideoPlay.chapterInVolumeIndex,
+                    VideoPlay.episodes?.size ?: 0
+                )
                 VideoPlay.saveRead(0)
                 upVolumesView()
                 VideoPlay.startPlay(playerView)
@@ -2106,8 +2091,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     private fun upEpisodesView() {
+        // AD-01：选集平铺已移除 ⇒ 不再滚动列表，仅刷新位置计数
         if (!VideoPlay.episodes.isNullOrEmpty()) {
-            scrollToDurChapter(binding.chapters, VideoPlay.chapterInVolumeIndex)
+            upEpisodeLabelPosition(
+                VideoPlay.chapterInVolumeIndex,
+                VideoPlay.episodes?.size ?: 0
+            )
         }
     }
 
@@ -2507,16 +2496,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                                 upRssRoutesView()
                             }
                         }
-                        // R1 多集选择播放：处理订阅源多集列表
+                        // R1 多集选择播放：处理订阅源多集（AD-01：选集走分组弹框，平铺容器恒 gone）
                         val rssEpisodes = VideoPlay.rssEpisodes
                         if (rssEpisodes != null && rssEpisodes.isNotEmpty()) {
-                            if (binding.chapters.adapter !is RssEpisodeAdapter) {
-                                binding.chaptersContainer.visible()
-                                binding.chapters.visible()
-                                showRssEpisodes(rssEpisodes)
-                            } else {
-                                upRssEpisodesView()
-                            }
+                            binding.chaptersContainer.visible()
+                            binding.chapters.gone()
+                            showRssEpisodes(rssEpisodes)
                         } else {
                             upEpisodesView()
                         }

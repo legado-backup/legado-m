@@ -52,7 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.legado.app.ui.book.info.compose.VideoCacheBar
+import io.legado.app.ui.book.info.compose.BookCacheBar
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -300,10 +300,10 @@ class BookInfoActivity :
     }
 
     /**
-     * video-cache-and-multiep R2 / V2b：经典详情页快速缓存条（分组/书源/目录下方）。
+     * book-info-unified-cache：经典详情页统一缓存条（分组/书源/目录下方）。
      *
-     * 与沉浸式/现代两套详情页共用同一个 [VideoCacheBar]；非视频书由组件内部策略空渲染。
-     * 搜索书（未入架）也展示：点击缓存会先入架并等待入库，再启动缓存服务。
+     * 三套详情页共用同一个 [BookCacheBar]（本页经 ComposeView 嵌入）；类型分派与"本地书/无目录不渲染"
+     * 由组件内部完成。搜索书（未入架）也展示：点击缓存会先入架并等待入库，再启动缓存。
      */
     private fun initVideoCacheBar() {
         binding.composeVideoCacheBar?.setViewCompositionStrategy(
@@ -314,7 +314,7 @@ class BookInfoActivity :
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val bookUrl = viewModel.getBook()?.bookUrl
                     ?: intent.getStringExtra("bookUrl").orEmpty()
-                VideoCacheBar(
+                BookCacheBar(
                     bookUrl = bookUrl,
                     accent = androidx.compose.ui.graphics.Color(context.accentColor),
                     inShelf = viewModel.inBookshelf,

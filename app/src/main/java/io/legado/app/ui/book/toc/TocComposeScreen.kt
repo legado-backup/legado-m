@@ -64,6 +64,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.CachedChapterResolver
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isLocal
@@ -1209,18 +1210,14 @@ private fun visiblePositionOf(chapters: List<BookChapter>, chapterIndex: Int): I
     return chapters.indexOfLast { it.index < chapterIndex }.coerceAtLeast(0)
 }
 
+/**
+ * 目录行「是否已缓存」——薄壳委托 [CachedChapterResolver]（book-info-unified-cache AD-04）。
+ *
+ * 改造前实现缺视频分支：视频书走 `BookHelp.hasContent`（文本 `.nb` 口径）⇒ 已缓存的 `.mp4` 集
+ * 恒判未缓存（用户真机铁证：已缓存 76/86 但目录无标记）。保留本函数签名以让既有调用点零改动。
+ */
 internal fun isChapterCached(
     book: Book?,
     chapter: BookChapter,
     cacheFileNames: Set<String>
-): Boolean {
-    if (book == null) return false
-    return book.isLocal ||
-            chapter.isVolume ||
-            if (book.isAudio || book.isImage) {
-                // 音频/图片场景：按已加载的缓存文件名集合判断（当前项目自有音频缓存实现，无 Archive 的 isMediaCached）
-                cacheFileNames.contains(chapter.getFileName())
-            } else {
-                BookHelp.hasContent(book, chapter)
-            }
-}
+): Boolean = CachedChapterResolver.isCached(book, chapter, cacheFileNames)

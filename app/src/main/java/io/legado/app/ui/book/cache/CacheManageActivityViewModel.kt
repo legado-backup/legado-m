@@ -16,6 +16,7 @@ import io.legado.app.help.book.CacheCloudIndex
 import io.legado.app.help.book.CacheCloudIndexItem
 import io.legado.app.help.book.CacheCloudIndexStore
 import io.legado.app.help.exoplayer.ExoPlayerHelper
+import io.legado.app.help.audio.AudioMediaRequestResolver
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.BookVideoCache
 import io.legado.app.help.book.CacheBookManifest
@@ -481,7 +482,7 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
         val started = AudioCacheTaskManager.start(
             book = book,
             chapters = targets,
-            resolver = ::resolveAudioMediaRequest,
+            resolver = { b, c -> AudioMediaRequestResolver.resolve(context, b, c) },
             onChapterResolved = { chapter, request ->
                 if (chapter.resourceUrl != request.url) {
                     chapter.resourceUrl = request.url
@@ -1061,46 +1062,6 @@ class CacheManageActivityViewModel(application: Application) : BaseViewModel(app
         return CacheManifestHelper.write(book, chapters) {
             isChapterCached(book, it, cacheNames, validateImageContent = false)
         }
-    }
-
-    private suspend fun resolveAudioMediaRequest(
-        book: Book,
-        chapter: BookChapter
-    ): ExoPlayerHelper.MediaRequest {
-        chapter.resourceUrl
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return ExoPlayerHelper.MediaRequest(it) }
-        val source = book.getBookSource()
-            ?: throw IllegalStateException(context.getString(R.string.book_source_not_found))
-        val candidates = linkedSetOf<String>()
-        BookHelp.getContent(book, chapter)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?.let(candidates::add)
-        WebBook.getContentAwait(source, book, chapter, needSave = true)
-            .trim()
-            .takeIf { it.isNotBlank() }
-            ?.let(candidates::add)
-        var lastError: Throwable? = null
-        for (content in candidates) {
-            try {
-                if (content.isJsonArray()) {
-                    return ExoPlayerHelper.MediaRequest(content)
-                }
-                return AnalyzeUrl(
-                    content,
-                    source = source,
-                    ruleData = book,
-                    chapter = chapter,
-                    coroutineContext = currentCoroutineContext()
-                ).getMediaRequest()
-            } catch (e: Exception) {
-                lastError = e
-            }
-        }
-        throw IllegalStateException(
-            lastError?.localizedMessage ?: context.getString(R.string.cache_manage_audio_url_empty)
-        )
     }
 
     private suspend fun createMergedUploadPackage(item: CacheBookItem): File {

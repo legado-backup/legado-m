@@ -39,6 +39,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.book.getDanmaku
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.update
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.source.isVideoSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.gsyVideo.ExoVideoManager
@@ -1972,7 +1973,16 @@ object VideoPlay : CoroutineScope by MainScope(){
         originalPlayUrl = chapter.url
         videoTitle = chapter.title
         // video-cache-and-multiep AD-11：本地缓存命中优先，直接播本地（零网络）
-        val localUri = LocalMediaResolver.localUri(book, chapter)
+        // book-info-unified-cache AD-06：视频身份用复合判定（书源类型兜底 `book.type` 未写位）
+        val sourceVideo = (source as? BookSource)?.isVideoSource(book.type) == true
+        val localUri = LocalMediaResolver.localUri(book, chapter, sourceVideo)
+        // 诊断「已缓存却在播在线」的三条候选根因（不经本函数 / 身份漏判 / 落盘主名不符）
+        AppLog.put(
+            "startPlayBookChapter: idx=${chapter.index}, isVideo=${book.isVideo}, " +
+                "sourceVideo=$sourceVideo, " +
+                "hasLocal=${LocalMediaResolver.hasLocal(book, chapter, sourceVideo)}, " +
+                "localUri=${localUri != null}"
+        )
         if (localUri != null) {
             AppLog.put("startPlayBookChapter: 本地缓存命中, 直接播放")
             val token = switchTokenCounter.incrementAndGet()
