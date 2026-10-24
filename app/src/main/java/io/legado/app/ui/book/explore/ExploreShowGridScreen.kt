@@ -32,7 +32,6 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItemStyle
 import io.legado.app.ui.main.bookshelf.compose.rememberBookshelfListRenderConfig
-import io.legado.app.ui.widget.compose.SearchBookListItem
 import io.legado.app.ui.widget.compose.SearchBookPreviewOverlay
 import io.legado.app.ui.widget.compose.SearchBookPreviewState
 import io.legado.app.utils.stableSearchBookKey
@@ -58,7 +57,6 @@ fun ExploreShowGridScreen(
     isInBookshelf: (SearchBook) -> Boolean,
     lifecycle: Lifecycle,
     onBookClick: (SearchBook) -> Unit,
-    onBookMore: (SearchBook) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -68,16 +66,21 @@ fun ExploreShowGridScreen(
     val rounded = AppConfig.bookshelfListItemStyle == BookshelfListItemStyle.RoundedCard
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
     val columns = ExploreShowLayout.columns(layoutMode)
+    // 网格卡「图在上、文字在下」，不再渲染行尾 ⋮（ExploreShowLayout.gridShowsMore 恒 false，
+    // 能力由 单击=书籍详情 / 长按=预览 承接，见 explore-grid-card-layout AD-02）
+    // 瀑布流简介不限行（完整展示 ⇒ 卡片高度自然错落）；双列/三列为 0（等高卡不展示简介）
+    val introMaxLines = ExploreShowLayout.gridIntroMaxLines(layoutMode)
     val item: @Composable (SearchBook) -> Unit = { book ->
         val inBookshelf = remember(book.bookUrl, bookshelfTick) { isInBookshelf(book) }
-        SearchBookListItem(
+        ExploreShowGridCard(
             book = book,
             inBookshelf = inBookshelf,
+            columns = columns,
+            introMaxLines = introMaxLines,
             rounded = rounded,
             renderConfig = renderConfig,
             lifecycle = lifecycle,
             onClick = { onBookClick(book) },
-            onMore = { onBookMore(book) },
             onPreview = { bounds -> previewState = SearchBookPreviewState(book, bounds) },
         )
     }
