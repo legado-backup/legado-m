@@ -25,4 +25,11 @@ class VideoCacheWaitingBudgetTest {
         assertEquals("轮询间隔应 500ms（兼顾响应速度与查库压力）", 500L, VideoCacheService.EPISODE_WAIT_STEP_MS)
         assertTrue("轮询次数须为正", VideoCacheService.EPISODE_WAIT_POLLS > 0)
     }
+
+    @Test
+    fun episodeGapLetsPooledWebViewRelease() {
+        // 真机实证：无间隔连跑时，紧跟上一条的抓包会话根本不启动（池化 WebView 尚在销毁）
+        assertTrue("集间节流须 ≥200ms", VideoCacheService.EPISODE_GAP_MS >= 200L)
+        assertTrue("集间节流须 ≤2s（避免整体过慢）", VideoCacheService.EPISODE_GAP_MS <= 2_000L)
+    }
 }

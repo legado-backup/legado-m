@@ -35,4 +35,13 @@ class VideoPlayNudgeScriptTest {
         assertTrue("点击次数须限流 ≤3（防广告连环弹）", js.contains("n<3"))
         assertEquals("点击须限定在含 video 的播放器区域", true, js.contains("querySelector('video')"))
     }
+
+    @Test
+    fun scriptReportsDiagnosticsForTroubleshooting() {
+        // 真机排障需要知道「页面有没有 video 元素 / play() 是否执行 / 点了几个」，
+        // 否则只能看到 0 命中却无法区分根因
+        assertEquals("必须返回诊断摘要", true, js.contains("return JSON.stringify(out)"))
+        assertEquals("必须统计 video 元素数量", true, js.contains("out.v=vs.length"))
+        assertEquals("必须统计点击次数", true, js.contains("out.c=n"))
+    }
 }

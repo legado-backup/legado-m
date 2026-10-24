@@ -54,6 +54,9 @@ class VideoCacheService : BaseService() {
         /** 目录未落库时的轮询次数与间隔（合计 20s，覆盖详情页入架→目录加载窗口） */
         internal const val EPISODE_WAIT_POLLS = 40
         internal const val EPISODE_WAIT_STEP_MS = 500L
+
+        /** 集间节流：让上一集的池化 WebView 完成 destroy/release，避免下一集嗅探会话无法启动 */
+        internal const val EPISODE_GAP_MS = 600L
     }
 
     private var cacheJob: Coroutine<*>? = null
@@ -165,6 +168,9 @@ class VideoCacheService : BaseService() {
                         VideoCacheKernel.onEpisodeFailed(bookUrl, chapter.index, it.localizedMessage)
                         AppLog.put("$TAG_VIDEO_CACHE 第 ${chapter.index} 集缓存失败", it)
                     }
+                    // 2026-10-24：集间节流——后台嗅探依赖池化 WebView，连续无间隔会与上一会话
+                    // 的 destroy/release 竞争（真机实测：紧跟上一集的抓包会话根本不启动）
+                    delay(EPISODE_GAP_MS)
                 }
                 notificationContent = "缓存完成"
                 upNotification()
@@ -205,8 +211,19 @@ class VideoCacheService : BaseService() {
         val streamUrl = if (VideoUrlExtractor.isDirectVideoStreamUrl(firstLine)) {
             firstLine
         } else {
-            VideoUrlExtractor.extractVideoUrlForEpisode(firstLine, source, chapter)?.url
-                ?: throw IOException("未能解析出视频流地址")
+            val startMs = System.currentTimeMillis()
+            var extracted: String? = null
+            kotlin.runCatching {
+                extracted = VideoUrlExtractor.extractVideoUrlForEpisode(firstLine, source, chapter)?.url
+            }.onFailure {
+                AppLog.put("$TAG_VIDEO_CACHE index=${chapter.index} 解析异常", it)
+            }
+            AppLog.put(
+                "$TAG_VIDEO_CACHE index=${chapter.index} 解析结果=" +
+                    "${if (extracted.isNullOrBlank()) "null" else "hit"}, " +
+                    "耗时=${System.currentTimeMillis() - startMs}ms"
+            )
+            extracted ?: throw IOException("未能解析出视频流地址")
         }
         AppLog.put(
             "$TAG_VIDEO_CACHE index=${chapter.index} 流类型=${if (isHls) "HLS" else "直链"}, " +

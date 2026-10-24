@@ -98,6 +98,11 @@ class BackstageWebView(
     private val sniffHitsLock = Any()
     private val probedUrls = HashSet<String>()
 
+    // 2026-10-24 诊断（永久保留）：嗅探可观测性——区分「页面没发出任何请求」与
+    // 「发出了请求但都不像媒体」。真机排障时这两类根因处置完全不同。
+    private val interceptedCount = java.util.concurrent.atomic.AtomicInteger(0)
+    private val mediaPatternCount = java.util.concurrent.atomic.AtomicInteger(0)
+
     // video-sniff-403-and-rss-classic-fix Phase 4 (5.2)：内置视频 URL 后缀白名单（拦截路兜底，
     // 覆盖源正则 VIDEO_SOURCE_REGEX 未含的 .ts；.ts 分片命中经 recordSniffHit 仅入缓冲不交付）
     private val VIDEO_URL_PATTERN = Regex(
@@ -116,6 +121,8 @@ class BackstageWebView(
             sniffHits.clear()
             probedUrls.clear()
         }
+        interceptedCount.set(0)
+        mediaPatternCount.set(0)
         suspendCancellableCoroutine { block ->
             block.invokeOnCancellation {
                 runOnUI {
@@ -466,6 +473,7 @@ class BackstageWebView(
             if (closed || callback == null) return null
             if (interceptAllRequests && request != null) {
                 val resUrl = request.url?.toString() ?: return null
+                interceptedCount.incrementAndGet()
                 // ===== video-sniff-403-and-rss-classic-fix Phase 4 (5.1/F-12/R6)：判定顺序修正 =====
                 // 旧逻辑：.html/url=http 嵌套排除前置于正则与 Content-Type 判定，
                 //   误杀 HTML 壳内直链视频的源（R6：.html 形态视频流 URL 被直接排除）
@@ -482,6 +490,7 @@ class BackstageWebView(
                 }
                 // isVideoFormat 第2层：URL 内置模式（5.2：含 .ts 分片，命中仅入缓冲）或 sourceRegex 匹配
                 if (urlPatternHit || regexHit) {
+                    mediaPatternCount.incrementAndGet()
                     deliverInterceptHit(view, request, resUrl)
                     return null
                 }
@@ -619,13 +628,16 @@ class BackstageWebView(
                 val webRef = WeakReference(webView)
                 mHandler.postDelayed({
                     if (closed || callback == null) return@postDelayed
-                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS, null)
-                    AppLog.putInfo("R5网络抓包: 已注入自动播放 nudge")
+                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS) { r ->
+                        AppLog.putInfo("R5网络抓包: nudge result=$r")
+                    }
                 }, 300L)
                 // 慢渲染页面：加载完成后 2/3 处再补一次（只对含 video 的播放器区域动作）
                 mHandler.postDelayed({
                     if (closed || callback == null) return@postDelayed
-                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS, null)
+                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS) { r ->
+                        AppLog.putInfo("R5网络抓包: nudge result(2)=$r")
+                    }
                 }, 300L + (delayTime * 2 / 3))
                 val readRunnable = ReadVideoUrlsRunnable(webView, sourceRegex)
                 mHandler.postDelayed(readRunnable, 200L + delayTime)  // 200L 确保 JS hook 已执行
@@ -651,6 +663,10 @@ class BackstageWebView(
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
             override fun run() {
                 if (closed || callback == null) return  // 防御：destroy 后不处理
+                // 诊断：拦截总量 / 媒体特征命中量（区分「页面没发请求」与「请求都不像媒体」）
+                AppLog.putInfo(
+                    "R5网络抓包: 拦截=${interceptedCount.get()}, 媒体特征=${mediaPatternCount.get()}"
+                )
                 mWebView.get()?.evaluateJavascript("JSON.stringify(window.__videoUrls__ || [])") { result ->
                     if (closed || callback == null) return@evaluateJavascript  // 防御
                     if (result.isNullOrEmpty() || result == "null" || result == "[]") {
@@ -721,11 +737,13 @@ class BackstageWebView(
          */
         private val VIDEO_PLAY_NUDGE_JS = """
             (function(){
+              var out={v:0,p:0,c:0,err:''};
               try{
                 var vs=document.querySelectorAll('video');
+                out.v=vs.length;
                 for(var i=0;i<vs.length;i++){
                   var v=vs[i];
-                  try{ v.muted=true; v.setAttribute('playsinline',''); var p=v.play(); if(p&&p.catch){p.catch(function(){});} }catch(e){}
+                  try{ v.muted=true; v.setAttribute('playsinline',''); var pr=v.play(); if(pr&&pr.catch){pr.catch(function(){});} out.p++; }catch(e){}
                   try{ v.click(); }catch(e){}
                 }
                 var all=document.querySelectorAll('[class*="play"],[id*="play"],.vjs-big-play-button,button');
@@ -739,9 +757,10 @@ class BackstageWebView(
                                  (el.closest&&el.closest('video')) ||
                                  (el.parentElement&&el.parentElement.querySelector('video')) );
                   }catch(e){}
-                  if(inPlayer){ try{ el.click(); n++; }catch(e){} }
+                  if(inPlayer){ try{ el.click(); n++; out.c=n; }catch(e){} }
                 }
-              }catch(e){}
+              }catch(e){ out.err=String(e).slice(0,60); }
+              return JSON.stringify(out);
             })();
         """.trimIndent()
 

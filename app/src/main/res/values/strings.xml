@@ -2845,7 +2845,7 @@ Selected text or question:
 <string name="bottom_bar_item_locked">始终显示</string>
 <string name="bottom_bar_item_hidden">已隐藏</string>
 <string name="cache_manage_title">Cache Manager</string>
-<string name="cache_manage_summary">Manage book, audio, and manga caches in one place.</string>
+<string name="cache_manage_summary">Manage book, audio, manga, and video caches in one place.</string>
 <string name="cache_manage_books">Books</string>
 <string name="cache_manage_video">Videos</string>
 <string name="cache_manage_video_start">Cache</string>
