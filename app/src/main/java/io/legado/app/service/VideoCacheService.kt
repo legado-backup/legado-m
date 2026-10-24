@@ -148,7 +148,14 @@ class VideoCacheService : BaseService() {
                 AppLog.put(
                     "$TAG_VIDEO_CACHE 开始缓存 total=${episodes.size} range=$startPosition..$endPosition"
                 )
-                for (position in startPosition..endPosition) {
+                // 上轮失败集排到末尾（详见 VideoCacheKernel.failedIndexes 注释）：
+                // 站点限制页每集要跑满嗅探超时，先排在开头会让用户白等数分钟才见到首次落盘。
+                val ordered = VideoCacheKernel.orderPositions(
+                    bookUrl,
+                    (startPosition..endPosition).toList()
+                )
+                AppLog.put("$TAG_VIDEO_CACHE 处理顺序前 3 位=${ordered.take(3)}（失败集已后置）")
+                for (position in ordered) {
                     if (!isActive) break
                     val chapter = episodes[position]
                     if (VideoCacheKernel.isCached(bookUrl, chapter.index)) continue

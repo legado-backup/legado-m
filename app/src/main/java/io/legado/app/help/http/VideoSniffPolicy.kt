@@ -26,6 +26,31 @@ object VideoSniffPolicy {
     }
 
     /**
+     * 嗅探候选的**形态分类**（诊断用，只产出计数，不暴露 URL 内容）。
+     *
+     * 用途：当「拦截计数只有页面自身、video 有 src 但 readyState=0」时，需要区分两类根因：
+     * - `blobOrMse > 0` ⇒ 播放器走 MSE（hls.js 等），真实流地址只会在分片请求里；
+     * - `blobOrMse == 0 && http > 0 && matched == 0` ⇒ 直链 URL 形态不匹配源正则。
+     */
+    data class CandidateShape(
+        val total: Int,
+        val http: Int,
+        val blobOrMse: Int,
+        val mime: Int,
+        val matched: Int
+    )
+
+    fun classifyCandidates(urls: List<String>, isMatch: (String) -> Boolean): CandidateShape {
+        return CandidateShape(
+            total = urls.size,
+            http = urls.count { it.startsWith("http") },
+            blobOrMse = urls.count { it.startsWith("__MSE__") || it.startsWith("blob:") },
+            mime = urls.count { it.startsWith("__MSE_MIME__") },
+            matched = urls.count(isMatch)
+        )
+    }
+
+    /**
      * 播放页「自动播放轻推」脚本（2026-10-24 真机实证新增）。
      *
      * 背景：大量采集站播放页必须**先触发播放**才发 m3u8 请求。后台嗅探没有用户手势，

@@ -689,6 +689,16 @@ class BackstageWebView(
                         AppLog.putWarn("R5网络抓包: window.__videoUrls__ 解析失败（GSON + 正则均失败）")
                         return@evaluateJavascript
                     }
+                    // 2026-10-24 诊断（永久保留）：候选 URL 的**形态分类**（只输出计数，不含 URL 内容）。
+                    // 真机证据：拦截计数只有页面自身、video 有 src 但 readyState=0 时，需要区分
+                    // 「播放器用 MSE（blob）→ 流地址只在分片请求里」与「直链 URL 形态不匹配源正则」。
+                    val shape = VideoSniffPolicy.classifyCandidates(urls) { u ->
+                        regex?.let { u.matches(it.toRegex()) } == true
+                    }
+                    AppLog.putInfo(
+                        "R5网络抓包: 候选形态 total=${shape.total}, http=${shape.http}, " +
+                            "blob/mse=${shape.blobOrMse}, mime=${shape.mime}, 匹配源正则=${shape.matched}"
+                    )
                     for (url in urls) {
                         if (regex != null && url.matches(regex.toRegex())) {
                             AppLog.putInfo("R5网络抓包: window.__videoUrls__ 命中, sameAsPage=${url == this@BackstageWebView.url}")

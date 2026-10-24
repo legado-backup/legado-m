@@ -77,4 +77,35 @@ class VideoPlayNudgeScriptTest {
             VideoSniffPolicy.isDeliverableHit("https://cdn.example.com/x/SEG002.TS", null)
         )
     }
+
+    /**
+     * 候选形态分类（诊断口径，2026-10-24 真机排障所需）。
+     *
+     * 需要区分「播放器走 MSE ⇒ 流地址只在分片请求里」与「直链 URL 形态不匹配源正则」，
+     * 否则只能看到 0 命中却无法定位根因。
+     */
+    @Test
+    fun candidateShapeClassifiesMseAndHttpUrls() {
+        val urls = listOf(
+            "https://cdn.example.com/x/index.m3u8",
+            "__MSE__:blob:https://example.com/1a2b",
+            "__MSE_MIME__:application/vnd.apple.mpegurl",
+            "blob:https://example.com/3c4d"
+        )
+        val shape = VideoSniffPolicy.classifyCandidates(urls) { it.endsWith(".m3u8") }
+        assertEquals("总数", 4, shape.total)
+        assertEquals("http 直链数", 1, shape.http)
+        assertEquals("MSE/blob 数", 2, shape.blobOrMse)
+        assertEquals("MIME 标记数", 1, shape.mime)
+        assertEquals("匹配数", 1, shape.matched)
+    }
+
+    @Test
+    fun candidateShapeFlagsUnmatchedHttpUrls() {
+        // 直链 URL 存在但形态不匹配源正则：分类必须能暴露这一根因
+        val shape = VideoSniffPolicy.classifyCandidates(listOf("https://cdn.example.com/stream?id=9")) { false }
+        assertEquals(0, shape.blobOrMse)
+        assertEquals(1, shape.http)
+        assertEquals(0, shape.matched)
+    }
 }
