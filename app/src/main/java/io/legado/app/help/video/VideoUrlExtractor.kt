@@ -279,8 +279,13 @@ object VideoUrlExtractor {
         // 等待结果，完成后移除 Entry（用 remove(key, value) 确保不误删其他 Entry）
         return try {
             deferred.await()
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // 2026-10-24 回归修复：嗅探超时是**本层失败**，不是调用方取消。
+            // 原实现按 CancellationException 重抛 ⇒ 整条播放协程被取消 ⇒ 黑屏且无错误日志、无 prepare 记录。
+            AppLog.putInfo("R5嗅探超时(${timeout}ms)，返回 null 交由上层回退直连, ${sanitizeUrl(url)}")
+            null
         } catch (e: kotlinx.coroutines.CancellationException) {
-            // 协程取消（退出播放器/超时）是正常行为，重新抛出
+            // 真正的协程取消（退出播放器/切换集）必须继续传播
             throw e
         } catch (e: Exception) {
             // 嗅探失败（BackstageWebView 异常等），返回 null
@@ -345,8 +350,12 @@ object VideoUrlExtractor {
                     SniffCandidate(url = hitUrl, source = SniffCandidate.SOURCE_WEBVIEW_RUNTIME)
                 }
             }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // 嗅探会话超时：本层失败（返回 null），不得取消上层播放协程
+            AppLog.putInfo("R5网络抓包超时(${timeout}ms)，返回 null, ${sanitizeUrl(url)}")
+            null
         } catch (e: kotlinx.coroutines.CancellationException) {
-            // 协程取消（退出播放器/超时）是正常行为，不记录为失败
+            // 真正的协程取消（退出播放器/切换集）是正常行为，继续传播
             throw e
         } catch (e: Exception) {
             AppLog.putWarn("R5网络抓包失败: ${sanitizeUrl(url)}", e)
@@ -685,6 +694,13 @@ object VideoUrlExtractor {
             AppLog.putInfo("extractVideoUrlForEpisode: URL已是视频流, 跳过三层解析直接返回, ${sanitizeUrl(url)}")
             return SniffCandidate(url = url, source = SniffCandidate.SOURCE_FAST)
         }
+        // 2026-10-24 回归修复：无扩展名的媒体直链（CDN path 不带 .mp4）按 Content-Type 判直连。
+        // 否则会进入 WebView 嗅探：首个命中就是该媒体 URL 本身（sameAsPage 不可交付）⇒ 干等 15s；
+        // 超时异常又会被当作协程取消向上抛出 ⇒ 整条播放协程被取消（黑屏、无错误、无 prepare 日志）。
+        if (looksLikeDirectMedia(url, source, ruleData)) {
+            AppLog.putInfo("extractVideoUrlForEpisode: 内容预检为 video/*, 跳过三层解析, ${sanitizeUrl(url)}")
+            return SniffCandidate(url = url, source = SniffCandidate.SOURCE_FAST)
+        }
         // FR-8: play.php 类 URL 预解析缓存检查（5 分钟 TTL，降低首帧延迟方差 7.5 倍）
         playerPageCache[url]?.let { entry ->
             if (System.currentTimeMillis() - entry.timestamp < PLAYER_PAGE_CACHE_TTL_MS) {
@@ -756,6 +772,10 @@ object VideoUrlExtractor {
                 AppLog.put("extractVideoUrlForEpisode: 第三层网络抓包返回null或等于原URL, ${sanitizeUrl(url)}")
                 null
             }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // 嗅探超时只算本层失败；原实现按 CancellationException 重抛会取消整条播放协程（2026-10-24 回归）
+            AppLog.put("extractVideoUrlForEpisode: 第三层网络抓包超时, 返回 null 交由上层回退直连")
+            null
         } catch (e: kotlinx.coroutines.CancellationException) {
             // T2.11: CancellationException 守卫（解决 Bug-17 + Bug-18：协程取消必须传播）
             throw e
@@ -765,4 +785,46 @@ object VideoUrlExtractor {
             null
         }
     }
+
+    /**
+     * 内容预检：URL 直接返回视频内容（Content-Type 以 video/ 开头）时视为直链。
+     *
+     * 背景（2026-10-24 真机回归）：站点 CDN 直链 path 不带 `.mp4` 等扩展名，
+     * [isDirectVideoStreamUrl] 判不出来 ⇒ 进入 WebView 嗅探；而该会话首个命中就是
+     * 媒体 URL 本身（sameAsPage，按规则不可交付）⇒ 干等 15s 超时；超时异常又被当作
+     * 协程取消重抛 ⇒ 整条播放协程被取消（黑屏、无错误弹窗、无 ExoPlayer prepare 日志）。
+     *
+     * 成本：Range 0-1 轻量请求（服务端支持 206 时只回 2 字节），3s 超时；任何失败一律按"非直链"处理。
+     */
+    private suspend fun looksLikeDirectMedia(
+        url: String,
+        source: BaseSource?,
+        ruleData: RuleDataInterface?
+    ): Boolean {
+        return try {
+            val analyzeUrl = AnalyzeUrl(url, source = source, ruleData = ruleData)
+            if (!analyzeUrl.headerMap.any { it.key.equals("Referer", ignoreCase = true) }) {
+                analyzeUrl.headerMap["Referer"] = resolveReferer(ruleData, url)
+            }
+            analyzeUrl.headerMap["Range"] = "bytes=0-1"
+            // withTimeoutOrNull 超时返回 null（不抛异常），不会误伤上层协程取消语义
+            val response = withTimeoutOrNull(3000L) {
+                analyzeUrl.getStrResponseAwait()
+            } ?: return false
+            response.headers()["Content-Type"].let(::isVideoContentType)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 纯函数（单测锁定）：Content-Type 是否表示视频内容。
+     *
+     * 只认以 video/ 开头的类型：`application/vnd.apple.mpegurl` 等清单已由
+     * [isDirectVideoStreamUrl] 处理，这里不能把 HTML/JSON 误判为直链。
+     */
+    internal fun isVideoContentType(contentType: String?): Boolean =
+        contentType?.trim()?.startsWith("video/", ignoreCase = true) == true
 }

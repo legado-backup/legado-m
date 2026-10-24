@@ -29,6 +29,19 @@ class VideoUrlExtractorContentTypeTest {
     }
 
     @Test
+    fun cdnVideoMimeVariantsAreDirectMedia() {
+        // 真实 CDN 响应里常见的视频类型都应判直链（不看扩展名）
+        assertTrue(VideoUrlExtractor.isVideoContentType("video/x-flv"))
+        assertTrue(VideoUrlExtractor.isVideoContentType("video/mp2t"))
+        assertTrue(VideoUrlExtractor.isVideoContentType("video/quicktime"))
+        assertTrue(VideoUrlExtractor.isVideoContentType("  video/mp4  "))
+        // 泛二进制类型刻意保守：无法确认是视频时交给后续嗅探，不得当直链
+        assertFalse(VideoUrlExtractor.isVideoContentType("application/octet-stream"))
+        // 前缀相似但不是 video/ 的类型不得误判
+        assertFalse(VideoUrlExtractor.isVideoContentType("videox/mp4"))
+    }
+
+    @Test
     fun extensionlessCdnUrlIsNotRecognizedBySuffixRule() {
         assertFalse(
             VideoUrlExtractor.isDirectVideoStreamUrl(
