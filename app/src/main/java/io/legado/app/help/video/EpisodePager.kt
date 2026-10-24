@@ -82,4 +82,39 @@ object EpisodePager {
     }
 
     private fun ceilDiv(a: Int, b: Int): Int = (a + b - 1) / b
+
+    /**
+     * 组内展示顺序（正序 / 倒序）。
+     *
+     * 正序：`start..end`；倒序：`end..start`（最新集在前）。
+     * 返回**全集下标**列表，供弹框直接映射点击目标，避免下标换算散落在 UI 层。
+     */
+    fun displayIndices(group: Group, descending: Boolean): List<Int> {
+        return if (descending) {
+            (group.endIndex downTo group.startIndex).toList()
+        } else {
+            (group.startIndex..group.endIndex).toList()
+        }
+    }
+
+    /** 分组标签随展示顺序变化（1-based 闭区间）：正序 `1-10`、倒序 `10-1` */
+    fun displayLabel(group: Group, descending: Boolean): String {
+        return if (descending) {
+            "${group.endIndex + 1}-${group.startIndex + 1}"
+        } else {
+            group.label
+        }
+    }
+
+    /**
+     * 分组行的展示顺序：正序 `0,1,2…`；倒序 `…,2,1,0`（最后一批集数排在最前）。
+     */
+    fun displayGroupOrder(groupCount: Int, descending: Boolean): List<Int> {
+        if (groupCount <= 0) return emptyList()
+        return if (descending) {
+            (groupCount - 1 downTo 0).toList()
+        } else {
+            (0 until groupCount).toList()
+        }
+    }
 }
