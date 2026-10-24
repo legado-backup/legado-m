@@ -38,6 +38,7 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
     mContext, R.style.dialog_style
 ) {
     private var headerView: TextView? = null
+    private var orderToggle: TextView? = null
     private var groupScroll: HorizontalScrollView? = null
     private var groupRow: LinearLayout? = null
     private var grid: RecyclerView? = null
@@ -47,6 +48,14 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
     private var currentSelection = -1
     private var paging: EpisodePager.Paging? = null
     private var selectedGroup = 0
+
+    /**
+     * 展示顺序：false = 正序（1→N，默认，与历史行为一致）；true = 倒序（最新集在前）。
+     *
+     * 2026-10-24 用户需求：长剧（如 86 集）想从最新集往回找时必须一直翻到底，
+     * 故头部提供一键切换。仅影响**展示顺序**，不改变集下标语义（点击仍回传真实全集下标）。
+     */
+    private var descending = false
 
     interface OnListItemClickListener {
         /** 全集下标（0-based，与 `episodes` / 目录一致） */
@@ -89,6 +98,7 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         val view: View = LayoutInflater.from(mContext)
             .inflate(R.layout.switch_episode_video_dialog, null)
         headerView = view.findViewById(R.id.listCount)
+        orderToggle = view.findViewById(R.id.order_toggle)
         groupScroll = view.findViewById(R.id.group_scroll)
         groupRow = view.findViewById(R.id.group_row)
         grid = view.findViewById(R.id.episode_grid)
@@ -102,20 +112,40 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         paging = EpisodePager.build(titles.size, currentSelection.coerceAtLeast(0))
         selectedGroup = paging?.currentGroupIndex?.coerceAtLeast(0) ?: 0
         headerView?.text = mContext.getString(R.string.video_episode_picker_header, titles.size)
+        // 正序 / 倒序切换：按钮文案显示「点击后会切到」的顺序，符合直觉
+        orderToggle?.apply {
+            text = mContext.getString(
+                if (descending) R.string.video_episode_order_asc
+                else R.string.video_episode_order_desc
+            )
+            setOnClickListener {
+                descending = !descending
+                text = mContext.getString(
+                    if (descending) R.string.video_episode_order_asc
+                    else R.string.video_episode_order_desc
+                )
+                // 分组行与网格共用同一 [descending]，一次切换两者同时重排
+                renderGroups()
+                renderGrid()
+            }
+        }
         renderGroups()
         renderGrid()
         applyWindow()
     }
 
-    /** 分组行：选中组高亮；点击切换组并重绘网格 */
+    /** 分组行：选中组高亮；点击切换组并重绘网格（展示顺序随 [descending] 变化） */
     private fun renderGroups() {
         val row = groupRow ?: return
         row.removeAllViews()
         val groups = paging?.groups.orEmpty()
         val density = mContext.resources.displayMetrics.density
-        groups.forEachIndexed { index, group ->
+        // 倒序时最后一批集数排在最前（分组行与网格顺序一致，避免"格子与分组对不上"）
+        val displayOrder = EpisodePager.displayGroupOrder(groups.size, descending)
+        displayOrder.forEachIndexed { displayIndex, groupIndex ->
+            val group = groups[groupIndex]
             val chip = TextView(mContext).apply {
-                text = group.label
+                text = EpisodePager.displayLabel(group, descending)
                 textSize = 13f
                 gravity = Gravity.CENTER
                 setPadding(
@@ -124,44 +154,43 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
                 )
                 isClickable = true
                 setOnClickListener {
-                    if (selectedGroup != index) {
-                        selectedGroup = index
+                    if (selectedGroup != groupIndex) {
+                        selectedGroup = groupIndex
                         renderGroups()
                         renderGrid()
                     }
                 }
             }
-            applyVideoChoiceItemStyle(mContext, chip, index == selectedGroup)
+            applyVideoChoiceItemStyle(mContext, chip, groupIndex == selectedGroup)
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { if (index > 0) it.marginStart = (6 * density).roundToInt() }
+            ).also { if (displayIndex > 0) it.marginStart = (6 * density).roundToInt() }
             row.addView(chip, lp)
         }
-        // 当前分组可能在横向滚动区域外：滚到可见位置
+        // 当前分组可能在横向滚动区域外：滚到可见位置（按展示序号定位，倒序时反向）
         groupScroll?.post {
-            val selected = row.getChildAt(selectedGroup) ?: return@post
+            val displayIndexOfSelected = displayOrder.indexOf(selectedGroup)
+            if (displayIndexOfSelected < 0) return@post
+            val selected = row.getChildAt(displayIndexOfSelected) ?: return@post
             val left = selected.left - (groupScroll!!.width / 3)
             groupScroll?.smoothScrollTo(left.coerceAtLeast(0), 0)
         }
     }
 
-    /** 集数网格：仅渲染当前分组，当前集高亮并自动定位 */
+    /** 集数网格：仅渲染当前分组，当前集高亮并自动定位；顺序由 [EpisodePager.displayIndices] 决定 */
     private fun renderGrid() {
         val recycler = grid ?: return
         val p = paging ?: return
         val group = p.groups.getOrNull(selectedGroup) ?: return
-        val items = titles.subList(group.startIndex, group.endIndex + 1)
-        val selectionInGroup =
-            if (currentSelection in group.startIndex..group.endIndex) {
-                currentSelection - group.startIndex
-            } else {
-                -1
-            }
+        // 集的**全集下标**：正序 start..end，倒序 end..start（点击直接回传该下标，无需再做换算）
+        val indices = EpisodePager.displayIndices(group, descending)
+        val items = indices.map { titles[it] }
+        val selectionInGroup = indices.indexOf(currentSelection)
         val layoutManager = GridLayoutManager(mContext, COLUMNS)
         recycler.layoutManager = layoutManager
         recycler.adapter = EpisodeGridAdapter(mContext, items, selectionInGroup) { positionInGroup ->
-            val fullIndex = group.startIndex + positionInGroup
+            val fullIndex = indices.getOrNull(positionInGroup) ?: return@EpisodeGridAdapter
             dismiss()
             onItemClickListener?.onItemClick(fullIndex)
         }

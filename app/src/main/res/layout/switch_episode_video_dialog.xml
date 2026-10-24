@@ -11,6 +11,7 @@
     高度由 ChoiceEpisodeDialog 按横竖屏剩余空间计算（视频在上方必须完整可见）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -19,20 +20,45 @@
     android:paddingEnd="12dp"
     android:paddingBottom="12dp">
 
-    <TextView
-        android:id="@+id/listCount"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="8dp"
-        android:textColor="@color/primaryText"
-        android:textSize="@dimen/text_14sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/listCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/primaryText"
+            android:textSize="@dimen/text_14sp"
+            android:textStyle="bold" />
+
+        <!-- 正序 / 倒序切换（2026-10-24 用户需求）：最新集在前时可一键切换 -->
+        <TextView
+            android:id="@+id/order_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/primary"
+            android:textSize="@dimen/text_13sp"
+            tools:text="倒序" />
+
+    </LinearLayout>
 
     <HorizontalScrollView
         android:id="@+id/group_scroll"
