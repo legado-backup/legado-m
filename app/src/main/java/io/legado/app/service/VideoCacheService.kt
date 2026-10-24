@@ -27,6 +27,7 @@ import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.book.cache.CacheActivity
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.servicePendingIntent
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import splitties.systemservices.notificationManager
 import java.io.File
@@ -49,6 +50,10 @@ class VideoCacheService : BaseService() {
 
     companion object {
         private const val TAG_VIDEO_CACHE = "VideoCacheDiag"
+
+        /** 目录未落库时的轮询次数与间隔（合计 20s，覆盖详情页入架→目录加载窗口） */
+        internal const val EPISODE_WAIT_POLLS = 40
+        internal const val EPISODE_WAIT_STEP_MS = 500L
     }
 
     private var cacheJob: Coroutine<*>? = null
@@ -111,9 +116,23 @@ class VideoCacheService : BaseService() {
                     return@execute
                 }
                 val chapters = appDb.bookChapterDao.getChapterList(bookUrl)
-                val episodes = VideoCacheKernel.episodesOf(chapters)
+                var episodes = VideoCacheKernel.episodesOf(chapters)
                 if (episodes.isEmpty()) {
-                    AppLog.put("$TAG_VIDEO_CACHE 启动失败：目录为空")
+                    // 详情页「点击缓存自动入架」场景：书籍入库与目录落库有先后，
+                    // 立刻起缓存会因「目录为空」fail-fast（用户感知＝缓存不了）。
+                    // 轮询等待目录落库（上限 20s），拿到即继续。
+                    AppLog.put("$TAG_VIDEO_CACHE 目录为空，等待目录落库（上限 20s）")
+                    for (i in 1..EPISODE_WAIT_POLLS) {
+                        if (!isActive) break
+                        delay(EPISODE_WAIT_STEP_MS)
+                        episodes = VideoCacheKernel.episodesOf(
+                            appDb.bookChapterDao.getChapterList(bookUrl)
+                        )
+                        if (episodes.isNotEmpty()) break
+                    }
+                }
+                if (episodes.isEmpty()) {
+                    AppLog.put("$TAG_VIDEO_CACHE 启动失败：目录为空（已等待 ${EPISODE_WAIT_POLLS * EPISODE_WAIT_STEP_MS / 1000}s）")
                     VideoCacheKernel.onStopped(bookUrl)
                     return@execute
                 }
@@ -173,6 +192,7 @@ class VideoCacheService : BaseService() {
     private suspend fun cacheEpisode(source: BookSource, book: Book, chapter: BookChapter) {
         val content = WebBook.getContentAwait(source, book, chapter, needSave = false)
             .trim()
+        AppLog.put("$TAG_VIDEO_CACHE index=${chapter.index} 正文长度=${content.length}")
         if (content.isEmpty()) {
             throw IOException("正文为空，未取到播放地址")
         }
@@ -180,12 +200,18 @@ class VideoCacheService : BaseService() {
             .map { it.trim() }
             .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
             ?: content
+        val isHls = VideoUrlExtractor.isDirectVideoStreamUrl(firstLine) &&
+            firstLine.contains(".m3u8", ignoreCase = true)
         val streamUrl = if (VideoUrlExtractor.isDirectVideoStreamUrl(firstLine)) {
             firstLine
         } else {
             VideoUrlExtractor.extractVideoUrlForEpisode(firstLine, source, chapter)?.url
                 ?: throw IOException("未能解析出视频流地址")
         }
+        AppLog.put(
+            "$TAG_VIDEO_CACHE index=${chapter.index} 流类型=${if (isHls) "HLS" else "直链"}, " +
+                "urlLen=${streamUrl.length}"
+        )
         val output = BookVideoCache.fileOf(book, chapter)
         output.parentFile?.mkdirs()
         if (output.exists() && output.length() > 0) return
@@ -197,23 +223,38 @@ class VideoCacheService : BaseService() {
         ).headerMap
         if (streamUrl.contains("m3u8", ignoreCase = true)) {
             val tempDir = File(output.parentFile, "vcache_${chapter.index}")
+            // 合并成功即取到完整 ts：即便 remux 失败也必须落盘（否则"下载成功但缓存被判失败"）
+            var mergedTs: File? = null
             val result = HlsDownloader.download(
                 m3u8Url = streamUrl,
                 outputMp4 = output,
                 tempDir = tempDir,
                 headers = headers,
                 onProgress = { _, _ -> },
+                onMerged = { mergedTs = it },
             )
-            tempDir.deleteRecursively()
-            if (result !is HlsResult.Mp4) {
-                throw IOException("HLS 下载未产出 mp4：$result")
+            AppLog.put(
+                "$TAG_VIDEO_CACHE index=${chapter.index} HLS 结果=" +
+                    "${result::class.simpleName}, ts=${mergedTs?.length() ?: 0}B"
+            )
+            if (result is HlsResult.TsFallback) {
+                // ts 兜底：MPEG-TS 单文件可直接被 ExoPlayer 渐进式播放（按内容嗅探，不看后缀），
+                // 故沿用主名 .mp4 落盘，避免缓存管理/本地优先的命名契约分叉。
+                val ts = mergedTs?.takeIf { it.exists() && it.length() > 0 }
+                    ?: throw IOException("HLS 合并产物缺失")
+                output.outputStream().use { out -> ts.inputStream().use { it.copyTo(out) } }
+                ts.delete()
+            } else if (result !is HlsResult.Mp4) {
+                throw IOException("HLS 下载未产出可用文件：$result")
             }
+            tempDir.deleteRecursively()
         } else {
             downloadDirect(streamUrl, output, headers)
         }
         if (!output.exists() || output.length() <= 0) {
             throw IOException("落盘文件为空")
         }
+        AppLog.put("$TAG_VIDEO_CACHE index=${chapter.index} 落盘完成 size=${output.length()}B")
     }
 
     private suspend fun downloadDirect(

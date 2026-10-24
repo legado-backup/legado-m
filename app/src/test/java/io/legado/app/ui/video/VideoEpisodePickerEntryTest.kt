@@ -57,4 +57,13 @@ class VideoEpisodePickerEntryTest {
         assertFalse(secondaryEntriesVisible(isFullscreen = true))
         assertTrue(secondaryEntriesVisible(isFullscreen = false))
     }
+
+    @Test
+    fun refreshEntryVisibleForBookSourceSessions() {
+        // R6：书源视频会话（有书）与订阅源会话都显示刷新；单 URL 直链不显示
+        assertTrue(VideoPlayerActivity.shouldShowRefresh(false, sourceIsBookSource = true, hasBook = true))
+        assertFalse("书源会话尚未加载出书时不显示", VideoPlayerActivity.shouldShowRefresh(false, true, false))
+        assertTrue(VideoPlayerActivity.shouldShowRefresh(true, false, false))
+        assertFalse("无采集链的直链会话不显示", VideoPlayerActivity.shouldShowRefresh(false, false, true))
+    }
 }

@@ -65,11 +65,12 @@ class CfItemHostCoverageTest {
         assertTrue("候选源文件异常（${sources.size}）—— 扫描根或过滤口径可能失效", sources.size >= 20)
         val items = itemLayouts()
         assertEquals(
-            "在用 item 布局数应为 22（38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
+            "在用 item 布局数应为 23（原 22 + video-cache-and-multiep 新增 item_video_episode_chip；" +
+                "原口径：38 − CA′ 已删 2 真死件 − CF 6.2 已退役 item_font、" +
                 "item_change_source、item_chapter_list、item_image_article、item_source_folder_grid、" +
                 "item_text、item_ai_generated_image、item_search_list、item_arrange_book、" +
                 "item_rss_article、item_rss_article_1~4）",
-            22, items.size
+            23, items.size
         )
         val orphans = items.filter { hostsOf(it, sources).isEmpty() }
         assertTrue(
@@ -111,8 +112,9 @@ class CfItemHostCoverageTest {
             .filter { it.contains("Adapter") }
             .toSet()
         assertEquals(
-            "Adapter 宿主数应与 `CF-宿主列表清单.md` 登记的实测值一致（映射漂移即 FAIL）",
-            11, adapters.size
+            "Adapter 宿主数应与 `CF-宿主列表清单.md` 登记的实测值一致（映射漂移即 FAIL）；" +
+                "11 = CF 6.2 收尾值，12 = + video-cache-and-multiep 新增 EpisodeGridAdapter",
+            12, adapters.size
         )
     }
 

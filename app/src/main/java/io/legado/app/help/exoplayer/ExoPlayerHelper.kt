@@ -520,6 +520,28 @@ object ExoPlayerHelper {
     }
 
     /**
+     * 播放侧「内容是否 m3u8 清单」判定（纯网络预检，供降级链排序用）。
+     *
+     * 背景（2026-10-24 真机实证）：嗅探结果为 UNKNOWN（无后缀、无 MIME）时原实现一律 HLS 优先；
+     * 若内容实际是 MP4/HTML，HLS 解析失败会让 GSY 判错并释放播放器，后续降级再无机会 ⇒ 黑屏。
+     * 因此先做一次轻量预检：明确不是清单时把 Progressive 排到首位。
+     *
+     * @return true=确认是 m3u8 清单；false=确认不是；null=未知（超时 / 403 拒绝）
+     */
+    suspend fun detectM3u8Manifest(
+        url: String,
+        headers: Map<String, String>,
+        timeoutMs: Long = 6000L
+    ): Boolean? = withTimeoutOrNull(timeoutMs) {
+        when (val r = M3u8PreCheckDataSource(headers).preCheck(url)) {
+            is M3u8PreCheckDataSource.PreCheckResult.Success -> true
+            is M3u8PreCheckDataSource.PreCheckResult.Fail ->
+                if (r.reason.contains("M3U8", ignoreCase = true)) false else null
+            is M3u8PreCheckDataSource.PreCheckResult.Rejected -> null
+        }
+    }
+
+    /**
      * W2 / REQ-14：m3u8 预检结果 → 嗅探结果（预检 Success 即权威：已与 CDN 握手并验证 `#EXTM3U`/MIME）。
      * 其余（Fail / Rejected / 超时）返回 null ⇒ 不参与抢占，也不覆盖 Range 的结论。
      */

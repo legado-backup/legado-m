@@ -42,4 +42,13 @@ class VideoCacheBarTest {
         // 搜索书（未入架）详情页同样需要缓存入口 → 可见性只看类型，不看是否已入架
         assertTrue(videoCacheBarVisible(true))
     }
+
+    @Test
+    fun `done state hides the cache action`() {
+        // 2.6 完成态：全集落盘后不再给「缓存」动作（重复点击只会空跑，误导用户）
+        assertTrue(videoCacheBarDone(cached = 12, total = 12, running = false))
+        assertFalse("运行中即使计数追平也不算完成", videoCacheBarDone(12, 12, running = true))
+        assertFalse("部分缓存不算完成", videoCacheBarDone(cached = 5, total = 12, running = false))
+        assertFalse("目录未知（total=0）不算完成", videoCacheBarDone(cached = 0, total = 0, running = false))
+    }
 }

@@ -1,5 +1,6 @@
 package io.legado.app.help.gsyVideo
 
+import androidx.media3.common.C
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,12 +62,46 @@ class Exo2MediaPlayerSelfHealWiringTest {
     @Test
     fun degradeVerdictReusesExistingFallbackInsteadOfNewRetryLoop() {
         assertTrue(
-            "DEGRADE 必须复用既有 tryNextFallback（合并非叠加）",
+            "DEGRADE 必须复用既有 tryNextFallback（合并不叠加）",
             player.contains("policy DEGRADE → tryNextFallback")
         )
         assertTrue(
             "策略须写入错误大类供 UI 换线判据",
             player.contains("VideoPlay.lastPlaybackErrorKind = kind")
+        )
+    }
+
+    @Test
+    fun fallbackRebuildKeepsPlayIntent() {
+        // 2026-10-24 真机实证：m3u8 解析失败回退 Progressive 后无条件置 playWhenReady=false，
+        // 之后没有 start() 调用 ⇒ 自动连播停在 00:00 黑屏。降级重建必须延续原播放意图。
+        assertTrue(
+            "降级重建须先快照原播放意图",
+            player.contains("val wantPlay = mInternalPlayer?.playWhenReady == true")
+        )
+        assertTrue(
+            "降级重建后须恢复原播放意图",
+            player.contains("mInternalPlayer?.playWhenReady = wantPlay")
+        )
+        // 只有初始装配分支（prepareAsyncInternal 的 else 分支）允许显式置 false
+        assertEquals(
+            "applyMediaSourceByType 内不得再出现强制暂停",
+            1,
+            Regex("mInternalPlayer\\.playWhenReady = false").findAll(player).count()
+        )
+    }
+
+    @Test
+    fun unknownContentPrefersProgressiveWhenConfirmedNotM3u8() {
+        assertEquals(
+            "预检确认非 m3u8 ⇒ Progressive 必须排首位（否则 HLS 失败会触发 GSY 释放播放器）",
+            listOf(C.TYPE_OTHER, C.TYPE_HLS),
+            unknownFallbackOrder(preferProgressive = true)
+        )
+        assertEquals(
+            "未确认时保持既有 HLS 优先（不扩大回归面）",
+            listOf(C.TYPE_HLS, C.TYPE_OTHER),
+            unknownFallbackOrder(preferProgressive = false)
         )
     }
 }

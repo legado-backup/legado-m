@@ -45,6 +45,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import tv.danmaku.ijk.media.exo2.IjkExo2MediaPlayer
 import tv.danmaku.ijk.media.exo2.demo.EventLogger
 
+/**
+ * UNKNOWN 嗅探结果下的降级链顺序（纯函数，单测锁定）。
+ *
+ * 预检确认「内容不是 m3u8 清单」时 Progressive 必须排首位——否则 HLS 解析必然失败，
+ * GSY 判错后会释放播放器，后续降级再无机会（2026-10-24 真机实证：自动连播黑屏）。
+ */
+internal fun unknownFallbackOrder(preferProgressive: Boolean): List<Int> =
+    if (preferProgressive) listOf(C.TYPE_OTHER, C.TYPE_HLS) else listOf(C.TYPE_HLS, C.TYPE_OTHER)
+
 class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     companion object {
         private const val TAG = "GSYExo2MediaPlayer"
@@ -236,7 +245,10 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
      * @param sniff 嗅探结果
      * @return 降级链 contentType 列表
      */
-    private fun buildFallbackTypes(sniff: ExoPlayerHelper.SniffResult): List<Int> {
+    private fun buildFallbackTypes(
+        sniff: ExoPlayerHelper.SniffResult,
+        preferProgressive: Boolean = false
+    ): List<Int> {
         // P1 嗅探成功率优化（2026-07-28）：区分两种 UNKNOWN 场景
         // 1. mimeType 是 HTML（text/html 等）→ HTML 页面形态（可能为壳内直链视频源）
         //    video-sniff-403-and-rss-classic-fix Phase 4 (5.5b/Z15·F-12)：不再返回空列表
@@ -263,11 +275,22 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
             // mimeType 为 null（嗅探超时）或非 HTML 类型 → 尝试 HLS 优先（最常见视频格式）
             // HLS 失败后会自动降级 WebView，不会卡死
             // P2-1: 默认降级链改为 [HLS, Progressive]
+            //
+            // 2026-10-24 真机实证补丁：预检明确「不是 m3u8 清单」时把 Progressive 排首位。
+            // 原实现 HLS 优先 ⇒ 内容为 MP4/HTML 时 HLS 解析必然失败，GSY 判错后直接释放播放器，
+            // 后续降级无机会 ⇒ 自动连播到该集后永久黑屏。
+            if (preferProgressive) {
+                AppLog.put(
+                    "ExoFallback: sniff UNKNOWN + preCheck 非 m3u8, try Progressive first, " +
+                        "urlPath=${ExoPlayerHelper.sanitizeUrl(currentUrl)}"
+                )
+                return unknownFallbackOrder(preferProgressive = true)
+            }
             AppLog.put(
                 "ExoFallback: sniff UNKNOWN + mimeType=$mt, try HLS first, " +
                     "urlPath=${ExoPlayerHelper.sanitizeUrl(currentUrl)}"
             )
-            return listOf(C.TYPE_HLS, C.TYPE_OTHER)
+            return unknownFallbackOrder(preferProgressive = false)
         }
         return when (sniff.contentType) {
             // P2-1: 清单类型（HLS/DASH/SS）降级链优化
@@ -381,9 +404,13 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
                     return
                 }
             }
+            // 降级重建必须**延续原播放意图**：原实现无条件 `playWhenReady = false`，
+            // 而降级路径之后没有任何 `start()` 调用 ⇒ 自动连播/失败降级后画面停在 00:00 黑屏
+            //（2026-10-24 真机实证：m3u8 解析失败回退 Progressive 后不再起播）。
+            val wantPlay = mInternalPlayer?.playWhenReady == true
             mInternalPlayer?.setMediaSource(mediaSource)
             mInternalPlayer?.prepare()
-            mInternalPlayer?.playWhenReady = false
+            mInternalPlayer?.playWhenReady = wantPlay
             AppLog.put(
                 "ExoFallback: try contentType=$contentType (#${currentFallbackIndex + 1}/${fallbackTypes.size}), " +
                     "urlPath=${ExoPlayerHelper.sanitizeUrl(effectiveUrl)}"
@@ -452,6 +479,12 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     fun releaseSniffResources() {
         if (isReleased) return  // 防止重复 release
         isReleased = true
+        // 诊断日志（永久保留）：释放点必须可追溯到调用方——历史故障中「非当前 Fragment 的
+        // onDestroyView 释放了全局嗅探资源 ⇒ 正在播放的集被掐断」难以定位，仅记方法名不含业务字段
+        AppLog.put(
+            "Exo2MediaPlayer.releaseSniffResources caller=" +
+                Throwable().stackTrace.drop(1).take(6).joinToString("<-") { it.methodName }
+        )
         currentSniffJob?.cancel()
         scope.cancel()
         // FR-3: 标记 scope 已取消，后续 onPlaybackStateChanged/onPlayerError/onRenderedFirstFrame 回调忽略
@@ -674,7 +707,18 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
                     }
 
                     currentSniffResult = sniff
-                    fallbackTypes = buildFallbackTypes(sniff)
+                    // 2026-10-24：UNKNOWN（无后缀/无 MIME）时再做一次内容预检，明确不是 m3u8 清单
+                    // 就把 Progressive 排首位，避免注定失败的 HLS 解析触发 GSY 释放播放器（黑屏）
+                    var preferProgressive = false
+                    if (sniff.contentType == ExoPlayerHelper.SniffResult.TYPE_UNKNOWN) {
+                        val verdict = ExoPlayerHelper.detectM3u8Manifest(currentUrl, currentHeaders)
+                        AppLog.put(
+                            "ExoFallback: M3U8 precheck verdict=$verdict, " +
+                                "urlPath=${ExoPlayerHelper.sanitizeUrl(currentUrl)}"
+                        )
+                        preferProgressive = verdict == false
+                    }
+                    fallbackTypes = buildFallbackTypes(sniff, preferProgressive)
                     currentFallbackIndex = 0
 
                     // video-sniff-403-and-rss-classic-fix 2.6/R-P1-4：预检被源站确定性拒绝（auth-retry 后仍 403/410）

@@ -74,4 +74,10 @@ class ExploreShowLayoutTest {
         )
         assertEquals(4, ExploreShowLayout.pickerValues.size)
     }
+
+    @Test
+    fun layoutPickerIsTopBarIconNotOverflow() {
+        // 需求 R11「右上角加按钮」：一级图标直出；若为 false 则退化为 ⋮ 二级菜单
+        assertEquals(true, ExploreShowLayout.TOP_BAR_ACTION_ALWAYS_SHOW)
+    }
 }

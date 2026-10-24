@@ -30,6 +30,7 @@ import io.legado.app.ui.widget.components.TopBarActionRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Preview
 import io.legado.app.ui.widget.compose.LegadoComposeTheme
@@ -155,7 +156,13 @@ class ExploreShowActivity : VMBaseActivity<ViewBinding, ExploreShowViewModel>() 
                             TopBarActionRow(
                                 listOf(
                                     // video-cache-and-multiep R11 / V7：全局布局切换（列表/瀑布/双列/三列）
-                                    MenuAction(title = getString(R.string.discovery_page_layout)) {
+                                    // alwaysShow ⇒ 顶栏一级图标直出（需求原文「右上角加按钮」，
+                                    // 收进 ⋮ 溢出菜单需要二次点击，不符合「一键切布局」的用法）
+                                    MenuAction(
+                                        icon = Icons.Filled.GridView,
+                                        title = getString(R.string.discovery_page_layout),
+                                        alwaysShow = ExploreShowLayout.TOP_BAR_ACTION_ALWAYS_SHOW,
+                                    ) {
                                         showLayoutPicker()
                                     },
                                     MenuAction(title = getString(R.string.menu_page, viewModel.pageLiveData.value ?: 1)) {

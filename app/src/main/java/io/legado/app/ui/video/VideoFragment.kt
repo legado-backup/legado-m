@@ -236,6 +236,12 @@ class VideoFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // 诊断日志（永久保留）：区分「当前 Fragment 销毁」与「ViewPager2 邻页/复建销毁」——
+        // 后者若释放全局嗅探资源，会把正在播放的集掐断（黑屏无反馈的真机故障根因候选）
+        AppLog.put(
+            "VideoFragment onDestroyView: episode=$episodeIndex, isActivated=$isActivated, " +
+                "pagerCurrent=${(activity as? VideoPlayerActivity)?.currentEpisodeIndex() ?: -1}"
+        )
         cancelAutoHide()  // F2: 清理自动隐藏 Handler
         stopBufferUpdate()  // F1: 停止缓冲进度更新
         stopProgressMonitor()  // 阶段8 F10：停止进度监听

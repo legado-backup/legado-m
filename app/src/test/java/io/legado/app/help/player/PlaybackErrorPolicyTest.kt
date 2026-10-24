@@ -54,6 +54,16 @@ class PlaybackErrorPolicyTest {
     }
 
     @Test
+    fun browserFallbackUrlNeverBlocksTheErrorPrompt() {
+        // 失败后 videoUrl 可能已清空：此时必须仍能提示（仅无"系统浏览器"按钮），
+        // 不能因无地址而静默 return（真机实证：黑屏无反馈）
+        assertEquals(null, PlaybackErrorPolicy.browserFallbackUrl(null))
+        assertEquals(null, PlaybackErrorPolicy.browserFallbackUrl(""))
+        assertEquals(null, PlaybackErrorPolicy.browserFallbackUrl("   "))
+        assertEquals("x", PlaybackErrorPolicy.browserFallbackUrl("x"))
+    }
+
+    @Test
     fun classifiesDecodeAndLiveWindowGroups() {
         assertEquals(
             PlaybackErrorKind.DECODE,

@@ -37,6 +37,19 @@ class ExoPlayerHelperSniffRaceWiringTest {
     }
 
     @Test
+    fun manifestDetectorIsAvailableForPlaybackFallbackOrdering() {
+        // 2026-10-24：播放侧降级链排序需要「内容是否 m3u8」的确定结论（否则注定失败的 HLS
+        // 解析会让 GSY 释放播放器 ⇒ 黑屏）
+        assertEquals("必须提供内容预检入口", true, helper.contains("suspend fun detectM3u8Manifest("))
+        assertEquals(
+            "预检明确失败须能区分返回 false",
+            true,
+            helper.contains("is M3u8PreCheckDataSource.PreCheckResult.Fail ->")
+        )
+        assertEquals("预检超时预算须 ≥3s（弱网/CDN 冷启动）", true, helper.contains("timeoutMs: Long = 6000L"))
+    }
+
+    @Test
     fun deterministicShortCircuitsStayBeforeRace() {
         val raceAt = helper.indexOf("SniffRace.race(")
         assertTrue("未找到赛马调用", raceAt > 0)
