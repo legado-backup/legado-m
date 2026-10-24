@@ -99,7 +99,6 @@ fun ExploreShowComposeScreen(
             isInBookshelf = isInBookshelf,
             lifecycle = lifecycle,
             onBookClick = onBookClick,
-            onBookMore = onBookMore,
             onLoadMore = onLoadMore,
             modifier = modifier,
         )
