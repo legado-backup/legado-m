@@ -51,6 +51,25 @@ object VideoCacheKernel {
 
     private val indexes = ConcurrentHashMap<String, Set<Int>>()
 
+    /**
+     * 本会话内失败过的集（内存态，不落盘）。
+     *
+     * 用途：重跑缓存时把「上轮已失败」的集**排到末尾**——失败集多为站点限制（锁定/下架）页，
+     * 每次嗅探都要跑满 15s 超时；若排在开头，用户在真能缓存的集之前要白等数分钟，
+     * 感知即「缓存好慢 / 缓存不了」。排到末尾后正常集先落盘，失败集仅作最终补充尝试。
+     */
+    private val failedIndexes = ConcurrentHashMap<String, MutableSet<Int>>()
+
+    /** 该集本轮是否已失败过（服务据此决定处理顺序） */
+    fun isFailed(bookUrl: String, index: Int): Boolean =
+        failedIndexes[bookUrl]?.contains(index) == true
+
+    /**
+     * 处理顺序：未失败集按原序在前，已失败集在后（稳定排序，保证断点续传语义不变）。
+     */
+    fun orderPositions(bookUrl: String, positions: List<Int>): List<Int> =
+        positions.sortedBy { if (isFailed(bookUrl, it)) 1 else 0 }
+
     fun progressOf(bookUrl: String): Progress = _states.value[bookUrl] ?: Progress(bookUrl = bookUrl)
 
     fun cachedIndexes(bookUrl: String): Set<Int> = indexes[bookUrl].orEmpty()
@@ -87,6 +106,7 @@ object VideoCacheKernel {
 
     fun markCleared(bookUrl: String) {
         indexes.remove(bookUrl)
+        failedIndexes.remove(bookUrl)
         _states.value = _states.value - bookUrl
     }
 
@@ -138,11 +158,14 @@ object VideoCacheKernel {
 
     internal fun onEpisodeDone(bookUrl: String, index: Int) {
         markCached(bookUrl, index)
+        failedIndexes[bookUrl]?.remove(index)
         val p = progressOf(bookUrl)
         _states.value = _states.value + (bookUrl to p.copy(cached = p.cached + 1))
     }
 
     internal fun onEpisodeFailed(bookUrl: String, index: Int, message: String?) {
+        failedIndexes.getOrPut(bookUrl) { java.util.Collections.synchronizedSet(mutableSetOf()) }
+            .add(index)
         val p = progressOf(bookUrl)
         _states.value = _states.value + (
             bookUrl to p.copy(failed = p.failed + 1, lastError = message)
