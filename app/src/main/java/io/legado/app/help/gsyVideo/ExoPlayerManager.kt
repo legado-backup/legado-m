@@ -60,9 +60,14 @@ class ExoPlayerManager : BasePlayerManager() {
             // R5 Header 修复：在 setDataSource 前注入 Header 到 okhttpDataFactory，
             // 确保 Exo2MediaPlayer.prepareAsyncInternal 构建的 HTTP 请求带上 Header（解决 CDN 防盗链 404）
             // E1 优化：同时设置 currentHeaders，通过 SPLIT_TAG per-request 注入（双保险，解决 setDefaultHeaders 全局覆盖问题）
-            model.getMapHeadData()?.takeIf { it.isNotEmpty() }?.let { headers ->
-                ExoPlayerHelper.setDefaultHeaders(headers)
-                mediaPlayer!!.currentHeaders = headers
+            val baseHeaders = model.getMapHeadData().orEmpty()
+            // HLS AES-128 清单的 key 请求需 Referer（无 Referer 时 URLError）：
+            // 单 URL 模式下 headers 常为空，此处按清单 URL 同源兜底；已有 Referer 不覆盖。
+            val effectiveHeaders = io.legado.app.help.exoplayer.M3u8UrlShape
+                .headersWithHlsReferer(baseHeaders, mediaPlayer!!.currentUrl ?: model.getUrl())
+            if (effectiveHeaders.isNotEmpty()) {
+                ExoPlayerHelper.setDefaultHeaders(effectiveHeaders)
+                mediaPlayer!!.currentHeaders = effectiveHeaders
             }
             if (model.isCache()) {
                 //通过管理器处理

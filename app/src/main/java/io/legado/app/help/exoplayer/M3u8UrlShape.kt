@@ -46,4 +46,24 @@ object M3u8UrlShape {
             value.endsWith(".m3u8") && !value.contains("://")
         }
     }
+
+    /**
+     * HLS 请求头兜底：**AES-128 加密清单**的 `#EXT-X-KEY` 请求常要求 `Referer`（真机铁证：
+     * 同一 key URL 无 Referer 时 `URLError`，带 `Referer=<清单 URL>` 返回 200/16 字节；
+     * 分片本身不需要 Referer）。
+     *
+     * 规则：
+     * - 已有 `Referer`（大小写不敏感）⇒ 原样返回，绝不覆盖书源显式配置
+     * - 非 HLS 形态 URL ⇒ 原样返回（避免给 mp4 直链塞 Referer）
+     * - 其余 ⇒ 追加 `Referer = 清单 URL`（同源兜底，成功率高且不触发跨站校验）
+     *
+     * 纯函数，供 `ExoPlayerHelper` 与单测共用。
+     */
+    fun headersWithHlsReferer(headers: Map<String, String>, url: String): Map<String, String> {
+        if (!matches(url)) return headers
+        if (headers.keys.any { it.equals("Referer", ignoreCase = true) }) return headers
+        val merged = LinkedHashMap(headers)
+        merged["Referer"] = url
+        return merged
+    }
 }

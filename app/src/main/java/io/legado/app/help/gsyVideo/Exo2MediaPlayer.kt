@@ -339,8 +339,13 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
         // 根因：HlsMediaSource 内部下载 AES-128 密钥和 TS 分片时，使用 okhttpDataFactory 发送请求，
         // 虽然 ExoPlayerManager 在 prepare 前调用了 setDefaultHeaders，但 applyMediaSourceByType 在降级链重试时
         // 可能覆盖/丢失 Header。此处双保险：每次创建 MediaSource 前重新注入 currentHeaders。
-        if (currentHeaders.isNotEmpty()) {
-            ExoPlayerHelper.setDefaultHeaders(currentHeaders)
+        if (currentHeaders.isNotEmpty() || io.legado.app.help.exoplayer.M3u8UrlShape.matches(url)) {
+            // HLS AES-128 清单的 key 请求需 Referer（无 Referer 时 URLError）；已有 Referer 不覆盖。
+            // 注意用**原始清单 URL**（而非重定向后的 CDN 地址）作 Referer —— 站点校验的是代理域名。
+            ExoPlayerHelper.setDefaultHeaders(
+                io.legado.app.help.exoplayer.M3u8UrlShape
+                    .headersWithHlsReferer(currentHeaders, url)
+            )
         }
         try {
             val mediaSource: MediaSource = when (contentType) {
