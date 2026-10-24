@@ -57,6 +57,20 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
      */
     private var descending = false
 
+    /** 打开期间读取实时当前集（自动连播推进时刷新高亮）；null = 用打开时的快照 */
+    private var selectionProvider: (() -> Int)? = null
+
+    /** 高亮轮询句柄（dismiss/onStop 时必须移除，防泄漏） */
+    private val selectionPollRunnable = object : Runnable {
+        override fun run() {
+            refreshSelectionIfChanged()
+            if (selectionProvider != null && isShowing) {
+                handler.postDelayed(this, SELECTION_POLL_MS)
+            }
+        }
+    }
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
     interface OnListItemClickListener {
         /** 全集下标（0-based，与 `episodes` / 目录一致） */
         fun onItemClick(position: Int)
@@ -65,11 +79,6 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-    }
-
-    override fun onStop() {
-        onItemClickListener?.finishDialog()
-        super.onStop()
     }
 
     /** 书源分支：目录章节 → 标题列表 */
@@ -86,15 +95,19 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
      *
      * @param titles 全集标题（顺序即集顺序）
      * @param initialSelection 当前集下标（0-based；-1 表示无选中）
+     * @param selectionProvider 弹框打开期间读取**实时**当前集（自动连播会继续推进）；
+     *        非空时每 [SELECTION_POLL_MS] 刷新高亮，避免「标题已到第 81 集、高亮还停在第 74 集」
      */
     fun initListByTitles(
         titles: List<String>,
         onItemClickListener: OnListItemClickListener,
-        initialSelection: Int = -1
+        initialSelection: Int = -1,
+        selectionProvider: (() -> Int)? = null
     ) {
         this.onItemClickListener = onItemClickListener
         this.titles = titles
         this.currentSelection = if (initialSelection in titles.indices) initialSelection else -1
+        this.selectionProvider = selectionProvider
         val view: View = LayoutInflater.from(mContext)
             .inflate(R.layout.switch_episode_video_dialog, null)
         headerView = view.findViewById(R.id.listCount)
@@ -132,6 +145,34 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         renderGroups()
         renderGrid()
         applyWindow()
+        // 自动连播期间高亮跟随（首帧延后一拍，避免与首次布局竞争）
+        if (selectionProvider != null) {
+            handler.postDelayed(selectionPollRunnable, SELECTION_POLL_MS)
+        }
+    }
+
+    /**
+     * 当前集变化时只重绘必要部分：组不变 ⇒ 只重绘网格；组变化 ⇒ 分组行也重排并滚到可见。
+     */
+    private fun refreshSelectionIfChanged() {
+        val provider = selectionProvider ?: return
+        val latest = provider()
+        if (latest !in titles.indices || latest == currentSelection) return
+        val p = paging ?: return
+        val previousGroup = selectedGroup
+        currentSelection = latest
+        val newGroup = p.groups.indexOfFirst { latest in it.startIndex..it.endIndex }
+        if (newGroup >= 0 && newGroup != selectedGroup) {
+            selectedGroup = newGroup
+        }
+        if (selectedGroup != previousGroup) renderGroups()
+        renderGrid()
+    }
+
+    override fun onStop() {
+        handler.removeCallbacks(selectionPollRunnable)
+        onItemClickListener?.finishDialog()
+        super.onStop()
     }
 
     /** 分组行：选中组高亮；点击切换组并重绘网格（展示顺序随 [descending] 变化） */
@@ -249,5 +290,8 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         private const val PANEL_PADDING_DP = 32f
         private const val MIN_GRID_DP = 132f
         private const val WINDOW_SIDE_MARGIN_DP = 16f
+
+        /** 高亮跟随轮询间隔（自动连播每集 10s~数分钟，500ms 足够且开销可忽略） */
+        private const val SELECTION_POLL_MS = 500L
     }
 }
