@@ -35,6 +35,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.video.SniffCandidate
+import io.legado.app.help.video.VideoUrlExtractor
 import io.legado.app.model.Debug
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
@@ -110,9 +111,6 @@ class BackstageWebView(
     )
 
     private fun isVideoUrlPattern(url: String): Boolean = VIDEO_URL_PATTERN.matches(url)
-
-    private fun isTsSegmentUrl(url: String): Boolean =
-        url.substringBefore('?').lowercase().endsWith(".ts")
 
     suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
         lastSniffCandidate = null
@@ -515,7 +513,14 @@ class BackstageWebView(
             request: WebResourceRequest,
             resUrl: String
         ) {
-            AppLog.putInfo("R5网络抓包命中(切UI线程), post到UI线程执行resume+destroy")
+            // 2026-10-24 诊断（永久保留）：命中 URL 形态 + 主框架标记。
+            // 真机铁证：缓存逐集时本回调常在第 5ms 就被触发且命中 URL == 播放页 URL，
+            // 会话随即 destroy，nudge/读取 window.__videoUrls__ 全部来不及执行 ⇒ 每集必失败。
+            AppLog.putInfo(
+                "R5网络抓包命中(切UI线程), post到UI线程执行resume+destroy, " +
+                    "mainFrame=${request.isForMainFrame}, " +
+                    "sameAsPage=${resUrl == url}, ${VideoUrlExtractor.sanitizeUrl(resUrl)}"
+            )
             mHandler.post {
                 try {
                     // R-P1-1/AD-01：记录命中现场上下文（requestHeaders 由 chromium 注入 Cookie 前的原始头，Cookie 统一 CookieManager 读取）
@@ -526,7 +531,8 @@ class BackstageWebView(
                         source = SniffCandidate.SOURCE_WEBVIEW_INTERCEPT,
                         requestHeaders = request.requestHeaders
                     )
-                    if (recordSniffHit(candidate, deliverable = !isTsSegmentUrl(resUrl))) {
+                    val deliverable = VideoSniffPolicy.isDeliverableHit(resUrl, url)
+                    if (recordSniffHit(candidate, deliverable = deliverable)) {
                         val response = StrResponse(url!!, resUrl)
                         callback?.onResult(response)
                         destroy()
@@ -576,7 +582,7 @@ class BackstageWebView(
                             source = SniffCandidate.SOURCE_WEBVIEW_OVERRIDE
                         )
                         // video-sniff-403-and-rss-classic-fix Phase 4 (5.3)：首命中交付，后续仅入缓冲
-                        if (recordSniffHit(candidate, deliverable = !isTsSegmentUrl(requestUrl))) {
+                        if (recordSniffHit(candidate, deliverable = VideoSniffPolicy.isDeliverableHit(requestUrl, url))) {
                             val response = StrResponse(url!!, requestUrl)
                             callback?.onResult(response)
                             destroy()
@@ -603,7 +609,7 @@ class BackstageWebView(
                             source = SniffCandidate.SOURCE_WEBVIEW_RESOURCE
                         )
                         // video-sniff-403-and-rss-classic-fix Phase 4 (5.3)：首命中交付，后续仅入缓冲
-                        if (recordSniffHit(candidate, deliverable = !isTsSegmentUrl(resUrl))) {
+                        if (recordSniffHit(candidate, deliverable = VideoSniffPolicy.isDeliverableHit(resUrl, url))) {
                             val response = StrResponse(url!!, resUrl)
                             callback?.onResult(response)
                             destroy()
@@ -628,14 +634,14 @@ class BackstageWebView(
                 val webRef = WeakReference(webView)
                 mHandler.postDelayed({
                     if (closed || callback == null) return@postDelayed
-                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS) { r ->
+                    webRef.get()?.evaluateJavascript(VideoSniffPolicy.PLAY_NUDGE_JS) { r ->
                         AppLog.putInfo("R5网络抓包: nudge result=$r")
                     }
                 }, 300L)
                 // 慢渲染页面：加载完成后 2/3 处再补一次（只对含 video 的播放器区域动作）
                 mHandler.postDelayed({
                     if (closed || callback == null) return@postDelayed
-                    webRef.get()?.evaluateJavascript(VIDEO_PLAY_NUDGE_JS) { r ->
+                    webRef.get()?.evaluateJavascript(VideoSniffPolicy.PLAY_NUDGE_JS) { r ->
                         AppLog.putInfo("R5网络抓包: nudge result(2)=$r")
                     }
                 }, 300L + (delayTime * 2 / 3))
@@ -685,7 +691,7 @@ class BackstageWebView(
                     }
                     for (url in urls) {
                         if (regex != null && url.matches(regex.toRegex())) {
-                            AppLog.putInfo("R5网络抓包: window.__videoUrls__ 命中")
+                            AppLog.putInfo("R5网络抓包: window.__videoUrls__ 命中, sameAsPage=${url == this@BackstageWebView.url}")
                             // R-P1-1/AD-01：记录命中现场上下文（JS 运行时命中，页面上下文取当前 WebView）
                             val candidate = SniffCandidate.fromWebViewHit(
                                 url = url,
@@ -693,13 +699,13 @@ class BackstageWebView(
                                 userAgent = mWebView.get()?.settings?.userAgentString,
                                 source = SniffCandidate.SOURCE_WEBVIEW_RUNTIME
                             )
-                            // video-sniff-403-and-rss-classic-fix Phase 4 (5.3)：首命中交付，后续仅入缓冲
-                            if (recordSniffHit(candidate, deliverable = !isTsSegmentUrl(url))) {
+                            val deliverable = VideoSniffPolicy.isDeliverableHit(url, this@BackstageWebView.url)
+                            if (recordSniffHit(candidate, deliverable = deliverable)) {
                                 val response = StrResponse(this@BackstageWebView.url!!, url)
                                 callback?.onResult(response)
                                 destroy()
                             }
-                            return@evaluateJavascript
+                            if (deliverable) return@evaluateJavascript
                         }
                     }
                     AppLog.putInfo("R5网络抓包: window.__videoUrls__ 有 ${urls.size} 个 URL 但无匹配")
@@ -726,46 +732,6 @@ class BackstageWebView(
 
         /** video-sniff-403-and-rss-classic-fix Phase 4 (5.3)：候选缓冲容量上限（防极端页面膨胀） */
         private const val MAX_SNIFF_CANDIDATES = 8
-
-        /**
-         * 播放页「自动播放轻推」脚本（2026-10-24 真机实证新增）。
-         *
-         * 背景：大量采集站播放页必须**先点播放**才发 m3u8 请求。后台嗅探没有用户手势，
-         * 只挂 fetch/XHR 钩子会 0 命中（实测 160 次嗅探 0 命中 ⇒ 播放/缓存双双失败）。
-         * 该脚本仅在页面内**含 video 元素**的播放器区域内动作（muted + playsinline + click），
-         * 且最多点 3 个，避免误触广告；失败静默，不影响原嗅探链。
-         */
-        private val VIDEO_PLAY_NUDGE_JS = """
-            (function(){
-              var out={v:0,p:0,c:0,err:''};
-              try{
-                var vs=document.querySelectorAll('video');
-                out.v=vs.length;
-                for(var i=0;i<vs.length;i++){
-                  var v=vs[i];
-                  try{ v.muted=true; v.setAttribute('playsinline',''); var pr=v.play(); if(pr&&pr.catch){pr.catch(function(){});} out.p++; }catch(e){}
-                  try{ v.click(); }catch(e){}
-                }
-                var all=document.querySelectorAll('[class*="play"],[id*="play"],.vjs-big-play-button,button');
-                var n=0;
-                for(var j=0;j<all.length&&n<3;j++){
-                  var el=all[j];
-                  if(!el) continue;
-                  var inPlayer=false;
-                  try{
-                    inPlayer=!!( (el.querySelector&&el.querySelector('video')) ||
-                                 (el.closest&&el.closest('video')) ||
-                                 (el.parentElement&&el.parentElement.querySelector('video')) );
-                  }catch(e){}
-                  if(inPlayer){ try{ el.click(); n++; out.c=n; }catch(e){} }
-                }
-              }catch(e){ out.err=String(e).slice(0,60); }
-              return JSON.stringify(out);
-            })();
-        """.trimIndent()
-
-        /** 供单测锁定脚本行为特征（muted + playsinline + 限流点击） */
-        internal fun playNudgeScript(): String = VIDEO_PLAY_NUDGE_JS
     }
 
     abstract class Callback {

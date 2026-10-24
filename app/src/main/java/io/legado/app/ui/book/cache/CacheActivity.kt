@@ -46,12 +46,14 @@ import io.legado.app.databinding.DialogSelectSectionExportBinding
 import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.tryParesExportFileName
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.CacheBook
 import io.legado.app.service.ExportBookService
+import io.legado.app.service.kernel.VideoCacheKernel
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.compose.showComposeChoiceListDialog
@@ -234,17 +236,27 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
                     CacheScreen(
                         books = booksCache,
                         refreshTickOf = { refreshTicks[it] ?: 0L },
-                        cacheChaptersOf = { viewModel.cacheChapters[it] },
+                        cacheCountOf = { book ->
+                            val diskCount = viewModel.cacheChapters[book.bookUrl]?.size
+                            if (book.isVideo) {
+                                // 运行期缓存由独立服务逐集落盘，磁盘扫描不会实时刷新 ⇒ 取内核进度与磁盘的较大值
+                                maxOf(
+                                    VideoCacheKernel.progressOf(book.bookUrl).cached,
+                                    diskCount ?: 0
+                                )
+                            } else {
+                                diskCount
+                            }
+                        },
                         exportMsgOf = { ExportBookService.exportMsg[it] },
                         exportProgressOf = { ExportBookService.exportProgress[it] },
+                        runningOf = { CacheTaskRouter.isRunning(it) },
                         onDownloadToggle = {
-                            // M7 合并后 `this` 被 ColumnScope 遮蔽 ⇒ 显式限定 Activity 接收者
-                            // 判定与行尾图标同源（cacheToggleAction）⇒ 不会出现"图标显示停止、点击却启动"
-                            val action = cacheToggleAction(CacheBook.cacheBookMap[it.bookUrl]?.isStop())
-                            if (action == CacheToggleAction.Stop) {
-                                CacheBook.remove(this@CacheActivity, it.bookUrl)
+                            // 判定与行尾图标同源（CacheTaskRouter.isRunning）⇒ 不会出现"图标显示停止、点击却启动"
+                            if (CacheTaskRouter.isRunning(it)) {
+                                CacheTaskRouter.stop(this@CacheActivity, it)
                             } else {
-                                CacheBook.start(this@CacheActivity, it, 0, it.lastChapterIndex)
+                                CacheTaskRouter.start(this@CacheActivity, it, 0)
                             }
                         },
                         onExport = { export(it) },
@@ -267,12 +279,7 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
                 onClick = {
                     if (!downloadRunning) sureCacheBook {
                         booksCache.forEach { book ->
-                            CacheBook.start(
-                                this@CacheActivity,
-                                book,
-                                book.durChapterIndex,
-                                book.lastChapterIndex
-                            )
+                            CacheTaskRouter.start(this, book, book.durChapterIndex)
                         }
                     } else {
                         CacheBook.stop(this@CacheActivity)
@@ -285,12 +292,7 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
                 onClick = {
                     if (!downloadRunning) sureCacheBook {
                         booksCache.forEach { book ->
-                            CacheBook.start(
-                                this@CacheActivity,
-                                book,
-                                0,
-                                book.lastChapterIndex
-                            )
+                            CacheTaskRouter.start(this, book, 0)
                         }
                     } else {
                         CacheBook.stop(this@CacheActivity)
@@ -436,6 +438,12 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
     override fun observeLiveBus() {
         viewModel.upAdapterLiveData.observe(this) {
             notifyItemChanged(it)
+        }
+        // 视频缓存由独立服务逐集回传进度（不走 CacheBook 事件总线）⇒ 订阅内核状态按书局部刷新
+        lifecycleScope.launch {
+            VideoCacheKernel.states.collect { states ->
+                states.keys.forEach(::notifyItemChanged)
+            }
         }
         observeEvent<String>(EventBus.EXPORT_BOOK) {
             notifyItemChanged(it)

@@ -6,7 +6,9 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.BookVideoCache
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.sendValue
 import kotlinx.coroutines.ensureActive
@@ -30,7 +32,13 @@ class CacheViewModel(application: Application) : BaseViewModel(application) {
                         appDb.bookChapterDao.getChapterList(book.bookUrl).also {
                             book.totalChapterNum = it.size
                         }.forEach { chapter ->
-                            if (cacheNames.contains(chapter.getFileName()) || chapter.isVolume) {
+                            // 视频集落盘为 c-{md5}.mp4，必须走视频口径；文本口径（.nb）会把已缓存集算成未下载
+                            val cached = if (book.isVideo) {
+                                BookVideoCache.isCachedIn(cacheNames, chapter)
+                            } else {
+                                cacheNames.contains(chapter.getFileName()) || chapter.isVolume
+                            }
+                            if (cached) {
                                 chapterCaches.add(chapter.url)
                             }
                         }

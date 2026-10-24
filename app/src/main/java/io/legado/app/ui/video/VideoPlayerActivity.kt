@@ -183,6 +183,24 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         private const val LISTEN_WAKE_LOCK_TAG = "legado:videoListen"
         private const val LISTEN_WAKE_LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
 
+        /** onResume 补跑初始化的最大次数（防 pause/resume 抖动无限重试） */
+        private const val MAX_INIT_RETRY = 3
+
+        /**
+         * 是否需要在 onResume 补跑初始化（纯策略，单测锁定）。
+         *
+         * @param isNew 是否为新会话语义（悬浮窗恢复会话不补跑，由原会话继续）
+         * @param sessionReady 会话初始化是否已完成
+         * @param initJobActive 初始化协程是否仍在跑（在跑说明只是瞬态 pause，无需重复启动）
+         * @param retryCount 已补跑次数
+         */
+        internal fun shouldRetryInit(
+            isNew: Boolean,
+            sessionReady: Boolean,
+            initJobActive: Boolean,
+            retryCount: Int
+        ): Boolean = isNew && !sessionReady && !initJobActive && retryCount < MAX_INIT_RETRY
+
         /**
          * 刷新入口可见性（纯策略，单测锁定）：
          * 订阅源文章会话与书源章节会话都具备"重新采集"能力，均可刷新；
@@ -290,6 +308,19 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
      * T2.8: initSource 协程 Job 引用（onPause 时取消，解决 Bug-25：onPause 后 initSource 仍运行导致资源泄漏）
      */
     private var initSourceJob: Job? = null
+
+    /**
+     * 会话初始化是否已完成（含 dispatchLayoutMode/upView/restorePlayHistory）。
+     *
+     * 2026-10-24 真机铁证：onPause 会取消 initSourceJob，而 singleTask 复用 + 窗口切换
+     * 存在「onResume → 3ms 后 onPause → onResume」的瞬态，协程刚起就被取消且不再补跑 ⇒
+     * 播放器始终未挂载，界面停在只有顶栏的白屏（用户感知「播放不了」）。
+     * 该标记供 onResume 判定是否需要补跑初始化。
+     */
+    private var sessionReady = false
+
+    /** 初始化补跑次数（防 pause/resume 抖动导致的无限重试） */
+    private var initRetryCount = 0
 
     /**
      * AD-04: 播放历史定时保存 Job（每10s保存一次，onPause取消）
@@ -495,6 +526,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private fun initFromIntent(intent: Intent) {
         isNew = intent.getBooleanExtra("isNew", true)
         if (isNew) {
+            // 每次新会话说起都从「未就绪」开始：被 onPause 取消时 onResume 依此补跑
+            sessionReady = false
             intent.getStringExtra("videoUrl")?.let {
                 VideoPlay.videoUrl = it
                 VideoPlay.singleUrl = true
@@ -556,6 +589,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 // video-source-multiline-l0-preload AD-02：进入播放器即步进预取"前方一部"目录
                 // （书源场景：使首次上滑切换命中 DB 缓存秒起播；非书源 prefetchNextNeighbor 内部 guard 跳过）
                 VideoPlay.prefetchNextNeighbor()
+                // 会话就绪：此后 onPause 取消协程也不再需要补跑
+                sessionReady = true
+                initRetryCount = 0
+                AppLog.put("VideoPlayerActivity initSource done: session ready")
             }
         } else {
             // 非新建恢复：从悬浮窗返回，按 layoutMode 分发布局（D3）
@@ -628,6 +665,16 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     override fun onResume() {
         super.onResume()
         FirstFramePreloader.cancelDelayedClear()
+        // 兜底补跑：onPause 取消 initSourceJob 后若会话仍未就绪（含「onResume→onPause→onResume」
+        // 瞬态把刚起的协程打断），必须重新初始化，否则界面停在无播放器的白屏（播放不了）。
+        if (shouldRetryInit(isNew, sessionReady, initSourceJob?.isActive == true, initRetryCount)) {
+            initRetryCount++
+            AppLog.put(
+                "VideoPlayerActivity onResume: initSource 未完成，补跑第 ${initRetryCount} 次 " +
+                    "(bookUrlNotNull=${intent.getStringExtra("bookUrl") != null})"
+            )
+            initFromIntent(intent)
+        }
         // add-dlna-cast：注册本地播放器控制通道（与 onPause 的注销成对）
         DlnaCastManager.playerControl = castPlayerControl
         // AD-05 兜底：通知曾被系统清理时重建，保证"会话在跑就一定能看到入口"

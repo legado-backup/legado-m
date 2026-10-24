@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.isLocal
-import io.legado.app.model.CacheBook
 import io.legado.app.ui.theme.bodyTertiary
 import io.legado.app.ui.theme.bodySecondary
 import io.legado.app.ui.widget.components.InlineTaskBar
@@ -45,9 +44,12 @@ import io.legado.app.ui.widget.components.InlineTaskState
 fun CacheScreen(
     books: List<Book>,
     refreshTickOf: (bookUrl: String) -> Long,
-    cacheChaptersOf: (bookUrl: String) -> HashSet<String>?,
+    /** 已缓存章节数（宿主注入：视频书可由 VideoCacheKernel 运行期进度补充） */
+    cacheCountOf: (Book) -> Int?,
     exportMsgOf: (bookUrl: String) -> String?,
     exportProgressOf: (bookUrl: String) -> Int?,
+    /** 行尾开关的运行态真值（宿主注入：文本/音频走 CacheBook，视频走 VideoCacheKernel） */
+    runningOf: (Book) -> Boolean,
     onDownloadToggle: (Book) -> Unit,
     onExport: (Book) -> Unit,
     /** F43 批量任务内联反馈条：非空时顶部常驻「正在缓存 N 本 · 待下载 X 章」+ 取消 */
@@ -75,9 +77,10 @@ fun CacheScreen(
                     book = book,
                     // 订阅该条目局部刷新 tick：值变化触发本 item 重组
                     refreshTick = refreshTickOf(book.bookUrl),
-                    cacheChapterCount = if (book.isLocal) null else cacheChaptersOf(book.bookUrl)?.size,
+                    cacheChapterCount = if (book.isLocal) null else cacheCountOf(book),
                     exportMsg = exportMsgOf(book.bookUrl),
                     exportProgress = exportProgressOf(book.bookUrl),
+                    running = runningOf(book),
                     onDownloadToggle = { onDownloadToggle(book) },
                     onExport = { onExport(book) }
                 )
@@ -93,6 +96,7 @@ private fun CacheBookItemRow(
     cacheChapterCount: Int?,
     exportMsg: String?,
     exportProgress: Int?,
+    running: Boolean,
     onDownloadToggle: () -> Unit,
     onExport: () -> Unit
 ) {
@@ -131,7 +135,8 @@ private fun CacheBookItemRow(
                 // 状态派生必须放在**行级 body**（随 refreshTick 重组重算）；禁止下沉进 IconButton 的
                 // content lambda——Kotlin 2.x 强跳过会记忆化该 lambda，tick 变化时其参数未变 ⇒ 子组件
                 // 被跳过 ⇒ 状态永不重算（真机实证症状：点「开始」确实开始缓存，但图标一直是三角）。
-                val running = isCacheRunning(CacheBook.cacheBookMap[book.bookUrl]?.isStop())
+                // 真值来源由宿主注入（runningOf）：文本/音频读 CacheBook，视频读 VideoCacheKernel，
+                // 保证「图标语义 = 点击语义」不因走视频内核而错配。
                 IconButton(onClick = onDownloadToggle) {
                     Icon(
                         imageVector = if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow,

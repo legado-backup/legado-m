@@ -17,7 +17,7 @@ import org.junit.Test
  */
 class VideoPlayNudgeScriptTest {
 
-    private val js: String = BackstageWebView.playNudgeScript()
+    private val js: String = VideoSniffPolicy.PLAY_NUDGE_JS
 
     @Test
     fun mutesAndPlaysInlineForBackgroundWebView() {
@@ -43,5 +43,38 @@ class VideoPlayNudgeScriptTest {
         assertEquals("必须返回诊断摘要", true, js.contains("return JSON.stringify(out)"))
         assertEquals("必须统计 video 元素数量", true, js.contains("out.v=vs.length"))
         assertEquals("必须统计点击次数", true, js.contains("out.c=n"))
+    }
+
+    /**
+     * 命中可交付口径（2026-10-24 真机铁证）。
+     *
+     * 现场：缓存逐集时嗅探会话在第 5ms 就被「命中」并 destroy，命中 URL == 播放页 URL，
+     * 于是上层判 null ⇒ 每集必失败。等于会话目标页的命中必须**只入缓冲、不交付、不销毁会话**，
+     * 否则 nudge 与 `window.__videoUrls__` 读取都没机会执行。
+     */
+    @Test
+    fun samePageRequestIsNotDeliverable() {
+        val page = "https://example.com/play/abc.html"
+        assertEquals("命中 URL 与会话目标页相同时不可交付", false, VideoSniffPolicy.isDeliverableHit(page, page))
+        assertEquals(
+            "真实媒体直链（不同 URL）可交付",
+            true,
+            VideoSniffPolicy.isDeliverableHit("https://cdn.example.com/x/index.m3u8", page)
+        )
+    }
+
+    @Test
+    fun tsSegmentsAreNotDeliverable() {
+        val page = "https://example.com/play/abc.html"
+        assertEquals(
+            "HLS 分片必须只入缓冲（ExoPlayer 需 m3u8 主索引）",
+            false,
+            VideoSniffPolicy.isDeliverableHit("https://cdn.example.com/x/seg001.ts?t=1", page)
+        )
+        assertEquals(
+            "无会话页时仍按分片规则排除",
+            false,
+            VideoSniffPolicy.isDeliverableHit("https://cdn.example.com/x/SEG002.TS", null)
+        )
     }
 }
