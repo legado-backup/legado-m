@@ -842,10 +842,14 @@ object ExoPlayerHelper {
         }
         val source = when {
             sniffedMimeType != null -> "sniffed"
-            suffixMime != null -> "suffix"
+            suffixMime != null -> "url-shape"
             else -> "auto"
         }
-        AppLog.putDebug("createMediaItem: mimeType=$mimeType, source=$source, headerKeys=${headers.keys}, urlPath=${sanitizeUrl(url)}")
+        AppLog.putDebug(
+            "createMediaItem: mimeType=$mimeType, source=$source, " +
+                "hlsShape=${M3u8UrlShape.matches(url)}, " +
+                "headerKeys=${headers.keys}, urlPath=${sanitizeUrl(url)}"
+        )
         return mediaItemBuilder.build()
     }
 
@@ -1072,32 +1076,23 @@ object ExoPlayerHelper {
     private fun getMimeType(url: String): String? {
         val lower = url.lowercase()
         val path = lower.substringBefore("?").substringBefore("#")
+        // HLS 识别收敛到 [M3u8UrlShape]（video-legacy-parity-hls AD-03）：
+        // 除原有「路径后缀 .m3u8」与显式 format=m3u8|type=m3u8 外，新增
+        // ①路径含 /m3u8/ 段（代理端点，如 /api/v1/m3u8/proxy）
+        // ②query 参数值为**相对路径**且以 .m3u8 结尾（如 ?path=xxx.m3u8）
+        // 仍保留历史 3002 修复的边界：query 值为**绝对 URL** 时不判 HLS
+        //（铁证：Play.php?uu=https%3A%2F%2F…%2Findex.m3u8 曾被过宽匹配误判 ⇒ HLS 解析非清单内容抛 3002）。
+        if (M3u8UrlShape.matches(url)) return MimeTypes.APPLICATION_M3U8
         return when {
-            path.endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
             path.endsWith(".mpd") -> MimeTypes.APPLICATION_MPD
             path.endsWith(".mp4") -> MimeTypes.VIDEO_MP4
             path.endsWith(".mkv") -> MimeTypes.VIDEO_MATROSKA
             path.endsWith(".webm") -> MimeTypes.VIDEO_WEBM
             path.endsWith(".flv") -> "video/x-flv"
             path.endsWith(".ts") -> MimeTypes.VIDEO_MP2T
-            // HLS query 标识检测：仅匹配显式 query 参数 format=m3u8 / type=m3u8
-            // 修复 R3 BUG：原 lower.contains("m3u8") 会匹配 URL 任意位置（含 query 参数中的 URL 值），
-            //   误判场景：/Player/Play.php?uu=https%3A%2F%2Fplay2.xxx.top%2F...%2Findex.m3u8
-            //   Play.php 是 PHP 代理页面，但 query 参数 uu 含 index.m3u8 字符串触发误判，
-            //   ExoPlayer 用 HLS 解析器解析非 m3u8 内容抛 3002 ERROR_CODE_PARSING_MANIFEST_MALFORMED
-            // 修复策略：
-            //   1. 删除 lower.contains("m3u8") 和 lower.contains("index.m3u8") 过宽匹配
-            //   2. 仅保留显式 format=m3u8 / type=m3u8 query 标识（站点B ruleContent 用）
-            //   3. path 后缀场景已由 path.endsWith(".m3u8") 覆盖
-            // 铁证：logcat L7164-L7218 SniffingMime cache hit mimeType=application/x-mpegURL
-            //       + ParserException "Input does not start with the #EXTM3U header"
-            lower.contains("format=m3u8") || lower.contains("type=m3u8") -> MimeTypes.APPLICATION_M3U8
-            // 修复 3002 PARSING_CONTAINER_MALFORMED BUG：
-            // 原代码 else 兜底强制返回 APPLICATION_M3U8，导致任何识别不出的 URL
-            // （如 play.php?id=xxx 返回 mp4 流）被误判为 m3u8，
-            // HlsMediaSource 期望 #EXTM3U 头但实际是 mp4 ftyp 二进制盒，抛 3002
-            // 修复：返回 null 让 ExoPlayer 根据 URL 后缀 + HTTP Content-Type 自动推断
-            // 安全性：L57 已有 if (mimeType != null) 判空，返回 null 不影响调用方
+            // 兜底返回 null 让 ExoPlayer 按 URL 后缀 + HTTP Content-Type 自动推断
+            // （原实现 else 强制 APPLICATION_M3U8 会让 mp4 流被误判 ⇒ 3002）
+            // 安全性：调用处已有判空，返回 null 不影响使用方
             else -> null
         }
     }

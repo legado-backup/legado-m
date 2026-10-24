@@ -50,6 +50,14 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
     private var selectedGroup = 0
 
     /**
+     * 已缓存集的**全集下标**集合（book-info-unified-cache AD-05）。
+     *
+     * 用全集下标而非格子位置：倒序展示时 `renderGrid` 按展示顺序换算成逐格布尔，
+     * 角标因此始终对应真实集号。
+     */
+    private var cachedIndexes: Set<Int> = emptySet()
+
+    /**
      * 展示顺序：false = 正序（1→N，默认，与历史行为一致）；true = 倒序（最新集在前）。
      *
      * 2026-10-24 用户需求：长剧（如 86 集）想从最新集往回找时必须一直翻到底，
@@ -97,15 +105,18 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
      * @param initialSelection 当前集下标（0-based；-1 表示无选中）
      * @param selectionProvider 弹框打开期间读取**实时**当前集（自动连播会继续推进）；
      *        非空时每 [SELECTION_POLL_MS] 刷新高亮，避免「标题已到第 81 集、高亮还停在第 74 集」
+     * @param cachedIndexes 已缓存集的**全集下标**（默认空 = 不显示勾选角标）
      */
     fun initListByTitles(
         titles: List<String>,
         onItemClickListener: OnListItemClickListener,
         initialSelection: Int = -1,
-        selectionProvider: (() -> Int)? = null
+        selectionProvider: (() -> Int)? = null,
+        cachedIndexes: Set<Int> = emptySet()
     ) {
         this.onItemClickListener = onItemClickListener
         this.titles = titles
+        this.cachedIndexes = cachedIndexes
         this.currentSelection = if (initialSelection in titles.indices) initialSelection else -1
         this.selectionProvider = selectionProvider
         val view: View = LayoutInflater.from(mContext)
@@ -227,10 +238,12 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         // 集的**全集下标**：正序 start..end，倒序 end..start（点击直接回传该下标，无需再做换算）
         val indices = EpisodePager.displayIndices(group, descending)
         val items = indices.map { titles[it] }
+        // AD-05：按展示顺序换算逐格「已缓存」布尔（角标随集号而非格子位置）
+        val cachedFlags = indices.map { it in cachedIndexes }
         val selectionInGroup = indices.indexOf(currentSelection)
         val layoutManager = GridLayoutManager(mContext, COLUMNS)
         recycler.layoutManager = layoutManager
-        recycler.adapter = EpisodeGridAdapter(mContext, items, selectionInGroup) { positionInGroup ->
+        recycler.adapter = EpisodeGridAdapter(mContext, items, selectionInGroup, cachedFlags) { positionInGroup ->
             val fullIndex = indices.getOrNull(positionInGroup) ?: return@EpisodeGridAdapter
             dismiss()
             onItemClickListener?.onItemClick(fullIndex)

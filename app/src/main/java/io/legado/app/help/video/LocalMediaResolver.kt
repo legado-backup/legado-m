@@ -24,11 +24,14 @@ object LocalMediaResolver {
 
     /**
      * 是否已有本地可用的缓存产物。
+     *
+     * @param sourceIsVideo 书源侧视频身份（`bookSource.isVideoSource(book.type)`）。
+     *   JS 单文件源常见 `book.type` 未写 video 位，仅凭 `book.isVideo` 会漏判 ⇒ 与缓存卡/统计同口径。
      */
-    fun hasLocal(book: Book, chapter: BookChapter): Boolean {
+    fun hasLocal(book: Book, chapter: BookChapter, sourceIsVideo: Boolean = false): Boolean {
         return when {
             chapter.isVolume -> false
-            book.isVideo -> BookVideoCache.has(book, chapter)
+            book.isVideo || sourceIsVideo -> BookVideoCache.has(book, chapter)
             book.isAudio -> ExoPlayerHelper.isMediaCached(chapter.resourceUrl)
             book.isImage -> BookHelp.hasImageContent(book, chapter)
             book.isLocalTxt -> true
@@ -38,9 +41,11 @@ object LocalMediaResolver {
 
     /**
      * 视频本地产物的 file Uri；其它类型或无本地文件时返回 null。
+     *
+     * @param sourceIsVideo 同 [hasLocal]：书源侧视频身份兜底（防 `book.type` 未写位导致命中失败）
      */
-    fun localUri(book: Book, chapter: BookChapter): String? {
-        if (!book.isVideo || chapter.isVolume) return null
+    fun localUri(book: Book, chapter: BookChapter, sourceIsVideo: Boolean = false): String? {
+        if (!(book.isVideo || sourceIsVideo) || chapter.isVolume) return null
         val file = BookVideoCache.fileOf(book, chapter)
         if (!file.exists() || file.length() <= 0L) return null
         return Uri.fromFile(file).toString()
