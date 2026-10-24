@@ -18,6 +18,7 @@ import org.junit.Test
 class EpisodeOrderEntryTest {
 
     private val detailSheet = SourceFileProbe.sourceText("ui/video/VideoBookDetailSheet.kt")
+    private val playerActivity = SourceFileProbe.sourceText("ui/video/VideoPlayerActivity.kt")
 
     @Test
     fun detailSheetHasOrderToggle() {
@@ -79,5 +80,19 @@ class EpisodeOrderEntryTest {
         val group = EpisodePager.Group(startIndex = 80, endIndex = 85)
         assertEquals("86-81", EpisodePager.displayLabel(group, descending = true))
         assertEquals(85, EpisodePager.displayIndices(group, descending = true).first())
+    }
+
+    /** 播放器侧必须把「实时当前集」注入弹框，否则弹框只能靠打开时的快照高亮。 */
+    @Test
+    fun playerInjectsLiveSelectionIntoPicker() {
+        assertTrue(
+            "选集入口必须注入实时集下标提供器",
+            playerActivity.contains("val liveIndex = {") &&
+                playerActivity.contains("VideoPlay.chapterInVolumeIndex")
+        )
+        assertTrue(
+            "提供器必须作为最后一个参数传给弹框",
+            playerActivity.contains("currentIndex,") && playerActivity.contains("liveIndex")
+        )
     }
 }

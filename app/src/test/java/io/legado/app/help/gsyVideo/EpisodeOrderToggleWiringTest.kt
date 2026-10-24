@@ -83,4 +83,29 @@ class EpisodeOrderToggleWiringTest {
         assertEquals("正序 1-10", "1-10", EpisodePager.displayLabel(group, descending = false))
         assertEquals("倒序 10-1", "10-1", EpisodePager.displayLabel(group, descending = true))
     }
+
+    /**
+     * 弹框打开期间自动连播会继续推进（真机实证：标题到第 81 集，弹框仍高亮第 74 集）。
+     * 因此必须支持实时选择器 + 轮询刷新，且 dismiss 时移除回调防泄漏。
+     */
+    @Test
+    fun selectionFollowsLivePlayback() {
+        assertTrue(
+            "弹框必须支持实时当前集读取",
+            dialog.contains("selectionProvider: (() -> Int)? = null")
+        )
+        assertTrue(
+            "必须轮询刷新高亮（变化时才重绘）",
+            dialog.contains("refreshSelectionIfChanged()") &&
+                dialog.contains("if (latest !in titles.indices || latest == currentSelection) return")
+        )
+        assertTrue(
+            "dismiss/onStop 必须移除轮询回调，防泄漏",
+            dialog.contains("handler.removeCallbacks(selectionPollRunnable)")
+        )
+        // 行为期望值：组归属换算（86 集、每组 10 集 ⇒ 第 74 集属于第 8 组，下标 7）
+        val paging = EpisodePager.build(total = 86, currentIndex = 73)
+        assertEquals(7, paging.currentGroupIndex)
+        assertEquals("71-80", paging.groups[paging.currentGroupIndex].label)
+    }
 }

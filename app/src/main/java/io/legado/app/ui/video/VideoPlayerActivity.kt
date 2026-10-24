@@ -1976,6 +1976,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
         if (!shouldOfferEpisodePicker(bookEpisodes?.size ?: 0, rssEpisodes?.size ?: 0)) return
         val dialog = ChoiceEpisodeDialog(this)
+        // 自动连播推进时高亮必须跟随（真机实证：标题到第 81 集，弹框仍高亮第 74 集）
+        val liveIndex = {
+            if (!bookEpisodes.isNullOrEmpty()) VideoPlay.chapterInVolumeIndex
+            else VideoPlay.rssEpisodeIndex
+        }
         dialog.initListByTitles(
             titles,
             object : ChoiceEpisodeDialog.OnListItemClickListener {
@@ -2000,7 +2005,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
                 override fun finishDialog() = Unit
             },
-            currentIndex
+            currentIndex,
+            liveIndex
         )
         dialog.show()
     }
