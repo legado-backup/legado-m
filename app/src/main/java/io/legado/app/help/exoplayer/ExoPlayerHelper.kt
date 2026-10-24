@@ -837,8 +837,11 @@ object ExoPlayerHelper {
             mediaItemBuilder.setMimeType(mimeType)
         }
         // headers 通过 setDefaultHeaders 注入 okhttpDataFactory（等价原 SPLIT_TAG 路径的行为）
-        if (headers.isNotEmpty()) {
-            setDefaultHeaders(headers)
+        // HLS AES-128 清单的 key 请求常要求 Referer（真机铁证：无 Referer 时 key 请求 URLError）；
+        // 由 M3u8UrlShape.headersWithHlsReferer 兜底：已有 Referer 不覆盖、非 HLS 不注入。
+        val effectiveHeaders = M3u8UrlShape.headersWithHlsReferer(headers, url)
+        if (effectiveHeaders.isNotEmpty()) {
+            setDefaultHeaders(effectiveHeaders)
         }
         val source = when {
             sniffedMimeType != null -> "sniffed"
@@ -848,7 +851,8 @@ object ExoPlayerHelper {
         AppLog.putDebug(
             "createMediaItem: mimeType=$mimeType, source=$source, " +
                 "hlsShape=${M3u8UrlShape.matches(url)}, " +
-                "headerKeys=${headers.keys}, urlPath=${sanitizeUrl(url)}"
+                "hlsReferer=${effectiveHeaders.keys.any { it.equals("Referer", true) }}, " +
+                "headerKeys=${effectiveHeaders.keys}, urlPath=${sanitizeUrl(url)}"
         )
         return mediaItemBuilder.build()
     }

@@ -68,4 +68,29 @@ class M3u8UrlShapeTest {
         assertEquals(false, M3u8UrlShape.matches("https://a.example/v/index.mpd"))
         assertEquals(false, M3u8UrlShape.matches("https://a.example/v/seg.ts"))
     }
+
+    @Test
+    fun hlsRefererInjectedWhenMissing() {
+        val hls = "https://a.example/api/v1/m3u8/proxy?path=x.m3u8"
+        assertEquals(
+            hls,
+            M3u8UrlShape.headersWithHlsReferer(emptyMap(), hls)["Referer"]
+        )
+        assertEquals(1, M3u8UrlShape.headersWithHlsReferer(emptyMap(), hls).size)
+    }
+
+    @Test
+    fun hlsRefererKeepsExplicitValue() {
+        // 大小写不敏感；书源显式 Referer 绝不被覆盖
+        val hls = "https://a.example/api/v1/m3u8/proxy"
+        val merged = M3u8UrlShape.headersWithHlsReferer(mapOf("referer" to "https://keep"), hls)
+        assertEquals("https://keep", merged["referer"])
+        assertEquals(1, merged.size)
+    }
+
+    @Test
+    fun hlsRefererNotInjectedForNonHls() {
+        assertEquals(0, M3u8UrlShape.headersWithHlsReferer(emptyMap(), "https://a.example/v.mp4").size)
+        assertEquals(0, M3u8UrlShape.headersWithHlsReferer(emptyMap(), "https://a.example/play?q=1").size)
+    }
 }
