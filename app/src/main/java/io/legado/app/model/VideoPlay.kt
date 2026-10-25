@@ -1663,6 +1663,14 @@ object VideoPlay : CoroutineScope by MainScope(){
             return false
         }
         chapterInVolumeIndex = index
+        // 2026-10-25 真机修复：书源线路映射下 `rssEpisodes` 是章节镜像（initSource 时逐集对齐），
+        // 自动连播/上一集下一集只推进 chapterInVolumeIndex ⇒ 选集面板与「第X集 · 全Y集」停留旧集。
+        // 订阅源不受影响（其 rssEpisodeIndex 由 playRssEpisode 维护）。
+        if (book != null) {
+            rssEpisodes?.let { mapped ->
+                rssEpisodeIndex = index.coerceIn(0, (mapped.size - 1).coerceAtLeast(0))
+            }
+        }
         saveRead(0)
         startPlay(player)
         postEvent(EventBus.UP_VIDEO_INFO, arrayListOf(1)) //更新选集视图
@@ -1969,6 +1977,9 @@ object VideoPlay : CoroutineScope by MainScope(){
      * L0 直链快速路径 / getContent → MPD 落盘 → 三层嗅探 → 头合并 → setUp 唯一实现见 Pipeline。
      */
     private fun startPlayBookChapter(player: GSYBaseVideoPlayer, book: Book, chapter: BookChapter) {
+        // 2026-10-25 用户真机反馈：切集后采集/嗅探空窗只有黑屏（流量在跑）⇒ 先亮加载反馈。
+        // 收起点：Pipeline.setUpAndPlay（setUp 完成）与 VIDEO_PLAY_ERROR 观察者（失败）。
+        postEvent(EventBus.VIDEO_SWITCH_LOADING, true)
         // 4.8b（Z9）：嗅探前捕获原始 URL（书源正文链接可重嗅），作为播放历史键
         originalPlayUrl = chapter.url
         videoTitle = chapter.title
@@ -2263,6 +2274,8 @@ object VideoPlay : CoroutineScope by MainScope(){
      * 采集链已委托 VideoPlaybackPipeline.playEpisode（AnalyzeUrl/setUp/startPlayLogic 由 Pipeline 统一实现）
      */
     fun playRssEpisode(player: GSYBaseVideoPlayer, episode: RssEpisode) {
+        // 切集加载反馈（与书源链同口径）：订阅源视频/普通订阅源集数均覆盖到 setUp 完成
+        postEvent(EventBus.VIDEO_SWITCH_LOADING, true)
         // video-booksource-multiroute：视频书源分派——episode 来自卷章映射，按索引走章节播放链
         val bookSource = source as? BookSource
         if (bookSource.isVideoSource(book?.type)) {

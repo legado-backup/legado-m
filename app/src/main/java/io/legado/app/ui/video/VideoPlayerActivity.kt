@@ -100,6 +100,7 @@ import io.legado.app.help.dlna.DlnaCastManager
 import io.legado.app.help.dlna.PlayerControl
 import io.legado.app.help.exoplayer.FirstFramePreloader
 import io.legado.app.help.gsyVideo.ChoiceEpisodeDialog
+import io.legado.app.help.gsyVideo.EpisodePanelBinder
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.player.ErrorMapper
 import io.legado.app.help.webView.PooledWebView
@@ -258,6 +259,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private var videoPagerAdapter: VideoPagerAdapter? = null
     private var currentFragment: VideoFragment? = null
     internal var settingsPanel: VideoSettingsPanel? = null  // 阶段5：当前打开的设置面板引用
+
+    /**
+     * 传统布局内嵌选集面板绑定器（2026-10-25）：跨多次 rebind 复用同一实例，
+     * 保证「正序/倒序」的用户选择在切集/刷新信息区后不丢失；分组与网格渲染与弹框共用同一实现。
+     */
+    private var episodePanelBinder: EpisodePanelBinder? = null
     // P0-1.4: 视频播放错误对话框引用（防止重复弹窗）
     private var errorDialog: AlertDialog? = null
     private var initIntroView = false
@@ -942,6 +949,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 } else {
                     binding.chapters.gone()
                     binding.tvEpisodeLabel.gone()
+                    binding.episodePanel.root.gone()
                 }
                 upNextFilmVisible()
             }
@@ -962,6 +970,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     } else {
                         binding.chapters.gone()
                         binding.tvEpisodeLabel.gone()
+                        binding.episodePanel.root.gone()
                     }
                 }
                 upNextFilmVisible()
@@ -973,6 +982,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 binding.tvAuthor.gone()
                 binding.tvRouteLabel.gone()
                 binding.tvEpisodeLabel.gone()
+                binding.episodePanel.root.gone()
                 upNextFilmVisible()
             }
         }
@@ -1810,12 +1820,17 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     private fun showToc(toc: List<BookChapter>) {
-        // video-legacy-parity-hls AD-01（2026-10-24 用户裁定）：传统模式选集统一走分组弹框
-        //（ChoiceEpisodeDialog，含分组 / 倒序 / 当前集高亮），不再渲染平铺集数列表；
-        // 信息区「选集 · 第X集 · 共Y集 ▾」是唯一入口（tvEpisodeLabel 已绑定 showEpisodePicker）。
+        // 2026-10-25 用户需求（episode-switch-loading-and-legacy-inline）：传统模式选集**直接展开**。
+        // 原 AD-01「停用平铺列表、只留『选集 ▾』弹框入口」被本条 MODIFIED 取代：
+        // 分组行 + 当前组网格直接内嵌渲染（与弹框共用 EpisodePanelBinder）。
         binding.chaptersContainer.visible()
         binding.chapters.gone()
         upEpisodeLabelPosition(VideoPlay.chapterInVolumeIndex, toc.size)
+        bindInlineEpisodePanel(
+            titles = toc.map { it.title },
+            current = VideoPlay.chapterInVolumeIndex,
+            bookEpisodes = toc,
+        )
     }
 
     /**
@@ -1896,6 +1911,78 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         binding.chapters.gone()
         // F183：区块标题补位置计数（与信息区 video_playlist_position_episode 同源同串）
         upEpisodeLabelPosition(VideoPlay.rssEpisodeIndex, episodes.size)
+        // 2026-10-25 MODIFIED：订阅源选集同样直接展开（与书源同构，同一个 binder）
+        bindInlineEpisodePanel(
+            titles = episodes.map { it.title },
+            current = VideoPlay.rssEpisodeIndex,
+            bookEpisodes = null,
+        )
+    }
+
+    /**
+     * 传统布局内嵌选集面板（2026-10-25 episode-switch-loading-and-legacy-inline C3）。
+     *
+     * 与选集弹框共用 [EpisodePanelBinder]：分组行 / 5 列网格 / 正序倒序 / 当前集高亮 / 已缓存角标。
+     * 单集或无集时不渲染空面板（避免信息区出现无意义空白）。
+     *
+     * @param bookEpisodes 书源章节（用于异步计算已缓存集角标）；订阅源传 null（无缓存产物）
+     */
+    private fun bindInlineEpisodePanel(
+        titles: List<String>,
+        current: Int,
+        bookEpisodes: List<BookChapter>?,
+    ) {
+        if (titles.size <= 1) {
+            binding.episodePanel.root.gone()
+            return
+        }
+        binding.episodePanel.root.visible()
+        val panel = episodePanelBinder
+            ?: EpisodePanelBinder(
+                context = this,
+                container = binding.episodePanel.root,
+                maxGridHeightPx = null, // 内嵌：随内容展开，由 legacy_scroll 滚动
+                onSelect = { position -> selectEpisodeAt(position) },
+            ).also { episodePanelBinder = it }
+        panel.bind(
+            titles = titles,
+            initialSelection = current,
+            showHeader = false, // 外层已有「选集 · 第X集 · 共Y集」标题
+            groupRowTopPaddingDp = 4,
+        )
+        if (bookEpisodes != null) {
+            // 缓存角标是 IO 任务（列举缓存目录 + .mp4 名比对），完成后再回主线程刷新
+            lifecycleScope.launch {
+                val cached = withContext(Dispatchers.IO) {
+                    computeCachedEpisodeIndexes(bookEpisodes)
+                }
+                panel.updateCachedIndexes(cached)
+            }
+        }
+    }
+
+    /**
+     * 选集点击统一入口（内嵌面板与弹框共用）。
+     *
+     * 书源走章节切换 + 重新采集；订阅源走 `playRssEpisode`。投屏中先终止会话再放行。
+     */
+    private fun selectEpisodeAt(position: Int) {
+        val bookEpisodes = VideoPlay.episodes
+        if (!bookEpisodes.isNullOrEmpty()) {
+            if (position == VideoPlay.chapterInVolumeIndex) return
+            endCastForLocalSwitch()
+            VideoPlay.chapterInVolumeIndex = position
+            VideoPlay.saveRead(0)
+            upEpisodesView()
+            VideoPlay.startPlay(playerView)
+        } else {
+            val episodes = VideoPlay.rssEpisodes ?: return
+            if (position == VideoPlay.rssEpisodeIndex) return
+            endCastForLocalSwitch()
+            VideoPlay.rssEpisodeIndex = position
+            VideoPlay.playRssEpisode(playerView, episodes[position])
+            upRssEpisodesView()
+        }
     }
 
     /**
@@ -1989,23 +2076,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             titles,
             object : ChoiceEpisodeDialog.OnListItemClickListener {
                 override fun onItemClick(position: Int) {
-                    val bookEpisodes = VideoPlay.episodes
-                    if (!bookEpisodes.isNullOrEmpty()) {
-                        if (position == VideoPlay.chapterInVolumeIndex) return
-                        // add-dlna-cast REQ-08：投屏中选集先终止会话再放行
-                        endCastForLocalSwitch()
-                        VideoPlay.chapterInVolumeIndex = position
-                        VideoPlay.saveRead(0)
-                        upEpisodesView()
-                        VideoPlay.startPlay(playerView)
-                    } else {
-                        val episodes = VideoPlay.rssEpisodes ?: return
-                        if (position == VideoPlay.rssEpisodeIndex) return
-                        endCastForLocalSwitch()
-                        VideoPlay.rssEpisodeIndex = position
-                        VideoPlay.playRssEpisode(playerView, episodes[position])
-                        upRssEpisodesView()
-                    }
+                    // 与内嵌面板共用同一选集入口（书源/订阅源分支与投屏终止逻辑单源）
+                    selectEpisodeAt(position)
                 }
 
                 override fun finishDialog() = Unit
@@ -2025,6 +2097,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (!episodes.isNullOrEmpty()) {
             // video-legacy-parity-hls AD-01：平铺列表已移除（选集走分组弹框），此处只刷新位置计数
             upEpisodeLabelPosition(VideoPlay.rssEpisodeIndex, episodes.size)
+            // 2026-10-25：内嵌面板高亮跟随（切线路/切集后同步）
+            episodePanelBinder?.updateSelection(VideoPlay.rssEpisodeIndex)
         }
     }
 
@@ -2046,6 +2120,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 upEpisodeLabelPosition(
                     VideoPlay.chapterInVolumeIndex,
                     VideoPlay.episodes?.size ?: 0
+                )
+                // 2026-10-25：切卷后集数整体变化 ⇒ 内嵌面板必须重绑（标题/分组/角标全部刷新）
+                bindInlineEpisodePanel(
+                    titles = VideoPlay.episodes?.map { it.title }.orEmpty(),
+                    current = VideoPlay.chapterInVolumeIndex,
+                    bookEpisodes = VideoPlay.episodes,
                 )
                 VideoPlay.saveRead(0)
                 upVolumesView()
@@ -2097,6 +2177,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 VideoPlay.chapterInVolumeIndex,
                 VideoPlay.episodes?.size ?: 0
             )
+            // 2026-10-25：内嵌面板高亮跟随（切卷/切集后同步）
+            episodePanelBinder?.updateSelection(VideoPlay.chapterInVolumeIndex)
         }
     }
 
@@ -2498,7 +2580,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         }
                         // R1 多集选择播放：处理订阅源多集（AD-01：选集走分组弹框，平铺容器恒 gone）
                         val rssEpisodes = VideoPlay.rssEpisodes
-                        if (rssEpisodes != null && rssEpisodes.isNotEmpty()) {
+                        if (VideoPlay.book != null) {
+                            // 2026-10-25：书源集数已内嵌展示 ⇒ 自动连播/上下集只同步高亮与计数，
+                            // 不再每集重建分组与网格（重绑会在长剧上产生可见卡顿）
+                            binding.chaptersContainer.visible()
+                            upEpisodesView()
+                        } else if (rssEpisodes != null && rssEpisodes.isNotEmpty()) {
                             binding.chaptersContainer.visible()
                             binding.chapters.gone()
                             showRssEpisodes(rssEpisodes)
@@ -2568,7 +2655,17 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             VideoPlay.prefetchNextNeighbor()
         }
 
+        observeEvent<Boolean>(EventBus.VIDEO_SWITCH_LOADING) { show ->
+            // 2026-10-25：切集异步窗口（采集 + 嗅探 + 准备）的加载反馈。
+            // 只在传统布局消费（沉浸式已有自己的加载/标题提示，避免双重遮罩）
+            if (VideoPlay.layoutMode == 1) {
+                binding.switchLoading.visible(show)
+            }
+        }
+
         observeEvent<String>(EventBus.VIDEO_PLAY_ERROR) {
+            // 失败必须收起加载反馈，避免遮罩残留（spec Drawbacks 兜底闭环之一）
+            binding.switchLoading.gone()
             // R3 阶段5：同步更新设置面板的调试日志
             settingsPanel?.appendDebugLog(it)
             // W2 / REQ-13（AD-04）：**首线路失败自动换线** —— 播放器终端点已把错误大类写入
@@ -2823,6 +2920,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (initGetter) {
             glideImageGetter.stop()
         }
+        // 页面停止时收起切集加载反馈（防止返回/切后台后遮罩残留）
+        binding.switchLoading.gone()
     }
 
     /**

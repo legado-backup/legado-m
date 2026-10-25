@@ -18,6 +18,7 @@ import org.junit.Test
 class EpisodeOrderToggleWiringTest {
 
     private val dialog = SourceFileProbe.sourceText("help/gsyVideo/ChoiceEpisodeDialog.kt")
+    private val binder = SourceFileProbe.sourceText("help/gsyVideo/EpisodePanelBinder.kt")
     private val layout =
         SourceFileProbe.sourceTextByPath("src/main/res/layout/switch_episode_video_dialog.xml")
 
@@ -36,15 +37,16 @@ class EpisodeOrderToggleWiringTest {
 
     @Test
     fun dialogBindsToggleAndFlipsOrder() {
+        // 2026-10-25：排序按钮绑定与重排逻辑下沉到 EpisodePanelBinder（弹框与内嵌面板共用）
         assertTrue(
-            "弹框必须绑定排序按钮",
-            dialog.contains("orderToggle = view.findViewById(R.id.order_toggle)")
+            "面板必须绑定排序按钮",
+            binder.contains("orderToggle: TextView? = container.findViewById(R.id.order_toggle)")
         )
         assertTrue(
             "点击必须翻转展示顺序并重排分组与网格",
-            dialog.contains("descending = !descending") &&
-                dialog.contains("renderGroups()") &&
-                dialog.contains("renderGrid()")
+            binder.contains("descending = !descending") &&
+                binder.contains("renderGroups()") &&
+                binder.contains("renderGrid()")
         )
     }
 
@@ -52,11 +54,11 @@ class EpisodeOrderToggleWiringTest {
     fun gridIndicesUseDisplayIndicesWhenReversed() {
         assertTrue(
             "网格下标必须经 displayIndices 映射",
-            dialog.contains("EpisodePager.displayIndices(group, descending)")
+            binder.contains("EpisodePager.displayIndices(group, descending)")
         )
         assertFalse(
             "不得再硬编码 startIndex + positionInGroup（倒序会点错集）",
-            dialog.contains("val fullIndex = group.startIndex + positionInGroup")
+            binder.contains("val fullIndex = group.startIndex + positionInGroup")
         )
         // 行为期望值：倒序时第一个格子必须是该组最后一集
         val group = EpisodePager.Group(startIndex = 70, endIndex = 79)
@@ -68,7 +70,7 @@ class EpisodeOrderToggleWiringTest {
     fun groupRowFollowsSameOrderAsGrid() {
         assertTrue(
             "分组行必须按 displayGroupOrder 渲染（与网格同序）",
-            dialog.contains("EpisodePager.displayGroupOrder(groups.size, descending)")
+            binder.contains("EpisodePager.displayGroupOrder(groups.size, descending)")
         )
         assertEquals(
             "倒序时最后一组排在最前",

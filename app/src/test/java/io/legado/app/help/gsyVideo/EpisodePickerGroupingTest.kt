@@ -37,7 +37,8 @@ class EpisodePickerGroupingTest {
 
     @Test
     fun gridColumnsIsFive() {
-        assertEquals(5, ChoiceEpisodeDialog.COLUMNS)
+        // 2026-10-25：列数随渲染逻辑下沉到 EpisodePanelBinder（弹框与内嵌面板共用同一口径）
+        assertEquals(5, EpisodePanelBinder.COLUMNS)
     }
 
     @Test
