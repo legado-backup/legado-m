@@ -58,11 +58,46 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <io.legado.app.help.gsyVideo.VideoPlayer
-                android:id="@+id/playerView"
+            <!-- 2026-10-25：playerView 外包一层 FrameLayout 仅用于叠加「切集加载反馈」遮罩；
+                 playerView 自身尺寸链路（wrap_content 由 GSY 测量）不变 -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                tools:layout_height="300dp" />
+                android:layout_height="wrap_content">
+
+                <io.legado.app.help.gsyVideo.VideoPlayer
+                    android:id="@+id/playerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    tools:layout_height="300dp" />
+
+                <!-- 切集/首播异步窗口（采集 + 嗅探 + 准备）期间的可见反馈：
+                     此前该窗口为纯黑屏，用户看到流量在跑却无提示（2026-10-25 真机反馈） -->
+                <LinearLayout
+                    android:id="@+id/switch_loading"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#66000000"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:indeterminate="true"
+                        android:indeterminateTint="@color/primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/video_switch_loading"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/text_13sp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
 
             <!-- video-source-dual-track AD-04：信息区合并为单一滚动容器——图片(iv_cover)、详情(intro)、
                  线路(volumes)、集数(chapters) 整体上下滚动；playerView 与底部操作栏 legacy_actions
@@ -207,7 +242,15 @@
                     android:orientation="vertical"
                     android:paddingTop="2dp"
                     android:paddingBottom="6dp"
+                    android:visibility="gone"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+                <!-- 2026-10-25 用户需求：传统布局选集分组直接展开，不再需要点击弹框入口。
+                     与选集弹框共用同一布局与 EpisodePanelBinder（分组行 + 5 列网格 + 倒序 + 缓存角标） -->
+                <include
+                    android:id="@+id/episodePanel"
+                    layout="@layout/switch_episode_video_dialog"
+                    android:visibility="gone" />
 
             </LinearLayout>
 

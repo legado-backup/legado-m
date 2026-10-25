@@ -248,6 +248,8 @@ object VideoPlaybackPipeline {
                 if (VideoPlay.autoPlay) {
                     ctx.player.startPlayLogic()
                 }
+                // 2026-10-25：订阅源集同理——setUp 下发即收起切集加载反馈
+                postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
                 ctx.onStarted?.invoke()
             }
         }.onError {
@@ -290,6 +292,9 @@ object VideoPlaybackPipeline {
             if (VideoPlay.autoPlay) {
                 ctx.player.startPlayLogic()
             }
+            // 2026-10-25：setUp 已下发 ⇒ 采集/嗅探空窗结束，收起切集加载反馈。
+            // 此后等待首帧期间的缓冲由播放器内置 loading 圈承担，避免双重提示。
+            postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
         }
     }
 }

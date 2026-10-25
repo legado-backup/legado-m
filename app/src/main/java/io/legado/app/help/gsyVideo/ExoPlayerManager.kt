@@ -7,6 +7,8 @@ import android.os.Build
 import android.os.Message
 import android.view.Surface
 import android.view.SurfaceControl
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import androidx.media3.common.util.UnstableApi
@@ -93,16 +95,25 @@ class ExoPlayerManager : BasePlayerManager() {
             if (model.getSpeed() != 1f && model.getSpeed() > 0) {
                 mediaPlayer!!.setSpeed(model.getSpeed(), 1f)
             }
-            // 仅在 API 29+ 使用 SurfaceControl
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // 2026-10-25 真机反馈修复（切集黑屏但流量在跑、刷新几次才出画面）：
+            // 切集时 GSY 的显示面没有变化 ⇒ 不会重新派发 setDisplay，若此处无条件把新 mediaPlayer
+            // 绑到 0x0 占位 Surface（API29+）/ dummySurface（低版本），解码与下载照常进行但**永不显示**。
+            // 故优先复用上一次已拿到的真实显示 Surface（isValid 守卫，避免用已释放的面）。
+            val reuseSurface = surface?.takeIf { it.isValid }
+            if (reuseSurface != null) {
+                mediaPlayer!!.setSurface(reuseSurface)
+                AppLog.put("ExoPlayerManager.initVideoPlayer: 复用已存在显示面（切集不重建 Surface）")
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 surfaceControl = SurfaceControl.Builder()
                     .setName(SURFACE_CONTROL_NAME)
                     .setBufferSize(0, 0)
                     .build()
                 videoSurface = Surface(surfaceControl!!)
                 mediaPlayer!!.setSurface(videoSurface)
+                AppLog.put("ExoPlayerManager.initVideoPlayer: 无可用显示面，先用 0x0 占位（等待 setDisplay）")
             } else {
                 mediaPlayer!!.setSurface(dummySurface)
+                AppLog.put("ExoPlayerManager.initVideoPlayer: 无可用显示面，先用 dummy 占位（等待 setDisplay）")
             }
         } catch (e: Exception) {
             AppLog.put("ExoPlayerManager: init", e)
@@ -112,13 +123,34 @@ class ExoPlayerManager : BasePlayerManager() {
 
     override fun showDisplay(msg: Message) {
         if (mediaPlayer == null) return
-        if (msg.obj == null) {
+        val target = resolveDisplaySurface(msg.obj)
+        if (target == null) {
+            // null = GSY 主动解绑（切容器/隐藏画面）；同时清空缓存面，避免下次 init 误复用
+            surface = null
             mediaPlayer!!.setSurface(dummySurface)
+            AppLog.put("ExoPlayerManager.showDisplay: 空/不可用显示面 ⇒ 切 dummy")
         } else {
-            val holder: Surface? = msg.obj as? Surface
-            surface = holder
-            mediaPlayer!!.setSurface(holder)
+            surface = target
+            mediaPlayer!!.setSurface(target)
+            AppLog.put(
+                "ExoPlayerManager.showDisplay: 绑定显示面, " +
+                    "objType=${msg.obj?.javaClass?.simpleName}"
+            )
         }
+    }
+
+    /**
+     * 解析 GSY 派发的显示面载体。
+     *
+     * GSY 的 `setDisplayNew(holder)` 可能传 SurfaceView（Surface 渲染模式），
+     * 原实现只认 `Surface` ⇒ 强转失败落空 ⇒ 播放有声音/有流量但**永不出画面**。
+     */
+    private fun resolveDisplaySurface(obj: Any?): Surface? = when (obj) {
+        null -> null
+        is Surface -> obj.takeIf { it.isValid }
+        is SurfaceView -> obj.holder?.surface?.takeIf { it.isValid }
+        is SurfaceHolder -> obj.surface?.takeIf { it.isValid }
+        else -> null
     }
 
     override fun setSpeed(speed: Float, soundTouch: Boolean) {

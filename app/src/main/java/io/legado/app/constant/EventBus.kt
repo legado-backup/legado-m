@@ -17,6 +17,14 @@ object EventBus {
     const val TIME_CHANGED = "timeChanged"
     const val UP_CONFIG = "upConfig"
     const val VIDEO_SUB_TITLE = "VideoSubTitle"
+    /**
+     * 切集加载反馈开关（Boolean）。
+     *
+     * 覆盖「点击新集 → 首帧」之间的采集/嗅探空窗：此前该窗口只有黑屏，
+     * 用户看到流量在跑却无任何提示（2026-10-25 用户真机反馈）。
+     * 置 true 于切集发起（含首播），置 false 于 setUp 完成 / 播放错误 / 页面停止。
+     */
+    const val VIDEO_SWITCH_LOADING = "VideoSwitchLoading"
     const val AUDIO_SUB_TITLE = "audioSubTitle"
     const val AUDIO_STATE = "audioState"
     const val AUDIO_PROGRESS = "audioProgress"
