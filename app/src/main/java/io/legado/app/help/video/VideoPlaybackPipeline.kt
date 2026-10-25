@@ -9,6 +9,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssEpisode
 import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.ContentEmptyException
 import io.legado.app.help.book.getDanmaku
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.video.engine.HeaderResolver
@@ -110,6 +111,8 @@ object VideoPlaybackPipeline {
                     if (content.isEmpty()) {
                         AppLog.putWarn("书源章节正文为空, 触发统一错误提示, chapter=${chapter.title}")
                         withContext(Main) {
+                            // 2026-10-25：失败必须同时收起切集加载反馈（否则遮罩永久残留）
+                            postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
                             postEvent(
                                 EventBus.VIDEO_PLAY_ERROR,
                                 "播放失败：书源章节正文为空，未获取到视频地址，请重试、切换书源/章节，或用系统浏览器打开"
@@ -169,6 +172,9 @@ object VideoPlaybackPipeline {
                     AppLog.put("获取资源链接出错\n$it", it, true)
                     // video-regression-fix-0906 AD-03：采集失败清解析登记（防短路复用失效地址）
                     VideoPlay.resolvedChapterUrl = null
+                    // 2026-10-25：异常路径也必须收起切集加载反馈并给出可读提示，
+                    // 否则「内容为空/采集抛错」会留下永久遮罩（真机：第80集被判越权后长转圈）。
+                    notifyPlayFailure(playFailureMessage(it))
                 }
         }
     }
@@ -201,6 +207,11 @@ object VideoPlaybackPipeline {
             )
             setUpAndPlay(ctx, analyzeUrl.url, merged, resolvePageUrl = resolved.startsWith("file://"))
             VideoPlay.isLoadingFalse()
+        }.onError {
+            // 2026-10-25：短路重放失败也要收起加载反馈（12s 看门狗负责回退全量采集链）
+            VideoPlay.resolvedChapterUrl = null
+            withContext(Main) { postEvent(EventBus.VIDEO_SWITCH_LOADING, false) }
+            AppLog.put("Pipeline: replayBookChapter 失败", it, true)
         }
     }
 
@@ -220,6 +231,7 @@ object VideoPlaybackPipeline {
             if (resolvedUrl == null) {
                 AppLog.putWarn("extractVideoUrlForEpisode 返回null, 触发统一错误提示, ${VideoUrlExtractor.sanitizeUrl(episode.url)}")
                 withContext(Main) {
+                    postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
                     postEvent(
                         EventBus.VIDEO_PLAY_ERROR,
                         "播放失败：视频地址采集失败（三层降级均失败），请重试、切换线路/集数，或用系统浏览器打开"
@@ -254,6 +266,29 @@ object VideoPlaybackPipeline {
             }
         }.onError {
             AppLog.put("加载订阅源视频集失败: ${episode.title}", it, true)
+            // 2026-10-25：订阅源集采集异常同样收起加载反馈并给出可读提示
+            notifyPlayFailure(playFailureMessage(it))
+        }
+    }
+
+    /**
+     * 采集失败的用户可读提示（区分「内容为空/需登录」与其他异常）。
+     *
+     * 2026-10-25：书源侧对越权集返回空串（拒绝播错集）⇒ `ContentEmptyException`，
+     * 必须给用户明确方向（登录/换源），而不是无限转圈。
+     */
+    private fun playFailureMessage(error: Throwable): String =
+        if (error is ContentEmptyException) {
+            "播放失败：该集未获取到播放地址（可能需登录书源或超出免费集数），请登录后重试或切换源"
+        } else {
+            "播放失败：视频地址获取失败（${error.javaClass.simpleName}），请重试或切换源"
+        }
+
+    /** 失败统一出口：收起切集加载反馈 + 发统一错误提示（主线程） */
+    private suspend fun notifyPlayFailure(message: String) {
+        withContext(Main) {
+            postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
+            postEvent(EventBus.VIDEO_PLAY_ERROR, message)
         }
     }
 

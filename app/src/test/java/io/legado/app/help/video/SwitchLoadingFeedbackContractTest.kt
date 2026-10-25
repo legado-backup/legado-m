@@ -15,15 +15,19 @@ import org.junit.Test
 class SwitchLoadingFeedbackContractTest {
 
     @Test
-    fun pipelineClearsLoadingOnBothChains() {
+    fun pipelineClearsLoadingOnAllPaths() {
         val pipeline = SourceFileProbe.sourceText("help/video/VideoPlaybackPipeline.kt")
-        // 书源 setUpAndPlay + 订阅源 playEpisode 各一次收起
+        // 书源 setUpAndPlay / 订阅源 playEpisode / 空正文 / 采集异常 / 短路重放失败 均须收起
         assertEquals(
-            2,
+            true,
             Regex("postEvent\\(EventBus\\.VIDEO_SWITCH_LOADING, false\\)")
-                .findAll(pipeline).count()
+                .findAll(pipeline).count() >= 4
         )
-        assertTrue(pipeline.contains("postEvent(EventBus.VIDEO_SUB_TITLE"))
+        // 失败统一出口必须同时发可读错误提示（防「永久遮罩 + 无提示」）
+        assertEquals(true, pipeline.contains("private suspend fun notifyPlayFailure(message: String)"))
+        assertEquals(true, pipeline.contains("postEvent(EventBus.VIDEO_PLAY_ERROR, message)"))
+        // ContentEmptyException 需给出「登录/换源」方向（书源越权集返回空串）
+        assertEquals(true, pipeline.contains("error is ContentEmptyException"))
     }
 
     @Test
