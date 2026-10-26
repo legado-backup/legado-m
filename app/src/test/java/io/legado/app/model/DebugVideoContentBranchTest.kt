@@ -56,4 +56,37 @@ class DebugVideoContentBranchTest {
         assertEquals("非视频源空内容即不可用（不受 browserMode 影响）",
             DebugVideoConclusion.Outcome.UNAVAILABLE, empty.outcome)
     }
+
+    // ============ 正文为空的成因区分（真机 2026-10-26：浏览器模式空正文被误报为规则失败） ============
+
+    @Test
+    fun playModeOf_readsFromVariableString() {
+        assertEquals("从 k=v; 串取 playmode", "browser",
+            DebugVideoConclusion.playModeOf("playmode=browser;diag=1"))
+        assertEquals("兼容 & 分隔", "browser", DebugVideoConclusion.playModeOf("diag=1&playmode=browser"))
+        assertEquals("键序无关", "browser", DebugVideoConclusion.playModeOf("Playmode=x\nplaymode=browser"))
+        assertEquals("缺失 ⇒ 空串", "", DebugVideoConclusion.playModeOf("diag=1"))
+        assertEquals("null 安全", "", DebugVideoConclusion.playModeOf(null))
+    }
+
+    @Test
+    fun emptyContentHint_browserModeSaysExpected() {
+        val hint = DebugVideoConclusion.emptyContentHint(video, "playmode=browser")
+        assertTrue("浏览器模式下必须说明空正文属预期（不得让用户以为是规则坏了）", hint.contains("属预期"))
+        assertTrue("必须说明播放已交由浏览器页", hint.contains("浏览器页"))
+    }
+
+    @Test
+    fun emptyContentHint_sniffModeSaysNoAddressWithActions() {
+        val hint = DebugVideoConclusion.emptyContentHint(video, "playmode=")
+        assertTrue("非浏览器模式应说明未取到地址", hint.contains("未提取到可播放地址"))
+        assertTrue("应给出可操作下一步（登录 / 切浏览器模式）",
+            hint.contains("登录") && hint.contains("内置浏览器播放"))
+    }
+
+    @Test
+    fun emptyContentHint_nonVideoIsEmpty() {
+        assertEquals("非视频源不追加视频专属提示（避免污染普通正文结论）", "",
+            DebugVideoConclusion.emptyContentHint(BookSourceType.default, "playmode=browser"))
+    }
 }
