@@ -48,6 +48,34 @@ fun selectCookieKeyToRemove(cookieMap: Map<String, String>): String? {
     return cookieMap.keys.maxByOrNull { it.length }
 }
 
+/**
+ * 按键删除 Cookie 字符串中的指定项（纯函数，无 Android 依赖，便于 JVM 单测）。
+ *
+ * 语义（C-1 铁律）：只删除 key 同名的那一项，**其余项逐字保留原有形态与顺序**；
+ * 绝不整域清空。key 不存在时原样返回，避免「无命中却把 Cookie 写没了」。
+ *
+ * @return 剩余 Cookie 串；删空返回 null；key 不存在返回原串
+ */
+fun removeCookieKeyFromString(cookie: String, key: String): String? {
+    if (cookie.isBlank()) return null
+    if (key.isBlank()) return cookie
+    val kept = ArrayList<String>()
+    var removed = false
+    cookie.split(semicolonRegex).forEach { pair ->
+        val item = pair.trim()
+        if (item.isEmpty()) return@forEach
+        val eq = item.indexOf('=')
+        val name = if (eq >= 0) item.substring(0, eq).trim() else item
+        if (name == key) {
+            removed = true
+        } else {
+            kept.add(item)
+        }
+    }
+    if (!removed) return cookie
+    return kept.joinToString("; ").takeIf { it.isNotBlank() }
+}
+
 @Keep
 object CookieStore : CookieManagerInterface {
 
@@ -184,6 +212,43 @@ object CookieStore : CookieManagerInterface {
         CacheManager.deleteMemory("${domain}_cookie")
         CacheManager.deleteMemory("${domain}_session_cookie")
         android.webkit.CookieManager.getInstance().removeCookie(url)
+    }
+
+    /**
+     * 按键删除单个 Cookie（C-4：JS 脚本面可调，替代整域清除）。
+     *
+     * 为什么必须提供按键删除：`removeCookie(url)` 会连同 **WebView 域层**一起抹掉
+     * （见下方 removeCookie(url) 实现：它额外调用
+     * `android.webkit.CookieManager.getInstance().removeCookie(url)`），
+     * 而网页登录（内置浏览器）产生的凭据正是落在 WebView 域层 ——
+     * 整域清一次就等于把刚拿到的登录态删掉。
+     *
+     * 本方法只删「源可读存储层」（DB 缓存 + 会话缓存），**不触碰 WebView 域层**，
+     * 因此清理风控 Cookie 时不会误伤登录态。
+     *
+     * 注：不作为 `CookieManagerInterface` 成员 —— 该接口是 OkHttp CookieJar 的契约
+     * （只关心整域读写），而本方法服务于**脚本可调用面**（`values["cookie"] = CookieStore`），
+     * 直接放在 object 上即可被 Rhino 解析，避免为一个调用方扩宽接口。
+     */
+    fun removeCookie(url: String, key: String) {
+        CookieManager.removeCookie(url, key)
+    }
+
+    /**
+     * 只读：WebView 域层 Cookie（源可读存储层之外的一层）。
+     *
+     * 用途（C-3 闭环）：内置浏览器完成网页登录后，凭据先落在 WebView 域层；
+     * 源可用本方法把该层凭据并入自身存储层（`replaceCookie`），
+     * 使后续 `java.ajax` 请求真正携带登录态。
+     * 返回空串表示该层当前无 Cookie（或 WebView 未就绪）。
+     */
+    fun getWebCookie(url: String): String {
+        return try {
+            android.webkit.CookieManager.getInstance().getCookie(url) ?: ""
+        } catch (e: Exception) {
+            AppLog.put("读取WebView Cookie失败\n$e", e)
+            ""
+        }
     }
 
     override fun cookieToMap(cookie: String): MutableMap<String, String> {
