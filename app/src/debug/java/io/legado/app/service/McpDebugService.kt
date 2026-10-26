@@ -55,7 +55,10 @@ class McpDebugService : BaseService() {
         if (isRun) return
         try {
             // 与主 WebService 同款实现：NanoHTTPD + ApiRegistry 查表 + WebAuth 鉴权
-            val server = HttpServer(PORT)
+            // **绑定回环**（AD-03 第 1 条 / tasks 3.5）：内腿只监听 127.0.0.1
+            // ⇒ 局域网/外网**物理不可达**，「来源」天然受限于本机，
+            // 无需解析任何可伪造请求头（X-Forwarded-For / Host）。
+            val server = HttpServer(PORT, LOOPBACK_HOST)
             server.start(SOCKET_READ_TIMEOUT_MS, false)
             httpServer = server
             isRun = true
@@ -79,6 +82,9 @@ class McpDebugService : BaseService() {
     companion object {
         /** 内腿端口（REQ-2-402）。 */
         const val PORT = 8765
+
+        /** 内腿监听地址：**回环**（物理隔离，见 AD-03）。 */
+        const val LOOPBACK_HOST = "127.0.0.1"
 
         private const val TAG = "McpDebugService"
         private const val SOCKET_READ_TIMEOUT_MS = 10_000

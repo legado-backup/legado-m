@@ -38,6 +38,11 @@ const val MCP_DOMAIN_APP = "app"
  *
  * @param readOnlyHint 默认由 [level] 推导（**保守口径**：只有 READONLY 级工具才向 AI 声明"只读安全"）。
  *        个别"只读但级别更高"的语义变体（如 `*_test`）保持 `false`，宁严不宽。
+ * @param timeoutMs **按工具覆盖超时**（AD-11 / A-6）：`null` ⇒ 用 [McpToolExecutor.DEFAULT_TOOL_TIMEOUT_MS]。
+ *        多次网络往返的工具（五链调试 / 取流验证 / 质量报告）必须显式声明，否则站点抗压时
+ *        会在默认 15s 处被截断（本轮实测真实踩坑）。
+ * @param asyncEligible 是否允许**异步任务模式**（AD-11）：调用方传 `async=true` 时立即返回任务 id，
+ *        由 `task_result` 轮询取结果，避免长任务在同步超时上反复失败。
  */
 data class McpTool(
     /** 对外工具名（唯一，域前缀 + 动作，如 `bookshelf_list`）。 */
@@ -55,6 +60,10 @@ data class McpTool(
     val dangerous: Boolean = false,
     /** 入参 JSON Schema（由 [McpJsonSchema] 生成，REQ-2-204）。 */
     val inputSchema: JsonObject = McpJsonSchema.empty(),
+    /** 按工具覆盖超时（毫秒）；`null` 用全局默认（AD-11）。 */
+    val timeoutMs: Long? = null,
+    /** 是否允许异步任务模式（AD-11）。 */
+    val asyncEligible: Boolean = false,
     /** 执行体：**只调 Kernel**。 */
     val invoke: suspend (McpArgs) -> Any?,
 )

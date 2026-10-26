@@ -74,9 +74,13 @@ object JsSourceTools {
             name = "js_source_debug",
             title = "调试 JS 书源链路",
             description = "按链路调试 JS 书源：chain=search/explore/info/toc/content。" +
-                "可传 script 覆盖本次脚本（不落库）。返回链路结果 JSON（超 20000 字符截断）。",
+                "可传 script 覆盖本次脚本（不落库）。返回链路结果 JSON（超 20000 字符截断）。" +
+                "长链路可用 async=true 转为异步任务（返回 taskId，用 task_result 轮询）。",
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
+            // AD-11：链路调试要做多次网络往返，站点抗压时单请求可达 20s ⇒ 必须覆盖 15s 默认
+            timeoutMs = 90_000L,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("url" to TYPE_STRING, "chain" to TYPE_STRING),
                 optional = mapOf(

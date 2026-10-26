@@ -23,27 +23,58 @@ import kotlinx.coroutines.withTimeout
  */
 object McpToolExecutor {
 
-    /** 工具执行默认超时（REQ-2-106）。 */
+    /** 工具执行默认超时（REQ-2-106）；工具可用 [McpTool.timeoutMs] 覆盖（AD-11）。 */
     const val DEFAULT_TOOL_TIMEOUT_MS = 15_000L
 
     /** 响应体积上限（对齐 `AiMcpClient.MAX_MCP_RESPONSE_BYTES`）。 */
     const val MAX_RESPONSE_BYTES = 1_048_576
 
+    /** 失败语义：工具执行超时（与业务失败区分，AD-11）。 */
+    const val ERROR_KIND_TIMEOUT = "timeout"
+
+    /** 失败语义：工具内部业务失败。 */
+    const val ERROR_KIND_TOOL = "tool_error"
+
+    /** 失败语义：端侧未确认。 */
+    const val ERROR_KIND_REJECTED = "rejected"
+
+    /** 解析实际超时：**工具声明值优先**于全局默认（AD-11 验收点）。 */
+    fun resolveTimeoutMs(tool: McpTool): Long = tool.timeoutMs?.takeIf { it > 0 } ?: DEFAULT_TOOL_TIMEOUT_MS
+
     /**
      * 执行工具并返回出参信封。
      *
-     * @param timeoutMs 执行超时（默认 [DEFAULT_TOOL_TIMEOUT_MS]；参数化是为了让单测用毫秒级超时
-     *        覆盖超时分支，无需真等 15 秒，也为后续"个别长任务工具放宽超时"留出接口）
+     * @param timeoutMs 执行超时（默认取 [resolveTimeoutMs]：**工具声明优先**，否则全局默认）；
+     *        参数化是为了让单测用毫秒级超时覆盖超时分支，无需真等 15 秒。
      * @throws McpParamException 入参非法（由协议核映射为 `-32602`）
      */
     suspend fun execute(
         tool: McpTool,
         args: McpArgs,
         requestId: String,
-        timeoutMs: Long = DEFAULT_TOOL_TIMEOUT_MS,
+        timeoutMs: Long = resolveTimeoutMs(tool),
     ): JsonObject {
         val startedAt = System.currentTimeMillis()
         val elapsed = { System.currentTimeMillis() - startedAt }
+
+        // 异步长任务模式（AD-11）：仅在工具显式声明 asyncEligible 且调用方显式要求时才走 ——
+        // 默认仍是同步语义，避免改变既有调用方的行为预期。
+        if (tool.asyncEligible && args.bool(ASYNC_PARAM)) {
+            val taskId = McpTaskRegistry.submit(tool.name) {
+                runTool(tool, args, timeoutMs, requestId)
+            }
+            return envelope(
+                ok = true,
+                data = McpJson.toTree(mapOf(
+                    "taskId" to taskId,
+                    "state" to "running",
+                    "tool" to tool.name,
+                )),
+                errorMsg = null,
+                elapsedMs = elapsed(),
+                requestId = requestId,
+            )
+        }
 
         // 端侧确认闸门（tasks 7.3 / 7.4 / 7.7 / REQ-2-501）：`dangerous` 工具必须先经**手机物理确认**。
         // **为什么不看 `confirm:true` 入参**：调用者可能是被提示注入的 AI，它自己能填 confirm ⇒ 不算人机确认。
@@ -60,10 +91,23 @@ object McpToolExecutor {
                     errorMsg = "端侧未确认（用户拒绝 / 60s 超时 / 已有待确认请求）：${tool.name}",
                     elapsedMs = elapsed(),
                     requestId = requestId,
+                    errorKind = ERROR_KIND_REJECTED,
                 )
             }
         }
 
+        return runTool(tool, args, timeoutMs, requestId, startedAt)
+    }
+
+    /** 真正的执行 + 超时/业务失败语义分离（同步与异步长任务共用）。 */
+    private suspend fun runTool(
+        tool: McpTool,
+        args: McpArgs,
+        timeoutMs: Long,
+        requestId: String,
+        startedAt: Long = System.currentTimeMillis(),
+    ): JsonObject {
+        val elapsed = { System.currentTimeMillis() - startedAt }
         return try {
             val data = withTimeout(timeoutMs) { tool.invoke(args) }
             envelope(ok = true, data = McpJson.toTree(data), errorMsg = null, elapsedMs = elapsed(), requestId = requestId)
@@ -74,7 +118,8 @@ object McpToolExecutor {
                 data = null,
                 errorMsg = "工具执行超时（>$limit）：${tool.name}",
                 elapsedMs = elapsed(),
-                requestId = requestId
+                requestId = requestId,
+                errorKind = ERROR_KIND_TIMEOUT,
             )
         } catch (e: McpParamException) {
             throw e
@@ -84,10 +129,14 @@ object McpToolExecutor {
                 data = null,
                 errorMsg = e.localizedMessage ?: e.message ?: "工具执行失败",
                 elapsedMs = elapsed(),
-                requestId = requestId
+                requestId = requestId,
+                errorKind = ERROR_KIND_TOOL,
             )
         }
     }
+
+    /** 异步长任务开关入参名（AD-11）。 */
+    const val ASYNC_PARAM = "async"
 
     /**
      * 组信封（形状与口径见 [McpServer] 类注释的**决策 #23**）：
@@ -104,6 +153,7 @@ object McpToolExecutor {
         errorMsg: String?,
         elapsedMs: Long,
         requestId: String,
+        errorKind: String? = null,
     ): JsonObject {
         val dataText = data?.let { McpJson.gson.toJson(it) } ?: ""
         var truncated = false
@@ -112,6 +162,9 @@ object McpToolExecutor {
             addProperty("ok", ok)
             add("data", embed)
             add("error", errorMsg?.let { JsonPrimitive(it) } ?: JsonNull.INSTANCE)
+            // 失败语义显式化（AD-11）：调用方可据此区分「工具超时」与「工具内部业务失败」，
+            // 不必靠解析 error 文案。
+            if (!ok && errorKind != null) addProperty("errorKind", errorKind)
             addProperty("elapsedMs", elapsedMs)
             addProperty("requestId", requestId)
             if (truncated) addProperty("truncated", true)

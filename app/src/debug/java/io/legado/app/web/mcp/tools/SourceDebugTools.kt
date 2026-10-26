@@ -21,6 +21,12 @@ import io.legado.app.web.mcp.McpTool
  */
 object SourceDebugTools {
 
+    /**
+     * 长任务超时（AD-11）：源校验 / 五链调试要做多次网络往返，站点抗压时单请求可达 20s，
+     * 用全局默认 15s 必然被截断 ⇒ 本组统一声明 90s，并允许 `async=true` 转异步任务。
+     */
+    private const val LONG_TASK_TIMEOUT_MS = 90_000L
+
     val tools: List<McpTool> = listOf(
         McpTool(
             name = "source_search_test",
@@ -30,6 +36,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("sourceUrl" to TYPE_STRING, "key" to TYPE_STRING),
                 optional = mapOf("page" to TYPE_INTEGER),
@@ -68,6 +76,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("sourceUrl" to TYPE_STRING, "bookUrl" to TYPE_STRING),
                 descriptions = mapOf(
@@ -91,6 +101,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("sourceUrl" to TYPE_STRING, "bookUrl" to TYPE_STRING),
                 optional = mapOf("chapterIndex" to TYPE_INTEGER),
@@ -116,6 +128,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("sourceUrl" to TYPE_STRING, "url" to TYPE_STRING),
                 optional = mapOf("page" to TYPE_INTEGER),
@@ -141,6 +155,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_RSS,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("rssSourceUrl" to TYPE_STRING, "key" to TYPE_STRING),
                 descriptions = mapOf(
@@ -163,6 +179,8 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_RSS,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.of(
                 required = mapOf("rssSourceUrl" to TYPE_STRING, "link" to TYPE_STRING),
                 optional = mapOf("sort" to TYPE_STRING),
