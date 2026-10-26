@@ -134,4 +134,42 @@ class WebServiceSettingsScreenContractTest {
             screen.contains("R.string.web_relay_open_settings")
         )
     }
+
+    /**
+     * 调试通道卡片（design 4.2 前端入口 / tasks 2.5）：**仅在测试包渲染**，且开关必须真接回偏好。
+     *
+     * 为何基线化：① 漏 [WebAuthDebugBranch.isAvailable] 变体门 ⇒ 正式包也会出现调试入口（泄漏）；
+     * ② 卡片渲染了但开关没接回调 ⇒ 用户点了不生效（"摆了没反应"）；
+     * ③ 文案键漏一份 ⇒ 英文环境显示资源键名。
+     */
+    @Test
+    fun debugChannelSection_isGatedAndWired() {
+        assertTrue(
+            "卡片必须由变体能力门（isAvailable）决定是否渲染",
+            screen.contains("if (!WebAuthDebugBranch.isAvailable()) return")
+        )
+        assertTrue(
+            "开关必须接回调（点了要生效）",
+            screen.contains("onCheckedChange = onDebugBranchToggle")
+        )
+        assertTrue(
+            "宿主必须把开关写回偏好（PreferKey.webAuthDebugBranch）",
+            activity.contains("putPrefBoolean(PreferKey.webAuthDebugBranch, enabled)")
+        )
+        assertTrue(
+            "release 面无支路能力 ⇒ 卡片不可出现（变体空实现恒定 false）",
+            read("src/release/java/io/legado/app/web/WebAuthDebugBranch.kt")
+                .contains("fun isAvailable(): Boolean = false")
+        )
+        val keys = listOf(
+            "web_section_debug_channel", "web_debug_branch_title",
+            "web_debug_channel_state_off", "web_debug_channel_state_on",
+            "web_debug_channel_state_stopped", "web_debug_channel_hint",
+        )
+        keys.forEach { key ->
+            listOf(strings, stringsZh).forEach { file ->
+                assertTrue("文案键 $key 须同时存在于 values 与 values-zh", file.contains("""name="$key""""))
+            }
+        }
+    }
 }

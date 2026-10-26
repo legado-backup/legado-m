@@ -3459,6 +3459,12 @@ Selected text or question:
     <string name="web_relay_open_settings">Relay settings</string>
     <string name="web_section_help">Help</string>
     <string name="web_help_open">Web service + MCP guide</string>
+    <string name="web_section_debug_channel">Debug channel (test build only)</string>
+    <string name="web_debug_branch_title">Loopback debug branch</string>
+    <string name="web_debug_channel_state_off">Off — normal token check applies</string>
+    <string name="web_debug_channel_state_on">On — AI tooling may use the loopback channel</string>
+    <string name="web_debug_channel_state_stopped">On — start the web service first</string>
+    <string name="web_debug_channel_hint">Start the web service first, then run scripts/ai_debug_init.py on your computer to set up forwarding and probe the channel.</string>
     <string name="web_shutdown_title">Stop service and revoke all tokens</string>
     <string name="web_shutdown_summary">One-tap cutoff: stop the web service, revoke all three token levels and clear the relay identity on this device. Existing clients lose access immediately.</string>
     <string name="web_shutdown_confirm_title">Cut off all access?</string>

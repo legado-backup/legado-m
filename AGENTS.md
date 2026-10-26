@@ -185,7 +185,7 @@ ai_tests\venv\Scripts\python.exe ai_tests/scripts/audit_gson_generic_signature.p
 | 使用 Agent 子代理 | `sub-agent-quality-management.md` |
 | 书源/订阅源/RSS源 | `legado-source-creator/SKILL.md` |
 | 阅读页主题包（readerTemplate / 内置或用户主题） | `reader-theme-package-creator/SKILL.md` |
-| 网络层/前端/协程/WebView 优化 | `forks-reference.md` + `forks_comparison_methodology.md`（对比方法论） |
+| 网络层/前端/协程/WebView 优化 | `forks-reference.md` + `forks_comparison_methodology.md`（对比方法论）+ `forks-comparison.md`（克隆账本：需源码行级对比时按地址恢复克隆） |
 | 前端 UI 改造/样式统一/页面迁移 | `ui-standards/architecture.md`（UI 设计架构体系总纲，**必读**：四组件族基线+取色唯一基线+开发门禁，防私自拉组件/硬编码色）+ `frontend-ui-standards.md` + `compose-ui-engineering` |
 | 打包构建/包名/APK发布 | `package-naming.md` + `build-apk-guide.md`（§第零章打包脚本强制规范必读：交付一律走 `build-legado.bat`） |
 | 改动功能前（门禁） | `global-thinking-checklist.md`（前端入口+后端接口+数据库+覆盖安装+使用场景+回填点 6 维盘点） |

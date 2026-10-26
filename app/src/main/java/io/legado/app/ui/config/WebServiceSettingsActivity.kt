@@ -29,6 +29,7 @@ import io.legado.app.utils.sendToClip
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.toastOnUi
 import io.legado.app.web.TokenManager
+import io.legado.app.web.WebAuthDebugBranch
 import io.legado.app.web.WebPortPolicy
 import kotlinx.coroutines.launch
 
@@ -80,7 +81,8 @@ class WebServiceSettingsActivity : BaseActivity<ViewBinding>() {
                 onRelayToggle = ::setRelayEnabled,
                 onOpenRelaySettings = ::openRelaySettings,
                 onOpenHelp = { showHelp("webMcpHelp") },
-                onShutdownAll = ::shutdownAll
+                onShutdownAll = ::shutdownAll,
+                onDebugBranchToggle = ::setDebugBranch
             )
         }
 
@@ -120,8 +122,16 @@ class WebServiceSettingsActivity : BaseActivity<ViewBinding>() {
             // 四期 §3.2：中继状态真源 = PreferKey + RelayState（本页只读，不写第二份配置）
             relayEnabled = getPrefBoolean(PreferKey.publicWebRelayEnabled, false),
             relayPaired = !getPrefString(PreferKey.publicWebRelayDeviceHandle).isNullOrBlank(),
-            relayConnected = RelayStateRepository.state.value is RelayConnectionState.Connected
+            relayConnected = RelayStateRepository.state.value is RelayConnectionState.Connected,
+            // 调试通道开关（debug 面读真实偏好；release 面恒 false ⇒ 卡片不渲染）
+            debugBranchEnabled = WebAuthDebugBranch.isEnabled()
         )
+    }
+
+    /** 调试卷支路开关（design 4.2 前端入口 / tasks 2.5）：`TokenManager` 侧每请求实时读偏好 ⇒ 无需重启。 */
+    private fun setDebugBranch(enabled: Boolean) {
+        putPrefBoolean(PreferKey.webAuthDebugBranch, enabled)
+        refresh()
     }
 
     /**

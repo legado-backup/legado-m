@@ -170,4 +170,35 @@ class WebServiceSettingsLogicTest {
             levels.map { it.ordinal }
         )
     }
+
+    // ---------------------------------------------------------------- 调试通道（design 4.2 前端入口 / tasks 2.5）
+
+    @Test
+    fun debugChannel_offWheneverBranchDisabled() {
+        // 支路关闭优先级最高：服务开不开都必须是 OFF（关闭即完全回落三级令牌校验）
+        listOf(true, false).forEach { running ->
+            assertEquals(
+                "支路关闭 ⇒ 无论服务是否运行都判 OFF（serviceRunning=$running）",
+                WebServiceSettingsLogic.DebugChannelState.OFF,
+                WebServiceSettingsLogic.debugChannelState(
+                    branchEnabled = false,
+                    serviceRunning = running
+                )
+            )
+        }
+    }
+
+    @Test
+    fun debugChannel_distinguishesServiceState() {
+        assertEquals(
+            "支路开启 + 服务在跑 ⇒ 通道可用",
+            WebServiceSettingsLogic.DebugChannelState.ON_SERVICE_RUNNING,
+            WebServiceSettingsLogic.debugChannelState(branchEnabled = true, serviceRunning = true)
+        )
+        assertEquals(
+            "支路开启但服务未跑 ⇒ 通道不可用（需先启动服务），不得误报为可用",
+            WebServiceSettingsLogic.DebugChannelState.ON_SERVICE_STOPPED,
+            WebServiceSettingsLogic.debugChannelState(branchEnabled = true, serviceRunning = false)
+        )
+    }
 }

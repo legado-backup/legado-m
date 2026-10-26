@@ -34,6 +34,14 @@ object WebAuthDebugBranch {
         runCatching { appCtx.getPrefBoolean(PreferKey.webAuthDebugBranch, true) }.getOrDefault(true)
 
     /**
+     * 本变体**是否具备**调试卷支路能力（与 [isEnabled] 的「开关开没开」是两件事）。
+     *
+     * 用途：设置页据此决定是否渲染「调试通道」卡片 —— release 面恒 `false` ⇒ 正式包**看不到**
+     * 任何调试入口（新增符号不泄漏到 release，tasks 5.5.2）。
+     */
+    fun isAvailable(): Boolean = true
+
+    /**
      * 三条件判定：满足返回 [TokenManager.Level.MANAGE]，否则 `null`（调用方回落）。
      *
      * 注意：来源判定取 **`session.remoteIpAddress`（连接层）**，**不读任何请求头**。
