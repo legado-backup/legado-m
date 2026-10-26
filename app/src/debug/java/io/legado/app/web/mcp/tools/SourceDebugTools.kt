@@ -63,6 +63,9 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            // AD-11：详情/目录/正文都要做网络往返，站点抗压时单请求可达 20s ⇒ 必须覆盖 15s 默认
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.singleRequiredString("sourceUrl", "书源地址（bookSourceUrl）"),
         ) { args ->
             SourceDebugKernel.infoTest(args.requireStr("sourceUrl"))
@@ -206,6 +209,9 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_SOURCE,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            // AD-11：联网深度校验要做多次网络往返 ⇒ 覆盖 15s 默认
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.singleRequiredString("sourceUrl", "书源地址（bookSourceUrl）"),
         ) { args ->
             SourceDebugKernel.validateSource(args.requireStr("sourceUrl"))
@@ -219,6 +225,9 @@ object SourceDebugTools {
             domain = MCP_DOMAIN_RSS,
             level = TokenManager.Level.MANAGE,
             readOnlyHint = false,
+            // AD-11：联网深度校验要做多次网络往返 ⇒ 覆盖 15s 默认
+            timeoutMs = LONG_TASK_TIMEOUT_MS,
+            asyncEligible = true,
             inputSchema = McpJsonSchema.singleRequiredString("rssSourceUrl", "订阅源地址（sourceUrl）"),
         ) { args ->
             SourceDebugKernel.validateRssSource(args.requireStr("rssSourceUrl"))
