@@ -99,4 +99,30 @@ internal object WebServiceSettingsLogic {
         serviceRunning -> DebugChannelState.ON_SERVICE_RUNNING
         else -> DebugChannelState.ON_SERVICE_STOPPED
     }
+
+    /**
+     * 「一键初始化」的连接命令（spec Requirement B-6）。
+     *
+     * 与 AI 侧脚本 `scripts/ai_debug_init.py` 用的是**同一条**转发命令（单一真源：
+     * 脚本内 `forward()` 也是 `adb forward tcp:8765 tcp:8765`）⇒ 用户与 AI 看到的是同一套接法。
+     */
+    const val DEBUG_FORWARD_COMMAND: String = "adb forward tcp:8765 tcp:8765"
+
+    /** 内腿就绪三态（供界面选择文案，纯映射便于 JVM 单测）。 */
+    enum class DebugInitStatus {
+        /** 内腿已监听回环 ⇒ 可用。 */
+        READY,
+
+        /** Web 服务未开 ⇒ 需先开服务（内腿与主服务同源鉴权，服务不开则无法探活）。 */
+        SERVICE_OFF,
+
+        /** 服务已开、内腿尚在启动（首次启动异步） ⇒ 稍等即可。 */
+        LEG_PENDING,
+    }
+
+    fun debugInitStatus(serviceRunning: Boolean, legRunning: Boolean): DebugInitStatus = when {
+        serviceRunning && legRunning -> DebugInitStatus.READY
+        !serviceRunning -> DebugInitStatus.SERVICE_OFF
+        else -> DebugInitStatus.LEG_PENDING
+    }
 }

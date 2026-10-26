@@ -42,6 +42,14 @@ object WebAuthDebugBranch {
     fun isAvailable(): Boolean = true
 
     /**
+     * 凭据**掩码**（供 App 内「一键初始化」卡片展示，见 spec B-6）。
+     *
+     * 只暴露前 2 位与长度 ⇒ 用户能确认"用的是哪一份凭据"，同时不把明文留在界面上。
+     * release 面无凭据 ⇒ 恒空串。
+     */
+    fun maskedToken(): String = "${FIXED_TOKEN.take(2)}***<len=${FIXED_TOKEN.length}>"
+
+    /**
      * 三条件判定：满足返回 [TokenManager.Level.MANAGE]，否则 `null`（调用方回落）。
      *
      * 注意：来源判定取 **`session.remoteIpAddress`（连接层）**，**不读任何请求头**。
