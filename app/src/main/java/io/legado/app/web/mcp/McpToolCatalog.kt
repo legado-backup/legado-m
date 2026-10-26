@@ -21,6 +21,7 @@ import io.legado.app.web.mcp.tools.RuleTools
 import io.legado.app.web.mcp.tools.SourceTools
 import io.legado.app.web.mcp.tools.StatsTools
 import io.legado.app.web.mcp.tools.StorageTools
+import io.legado.app.web.mcp.tools.TaskTools
 import io.legado.app.web.mcp.tools.TtsTools
 
 /**
@@ -68,6 +69,8 @@ object McpToolCatalog {
             addAll(AppearanceTools.tools)
             addAll(CacheTaskTools.tools)
             addAll(AppSettingsTools.tools)
+            // 长任务查询（AD-11）：所有变体都有（异步任务机制在 main，非 debug 专属）
+            addAll(TaskTools.tools)
         }.also(::requireUniqueNames)
     }
 

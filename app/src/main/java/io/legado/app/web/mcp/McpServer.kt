@@ -193,7 +193,8 @@ object McpServer {
         val requestId = id?.let { if (it.isJsonPrimitive) it.asString else it.toString() }
             ?: UUID.randomUUID().toString()
         val envelope = try {
-            McpToolExecutor.execute(tool, McpArgs(arguments), requestId)
+            // 按工具覆盖超时（AD-11）：长任务工具声明自己的 timeoutMs，不再被 15s 全局默认截断
+            McpToolExecutor.execute(tool, McpArgs(arguments), requestId, McpToolExecutor.resolveTimeoutMs(tool))
         } catch (e: McpParamException) {
             // 参数非法属 JSON-RPC 层语义（REQ-2-204：缺失参数须返**结构化**参数错误）
             return rpcError(id, MCP_RPC_INVALID_PARAMS, e.message ?: "参数非法", 200)

@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,6 +72,37 @@ private fun BookDebugTarget.buildKey(query: String): String = when (this) {
     BookDebugTarget.CONTENT -> "--${query.removePrefix("--")}"
 }
 
+/**
+ * 「一键跑全链」的键（A-4 / AD-02）：串跑 search/explore → 详情 → 目录 → 正文。
+ *
+ * 与逐链的差别只在**起点**：目录/正文档若直接从该链跑，只会跑一段；
+ * 全链一律从**最上游**开始（URL 走详情 = 详情→目录→正文；关键字走搜索）⇒ 一次点完即全链。
+ * 纯函数，便于单测锁定。
+ */
+internal fun fullChainKey(target: BookDebugTarget, query: String): String {
+    val raw = query.removePrefix("发现::").removePrefix("++").removePrefix("--")
+    return when (target) {
+        BookDebugTarget.SEARCH -> query
+        BookDebugTarget.EXPLORE -> "发现::$raw"
+        // 详情/目录/正文都从详情起点跑（Debug 会自动依次进入 详情→目录→正文）
+        BookDebugTarget.INFO, BookDebugTarget.TOC, BookDebugTarget.CONTENT -> raw
+    }
+}
+
+/**
+ * 从调试事件里取出「可试播的正文地址」（A-5）。
+ *
+ * 口径：取**最后一条**正文响应（kind=40）文本中的首个 http(s) 地址；
+ * 取不到返回 `null`（此时不显示试播入口，避免点了没反应）。
+ * 纯函数，便于单测锁定。
+ */
+internal fun extractTryPlayUrl(entries: List<Pair<Int, String>>): String? {
+    val text = entries.lastOrNull { it.first == 40 }?.second ?: return null
+    val match = Regex("""https?://[^\s"'<>\\]+""").find(text) ?: return null
+    // 同时清理半角与全角句读（日志里地址常紧跟中文标点，带标点会让播放器拿到坏地址）
+    return match.value.trimEnd('.', ',', ';', ')', ']', '。', '，', '；', '）', '】', '、')
+}
+
 private fun kindTitle(kind: Int): String = when (kind) {
     -1 -> "错误"
     10 -> "搜索/发现响应"
@@ -86,6 +120,7 @@ fun BookSourceDebugScreen(
     onStart: (String) -> Unit,
     onCancel: () -> Unit,
     onShowFull: (String, String) -> Unit,
+    onTryPlay: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val events by Debug.events.collectAsState()
@@ -165,6 +200,34 @@ fun BookSourceDebugScreen(
                     }
                 }
                 DebugFilterChips(selected = filter, onSelect = { filter = it })
+                // A-4：一键跑全链（与逐链共用同一套 Debug 实现，只是从最上游起点串跑）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (onTryPlay != null) {
+                        val tryPlayUrl = remember(entries) {
+                            extractTryPlayUrl(entries.map { it.kind to it.message })
+                        }
+                        if (tryPlayUrl != null) {
+                            // A-5：调试结论旁提供试播，把「调试说成功」与「真机能不能播」对齐
+                            TextButton(onClick = { onTryPlay(tryPlayUrl) }) {
+                                Text("在播放器中试播该集")
+                            }
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(
+                        enabled = phase != DebugPhase.RUNNING && query.isNotBlank(),
+                        onClick = {
+                            if (query.isBlank()) return@TextButton
+                            phase = DebugPhase.RUNNING
+                            onStart(fullChainKey(target, query))
+                        },
+                    ) {
+                        Text("一键跑全链")
+                    }
+                }
             }
 
             if (visibleEntries.isEmpty()) {

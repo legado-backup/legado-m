@@ -20,7 +20,7 @@ import kotlinx.coroutines.runBlocking
  * ① OPTIONS 预检放行 → ② 请求体解析 → ③ 查表 `ApiRegistry.find` → ④ 鉴权 + 限流（`WebAuth` / `WebRateLimiter`，
  * 级别取自 `route.level`）→ ⑤ 分发 + 装信封 `ApiEnvelope.dispatch` → ⑥ 未注册落静态资源。
  */
-class HttpServer(port: Int) : NanoHTTPD(port) {
+class HttpServer(port: Int, hostname: String? = null) : NanoHTTPD(hostname, port) {
 
     private val assetsWeb = AssetsWeb("web")
 

@@ -13,6 +13,7 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.base.attachComposeContent
 import io.legado.app.base.composeShell
+import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.Debug
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.components.GlassTopAppBar
@@ -82,10 +83,32 @@ class BookSourceDebugActivity : VMBaseActivity<ViewBinding, BookSourceDebugModel
                         onShowFull = { title, content ->
                             showDialogFragment(TextDialog(title, content, TextDialog.Mode.TEXT))
                         },
+                        // A-5：复用**线上播放器**入口试播调试得到的地址（不新建播放实现）
+                        onTryPlay = { url -> tryPlayInOnlinePlayer(url) },
                         modifier = Modifier.weight(1f),
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * A-5：把调试得到的地址交给**线上播放器**试播（复用 `SourceHelp.openVideoPlayer`）。
+     *
+     * 为什么必须有这一步：调试链路说「取流成功」只代表规则拿到了地址，
+     * 不代表播放器能播（可能需要 Referer/Cookie/页面环境）。
+     * 用与线上完全相同的入口试播，才能把「调试结论」与「真机表现」对齐。
+     */
+    private fun tryPlayInOnlinePlayer(url: String) {
+        val source = viewModel.bookSource
+        if (source == null) {
+            toastOnUi("未获取到书源")
+            return
+        }
+        runCatching {
+            SourceHelp.openVideoPlayer(source, url, "调试试播", false)
+        }.onFailure {
+            toastOnUi(it.localizedMessage ?: "打开播放器失败")
         }
     }
 

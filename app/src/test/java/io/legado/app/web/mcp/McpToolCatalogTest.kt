@@ -106,8 +106,9 @@ class McpToolCatalogTest {
         // `ApiRoute.mcpToolName` 与之对拍）⇒ 计数 217→218 / 231→232。
         // **2026-10-22（ng-js-source-port）**：书源域新增 4 个 JS 源工具（validate/save/export/debug，
         // 见 JsSourceTools）⇒ 222 / 236。
-        val expected = if (BuildConfig.BUILD_DEBUG) 236 else 222
-        assertEquals("工具总数须与已落地域一致（release 222 / debug 236）", expected, McpToolCatalog.all().size)
+        // **2026-10-26（ai-source-debug-loop AD-11）**：新增 `task_result`（长任务轮询）⇒ 223 / 237。
+        val expected = if (BuildConfig.BUILD_DEBUG) 237 else 223
+        assertEquals("工具总数须与已落地域一致（release 223 / debug 237）", expected, McpToolCatalog.all().size)
     }
 
     @Test

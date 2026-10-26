@@ -36,9 +36,21 @@ object WebAuth {
     fun bearerToken(session: NanoHTTPD.IHTTPSession): String? =
         extractBearer(session.headers[HEADER_AUTHORIZATION])
 
-    /** 解析 `Authorization: Bearer <token>` 并校验级别；无令牌/错令牌返回 [TokenManager.Level.NONE]。 */
-    fun verify(session: NanoHTTPD.IHTTPSession): TokenManager.Level =
-        TokenManager.verify(bearerToken(session))
+    /**
+     * 解析 `Authorization: Bearer <token>` 并校验级别；无令牌/错令牌返回 [TokenManager.Level.NONE]。
+     *
+     * 校验顺序（AD-03）：
+     * 1. **调试卷支路**（`WebAuthDebugBranch`）—— 仅 debug 变体有实现，需**三条件同时满足**
+     *    （内腿绑回环 + debug 变体 + 固定值）才授予 `MANAGE`；release 变体恒 `null`。
+     * 2. 未命中支路 ⇒ **完全回落**既有三级令牌校验 `TokenManager.verify`（行为与改造前一致）。
+     *
+     * 注意：来源判定在支路内取**连接层** `remoteIpAddress`，本类**不读任何请求头**做来源判定。
+     */
+    fun verify(session: NanoHTTPD.IHTTPSession): TokenManager.Level {
+        val plain = bearerToken(session)
+        WebAuthDebugBranch.match(session, plain)?.let { return it }
+        return TokenManager.verify(plain)
+    }
 
     /** WS 握手校验（令牌由握手 query 参数 `token` 传入）。 */
     fun verifyWs(token: String?): TokenManager.Level = TokenManager.verify(token)

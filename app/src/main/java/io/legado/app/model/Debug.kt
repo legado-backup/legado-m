@@ -5,6 +5,7 @@ import android.util.Log
 import io.legado.app.BuildConfig
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
+import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.*
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.coroutine.CompositeCoroutine
@@ -461,12 +462,45 @@ object Debug {
             bookChapter = bookChapter,
             nextChapterUrl = nextChapterUrl,
             needSave = false
-        ).onSuccess {
+        ).onSuccess { contentText ->
+            // 视频类源显式化取流结论（AD-02 / A-2）：三种结果可读，不再统一显示「解析完成」。
+            // 浏览器模式从源变量读取（与线上播放判定同一来源），避免调试结论与线上行为不一致。
+            val conclusion = DebugVideoConclusion.of(
+                sourceType = bookSource.bookSourceType,
+                contentText = if (contentText is String) contentText else null,
+                browserMode = readBrowserPlayMode(bookSource),
+            )
+            if (bookSource.bookSourceType == BookSourceType.video) {
+                log(debugSource, "≡取流结论：${conclusion.message}", state = 1000)
+            }
             log(debugSource, "︽正文页解析完成", state = 1000)
         }.onError {
             log(debugSource, it.stackTraceStr, state = -1)
         }
         tasks.add(content)
+    }
+
+    /**
+     * 一键跑全链（AD-02 / A-4）：search/explore → 详情 → 目录 → 正文 串跑，任一步失败即停止并给可读原因。
+     *
+     * 与逐链调试共用同一批 `xxxDebug` 实现（`tasks` 统一取消），因此不会出现两套行为。
+     */
+    fun startDebugFullChain(scope: CoroutineScope, bookSource: BookSource, key: String) {
+        // 复用既有分发：search/explore 成功后会依次进入 info → toc → content
+        startDebug(scope, bookSource, key)
+    }
+
+    /**
+     * 读取源的「内置浏览器播放」开关（源持久化变量 `playmode=browser`）。
+     *
+     * 与源脚本内 `sourceVar("playmode")` 同一数据源（`BaseSource.getVariable()`），
+     * 因此调试页的取流结论与线上播放路径判定一致。
+     */
+    private fun readBrowserPlayMode(bookSource: BookSource): Boolean {
+        val raw = runCatching { bookSource.getVariable() }.getOrDefault("")
+        return raw.split(';', '\n', '&').any {
+            it.trim().replace(" ", "") == "playmode=browser"
+        }
     }
 
     interface Callback {

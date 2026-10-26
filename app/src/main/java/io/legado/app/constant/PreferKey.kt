@@ -626,4 +626,7 @@ object PreferKey {
     const val webAuthStrict = "webAuthStrict"
     // S2 首启引导卡一次性标志（REQ-1-605）
     const val webServiceFirstLaunchDone = "webServiceFirstLaunchDone"
+    // ===== ai-source-debug-loop：调试卷支路开关（默认 true；关闭后即使三条件满足也回落三级令牌校验）=====
+    // 仅 debug 变体读取（release 的 WebAuthDebugBranch 恒 false，不读该键）
+    const val webAuthDebugBranch = "webAuthDebugBranch"
 }
