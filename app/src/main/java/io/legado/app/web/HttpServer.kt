@@ -71,7 +71,10 @@ class HttpServer(port: Int, hostname: String? = null) : NanoHTTPD(hostname, port
             var response: Response? = null
             val token = WebAuth.bearerToken(session)
             val got = if (route != null && !WebAuth.isWhitelisted(uri)) {
-                TokenManager.verify(token)
+                // 必须经 `WebAuth.verify`（而不是直接 `TokenManager.verify`）：
+                // 调试卷支路（回环 + debug 变体 + 固定凭据 ⇒ MANAGE）挂接在 `WebAuth.verify` 内，
+                // 绕过它会让支路永不生效（真机实测 401 根因）。release 变体支路恒空 ⇒ 等价于改造前。
+                WebAuth.verify(session)
             } else {
                 TokenManager.Level.NONE
             }

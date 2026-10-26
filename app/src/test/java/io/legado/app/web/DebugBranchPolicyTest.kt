@@ -141,4 +141,26 @@ class DebugBranchPolicyTest {
             io.legado.app.constant.PreferKey.webAuthDebugBranch != io.legado.app.constant.PreferKey.webAuthStrict,
         )
     }
+
+    // ============ 接入点防回归（真机 401 根因） ============
+
+    /**
+     * 支路挂接在 `WebAuth.verify(session)` 内；HTTP 层若直接调 `TokenManager.verify(token)`
+     * 就会**绕过支路**，表现为「脚本全流程 PASS 但探活 401」（本轮真机首次实测即如此）。
+     * 这里以源码断言锁住接入点，避免回归。
+     */
+    @Test
+    fun httpLayer_authGoesThroughWebAuthVerify() {
+        val file = java.io.File("src/main/java/io/legado/app/web/HttpServer.kt")
+        assertTrue("HttpServer.kt 不存在：${file.absolutePath}", file.exists())
+        val text = file.readText()
+        assertTrue(
+            "HTTP 鉴权必须经 WebAuth.verify（支路接入点），否则调试卷支路永不生效",
+            text.contains("WebAuth.verify(session)"),
+        )
+        assertTrue(
+            "HTTP 层不得直接调用 TokenManager.verify（会绕过支路）",
+            !Regex("""(?m)^\s*TokenManager\.verify\(""").containsMatchIn(text),
+        )
+    }
 }
