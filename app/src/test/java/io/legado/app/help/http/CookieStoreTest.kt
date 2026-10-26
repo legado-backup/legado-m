@@ -126,4 +126,59 @@ class CookieStoreTest {
             selectCookieKeyToRemove(map)
         )
     }
+
+    // ============ removeCookieKeyFromString（C-4 按键删除） ============
+
+    @Test
+    fun removeCookieKeyFromString_keepsOtherKeysVerbatim() {
+        // 核心用例：只删指定键，其余键逐键等价保留（C-1 验收标准）
+        val cookie = "ttwid=abc; sessionid=login-value; _ga=GA1.2.9"
+        val rest = removeCookieKeyFromString(cookie, "ttwid")
+        assertEquals(
+            "删 ttwid 后其余键必须原样保留（含顺序）",
+            "sessionid=login-value; _ga=GA1.2.9",
+            rest
+        )
+    }
+
+    @Test
+    fun removeCookieKeyFromString_repeatedCallIsIdempotent() {
+        // 幂等用例：清理后再执行一次，键集合不再变化
+        val once = removeCookieKeyFromString("ttwid=abc; sessionid=s1", "ttwid")
+        val twice = removeCookieKeyFromString(once!!, "ttwid")
+        assertEquals("重复清理不应再改变键集合", once, twice)
+    }
+
+    @Test
+    fun removeCookieKeyFromString_missingKey_returnsOriginal() {
+        // 边界用例：key 不存在时原样返回，禁止「无命中却把 Cookie 写没了」
+        val cookie = "sessionid=s1; token=t1"
+        assertEquals("key 不存在应原样返回", cookie, removeCookieKeyFromString(cookie, "ttwid"))
+    }
+
+    @Test
+    fun removeCookieKeyFromString_removingLastKey_returnsNull() {
+        // 边界用例：删空返回 null（调用方据此走清除语义）
+        assertNull(
+            "删空应返回 null",
+            removeCookieKeyFromString("ttwid=abc", "ttwid")
+        )
+    }
+
+    @Test
+    fun removeCookieKeyFromString_blankInputs_areSafe() {
+        assertNull("空 Cookie 返回 null", removeCookieKeyFromString("", "ttwid"))
+        assertEquals(
+            "key 为空时原样返回（不做误删）",
+            "a=1; b=2",
+            removeCookieKeyFromString("a=1; b=2", "  ")
+        )
+    }
+
+    @Test
+    fun removeCookieKeyFromString_valueContainingEquals_isPreserved() {
+        // 对照用例：值里含 '='（base64 padding）不得被截断
+        val rest = removeCookieKeyFromString("ttwid=x; sid_guard=YWJj==; uid=7", "ttwid")
+        assertEquals("含 '=' 的值必须完整保留", "sid_guard=YWJj==; uid=7", rest)
+    }
 }
