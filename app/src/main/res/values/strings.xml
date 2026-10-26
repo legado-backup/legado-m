@@ -3465,6 +3465,13 @@ Selected text or question:
     <string name="web_debug_channel_state_on">On — AI tooling may use the loopback channel</string>
     <string name="web_debug_channel_state_stopped">On — start the web service first</string>
     <string name="web_debug_channel_hint">Start the web service first, then run scripts/ai_debug_init.py on your computer to set up forwarding and probe the channel.</string>
+    <string name="web_debug_init_button">Set up debug environment (start service + loopback leg)</string>
+    <string name="web_debug_init_ready">Loopback leg is listening on 127.0.0.1:8765</string>
+    <string name="web_debug_init_service_off">Web service is off — tap the button above to start it</string>
+    <string name="web_debug_init_pending">Loopback leg is starting…</string>
+    <string name="web_debug_init_done">Debug environment is ready</string>
+    <string name="web_debug_connect_forward">Connect on your computer: %1$s → http://127.0.0.1:8765/mcp</string>
+    <string name="web_debug_token_masked">Credential: %1$s (masked; the full value lives only in the debug source constant)</string>
     <string name="web_shutdown_title">Stop service and revoke all tokens</string>
     <string name="web_shutdown_summary">One-tap cutoff: stop the web service, revoke all three token levels and clear the relay identity on this device. Existing clients lose access immediately.</string>
     <string name="web_shutdown_confirm_title">Cut off all access?</string>

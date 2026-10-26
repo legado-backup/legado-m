@@ -64,7 +64,10 @@ internal data class WebServiceSettingsState(
     val relayPaired: Boolean = false,
     val relayConnected: Boolean = false,
     // 调试通道（调试卷支路开关）：仅测试包渲染；release 面 WebAuthDebugBranch.isAvailable()==false ⇒ 卡片不出现
-    val debugBranchEnabled: Boolean = false
+    val debugBranchEnabled: Boolean = false,
+    // 一键初始化（spec B-6）显示用：内腿是否已就绪 + 凭据掩码（掩码由变体实现给出，release 恒空）
+    val debugLegRunning: Boolean = false,
+    val debugMaskedToken: String = ""
 )
 
 /**
@@ -95,7 +98,9 @@ internal fun WebServiceSettingsScreen(
     onOpenHelp: () -> Unit,
     onShutdownAll: () -> Unit,
     /** 调试卷支路开关（design 4.2 前端入口 / tasks 2.5）；release 面卡片不渲染，回调不会被调用。 */
-    onDebugBranchToggle: (Boolean) -> Unit
+    onDebugBranchToggle: (Boolean) -> Unit,
+    /** 一键初始化：开服务 + 起内腿（spec B-6）；release 面卡片不渲染，回调不会被调用。 */
+    onDebugInit: () -> Unit
 ) {
     val palette = rememberAppManagementPalette()
     // 真机缺陷修复（2026-09-29 两次截图实测）：
@@ -190,7 +195,9 @@ internal fun WebServiceSettingsScreen(
                     DebugChannelSection(
                         state = state,
                         palette = palette,
-                        onDebugBranchToggle = onDebugBranchToggle
+                        buttons = actionPalette,
+                        onDebugBranchToggle = onDebugBranchToggle,
+                        onDebugInit = onDebugInit
                     )
                 }
             }
@@ -638,7 +645,9 @@ private fun FirstLaunchGuide(
 private fun DebugChannelSection(
     state: WebServiceSettingsState,
     palette: AppManagementPalette,
-    onDebugBranchToggle: (Boolean) -> Unit
+    buttons: LegadoMiuixPalette,
+    onDebugBranchToggle: (Boolean) -> Unit,
+    onDebugInit: () -> Unit
 ) {
     if (!WebAuthDebugBranch.isAvailable()) return
     val stateText = when (
@@ -689,6 +698,48 @@ private fun DebugChannelSection(
                 onCheckedChange = onDebugBranchToggle,
                 palette = palette.miuix
             )
+        }
+        // 一键初始化（spec B-6）：开服务 + 起内腿，并把「连接方式 + 凭据掩码」摆在同一处
+        LegadoMiuixActionButton(
+            text = stringResource(R.string.web_debug_init_button),
+            palette = buttons,
+            onClick = onDebugInit,
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = buttons.actionRadius
+        )
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            Text(
+                text = stringResource(
+                    when (WebServiceSettingsLogic.debugInitStatus(state.serviceRunning, state.debugLegRunning)) {
+                        WebServiceSettingsLogic.DebugInitStatus.READY -> R.string.web_debug_init_ready
+                        WebServiceSettingsLogic.DebugInitStatus.SERVICE_OFF -> R.string.web_debug_init_service_off
+                        WebServiceSettingsLogic.DebugInitStatus.LEG_PENDING -> R.string.web_debug_init_pending
+                    }
+                ),
+                color = palette.settings.secondaryText,
+                fontSize = MaterialTheme.typography.bodyTertiary.fontSize,
+                lineHeight = 18.sp
+            )
+            Text(
+                text = stringResource(
+                    R.string.web_debug_connect_forward,
+                    WebServiceSettingsLogic.DEBUG_FORWARD_COMMAND
+                ),
+                color = palette.settings.secondaryText,
+                fontSize = MaterialTheme.typography.bodyTertiary.fontSize,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(top = 3.dp)
+            )
+            // 凭据只显示掩码（完整值仅存在于 debug 源码常量；release 面 maskedToken() 为空 ⇒ 不渲染该行）
+            if (state.debugMaskedToken.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.web_debug_token_masked, state.debugMaskedToken),
+                    color = palette.settings.secondaryText,
+                    fontSize = MaterialTheme.typography.bodyTertiary.fontSize,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
         }
     }
 }

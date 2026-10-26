@@ -19,6 +19,9 @@ object WebAuthDebugBranch {
     /** release 面**不具备**调试卷支路能力 ⇒ 设置页不渲染调试通道卡片。 */
     fun isAvailable(): Boolean = false
 
+    /** release 面无调试凭据 ⇒ 掩码恒空串。 */
+    fun maskedToken(): String = ""
+
     /** release 无调试支路：恒不匹配（调用方回落三级令牌校验）。 */
     fun match(session: NanoHTTPD.IHTTPSession, token: String?): TokenManager.Level? = null
 }

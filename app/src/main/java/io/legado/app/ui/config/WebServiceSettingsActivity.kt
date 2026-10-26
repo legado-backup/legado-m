@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.lifecycleScope
 import androidx.viewbinding.ViewBinding
+import io.legado.app.DebugAppHook
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.attachComposeContent
@@ -31,7 +32,10 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.web.TokenManager
 import io.legado.app.web.WebAuthDebugBranch
 import io.legado.app.web.WebPortPolicy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 「Web 服务与 AI 接入」设置页宿主（web-mcp-productization 一期 · §6.1 / 任务 6.1–6.8）。
@@ -42,6 +46,11 @@ import kotlinx.coroutines.launch
  * 消除的中间态：本次改动前鉴权已生效，但令牌**没有任何 UI 可生成** ⇒ 写端点必定 401 且用户无解。
  */
 class WebServiceSettingsActivity : BaseActivity<ViewBinding>() {
+
+    /** 内腿首次启动是异步的 ⇒ 一键初始化后延时这么久再复读一次真实状态。 */
+    private companion object {
+        const val LEG_READY_POLL_MS = 1_500L
+    }
 
     override val binding: ViewBinding by lazy { composeShell(this) }
 
@@ -82,7 +91,8 @@ class WebServiceSettingsActivity : BaseActivity<ViewBinding>() {
                 onOpenRelaySettings = ::openRelaySettings,
                 onOpenHelp = { showHelp("webMcpHelp") },
                 onShutdownAll = ::shutdownAll,
-                onDebugBranchToggle = ::setDebugBranch
+                onDebugBranchToggle = ::setDebugBranch,
+                onDebugInit = ::debugInit
             )
         }
 
@@ -124,14 +134,59 @@ class WebServiceSettingsActivity : BaseActivity<ViewBinding>() {
             relayPaired = !getPrefString(PreferKey.publicWebRelayDeviceHandle).isNullOrBlank(),
             relayConnected = RelayStateRepository.state.value is RelayConnectionState.Connected,
             // 调试通道开关（debug 面读真实偏好；release 面恒 false ⇒ 卡片不渲染）
-            debugBranchEnabled = WebAuthDebugBranch.isEnabled()
+            debugBranchEnabled = WebAuthDebugBranch.isEnabled(),
+            // 一键初始化状态（spec B-6）：内腿运行态 + 凭据掩码（release 面均恒空/false）
+            debugLegRunning = DebugAppHook.isLegRunning(),
+            debugMaskedToken = WebAuthDebugBranch.maskedToken()
         )
+        syncDebugLegState()
+    }
+
+    /**
+     * 内腿就绪状态以**实测监听**为准（真机实测：同进程静态标记在部分时序下读到 `false`，
+     * 而端口已监听 ⇒ 界面会停在"正在启动"）。探测在工作线程做，结果回主线程校正。
+     */
+    private fun syncDebugLegState() {
+        lifecycleScope.launch {
+            val listening = withContext(Dispatchers.IO) { DebugAppHook.probeLeg() }
+            if (listening != uiState.value.debugLegRunning) {
+                uiState.value = uiState.value.copy(debugLegRunning = listening)
+            }
+        }
     }
 
     /** 调试卷支路开关（design 4.2 前端入口 / tasks 2.5）：`TokenManager` 侧每请求实时读偏好 ⇒ 无需重启。 */
     private fun setDebugBranch(enabled: Boolean) {
         putPrefBoolean(PreferKey.webAuthDebugBranch, enabled)
         refresh()
+    }
+
+    /**
+     * App 内「一键初始化」（spec Requirement B-6）。
+     *
+     * 与 AI 侧脚本**同一套原语**：`WebService.start` + `DebugAppHook.startLeg`（debug 变体内部即
+     * `McpDebugService.start`，release 面空实现）⇒ 不开第二套逻辑；连接方式用同一条
+     * `DEBUG_FORWARD_COMMAND`。凭据只显示掩码。
+     *
+     * 内腿首次启动是异步的（服务把 server 启动投递到 IO 线程）⇒ 先乐观置位，再延时复读真实状态。
+     */
+    private fun debugInit() {
+        if (!WebService.isRun) {
+            putPrefBoolean(PreferKey.webService, true)
+            WebService.start(this)
+        }
+        DebugAppHook.startLeg()
+        uiState.value = uiState.value.copy(
+            serviceRunning = true,
+            debugLegRunning = DebugAppHook.isLegRunning(),
+        )
+        lifecycleScope.launch {
+            delay(LEG_READY_POLL_MS)
+            refresh()
+            if (DebugAppHook.isLegRunning()) {
+                toastOnUi(getString(R.string.web_debug_init_done))
+            }
+        }
     }
 
     /**

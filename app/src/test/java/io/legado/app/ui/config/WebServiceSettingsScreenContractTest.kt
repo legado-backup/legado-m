@@ -172,4 +172,54 @@ class WebServiceSettingsScreenContractTest {
             }
         }
     }
+
+    /**
+     * 一键初始化（spec Requirement B-6）：App 内入口必须**真开服务 + 真起内腿**，并展示连接方式与掩码凭据。
+     *
+     * 为何基线化：① 只画按钮不接动作 ⇒ "摆了没反应"（本项目历史失守类型）；
+     * ② 只起内腿不开服务 ⇒ 鉴权依赖主服务，探活必 401（等于没初始化）；
+     * ③ 凭据若显示明文 ⇒ 违反 AD-04 / B-5；④ release 面缺空实现 ⇒ 正式包编译期即崩。
+     */
+    @Test
+    fun oneTapDebugInit_startsServiceAndLegAndShowsMaskedToken() {
+        assertTrue("卡片须提供一键初始化按钮", screen.contains("R.string.web_debug_init_button"))
+        assertTrue("按钮须接回调（点了要生效）", screen.contains("onClick = onDebugInit"))
+        assertTrue(
+            "宿主必须同时开 Web 服务与内腿（同一套原语，不是两套逻辑）",
+            activity.contains("WebService.start(this)") && activity.contains("DebugAppHook.startLeg()"),
+        )
+        assertTrue(
+            "连接方式须用与 AI 脚本同一条转发命令",
+            screen.contains("WebServiceSettingsLogic.DEBUG_FORWARD_COMMAND"),
+        )
+        assertTrue(
+            "凭据只显示掩码（空则不渲染该行）",
+            screen.contains("state.debugMaskedToken.isNotEmpty()") &&
+                screen.contains("R.string.web_debug_token_masked"),
+        )
+        assertTrue(
+            "release 面内腿空实现 ⇒ 恒不就绪（正式包不出现调试入口）",
+            read("src/release/java/io/legado/app/DebugAppHook.kt")
+                .contains("fun startLeg(): Boolean = false"),
+        )
+        assertTrue(
+            "正式包不得做任何探测网络动作（probeLeg 恒 false）",
+            read("src/release/java/io/legado/app/DebugAppHook.kt")
+                .contains("fun probeLeg(timeoutMs: Int = 200): Boolean = false"),
+        )
+        assertTrue(
+            "就绪状态须以实测监听校正（避免「已起却显示正在启动」）",
+            activity.contains("DebugAppHook.probeLeg()"),
+        )
+        val keys = listOf(
+            "web_debug_init_button", "web_debug_init_ready", "web_debug_init_service_off",
+            "web_debug_init_pending", "web_debug_init_done",
+            "web_debug_connect_forward", "web_debug_token_masked",
+        )
+        keys.forEach { key ->
+            listOf(strings, stringsZh).forEach { file ->
+                assertTrue("文案键 $key 须同时存在于 values 与 values-zh", file.contains("""name="$key""""))
+            }
+        }
+    }
 }

@@ -2940,6 +2940,13 @@ bookUrl：%7$s
     <string name="web_debug_channel_state_on">已开启 —— AI 工具可经回环通道接入</string>
     <string name="web_debug_channel_state_stopped">已开启 —— 请先启动网页服务</string>
     <string name="web_debug_channel_hint">先在电脑执行 scripts/ai_debug_init.py 完成端口转发与探活，即可让 AI 工具接入本机回环通道。</string>
+    <string name="web_debug_init_button">一键开启调试环境（开服务 + 起回环内腿）</string>
+    <string name="web_debug_init_ready">回环内腿已监听 127.0.0.1:8765</string>
+    <string name="web_debug_init_service_off">Web 服务未开启 —— 点上方按钮即可一并开启</string>
+    <string name="web_debug_init_pending">回环内腿正在启动…</string>
+    <string name="web_debug_init_done">调试环境已就绪</string>
+    <string name="web_debug_connect_forward">电脑端连接：%1$s → http://127.0.0.1:8765/mcp</string>
+    <string name="web_debug_token_masked">凭据：%1$s（仅掩码；完整值只在 debug 源码常量中）</string>
     <string name="web_shutdown_title">关闭服务并吊销全部令牌</string>
     <string name="web_shutdown_summary">一键断开：停止 Web 服务、吊销三级全部令牌，并清除本机中继身份。已连接的客户端会立即失去访问权限。</string>
     <string name="web_shutdown_confirm_title">确认断开全部访问？</string>

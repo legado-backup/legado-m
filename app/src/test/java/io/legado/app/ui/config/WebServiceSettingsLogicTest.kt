@@ -201,4 +201,39 @@ class WebServiceSettingsLogicTest {
             WebServiceSettingsLogic.debugChannelState(branchEnabled = true, serviceRunning = false)
         )
     }
+
+    // ---------------------------------------------------------------- 一键初始化（spec B-6）
+
+    @Test
+    fun debugInitStatus_threeStatesAreDistinct() {
+        assertEquals(
+            "服务 + 内腿都在 ⇒ READY",
+            WebServiceSettingsLogic.DebugInitStatus.READY,
+            WebServiceSettingsLogic.debugInitStatus(serviceRunning = true, legRunning = true)
+        )
+        assertEquals(
+            "服务未开 ⇒ SERVICE_OFF（内腿依赖主服务鉴权，先开服务）",
+            WebServiceSettingsLogic.DebugInitStatus.SERVICE_OFF,
+            WebServiceSettingsLogic.debugInitStatus(serviceRunning = false, legRunning = false)
+        )
+        assertEquals(
+            "服务已开、内腿尚在启动 ⇒ LEG_PENDING（首次启动异步）",
+            WebServiceSettingsLogic.DebugInitStatus.LEG_PENDING,
+            WebServiceSettingsLogic.debugInitStatus(serviceRunning = true, legRunning = false)
+        )
+        assertEquals(
+            "服务未开但内腿在跑 ⇒ 仍按 SERVICE_OFF（不得显示为就绪）",
+            WebServiceSettingsLogic.DebugInitStatus.SERVICE_OFF,
+            WebServiceSettingsLogic.debugInitStatus(serviceRunning = false, legRunning = true)
+        )
+    }
+
+    @Test
+    fun debugForwardCommand_matchesAiScript() {
+        assertEquals(
+            "App 内展示的转发命令必须与 AI 脚本一致（同一套接法）",
+            "adb forward tcp:8765 tcp:8765",
+            WebServiceSettingsLogic.DEBUG_FORWARD_COMMAND,
+        )
+    }
 }
