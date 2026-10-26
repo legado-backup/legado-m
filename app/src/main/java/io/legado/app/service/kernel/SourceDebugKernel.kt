@@ -10,6 +10,7 @@ import io.legado.app.model.CheckDepth
 import io.legado.app.model.CheckSource
 import io.legado.app.model.CheckSourceRunConfig
 import io.legado.app.model.CheckSourceTaskStore
+import io.legado.app.model.DebugVideoConclusion
 import io.legado.app.model.ProbeOptions
 import io.legado.app.model.SourceQualityChecker
 import io.legado.app.model.SourceQualityReport
@@ -166,6 +167,12 @@ object SourceDebugKernel {
     /** 规则未定位到具体行时的固定措辞（避免上层误读为"已精确诊断"）。 */
     private const val NOTE_NO_RULE_LINE = "正文规则解析失败，未定位到具体规则行（既有解析 API 不返回失败规则/行号）"
 
+    /** 视频源正文为空的两类成因提示拼装（纯函数，`internal` 便于 JVM 单测）。 */
+    internal fun contentFailureMessage(errText: String, sourceType: Int, variable: String?): String {
+        val hint = DebugVideoConclusion.emptyContentHint(sourceType, variable)
+        return if (hint.isEmpty()) "$errText；$NOTE_NO_RULE_LINE" else "$errText；$hint"
+    }
+
     // ============================================================ ① 书源：搜索
 
     /**
@@ -302,7 +309,14 @@ object SourceDebugKernel {
                     )
                 )
             },
-            onFailure = { fail("content", "${describeError(it)}；$NOTE_NO_RULE_LINE", cost) },
+            onFailure = { err ->
+                // 视频源正文为空有两类成因（浏览器播放属预期 / 未取到地址）⇒ 给出可读提示（E-1 / E-4）
+                fail(
+                    "content",
+                    contentFailureMessage(describeError(err), source.bookSourceType, source.getVariable()),
+                    cost,
+                )
+            },
         )
     }
 

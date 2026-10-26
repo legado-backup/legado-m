@@ -62,4 +62,35 @@ object DebugVideoConclusion {
     /** 仅判定结果（供单测/日志分类使用）。 */
     fun outcomeOf(sourceType: Int, contentText: String?, browserMode: Boolean): Outcome =
         of(sourceType, contentText, browserMode).outcome
+
+    /**
+     * 从源变量串取 `playmode` 的值（缺失 ⇒ 空串）。纯函数，供内核与调试页共用同一解析口径。
+     *
+     * 源变量形态为 `k=v;k2=v2`（也兼容 `&` 与换行分隔）。
+     */
+    fun playModeOf(variable: String?): String =
+        variable.orEmpty()
+            .split(';', '&', '\n')
+            .asSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("playmode=") }
+            ?.substringAfter('=')
+            ?.trim()
+            .orEmpty()
+
+    /**
+     * 视频源**正文为空**时的追加提示（空串 ⇒ 非视频源，调用方不追加）。
+     *
+     * 为什么需要（2026-10-26 真机实测）：浏览器播放模式下 `getContent` **按设计返回空串**
+     * （取流交给网页播放器），但 MCP `source_content_test` 只报「内容为空 ⇒ 正文规则解析失败」
+     * ⇒ 用户/AI 会把"预期内的空正文"误读成规则错误。此处把两种成因分开说清。
+     */
+    fun emptyContentHint(sourceType: Int, variable: String?): String {
+        if (sourceType != BookSourceType.video) return ""
+        return if (playModeOf(variable) == "browser") {
+            "内置浏览器播放模式下正文为空属预期：播放已交由浏览器页完成（若要嗅探取流请切回播放器模式）"
+        } else {
+            "未提取到可播放地址：本集可能超出免费额度（需网页登录）或站点要求页面环境（可切「内置浏览器播放」再试）"
+        }
+    }
 }
