@@ -2934,6 +2934,12 @@ bookUrl：%7$s
     <string name="web_relay_open_settings">中继设置</string>
     <string name="web_section_help">使用帮助</string>
     <string name="web_help_open">《网页服务 + MCP》使用帮助</string>
+    <string name="web_section_debug_channel">调试通道（仅测试包）</string>
+    <string name="web_debug_branch_title">回环调试支路</string>
+    <string name="web_debug_channel_state_off">已关闭 —— 走常规令牌校验</string>
+    <string name="web_debug_channel_state_on">已开启 —— AI 工具可经回环通道接入</string>
+    <string name="web_debug_channel_state_stopped">已开启 —— 请先启动网页服务</string>
+    <string name="web_debug_channel_hint">先在电脑执行 scripts/ai_debug_init.py 完成端口转发与探活，即可让 AI 工具接入本机回环通道。</string>
     <string name="web_shutdown_title">关闭服务并吊销全部令牌</string>
     <string name="web_shutdown_summary">一键断开：停止 Web 服务、吊销三级全部令牌，并清除本机中继身份。已连接的客户端会立即失去访问权限。</string>
     <string name="web_shutdown_confirm_title">确认断开全部访问？</string>

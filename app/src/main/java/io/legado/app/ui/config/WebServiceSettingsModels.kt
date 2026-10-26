@@ -76,4 +76,27 @@ internal object WebServiceSettingsLogic {
         TokenManager.Level.MANAGE,
         TokenManager.Level.ADMIN
     )
+
+    /**
+     * 调试通道（调试卷支路）卡片状态 —— 纯映射，便于 JVM 单测（页面侧只做渲染）。
+     *
+     * 支路开关真源为 `PreferKey.webAuthDebugBranch`；本函数**不读任何存储**，
+     * 由调用方传入当前值，避免"页面读存储"嵌进逻辑层。
+     */
+    enum class DebugChannelState {
+        /** 支路已关闭 ⇒ 完全回落三级令牌校验。 */
+        OFF,
+
+        /** 支路开启且 Web 服务在跑 ⇒ AI 工具可经回环通道接入。 */
+        ON_SERVICE_RUNNING,
+
+        /** 支路开启但服务未跑 ⇒ 通道不可用，需先启动服务。 */
+        ON_SERVICE_STOPPED,
+    }
+
+    fun debugChannelState(branchEnabled: Boolean, serviceRunning: Boolean): DebugChannelState = when {
+        !branchEnabled -> DebugChannelState.OFF
+        serviceRunning -> DebugChannelState.ON_SERVICE_RUNNING
+        else -> DebugChannelState.ON_SERVICE_STOPPED
+    }
 }

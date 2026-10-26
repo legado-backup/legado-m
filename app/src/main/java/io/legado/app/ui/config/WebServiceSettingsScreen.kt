@@ -42,6 +42,7 @@ import io.legado.app.ui.widget.compose.LegadoMiuixPalette
 import io.legado.app.ui.widget.compose.LegadoMiuixSwitch
 import io.legado.app.ui.widget.compose.rememberAppManagementPalette
 import io.legado.app.web.TokenManager
+import io.legado.app.web.WebAuthDebugBranch
 import io.legado.app.web.WebPortPolicy
 
 /**
@@ -61,7 +62,9 @@ internal data class WebServiceSettingsState(
     // 四期 §3：公网中继卡片（状态真源 = RelayConfig / RelayState，本页不持有第二份配置）
     val relayEnabled: Boolean = false,
     val relayPaired: Boolean = false,
-    val relayConnected: Boolean = false
+    val relayConnected: Boolean = false,
+    // 调试通道（调试卷支路开关）：仅测试包渲染；release 面 WebAuthDebugBranch.isAvailable()==false ⇒ 卡片不出现
+    val debugBranchEnabled: Boolean = false
 )
 
 /**
@@ -90,7 +93,9 @@ internal fun WebServiceSettingsScreen(
     onRelayToggle: (Boolean) -> Unit,
     onOpenRelaySettings: () -> Unit,
     onOpenHelp: () -> Unit,
-    onShutdownAll: () -> Unit
+    onShutdownAll: () -> Unit,
+    /** 调试卷支路开关（design 4.2 前端入口 / tasks 2.5）；release 面卡片不渲染，回调不会被调用。 */
+    onDebugBranchToggle: (Boolean) -> Unit
 ) {
     val palette = rememberAppManagementPalette()
     // 真机缺陷修复（2026-09-29 两次截图实测）：
@@ -181,6 +186,11 @@ internal fun WebServiceSettingsScreen(
                     HelpSection(
                         palette = palette,
                         onOpenHelp = onOpenHelp
+                    )
+                    DebugChannelSection(
+                        state = state,
+                        palette = palette,
+                        onDebugBranchToggle = onDebugBranchToggle
                     )
                 }
             }
@@ -612,5 +622,73 @@ private fun FirstLaunchGuide(
             modifier = Modifier.weight(1f),
             cornerRadius = buttons.actionRadius
         )
+    }
+}
+
+/**
+ * 调试通道（design 4.2 前端入口 / tasks 2.5）：调试卷支路开关 + 一键初始化指引。
+ *
+ * **变体隔离**：卡片是否渲染由 [WebAuthDebugBranch.isAvailable] 决定 ——
+ * debug 面恒 `true`（可见开关），release 面恒 `false`（正式包**看不到任何调试入口**，
+ * 即「新增符号不泄漏到 release」，tasks 5.5.2）。
+ *
+ * 开关语义（`PreferKey.webAuthDebugBranch`）：关闭后即使三条件满足也完全回落三级令牌校验。
+ */
+@Composable
+private fun DebugChannelSection(
+    state: WebServiceSettingsState,
+    palette: AppManagementPalette,
+    onDebugBranchToggle: (Boolean) -> Unit
+) {
+    if (!WebAuthDebugBranch.isAvailable()) return
+    val stateText = when (
+        WebServiceSettingsLogic.debugChannelState(state.debugBranchEnabled, state.serviceRunning)
+    ) {
+        WebServiceSettingsLogic.DebugChannelState.OFF ->
+            stringResource(R.string.web_debug_channel_state_off)
+
+        WebServiceSettingsLogic.DebugChannelState.ON_SERVICE_RUNNING ->
+            stringResource(R.string.web_debug_channel_state_on)
+
+        WebServiceSettingsLogic.DebugChannelState.ON_SERVICE_STOPPED ->
+            stringResource(R.string.web_debug_channel_state_stopped)
+    }
+    AppSettingSectionTitle(
+        title = stringResource(R.string.web_section_debug_channel),
+        palette = palette.settings
+    )
+    AppManagementCard(palette = palette) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.web_debug_branch_title),
+                    color = palette.settings.primaryText,
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = stateText,
+                    color = palette.settings.secondaryText,
+                    fontSize = MaterialTheme.typography.bodyTertiary.fontSize,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+                Text(
+                    text = stringResource(R.string.web_debug_channel_hint),
+                    color = palette.settings.secondaryText,
+                    fontSize = MaterialTheme.typography.bodyTertiary.fontSize,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+            LegadoMiuixSwitch(
+                checked = state.debugBranchEnabled,
+                onCheckedChange = onDebugBranchToggle,
+                palette = palette.miuix
+            )
+        }
     }
 }
