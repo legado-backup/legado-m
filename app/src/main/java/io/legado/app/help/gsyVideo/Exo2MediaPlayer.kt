@@ -25,6 +25,11 @@ import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.BehindLiveWindowException
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import androidx.media3.extractor.DefaultExtractorsFactory
+import io.legado.app.help.exoplayer.CencDrmInitInjectingExtractorsFactory
+import io.legado.app.help.exoplayer.CencDrmSessionProvider
+import io.legado.app.help.exoplayer.CencKeyStore
+import io.legado.app.help.exoplayer.CencLocalFallback
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.exoplayer.HlsKeyDataSourceFactory
 import io.legado.app.help.exoplayer.PlayerInstancePool
@@ -53,6 +58,18 @@ import tv.danmaku.ijk.media.exo2.demo.EventLogger
  */
 internal fun unknownFallbackOrder(preferProgressive: Boolean): List<Int> =
     if (preferProgressive) listOf(C.TYPE_OTHER, C.TYPE_HLS) else listOf(C.TYPE_HLS, C.TYPE_OTHER)
+
+/**
+ * CENC 播放门禁（纯函数，单测锁定）：kid 合法 + encryption=cenc-aes-ctr + 当前是**网络地址**。
+ *
+ * 为什么不是「URL 全等」：源站可能 302/拼接参数导致实际播放 URL 与声明地址不同
+ * （真机实测全等比较会让 DRM 静默失效）；而本地明文降级文件是 `file://` ⇒ 天然不命中。
+ * 残留风险由采集链每次入口 `VideoPlay.clearCenc()` 兜住。
+ */
+internal fun isCencPlaybackActive(currentUrl: String, kid: String?, encryption: String?): Boolean =
+    CencDrmSessionProvider.isCencEncryption(encryption) &&
+        CencDrmSessionProvider.normalizeKid(kid) != null &&
+        currentUrl.startsWith("http")
 
 class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     companion object {
@@ -189,6 +206,16 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     var currentHeaders: Map<String, String> = emptyMap()
 
     /**
+     * CENC Clear-Key（AD-05）：书源声明的加密标识与 kid（32 位 hex）。
+     * 两者同时有效时才启用 DRM；null/空 ⇒ 完全走原明文播放路径。
+     */
+    var cencKid: String? = null
+    var cencEncryption: String? = null
+
+    /** 声明对应远端地址：仅当 currentUrl 与之匹配才启用 DRM（本地降级地址不匹配） */
+    var cencUrl: String? = null
+
+    /**
      * R4-T8: 降级链类型列表（如 HLS→DASH→Progressive）
      *
      * - 嗅探成功时：按嗅探结果优先 + 全量降级（如 HLS 识别成功 → [HLS, DASH, Progressive]）
@@ -314,6 +341,23 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     }
 
     /**
+     * CENC 声明是否生效：见 [isCencPlaybackActive]（纯函数，便于单测）。
+     */
+    private fun isCencActive(): Boolean =
+        isCencPlaybackActive(currentUrl, cencKid, cencEncryption)
+
+    /**
+     * 统一 MediaItem 构建（AD-05）：嗅探 mimeType + 条件式 CENC DrmConfiguration。
+     * 非 CENC 媒体与改造前完全等价（仅多了 mimeType 设置）。
+     */
+    private fun buildCencAwareMediaItem(url: String): MediaItem {
+        val builder = MediaItem.Builder().setUri(url)
+        currentSniffResult.mimeType?.let { builder.setMimeType(it) }
+        if (!isCencActive()) return builder.build()
+        return CencDrmSessionProvider.attachCencIfNeeded(builder, cencKid, cencEncryption).build()
+    }
+
+    /**
      * R4-T8: 按 contentType 创建 MediaSource 并应用到 ExoPlayer
      *
      * 关键改造：
@@ -327,6 +371,12 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
      */
     @OptIn(UnstableApi::class)
     private fun applyMediaSourceByType(contentType: Int, url: String, headers: Map<String, String>) {
+        // 诊断（保留）：CENC 门禁要素，便于排查「明文文件却被当加密轨 / DRM 未激活」
+        AppLog.put(
+            "CencGate: contentType=$contentType, active=${isCencActive()}, " +
+                "kidNull=${cencKid == null}, encNull=${cencEncryption == null}, " +
+                "cencUrlNull=${cencUrl == null}, isHttp=${currentUrl.startsWith("http")}"
+        )
         // T1.9: 检查 isReleased + scope.isActive，避免 onDestroy 后嗅探协程回调 setMediaItem（解决 Bug-5）
         // scope.cancel 无法中断非 suspend 函数，需 isReleased 标志位兜底
         if (isReleased || !scope.isActive) {
@@ -350,19 +400,15 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
         try {
             val mediaSource: MediaSource = when (contentType) {
                 C.TYPE_HLS -> {
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(effectiveUrl)
-                        .apply {
-                            // R4-T8: 嗅探到的 mimeType 显式设置，避免 ExoPlayer URL 后缀误判
-                            currentSniffResult.mimeType?.let { setMimeType(it) }
-                        }
-                        .build()
+                    val mediaItem = buildCencAwareMediaItem(effectiveUrl)
                     // video-sniff-403-and-rss-classic-fix 2.8b/R-P1-8（Z3）：HlsKeyDataSourceFactory 接入主链路——
                     // 对 AES-128 key URL 额外注入 currentPlayHeaders 防盗链头（部分 CDN 对 key 请求校验更严格），
                     // 对齐旧入口 createMediaSource 的 P1-8 包装（原先仅旧入口接入，主链路缺失）
                     val hlsDataSourceFactory =
                         HlsKeyDataSourceFactory().wrap(ExoPlayerHelper.resolvingDataSource)
                     HlsMediaSource.Factory(hlsDataSourceFactory)
+                        // CENC Clear-Key（AD-01）：条件式 DRM，未声明 cenc-aes-ctr 的媒体行为不变
+                        .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
                         // 缓冲速度优化（P0）：仅解析 m3u8 清单即完成 preparation，首帧耗时降 30%+
                         .setAllowChunklessPreparation(true)
                         // P2-2: 指数退避重试策略（1s/2s/4s/8s/16s），最多 5 次
@@ -379,29 +425,34 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
                         .createMediaSource(mediaItem)
                 }
                 C.TYPE_DASH -> {
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(effectiveUrl)
-                        .apply { currentSniffResult.mimeType?.let { setMimeType(it) } }
-                        .build()
+                    val mediaItem = buildCencAwareMediaItem(effectiveUrl)
                     DashMediaSource.Factory(ExoPlayerHelper.resolvingDataSource)
+                        // CENC Clear-Key（AD-01）：条件式 DRM，未声明 cenc-aes-ctr 的媒体行为不变
+                        .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
                         .createMediaSource(mediaItem)
                 }
                 C.TYPE_SS -> {
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(effectiveUrl)
-                        .apply { currentSniffResult.mimeType?.let { setMimeType(it) } }
-                        .build()
+                    val mediaItem = buildCencAwareMediaItem(effectiveUrl)
                     SsMediaSource.Factory(ExoPlayerHelper.resolvingDataSource)
+                        // CENC Clear-Key（AD-01）：条件式 DRM，未声明 cenc-aes-ctr 的媒体行为不变
+                        .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
                         .createMediaSource(mediaItem)
                 }
                 C.TYPE_OTHER -> {
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(effectiveUrl)
-                        .apply { currentSniffResult.mimeType?.let { setMimeType(it) } }
-                        .build()
-                    ProgressiveMediaSource.Factory(ExoPlayerHelper.resolvingDataSource)
+                    val mediaItem = buildCencAwareMediaItem(effectiveUrl)
+                    // CENC 且源流缺 pssh 时，用注入式 ExtractorsFactory 给 Format 补 ClearKey schemeData（AD-04）
+                    val progressiveFactory = if (isCencActive()) {
+                        ProgressiveMediaSource.Factory(
+                            ExoPlayerHelper.resolvingDataSource,
+                            CencDrmInitInjectingExtractorsFactory(DefaultExtractorsFactory(), cencKid!!)
+                        )
+                    } else {
+                        ProgressiveMediaSource.Factory(ExoPlayerHelper.resolvingDataSource)
+                    }
+                    progressiveFactory
+                        .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
                         // 注: media3 1.10.1 ProgressiveMediaSource.Factory 无 setExtractorsFactory，
-                        // ExoPlayer 内部使用默认 DefaultExtractorsFactory(含全部 14 个 Extractor)
+                        // 需在构造时传入 ExtractorsFactory（CENC 注入走构造参数）
                         .createMediaSource(mediaItem)
                 }
                 else -> {
@@ -697,6 +748,27 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
                 currentSniffJob = scope.launch {
                     // T2.4: 嗅探协程生命周期日志 - started 态
                     AppLog.put("ExoFallback: sniff job started, urlPath=${ExoPlayerHelper.sanitizeUrl(currentUrl)}")
+                    // CENC 软件降级（AD-04）：设备不具备 ClearKey 时，先本地解密再按普通文件播放
+                    if (isCencActive() && CencLocalFallback.isRequired(cencKid, cencEncryption)) {
+                        val kid = CencDrmSessionProvider.normalizeKid(cencKid)
+                        val key = kid?.let { CencKeyStore.provider.key(it) }
+                        if (kid != null && key != null) {
+                            val local = CencLocalFallback.prepare(currentUrl, currentHeaders, kid, key)
+                            if (!isActive) return@launch
+                            if (local != null) {
+                                currentUrl = Uri.fromFile(local).toString()
+                                currentHeaders = emptyMap()
+                                cencKid = null
+                                cencEncryption = null
+                                currentSniffResult = ExoPlayerHelper.SniffResult(C.TYPE_OTHER, null)
+                                AppLog.put("CencFallback: 切换到本地明文文件播放")
+                                applyMediaSourceByType(C.TYPE_OTHER, currentUrl, emptyMap())
+                                return@launch
+                            }
+                        } else {
+                            AppLog.put("CencFallback: 缺少 kid 或 key，无法软件解密, kidLen=${cencKid?.length ?: 0}")
+                        }
+                    }
                     // V-004-P0-1: 嗅探前 DNS 预解析（异步预热系统 DNS 缓存，降低嗅探耗时）
                     // 根因：004 日志嗅探耗时 3123ms，DNS 解析占主导（DoH 冷启动失败期间等待 2-3s）
                     // 方案：异步预解析域名，Range 请求发起时 DNS 命中缓存（0ms）

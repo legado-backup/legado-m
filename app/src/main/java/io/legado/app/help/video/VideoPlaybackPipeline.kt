@@ -12,6 +12,9 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.help.book.getDanmaku
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.exoplayer.CencDrmSessionProvider
+import io.legado.app.help.exoplayer.CencKeyStore
+import io.legado.app.help.exoplayer.CencLocalFallback
 import io.legado.app.help.video.engine.HeaderResolver
 import io.legado.app.help.video.engine.SniffEngine
 import io.legado.app.model.VideoPlay
@@ -88,6 +91,8 @@ object VideoPlaybackPipeline {
                 "chapterUrlEnd=${chapter.url.takeLast(20)}, bookUrlHash=${(book.bookUrl ?: "").hashCode()}"
         )
         SniffEngine.invalidate()
+        // CENC（AD-05）：新一次采集先清空上一集声明，避免 kid/encryption 跨集残留
+        VideoPlay.clearCenc()
         return Coroutine.async(ctx.scope, IO) {
             if (VideoUrlExtractor.isDirectVideoStreamUrl(chapter.url)) {
                 AppLog.put("Pipeline: L0 直链快速路径, urlEnd=${chapter.url.takeLast(24)}")
@@ -105,8 +110,20 @@ object VideoPlaybackPipeline {
                 return@async
             }
             WebBook.getContent(ctx.scope, bookSource, book, chapter)
-                .onSuccess(IO) { content ->
-                    val content = content.trim()
+                .onSuccess(IO) { rawContent ->
+                    var content = rawContent.trim()
+                    // CENC 契约（AD-05）：ruleContent 返回 {"url","kid","encryption"} 时拆出播放地址 + DRM 声明
+                    parseCencContent(content)?.let { cenc ->
+                        content = cenc.first
+                        VideoPlay.cencKid = cenc.second
+                        VideoPlay.cencEncryption = cenc.third
+                        // 记录声明对应远端地址：播放器仅在该地址上启用 DRM（本地降级地址不匹配）
+                        VideoPlay.cencUrl = cenc.first
+                        AppLog.put(
+                            "Pipeline: CENC 声明命中, kidLen=${cenc.second?.length ?: 0}, " +
+                                "encryptionMatched=${CencDrmSessionProvider.isCencEncryption(cenc.third)}"
+                        )
+                    }
                     // 4.8c（Z10）：书源章节空正文统一错误提示（不裸抛）
                     if (content.isEmpty()) {
                         AppLog.putWarn("书源章节正文为空, 触发统一错误提示, chapter=${chapter.title}")
@@ -137,6 +154,24 @@ object VideoPlaybackPipeline {
                         } else {
                             content
                         }
+                    }
+                    // CENC 软件降级（AD-04）：设备无 ClearKey 且已注入 key ⇒ 采集阶段先本地解密，
+                    // 播放器只见明文本地文件（避免远端加密流先被装载导致提取器报加密轨）
+                    val localCencUrl = prepareCencLocal(mUrl, ctx, book, chapter)
+                    if (localCencUrl != null) {
+                        VideoPlay.videoUrl = localCencUrl
+                        VideoPlay.resolvedChapterUrl = chapter.url
+                        val localAnalyzeUrl = AnalyzeUrl(
+                            localCencUrl,
+                            source = ctx.source,
+                            ruleData = book,
+                            chapter = chapter
+                        )
+                        setUpAndPlay(
+                            ctx, localCencUrl, localAnalyzeUrl.headerMap, resolvePageUrl = false
+                        )
+                        VideoPlay.isLoadingFalse()
+                        return@onSuccess
                     }
                     VideoPlay.videoUrl = mUrl
                     // 播放页 URL 三层嗅探；MPD 文本/本地文件跳过嗅探，失败回退直连
@@ -224,6 +259,8 @@ object VideoPlaybackPipeline {
         val episode = ctx.episode ?: throw IllegalArgumentException("Pipeline.playEpisode: episode required")
         val article = ctx.article ?: throw IllegalArgumentException("Pipeline.playEpisode: article required")
         SniffEngine.invalidate()
+        // CENC（AD-05）：新一次采集先清空上一集声明，避免 kid/encryption 跨集残留
+        VideoPlay.clearCenc()
         return Coroutine.async(ctx.scope, IO) {
             // 三层降级采集：MacCMS 播放页解析 → DOM 解析 → 网络抓包（URL 已是视频流时内部快速返回）
             val resolvedCandidate = VideoUrlExtractor.extractVideoUrlForEpisode(episode.url, ctx.source, article)
@@ -331,5 +368,50 @@ object VideoPlaybackPipeline {
             // 此后等待首帧期间的缓冲由播放器内置 loading 圈承担，避免双重提示。
             postEvent(EventBus.VIDEO_SWITCH_LOADING, false)
         }
+    }
+
+    /**
+     * CENC 软件降级前置（AD-04）：设备不具备 ClearKey 且本地已注入 key 时，先把远端加密流下载并解密为
+     * 本地明文 fMP4，返回 file:// 地址；否则返回 null（调用方保持原远程播放/失败路径）。
+     */
+    private suspend fun prepareCencLocal(
+        url: String,
+        ctx: PipelineContext,
+        book: Book,
+        chapter: BookChapter
+    ): String? {
+        if (!CencDrmSessionProvider.isCencEncryption(VideoPlay.cencEncryption)) return null
+        if (!CencLocalFallback.isRequired(VideoPlay.cencKid, VideoPlay.cencEncryption)) return null
+        val kid = CencDrmSessionProvider.normalizeKid(VideoPlay.cencKid)
+            ?: return null
+        val key = CencKeyStore.provider.key(kid)
+        if (key == null) {
+            AppLog.put("Pipeline: CENC 缺少解密密钥，无法本地解密, kidLen=${kid.length}")
+            return null
+        }
+        val headers = kotlin.runCatching {
+            AnalyzeUrl(url, source = ctx.source, ruleData = book, chapter = chapter).headerMap
+        }.getOrDefault(emptyMap())
+        val localFile = CencLocalFallback.prepare(url, headers, kid, key) ?: return null
+        VideoPlay.clearCenc()
+        AppLog.put("Pipeline: CENC 本地解密完成，改用本地文件播放, size=${localFile.length()}")
+        return android.net.Uri.fromFile(localFile).toString()
+    }
+
+    /**
+     * CENC 契约解析（AD-05）：`{"url":"...","kid":"32hex","encryption":"cenc-aes-ctr"}`。
+     *
+     * 非该契约（普通字符串 URL / MPD 文本 / 空串）一律返回 null，保持原解析路径不变。
+     * 只接受 http(s) 地址，避免把任意 JSON 文本误当播放地址。
+     */
+    internal fun parseCencContent(content: String): Triple<String, String?, String?>? {
+        val obj = kotlin.runCatching { org.json.JSONObject(content) }.getOrNull() ?: return null
+        val url = obj.optString("url").trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return null
+        return Triple(
+            url,
+            obj.optString("kid").takeIf { it.isNotBlank() },
+            obj.optString("encryption").takeIf { it.isNotBlank() }
+        )
     }
 }

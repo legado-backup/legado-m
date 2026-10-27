@@ -167,6 +167,8 @@ object PlayerInstancePool {
                 .setMediaSourceFactory(
                     DefaultMediaSourceFactory(ExoPlayerHelper.resolvingDataSource)
                         .setLiveTargetOffsetMs(5000)
+                        // CENC Clear-Key（AD-01）：条件式 DRM，未声明 cenc-aes-ctr 的媒体行为不变
+                        .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
                 )
                 .build()
             selectorMap[player] = selector
@@ -195,6 +197,8 @@ object PlayerInstancePool {
                 // 与原 Exo2MediaPlayer 配置一致：resolvingDataSource 支持 SPLIT_TAG per-request Header 注入
                 DefaultMediaSourceFactory(ExoPlayerHelper.resolvingDataSource)
                     .setLiveTargetOffsetMs(5000) // 直播时延 5 秒
+                    // CENC Clear-Key（AD-01）：条件式 DRM，未声明 cenc-aes-ctr 的媒体行为不变
+                    .setDrmSessionManagerProvider(ExoPlayerHelper.cencDrmSessionProvider)
             )
             .build()
         selectorMap[player] = selector

@@ -167,6 +167,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * 直连 URL 播放（Intent 带 videoUrl）不携带 CENC 声明 ⇒ 必须清除上一会话残留。
+ * 抽成纯函数用于单测锁定该契约（避免「上一集 CENC 状态串到直连播放」）。
+ */
+internal fun shouldClearCencForDirectUrl(videoUrlExtra: String?): Boolean =
+    !videoUrlExtra.isNullOrBlank()
+
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack, RssFavoritesDialog.Callback, VideoSettingsPanel.SettingsPanelCallback {
 
@@ -541,6 +548,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             // 每次新会话说起都从「未就绪」开始：被 onPause 取消时 onResume 依此补跑
             sessionReady = false
             intent.getStringExtra("videoUrl")?.let {
+                // CENC（AD-05）：直连 URL 播放不带 DRM 声明，先清上一会话残留
+                if (shouldClearCencForDirectUrl(it)) VideoPlay.clearCenc()
                 VideoPlay.videoUrl = it
                 VideoPlay.singleUrl = true
             } ?: run {
@@ -550,6 +559,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 // 此处清残留，让 startPlay 走 source（RssSource/BookSource）嗅探分支播放新内容。
                 if (VideoPlay.singleUrl || VideoPlay.videoUrl != null) {
                     AppLog.put("VideoPlayerActivity initFromIntent: clear stale singleUrl state, singleUrl=${VideoPlay.singleUrl}, videoUrl=${VideoPlay.videoUrl?.take(2)}")
+                    VideoPlay.clearCenc()
                     VideoPlay.singleUrl = false
                     VideoPlay.videoUrl = null
                 }
