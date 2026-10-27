@@ -12,6 +12,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.source.exploreKindsJson
 import io.legado.app.help.source.getBookType
 import io.legado.app.model.Debug
+import io.legado.app.model.DebugFastMode
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setRuleData
@@ -117,7 +118,10 @@ object BookList {
             val ruleLastChapter = analyzeRule.splitSourceRule(bookListRule.lastChapter)
             val ruleWordCount = analyzeRule.splitSourceRule(bookListRule.wordCount)
             Debug.log(bookSource.bookSourceUrl, "└列表大小:${collections.size}")
-            for ((index, item) in collections.withIndex()) {
+            // 调试快速模式：只解析首条，避免 40 份重复字段日志（生产行为不变）
+            val fastMode = DebugFastMode.enabled(bookSource.bookSourceUrl)
+            val items = collections.take(DebugFastMode.itemLimit(collections.size, fastMode))
+            for ((index, item) in items.withIndex()) {
                 getSearchItem(
                     bookSource, analyzeRule, item, baseUrl, ruleData.getVariable(),
                     index == 0,

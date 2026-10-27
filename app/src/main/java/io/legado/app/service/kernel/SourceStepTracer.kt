@@ -125,12 +125,30 @@ object SourceStepTracer {
         "error" to null,
     )
 
-    /** 失败信封（`step` 指出失败环节）。 */
+    /** 失败信封（`step` 指出失败环节；`hint` 给出下一步排查建议，供 App/MCP 共用）。 */
     fun fail(step: String, message: String, elapsedMs: Long = 0L): Map<String, Any?> = mapOf(
         "success" to false,
         "step" to step,
         "elapsedMs" to elapsedMs,
         "detail" to null,
         "error" to message,
+        "hint" to hintForStep(step),
     )
+
+    /**
+     * 阶段级下一步建议（纯函数，无业务数据）。
+     *
+     * 口径：既有解析 API 不返回失败规则行号，故只给**阶段级**建议，不冒充精确诊断；
+     * App 调试摘要与 MCP 失败信封共用同一份文案，避免两端漂移。
+     */
+    fun hintForStep(step: String): String = when (step) {
+        STEP_SOURCE -> "检查源是否启用、入口 URL 与必填规则是否齐全"
+        STEP_SEARCH -> "检查搜索 URL / 关键词编码与 ruleSearch.bookList"
+        STEP_EXPLORE -> "检查发现 URL 与发现列表规则"
+        STEP_INFO -> "检查 ruleBookInfo 与登录态/反爬（Cookie、Header）"
+        STEP_TOC -> "检查 ruleToc.chapterList 与下一页规则"
+        STEP_CONTENT -> "检查 ruleContent、登录态与视频取流规则"
+        STEP_RSS -> "检查 ruleArticles / ruleContent 与分页规则"
+        else -> "查看完整日志定位失败阶段"
+    }
 }

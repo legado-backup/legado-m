@@ -1369,6 +1369,7 @@
     <string name="confirm">Confirm</string>
     <string name="jump_to_another_app">Jump to another app</string>
     <string name="source_tab_list">List</string>
+    <string name="source_tab_web_view">WebView</string>
     <string name="dict_rule">Dict rule</string>
     <string name="config_dict_rule">Config dict rule</string>
     <string name="create">Create</string>

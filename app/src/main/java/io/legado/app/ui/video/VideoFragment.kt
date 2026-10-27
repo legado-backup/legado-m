@@ -4,6 +4,11 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -29,6 +34,7 @@ import io.legado.app.help.gsyVideo.ChoiceSpeedDialog
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.source.isVideoSource
 import io.legado.app.help.video.LocalMediaResolver
+import io.legado.app.help.video.VideoPlaylistHolder
 import io.legado.app.model.Download
 import io.legado.app.model.VideoPlay
 import io.legado.app.service.DownloadTaskType
@@ -71,6 +77,63 @@ internal fun episodeIndicatorIndex(
     chapterInVolumeIndex: Int,
     rssEpisodeIndex: Int,
 ): Int = if (bookSession) chapterInVolumeIndex else rssEpisodeIndex
+
+/**
+ * 位置指示的「篇 + 集」双维度结果（纯数据，便于单测锁定）。
+ *
+ * - `listIndex/listTotal`：来源列表位置（书源=播放列表，订阅源=文章列表）；null 表示不显示。
+ * - `episodeIndex/episodeTotal`：剧集位置（书源=目录章节，订阅源=rssEpisodes）；null 表示不显示。
+ * - 索引一律 0-based，且必须落在合法范围；越界按 null 处理（宁可不显示，不显示错误位置）。
+ */
+internal data class PlaybackPosition(
+    val listIndex: Int?,
+    val listTotal: Int,
+    val episodeIndex: Int?,
+    val episodeTotal: Int,
+)
+
+/**
+ * 解析「第X篇 · 共Y篇」与「第X集 · 全Y集」两个维度。
+ *
+ * 语义边界（2026-10-27 用户反馈）：
+ * - 篇是公共信息：书源读 [VideoPlaylistHolder] 的播放列表，订阅源读 rssArticles；
+ * - 集独立展示：书源以 `chapterInVolumeIndex` 为权威，订阅源以 `rssEpisodeIndex` 为权威；
+ * - 篇与集互不串线，只有集允许触发选集弹框。
+ */
+internal fun resolvePlaybackPosition(
+    hasBook: Boolean,
+    rssArticleIndex: Int,
+    rssArticleCount: Int,
+    bookPlaylistIndex: Int?,
+    bookPlaylistTotal: Int,
+    bookEpisodeIndex: Int,
+    bookEpisodeCount: Int,
+    rssEpisodeIndex: Int,
+    rssEpisodeCount: Int,
+): PlaybackPosition {
+    val listIndex = if (hasBook) {
+        bookPlaylistIndex?.takeIf { bookPlaylistTotal > 1 && it in 0 until bookPlaylistTotal }
+    } else {
+        rssArticleIndex.takeIf { rssArticleCount > 1 && it in 0 until rssArticleCount }
+    }
+    val listTotal = when {
+        listIndex == null -> 0
+        hasBook -> bookPlaylistTotal
+        else -> rssArticleCount
+    }
+    val bookEpisodeSession = hasBook && bookEpisodeCount > 1
+    val episodeIndex = if (bookEpisodeSession) {
+        bookEpisodeIndex.takeIf { it in 0 until bookEpisodeCount }
+    } else {
+        rssEpisodeIndex.takeIf { rssEpisodeCount > 1 && it in 0 until rssEpisodeCount }
+    }
+    val episodeTotal = when {
+        episodeIndex == null -> 0
+        bookEpisodeSession -> bookEpisodeCount
+        else -> rssEpisodeCount
+    }
+    return PlaybackPosition(listIndex, listTotal, episodeIndex, episodeTotal)
+}
 
 /**
  * 次要入口（倍速/收藏/下载）可见性（纯策略，单测锁定）。
@@ -627,40 +690,74 @@ class VideoFragment : Fragment() {
      */
     private fun updatePositionIndicator() {
         val tv = tvPositionIndicator ?: return
-        val articles = VideoPlay.rssArticles
-        val episodes = VideoPlay.rssEpisodes
-        // 书源会话（含"书源视频映射为 rssEpisodes"的场景）：集索引权威是 chapterInVolumeIndex，
-        // 与左下角标题 displayEpisodeTitle 同源；否则会与 rssEpisodeIndex 错位一集（真机实证）。
-        val bookEpisodeCount = VideoPlay.episodes?.size ?: 0
-        val bookSession = VideoPlay.book != null && bookEpisodeCount > 1
-        val rssEpisodeMode = !bookSession && !episodes.isNullOrEmpty() && episodes.size > 1
-        val episodeIndex = episodeIndicatorIndex(
-            bookSession = bookSession,
-            chapterInVolumeIndex = VideoPlay.chapterInVolumeIndex,
+        val book = VideoPlay.book
+        val playlist = book?.let { VideoPlaylistHolder.positionOf(it.bookUrl) }
+        val position = resolvePlaybackPosition(
+            hasBook = book != null,
+            rssArticleIndex = VideoPlay.rssArticleIndex,
+            rssArticleCount = VideoPlay.rssArticles?.size ?: 0,
+            bookPlaylistIndex = playlist?.first,
+            bookPlaylistTotal = playlist?.second ?: 0,
+            bookEpisodeIndex = VideoPlay.chapterInVolumeIndex,
+            bookEpisodeCount = VideoPlay.episodes?.size ?: 0,
             rssEpisodeIndex = VideoPlay.rssEpisodeIndex,
+            rssEpisodeCount = VideoPlay.rssEpisodes?.size ?: 0,
         )
-        val text = when {
-            !articles.isNullOrEmpty() && articles.size > 1 ->
-                getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles.size)
-            bookSession ->
-                getString(R.string.video_playlist_position_episode, episodeIndex + 1, bookEpisodeCount)
-            rssEpisodeMode ->
-                getString(R.string.video_playlist_position_episode, episodeIndex + 1, episodes.size)
-            else -> ""
+        // 段 = (文案, 是否可点选集)；篇永远不可点，集才打开分组选集
+        val segments = mutableListOf<Pair<String, Boolean>>()
+        position.listIndex?.let {
+            segments += (getString(
+                R.string.video_playlist_position_article,
+                it + 1,
+                position.listTotal,
+            ) to false)
         }
-        if (text.isNotBlank()) {
-            val multiEpisode = bookSession || rssEpisodeMode
-            tv.text = text + if (multiEpisode) EPISODE_PICKER_ARROW_SUFFIX else ""
-            tv.isClickable = multiEpisode
-            tv.setOnClickListener {
-                (activity as? VideoPlayerActivity)?.showEpisodePicker()
-            }
-            tv.visible()
-        } else {
+        position.episodeIndex?.let {
+            segments += ((getString(
+                R.string.video_playlist_position_episode,
+                it + 1,
+                position.episodeTotal,
+            ) + EPISODE_PICKER_ARROW_SUFFIX) to true)
+        }
+        if (segments.isEmpty()) {
+            tv.text = ""
+            tv.movementMethod = null
             tv.isClickable = false
             tv.setOnClickListener(null)
             tv.gone()
+            return
         }
+        val text = segments.joinToString("  ") { it.first }
+        val spannable = SpannableString(text)
+        var start = 0
+        segments.forEach { (segment, clickable) ->
+            if (clickable) {
+                spannable.setSpan(
+                    object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            (activity as? VideoPlayerActivity)?.showEpisodePicker()
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            super.updateDrawState(ds)
+                            // 沿用位置指示的白色文字，不额外加下划线（保持悬浮层视觉一致）
+                            ds.isUnderlineText = false
+                            ds.color = tv.currentTextColor
+                        }
+                    },
+                    start,
+                    start + segment.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+            start += segment.length + "  ".length
+        }
+        tv.text = spannable
+        tv.movementMethod = LinkMovementMethod.getInstance()
+        // 点击由 ClickableSpan 承担；TextView 自身不设 clickable，避免「点篇也弹选集」
+        tv.isClickable = false
+        tv.setOnClickListener(null)
+        tv.visible()
     }
 
     /**

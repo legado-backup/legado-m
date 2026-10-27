@@ -1016,7 +1016,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         val articles = VideoPlay.rssArticles
         val episodes = VideoPlay.rssEpisodes
         val subInfo = when {
-            !articles.isNullOrEmpty() ->
+            !articles.isNullOrEmpty() && articles.size > 1 ->
                 getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles.size)
             !episodes.isNullOrEmpty() ->
                 getString(R.string.video_playlist_position_episode, VideoPlay.rssEpisodeIndex + 1, episodes.size)
@@ -1674,11 +1674,29 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         binding.run {
             showCover(book)
             tvName.text = book.name
-            book.getRealAuthor().takeIf { it.isNotEmpty() }?.let {
-                tvAuthor.text = it
-            } ?: tvAuthor.gone()
+            // 篇数公共显示（2026-10-27）：书源播放列表位置与作者同行，避免新增信息区
+            val meta = listOfNotNull(
+                book.getRealAuthor().takeIf { it.isNotEmpty() },
+                bookPlaylistPositionText(book),
+            ).joinToString(" · ")
+            if (meta.isNotEmpty()) {
+                tvAuthor.visible()
+                tvAuthor.text = meta
+            } else {
+                tvAuthor.gone()
+            }
             showBookIntro(book)
         }
+    }
+
+    /** 书源播放列表位置「第X篇 · 共Y篇」；无注入列表/单条/未命中时返回 null。 */
+    private fun bookPlaylistPositionText(book: Book?): String? {
+        val position = VideoPlaylistHolder.positionOf(book?.bookUrl) ?: return null
+        return getString(
+            R.string.video_playlist_position_article,
+            position.first + 1,
+            position.second,
+        )
     }
 
     inner class CustomWebViewClient : SilentSslWebViewClient() {

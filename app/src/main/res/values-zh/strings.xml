@@ -597,6 +597,8 @@
     <string name="source_tab_info">详情</string>
     <string name="source_tab_toc">目录</string>
     <string name="source_tab_content">正文</string>
+    <string name="source_tab_list">列表</string>
+    <string name="source_tab_web_view">WebView</string>
 
     <string name="web_port_title">Web 端口</string>
     <string name="web_port_summary">当前端口 %s</string>

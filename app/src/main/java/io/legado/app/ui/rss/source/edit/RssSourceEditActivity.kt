@@ -71,6 +71,9 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.ui.code.CodeEditPayloadPolicy
+import io.legado.app.ui.source.edit.SourceFieldEditor
+import io.legado.app.ui.source.edit.applyNoCapsTabLabels
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -110,6 +113,11 @@ class RssSourceEditActivity :
     VMBaseActivity<ViewBinding, RssSourceEditViewModel>(),
     KeyboardToolPop.CallBack,
     VariableDialog.Callback {
+
+    companion object {
+        /** 全屏编辑目标字段 key 的实例状态键（页面重建后仍能回填）。 */
+        private const val STATE_FULL_EDIT_KEY = "fullEditTargetKey"
+    }
 
     // CE 5.2（compose 包）：原 activity_rss_source_edit.xml 已退役 ⇒ composeShell 合成壳 +
     // attachComposeContent 单源承载；**四个 View 内核一律 AndroidView 原样托管**
@@ -163,6 +171,10 @@ class RssSourceEditActivity :
         KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
     private val adapter by lazy { RssSourceEditAdapter() }
+
+    /** 全屏编辑目标字段（key + 视图引用）；返回时以 key/EditEntity 为权威，避免复用视图盲写。 */
+    private var fullEditTargetKey: String? = null
+    private var fullEditTargetView: EditText? = null
     private val sourceEntities: ArrayList<EditEntity> = ArrayList()
     private val listEntities: ArrayList<EditEntity> = ArrayList()
     private val webViewEntities: ArrayList<EditEntity> = ArrayList()
@@ -185,6 +197,8 @@ class RssSourceEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        fullEditTargetKey = savedInstanceState?.getString(STATE_FULL_EDIT_KEY)
+        SourceFieldEditor.cleanupStale()
         softKeyboardTool.attachToWindow(window)
         initView()
         initComposeContent()
@@ -556,33 +570,98 @@ class RssSourceEditActivity :
 
     private val textEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
+            lifecycleScope.launch {
+                val text = SourceFieldEditor.readResult(result.data)
+                val cursor = result.data?.getIntExtra("cursorPosition", -1) ?: -1
+                if (text == null) {
+                    toastOnUi("未能读取编辑内容")
+                    clearFullEditTarget()
+                } else {
+                    applyFullEditResult(text, cursor)
+                }
+            }
+        } else {
+            SourceFieldEditor.discard(result.data)
+            clearFullEditTarget()
+        }
+    }
+
+    /** 回填全屏编辑结果：实体为权威；视图 key 匹配才 setText，否则重绑。 */
+    private fun applyFullEditResult(text: String, cursorPosition: Int) {
+        val key = fullEditTargetKey
+        if (key == null) {
             val view = window.decorView.findFocus()
             if (view is EditText) {
-                result.data?.getStringExtra("text")?.let {
-                    view.setText(it)
-                }
-                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it in 0 ..< view.text.length }?.let {
-                    view.setSelection(it)
-                }
+                view.setText(text)
+                if (cursorPosition in 0..view.text.length) view.setSelection(cursorPosition)
             } else {
                 toastOnUi(R.string.focus_lost_on_textbox)
             }
+            return
         }
+        val index = adapter.indexOfKey(key)
+        if (index < 0) {
+            toastOnUi("目标字段已不存在，未能回填")
+            clearFullEditTarget()
+            return
+        }
+        adapter.editEntities[index].value = text
+        val target = fullEditTargetView
+        if (target != null && target.getTag(R.id.tag) == key) {
+            target.setText(text)
+            if (cursorPosition in 0..target.text.length) {
+                target.setSelection(cursorPosition)
+            }
+        } else {
+            adapter.notifyItemChanged(index)
+        }
+        clearFullEditTarget()
     }
+
+    private fun clearFullEditTarget() {
+        fullEditTargetKey = null
+        fullEditTargetView = null
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        fullEditTargetKey?.let { outState.putString(STATE_FULL_EDIT_KEY, it) }
+    }
+
     private fun onFullEditClicked() {
         val view = window.decorView.findFocus()
-        if (view is EditText) {
-            val hint = findParentTextInputLayout(view)?.hint?.toString()
-            val currentText = view.text.toString()
-            val intent = Intent(this, CodeEditActivity::class.java).apply {
-                putExtra("text", currentText)
-                putExtra("title", hint)
-                putExtra("cursorPosition", view.selectionStart)
-            }
-            textEditLauncher.launch(intent)
-        }
-        else {
+        if (view !is EditText) {
             toastOnUi(R.string.please_focus_cursor_on_textbox)
+            return
+        }
+        if (fullEditTargetKey != null) return
+        val hint = findParentTextInputLayout(view)?.hint?.toString()
+        val currentText = view.text.toString()
+        val cursor = view.selectionStart
+        val key = view.getTag(R.id.tag) as? String
+        lifecycleScope.launch {
+            val sessionIntent = SourceFieldEditor.open(
+                context = this@RssSourceEditActivity,
+                text = currentText,
+                title = hint,
+                cursorPosition = cursor,
+            )
+            val intent = sessionIntent ?: run {
+                if (currentText.length <= CodeEditPayloadPolicy.MaxInlineChars) {
+                    Intent(this@RssSourceEditActivity, CodeEditActivity::class.java).apply {
+                        putExtra("text", currentText)
+                        putExtra("title", hint)
+                        putExtra("cursorPosition", cursor)
+                    }
+                } else {
+                    toastOnUi("无法打开编辑器（存储不可用），请释放空间后重试")
+                    null
+                }
+            } ?: return@launch
+            if (isFinishing) return@launch
+            fullEditTargetKey = key
+            fullEditTargetView = view
+            textEditLauncher.launch(intent)
         }
     }
 
@@ -597,8 +676,10 @@ class RssSourceEditActivity :
             setText(R.string.source_tab_list)
         })
         tabLayoutView.addTab(tabLayoutView.newTab().apply {
-            text = "WEB_VIEW"
+            setText(R.string.source_tab_web_view)
         })
+        // WebView 保留英文规范大小写（TabLayout 默认会强制全大写）
+        tabLayoutView.applyNoCapsTabLabels()
         recyclerView.setEdgeEffectColor(primaryColor)
         val createSpanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int = when (adapter.getItemViewType(position)) {

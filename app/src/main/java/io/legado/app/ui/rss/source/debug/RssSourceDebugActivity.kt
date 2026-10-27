@@ -6,6 +6,9 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.FileProvider
 import androidx.viewbinding.ViewBinding
@@ -14,14 +17,15 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.base.attachComposeContent
 import io.legado.app.base.composeShell
 import io.legado.app.model.Debug
+import io.legado.app.ui.source.debug.DebugPhase
+import io.legado.app.ui.source.debug.debugStatusText
+import io.legado.app.ui.source.debug.openDebugFullContent
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.GlassTopAppBar
 import io.legado.app.ui.widget.components.MenuAction
 import io.legado.app.ui.widget.components.TopBarActionRow
 import io.legado.app.ui.widget.compose.showComposeChoiceListDialog
-import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.sendToClip
-import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import java.io.File
 import java.text.SimpleDateFormat
@@ -37,6 +41,9 @@ class RssSourceDebugActivity : VMBaseActivity<ViewBinding, RssSourceDebugModel>(
     // M7 清壳：原 activity_rss_source_debug.xml 仅含两个 ComposeView（无 View 语义）
     override val binding: ViewBinding by lazy { composeShell(this) }
     override val viewModel by viewModels<RssSourceDebugModel>()
+
+    /** 顶栏副标题状态（源名 · 状态）；由 Screen 在阶段/状态变化时上抛。 */
+    private var composeStatus by mutableStateOf("就绪")
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initComposeContent()
@@ -56,6 +63,9 @@ class RssSourceDebugActivity : VMBaseActivity<ViewBinding, RssSourceDebugModel>(
                 Column {
                     GlassTopAppBar(
                         title = getString(R.string.debug_source),
+                        subtitle = listOf(viewModel.sourceName, composeStatus)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" · "),
                         navIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavClick = { finish() },
                         actions = {
@@ -73,7 +83,10 @@ class RssSourceDebugActivity : VMBaseActivity<ViewBinding, RssSourceDebugModel>(
                         onStart = { key -> viewModel.startDebug(key) { toastOnUi("未获取到订阅源") } },
                         onCancel = { viewModel.stopDebug() },
                         onShowFull = { title, content ->
-                            showDialogFragment(TextDialog(title, content, TextDialog.Mode.TEXT))
+                            openDebugFullContent(this@RssSourceDebugActivity, title, content)
+                        },
+                        onStatusChange = { phase: DebugPhase, stage: String? ->
+                            composeStatus = debugStatusText(phase, stage)
                         },
                         modifier = Modifier.weight(1f),
                     )

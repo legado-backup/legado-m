@@ -12,6 +12,7 @@ import io.legado.app.help.coroutine.CompositeCoroutine
 import io.legado.app.help.source.sortUrls
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.service.kernel.SourceStepTracer
 import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.isAbsUrl
@@ -30,6 +31,24 @@ object Debug {
     val debugMessageMap = HashMap<String, String>()
     private val debugTimeMap = HashMap<String, Long>()
     var isChecking: Boolean = false
+
+    /** 调试会话是否仍在进行（startDebug 置 true；终态 1000/-1 或 cancelDebug 置 false）。 */
+    private var debugRunning: Boolean = false
+
+    /** 当前调试阶段（复用 `SourceStepTracer.STEP_*`，日志事件在写入时快照此值）。 */
+    private var stage: String? = null
+
+    /** 调试会话单条消息上限：远大于普通 2000，覆盖完整 HTML/JSON 列表响应。 */
+    private const val DEBUG_MESSAGE_MAX_CHARS = 256 * 1024
+
+    /** 普通日志单条上限（logcat 仍用此值，防刷爆）。 */
+    private const val NORMAL_MESSAGE_MAX_CHARS = 2000
+
+    /** 会话缓冲总字符预算（4MB），超限淘汰最旧，防连续大响应 OOM。 */
+    private const val SESSION_CHAR_BUDGET = 4 * 1024 * 1024
+
+    /** 结构化事件流总字符预算（4MB），超限淘汰最旧但至少保留末条。 */
+    private const val EVENT_CHAR_BUDGET = 4 * 1024 * 1024
 
     /**
      * log-compliance-cleanup 批次E：调试会话缓冲（业务侧第四通道，不并入 AppLog——用户裁决口径）。
@@ -66,6 +85,8 @@ object Debug {
         val message: String,
         val timestamp: Long = System.currentTimeMillis(),
         val elapsedMillis: Long = timestamp - startTime,
+        /** 阶段（`SourceStepTracer.STEP_*`）；旧事件/非调试链日志可为 null。 */
+        val stage: String? = null,
     )
 
     private const val MAX_EVENT_ENTRIES = 1000
@@ -84,6 +105,24 @@ object Debug {
         return callback != null && debugSource == sourceUrl
     }
 
+    /**
+     * 是否处于该源的**进行中**调试会话（快速模式门控）。
+     *
+     * 与 [isDebugging] 的区别：[isDebugging] 依赖旧 `callback`（Compose 调试页已不设置 ⇒ 恒 false）；
+     * 本方法用 `debugRunning + debugSource` 判定，供解析链在调试时收敛并发/翻页/条目。
+     * 终态（1000/-1）与 [cancelDebug] 会把 `debugRunning` 置 false ⇒ 调试结束后的试播/正常播放不被误伤。
+     */
+    @Synchronized
+    fun isDebugSessionFor(sourceUrl: String?): Boolean {
+        return debugRunning && sourceUrl != null && debugSource == sourceUrl
+    }
+
+    /** 仅在调试开始时由本类内部切换阶段。 */
+    @Synchronized
+    private fun updateStage(value: String?) {
+        stage = value
+    }
+
     @Synchronized
     fun log(
         sourceUrl: String?,
@@ -93,34 +132,41 @@ object Debug {
         showTime: Boolean = true,
         state: Int = 1
     ) {
-        // P0 截断保护：单点截断覆盖下游 Log.d + callback + isChecking 分支（复用 AppLog.truncateSafely 避免循环依赖）
-        val safeMsg = AppLog.truncateSafely(msg)
+        // 调试会话：UI/事件流放宽到 256K；logcat 仍按 2000 截断（防刷爆）
+        val isSession = debugRunning && sourceUrl != null && debugSource == sourceUrl
+        val normalMsg = AppLog.truncateSafely(msg, NORMAL_MESSAGE_MAX_CHARS)
+        val uiMsg = if (isSession) {
+            AppLog.truncateSafely(msg, DEBUG_MESSAGE_MAX_CHARS)
+        } else {
+            normalMsg
+        }
         // 批次E：logcat 守卫放宽——recordLog 开启时 release 包也输出（调试是用户主动行为，
         // 会话短暂不构成噪音；AI 可 adb logcat -s sourceDebug 从用户真机采集）
         if (BuildConfig.BUILD_DEBUG || AppLog.recordLogEnabled()) {
-            Log.d("sourceDebug", safeMsg)
+            Log.d("sourceDebug", normalMsg)
         }
         // 批次E：会话缓冲同步写入（不受 callback 过滤影响，全量留痕）
-        var bufferMsg = if (isHtml) HtmlFormatter.format(safeMsg) else safeMsg
+        var bufferMsg = if (isHtml) HtmlFormatter.format(uiMsg) else uiMsg
         if (showTime) {
             val time = debugTimeFormat.format(Date(System.currentTimeMillis() - startTime))
             bufferMsg = "$time $bufferMsg"
         }
         sessionLines.addLast(bufferMsg)
-        while (sessionLines.size > MAX_SESSION_LINES) {
-            sessionLines.removeFirst()
-        }
+        trimSessionLines()
         // debug-page-redesign AD-01：同步发射结构化事件（log() 已 @Synchronized，追加无竞态）
-        _events.value = (_events.value + DebugEvent(
-            kind = state,
-            message = bufferMsg,
-        )).takeLast(MAX_EVENT_ENTRIES)
+        appendEvent(
+            DebugEvent(
+                kind = state,
+                message = bufferMsg,
+                stage = stage,
+            )
+        )
         //调试信息始终要执行
         callback?.let {
-            if ((debugSource != sourceUrl || !print)) return
-            var printMsg = safeMsg
+            if ((debugSource != sourceUrl || !print)) return@let
+            var printMsg = uiMsg
             if (isHtml) {
-                printMsg = HtmlFormatter.format(safeMsg)
+                printMsg = HtmlFormatter.format(uiMsg)
             }
             if (showTime) {
                 val time = debugTimeFormat.format(Date(System.currentTimeMillis() - startTime))
@@ -128,10 +174,10 @@ object Debug {
             }
             it.printLog(state, printMsg)
         }
-        if (isChecking && sourceUrl != null && safeMsg.length < 30) {
-            var printMsg = safeMsg
+        if (isChecking && sourceUrl != null && uiMsg.length < 30) {
+            var printMsg = uiMsg
             if (isHtml) {
-                printMsg = HtmlFormatter.format(safeMsg)
+                printMsg = HtmlFormatter.format(uiMsg)
             }
             if (showTime && debugTimeMap[sourceUrl] != null) {
                 val time =
@@ -141,6 +187,32 @@ object Debug {
                 debugMessageMap[sourceUrl] = "$time $printMsg"
             }
         }
+        // 终态：先按会话上限写入上面的事件，再关闭快速模式（保证完成/失败那条本身也不被 2000 截断）
+        if (state == 1000 || state == -1) {
+            debugRunning = false
+        }
+    }
+
+    /** 会话缓冲：500 行 + 4MB 字符预算，超限淘汰最旧。 */
+    private fun trimSessionLines() {
+        if (sessionLines.isEmpty()) return
+        var totalChars = sessionLines.sumOf { it.length }
+        while ((sessionLines.size > MAX_SESSION_LINES || totalChars > SESSION_CHAR_BUDGET) &&
+            sessionLines.isNotEmpty()
+        ) {
+            totalChars -= sessionLines.removeFirst().length
+        }
+    }
+
+    /** 事件流：1000 条 + 4MB 字符预算，超限淘汰最旧，但至少保留末条。 */
+    private fun appendEvent(event: DebugEvent) {
+        val list = _events.value.toMutableList()
+        list.add(event)
+        var totalChars = list.sumOf { it.message.length }
+        while ((list.size > MAX_EVENT_ENTRIES || totalChars > EVENT_CHAR_BUDGET) && list.size > 1) {
+            totalChars -= list.removeAt(0).message.length
+        }
+        _events.value = list
     }
 
     @Synchronized
@@ -151,6 +223,9 @@ object Debug {
     @Synchronized
     fun cancelDebug(destroy: Boolean = false) {
         tasks.clear()
+        // 调试会话结束：快速模式立即失效（避免试播/正常播放命中「只取首页首条」）
+        debugRunning = false
+        stage = null
         // 批次E：会话结束（新调试开始或页面销毁）时清空缓冲，避免跨会话串日志（同锁防与 log()/getSessionLogs 并发）
         sessionLines.clear()
 
@@ -205,7 +280,11 @@ object Debug {
     suspend fun startDebug(scope: CoroutineScope, rssSource: RssSource) {
         cancelDebug()
         debugSource = rssSource.sourceUrl
+        debugRunning = true
+        stage = SourceStepTracer.STEP_RSS
+        startTime = System.currentTimeMillis()
         log(debugSource, "︾开始解析")
+        DebugFastMode.logFastMode(debugSource)
         val sort = rssSource.sortUrls().first()
         Rss.getArticles(scope, sort.first, sort.second, rssSource, 1)
             .onSuccess {
@@ -236,7 +315,10 @@ object Debug {
     fun startDebug(scope: CoroutineScope, rssSource: RssSource, key: String) {
         cancelDebug()
         debugSource = rssSource.sourceUrl
+        debugRunning = true
+        stage = SourceStepTracer.STEP_RSS
         startTime = System.currentTimeMillis()
+        DebugFastMode.logFastMode(debugSource)
         when {
             key.contains("::") -> {
                 val name = key.substringBefore("::")
@@ -278,6 +360,7 @@ object Debug {
     }
 
     private fun sortDebug(scope: CoroutineScope, rssSource: RssSource, name: String, url: String, key: String? = null) {
+        updateStage(SourceStepTracer.STEP_RSS)
         Rss.getArticles(scope, name, url, rssSource, 1, key)
             .onSuccess {
                 if (it.first.isEmpty()) {
@@ -310,6 +393,7 @@ object Debug {
         ruleContent: String,
         rssSource: RssSource
     ) {
+        updateStage(SourceStepTracer.STEP_CONTENT)
         log(debugSource, "︾开始解析内容页")
         Rss.getContent(scope, rssArticle, ruleContent, rssSource)
             .onSuccess {
@@ -324,7 +408,10 @@ object Debug {
     fun startDebug(scope: CoroutineScope, bookSource: BookSource, key: String) {
         cancelDebug()
         debugSource = bookSource.bookSourceUrl
+        debugRunning = true
+        stage = SourceStepTracer.STEP_SOURCE
         startTime = System.currentTimeMillis()
+        DebugFastMode.logFastMode(debugSource)
         when {
             key.isAbsUrl() -> {
                 val book = Book()
@@ -368,6 +455,7 @@ object Debug {
     }
 
     private fun exploreDebug(scope: CoroutineScope, bookSource: BookSource, url: String) {
+        updateStage(SourceStepTracer.STEP_EXPLORE)
         log(debugSource, "︾开始解析发现页")
         val explore = WebBook.exploreBook(scope, bookSource, url, 1)
             .onSuccess { exploreBooks ->
@@ -386,6 +474,7 @@ object Debug {
     }
 
     private fun searchDebug(scope: CoroutineScope, bookSource: BookSource, key: String) {
+        updateStage(SourceStepTracer.STEP_SEARCH)
         log(debugSource, "︾开始解析搜索页")
         val search = WebBook.searchBook(scope, bookSource, key, 1)
             .onSuccess { searchBooks ->
@@ -410,6 +499,7 @@ object Debug {
             tocDebug(scope, bookSource, book)
             return
         }
+        updateStage(SourceStepTracer.STEP_INFO)
         log(debugSource, "︾开始解析详情页")
         val info = WebBook.getBookInfo(scope, bookSource, book)
             .onSuccess {
@@ -428,6 +518,7 @@ object Debug {
     }
 
     private fun tocDebug(scope: CoroutineScope, bookSource: BookSource, book: Book) {
+        updateStage(SourceStepTracer.STEP_TOC)
         log(debugSource, "︾开始解析目录页")
         val chapterList = WebBook.getChapterList(scope, bookSource, book)
             .onSuccess { chapters ->
@@ -454,6 +545,7 @@ object Debug {
         bookChapter: BookChapter,
         nextChapterUrl: String?
     ) {
+        updateStage(SourceStepTracer.STEP_CONTENT)
         log(debugSource, "︾开始解析正文页")
         val content = WebBook.getContent(
             scope = scope,

@@ -79,6 +79,23 @@ object VideoPlaylistHolder {
         return contained
     }
 
+    /**
+     * 当前位置（0-based 下标 + 列表总数），供播放页展示「第X篇 · 共Y篇」。
+     *
+     * 口径：
+     * - 只读、不消费（[consume] 的 consumed 语义不变）；
+     * - 当前 bookUrl 必须精确命中列表，否则返回 null（宁可不显示，不伪造位置）；
+     * - 总数 ≤ 1 返回 null（单条无信息量）。
+     */
+    fun positionOf(bookUrl: String?): Pair<Int, Int>? {
+        if (bookUrl.isNullOrBlank()) return null
+        val list = books ?: return null
+        if (list.size <= 1) return null
+        val idx = list.indexOfFirst { it.bookUrl == bookUrl }
+        if (idx < 0) return null
+        return idx to list.size
+    }
+
     /** 取指定影片在列表中的邻居（direction: +1 下一部 / -1 上一部） */
     fun neighborOf(bookUrl: String?, direction: Int): SearchBook? {
         val list = books ?: run {

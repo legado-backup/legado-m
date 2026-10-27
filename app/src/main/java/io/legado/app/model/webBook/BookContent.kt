@@ -12,6 +12,7 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.Debug
+import io.legado.app.model.DebugFastMode
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -59,6 +60,7 @@ object BookContent {
         val contentList = arrayListOf<String>()
         val nextUrlList = arrayListOf(redirectUrl)
         val contentRule = bookSource.getContentRule()
+        val fastMode = DebugFastMode.enabled(bookSource.bookSourceUrl)
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setContent(body, baseUrl)
         analyzeRule.setRedirectUrl(redirectUrl)
@@ -106,7 +108,7 @@ object BookContent {
                 for (urlStr in contentData.second) {
                     emit(urlStr)
                 }
-            }.mapAsync(AppConfig.updateCacheThreadCount) { urlStr ->
+            }.mapAsync(DebugFastMode.parseConcurrency(AppConfig.updateCacheThreadCount, fastMode)) { urlStr ->
                 val analyzeUrl = AnalyzeUrl(
                     mUrl = urlStr,
                     source = bookSource,

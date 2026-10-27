@@ -16,6 +16,7 @@ import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.SourcePreconnectHelper
 import io.legado.app.model.Debug
+import io.legado.app.model.DebugFastMode
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -46,6 +47,7 @@ object BookChapterList {
             appCtx.getString(R.string.error_get_web_content, baseUrl)
         )
         val chapterList = ArrayList<BookChapter>()
+        val fastMode = DebugFastMode.enabled(bookSource.bookSourceUrl)
         Debug.log(bookSource.bookSourceUrl, "≡获取成功:${baseUrl}")
         Debug.log(bookSource.bookSourceUrl, body, state = 30)
         val tocRule = bookSource.getTocRule()
@@ -63,7 +65,10 @@ object BookChapterList {
             analyzeChapterList(
                 book, baseUrl, redirectUrl, body,
                 tocRule, listRule, bookSource, log = true,
-                isFromBookInfo = isFromBookInfo
+                isFromBookInfo = isFromBookInfo,
+                // 调试快速模式：只解析目录首页（不取下一页）+ 只解析首条章节
+                getNextUrl = DebugFastMode.paginationEnabled(fastMode),
+                itemLimit = DebugFastMode.itemLimit(Int.MAX_VALUE, fastMode),
             )
         chapterList.addAll(chapterData.first)
         when (chapterData.second.size) {
@@ -101,7 +106,7 @@ object BookChapterList {
                     for (urlStr in chapterData.second) {
                         emit(urlStr)
                     }
-                }.mapAsync(AppConfig.updateCacheThreadCount) { urlStr ->
+                }.mapAsync(DebugFastMode.parseConcurrency(AppConfig.updateCacheThreadCount, fastMode)) { urlStr ->
                     val analyzeUrl = AnalyzeUrl(
                         mUrl = urlStr,
                         source = bookSource,
@@ -205,7 +210,8 @@ object BookChapterList {
         bookSource: BookSource,
         getNextUrl: Boolean = true,
         log: Boolean = false,
-        isFromBookInfo:Boolean
+        isFromBookInfo:Boolean,
+        itemLimit: Int = Int.MAX_VALUE,
     ): Pair<List<BookChapter>, List<String>> {
         val analyzeRule = AnalyzeRule(book, bookSource, false, isFromBookInfo)
         analyzeRule.setContent(body).setBaseUrl(baseUrl)
@@ -237,6 +243,15 @@ object BookChapterList {
         currentCoroutineContext().ensureActive()
         if (elements.isNotEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "┌解析目录列表", log)
+            // 调试快速模式：只解析首条章节，避免大目录逐项日志拖慢/刷屏
+            if (elements.size > itemLimit) {
+                Debug.log(
+                    bookSource.bookSourceUrl,
+                    "◇调试快速模式：仅解析首条章节(共${elements.size})",
+                    log
+                )
+            }
+            val items = elements.take(itemLimit)
             val nameRule = analyzeRule.splitSourceRule(tocRule.chapterName)
             val urlRule = analyzeRule.splitSourceRule(tocRule.chapterUrl)
             val vipRule = analyzeRule.splitSourceRule(tocRule.isVip)
@@ -244,7 +259,7 @@ object BookChapterList {
             val upTimeRule = analyzeRule.splitSourceRule(tocRule.updateTime)
             val isVolumeRule = analyzeRule.splitSourceRule(tocRule.isVolume)
             val tocCountWords = AppConfig.tocCountWords
-            elements.forEachIndexed { index, item ->
+            items.forEachIndexed { index, item ->
                 currentCoroutineContext().ensureActive()
                 analyzeRule.setContent(item)
                 val bookChapter = BookChapter(bookUrl = book.bookUrl, baseUrl = redirectUrl)

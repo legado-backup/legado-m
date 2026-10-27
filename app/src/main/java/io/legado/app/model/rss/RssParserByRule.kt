@@ -9,6 +9,7 @@ import io.legado.app.help.source.autoNextPageEnabled
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.Debug
+import io.legado.app.model.DebugFastMode
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setRuleData
@@ -96,15 +97,22 @@ object RssParserByRule {
             // 🔴 硬性前提2：articleList不在并行块内add（mutableListOf非线程安全），awaitAll后批量收集
             // 顺序保证：mapIndexed+awaitAll保持发起顺序，filterNotNull保持顺序，与原for循环结果一致
             // 并发数：源级parseConcurrency(>0)优先，否则使用全局配置rssParseConcurrency(默认3)
-            val parseConcurrency = if (rssSource.parseConcurrency > 0) {
+            val configuredConcurrency = if (rssSource.parseConcurrency > 0) {
                 rssSource.parseConcurrency
             } else {
                 AppConfig.rssParseConcurrency
             }
-            Debug.log(sourceUrl, "┌并行解析列表项(共${collections.size}项,限流${parseConcurrency})")
+            // 调试快速模式：并发固定 1 + 只解析首条，保证日志顺序确定、无重复列表噪声
+            val fastMode = DebugFastMode.enabled(sourceUrl)
+            val parseConcurrency = DebugFastMode.parseConcurrency(configuredConcurrency, fastMode)
+            val items = collections.take(DebugFastMode.itemLimit(collections.size, fastMode))
+            if (items.size < collections.size) {
+                Debug.log(sourceUrl, "◇调试快速模式：仅解析首条(共${collections.size}项)")
+            }
+            Debug.log(sourceUrl, "┌并行解析列表项(共${items.size}项,限流${parseConcurrency})")
             val parseSemaphore = Semaphore(parseConcurrency)
             val articleList = coroutineScope {
-                collections.mapIndexed { index, item ->
+                items.mapIndexed { index, item ->
                     async(Dispatchers.IO) {
                         parseSemaphore.withPermit {
                             // 硬性前提1：独立 AnalyzeRule 实例
@@ -130,7 +138,7 @@ object RssParserByRule {
                 it.sort = sortName
                 it.origin = sourceUrl
             }
-            Debug.log(sourceUrl, "└并行解析完成(成功${articleList.size}/${collections.size}项)")
+            Debug.log(sourceUrl, "└并行解析完成(成功${articleList.size}/${items.size}项)")
             if (reverse) {
                 articleList.reverse()
             }

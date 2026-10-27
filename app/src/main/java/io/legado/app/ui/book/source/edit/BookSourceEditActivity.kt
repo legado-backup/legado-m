@@ -49,6 +49,8 @@ import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.ui.code.CodeEditPayloadPolicy
+import io.legado.app.ui.source.edit.SourceFieldEditor
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -86,6 +88,11 @@ class BookSourceEditActivity :
     KeyboardToolPop.CallBack,
     VariableDialog.Callback {
 
+    companion object {
+        /** 全屏编辑目标字段 key 的实例状态键（页面重建后仍能回填）。 */
+        private const val STATE_FULL_EDIT_KEY = "fullEditTargetKey"
+    }
+
     // 原 activity_book_source_edit.xml 已退役（CE-a）：composeShell 合成壳 + attachComposeContent 单源；
     // 顶栏由 installGlassTopBar 运行时注入（首插 ComposeView + 移除 R.id.title_bar 锚点）改为**页内直接渲染**
     override val binding: ViewBinding by lazy { composeShell(this) }
@@ -96,6 +103,10 @@ class BookSourceEditActivity :
     private val shell by lazy { BookSourceEditShellViews(this) }
 
     private val adapter by lazy { BookSourceEditAdapter() }
+
+    /** 全屏编辑目标字段（key + 视图引用）；返回时以 key/EditEntity 为权威，避免复用视图盲写。 */
+    private var fullEditTargetKey: String? = null
+    private var fullEditTargetView: EditText? = null
     private val sourceEntities: ArrayList<EditEntity> = ArrayList()
     private val searchEntities: ArrayList<EditEntity> = ArrayList()
     private val exploreEntities: ArrayList<EditEntity> = ArrayList()
@@ -125,6 +136,9 @@ class BookSourceEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // 全屏编辑期间页面重建：恢复目标字段 key，保证返回后仍能回填
+        fullEditTargetKey = savedInstanceState?.getString(STATE_FULL_EDIT_KEY)
+        SourceFieldEditor.cleanupStale()
         // JS 单文件书源没有可编辑的声明式规则：**在建任何界面之前**统一重定向到 JS 编排页。
         // 为什么收敛在这里而不是逐个改调用方：发现页/阅读页/播放器/音频页/书籍详情等 ≥6 处都会拉起本页
         // （`ExploreFragment:3402`、`ReadBookActivity:333`、`VideoPlayerActivity:344`、`AudioPlayActivity:127` …），
@@ -324,34 +338,101 @@ class BookSourceEditActivity :
 
     private val textEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
+            lifecycleScope.launch {
+                val text = SourceFieldEditor.readResult(result.data)
+                val cursor = result.data?.getIntExtra("cursorPosition", -1) ?: -1
+                if (text == null) {
+                    toastOnUi("未能读取编辑内容")
+                    clearFullEditTarget()
+                } else {
+                    applyFullEditResult(text, cursor)
+                }
+            }
+        } else {
+            SourceFieldEditor.discard(result.data)
+            clearFullEditTarget()
+        }
+    }
+
+    /** 回填全屏编辑结果：实体为权威；视图 key 匹配才 setText，否则重绑。 */
+    private fun applyFullEditResult(text: String, cursorPosition: Int) {
+        val key = fullEditTargetKey
+        if (key == null) {
+            // 兼容旧焦点路径（理论上不再走到）
             val view = window.decorView.findFocus()
             if (view is EditText) {
-                result.data?.getStringExtra("text")?.let {
-                    view.setText(it)
-                }
-                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it in 0 ..< view.text.length }?.let {
-                    view.setSelection(it)
-                }
+                view.setText(text)
+                if (cursorPosition in 0..view.text.length) view.setSelection(cursorPosition)
             } else {
                 toastOnUi(R.string.focus_lost_on_textbox)
             }
+            return
         }
+        val index = adapter.indexOfKey(key)
+        if (index < 0) {
+            toastOnUi("目标字段已不存在，未能回填")
+            clearFullEditTarget()
+            return
+        }
+        adapter.editEntities[index].value = text
+        val target = fullEditTargetView
+        if (target != null && target.getTag(R.id.tag) == key) {
+            target.setText(text)
+            if (cursorPosition in 0..target.text.length) {
+                target.setSelection(cursorPosition)
+            }
+        } else {
+            adapter.notifyItemChanged(index)
+        }
+        clearFullEditTarget()
+    }
+
+    private fun clearFullEditTarget() {
+        fullEditTargetKey = null
+        fullEditTargetView = null
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        fullEditTargetKey?.let { outState.putString(STATE_FULL_EDIT_KEY, it) }
     }
 
     private fun onFullEditClicked() {
         val view = window.decorView.findFocus()
-        if (view is EditText) {
-            val hint = findParentTextInputLayout(view)?.hint?.toString()
-            val currentText = view.text.toString()
-            val intent = Intent(this, CodeEditActivity::class.java).apply {
-                putExtra("text", currentText)
-                putExtra("title", hint)
-                putExtra("cursorPosition", view.selectionStart)
-            }
-            textEditLauncher.launch(intent)
-        }
-        else {
+        if (view !is EditText) {
             toastOnUi(R.string.please_focus_cursor_on_textbox)
+            return
+        }
+        // 防双开：已有待回填目标时忽略
+        if (fullEditTargetKey != null) return
+        val hint = findParentTextInputLayout(view)?.hint?.toString()
+        val currentText = view.text.toString()
+        val cursor = view.selectionStart
+        val key = view.getTag(R.id.tag) as? String
+        lifecycleScope.launch {
+            val sessionIntent = SourceFieldEditor.open(
+                context = this@BookSourceEditActivity,
+                text = currentText,
+                title = hint,
+                cursorPosition = cursor,
+            )
+            val intent = sessionIntent ?: run {
+                // 会话创建失败：小字段回落旧内联通道；大字段明确提示，不崩溃
+                if (currentText.length <= CodeEditPayloadPolicy.MaxInlineChars) {
+                    Intent(this@BookSourceEditActivity, CodeEditActivity::class.java).apply {
+                        putExtra("text", currentText)
+                        putExtra("title", hint)
+                        putExtra("cursorPosition", cursor)
+                    }
+                } else {
+                    toastOnUi("无法打开编辑器（存储不可用），请释放空间后重试")
+                    null
+                }
+            } ?: return@launch
+            if (isFinishing) return@launch
+            fullEditTargetKey = key
+            fullEditTargetView = view
+            textEditLauncher.launch(intent)
         }
     }
 
