@@ -510,6 +510,28 @@ object VideoPlay : CoroutineScope by MainScope(){
     private var isSwitchingArticle = false
     var videoUrl: String? = null //播放链接
     /**
+     * CENC Clear-Key（AD-05）：书源 ruleContent 返回 `{url,kid,encryption}` 时写入。
+     * 与 [videoUrl] 生命周期一致——每次采集入口先 [clearCenc]，仅命中声明时才置值。
+     */
+    @Volatile
+    var cencKid: String? = null
+    @Volatile
+    var cencEncryption: String? = null
+
+    /**
+     * CENC 声明对应的**原始远端地址**：播放器仅当 `currentUrl == cencUrl` 时才启用 DRM/注入器。
+     * 软件降级切到本地明文文件后 `currentUrl` 不再匹配 ⇒ 即使播放器实例上还残留声明也不会误启用。
+     */
+    @Volatile
+    var cencUrl: String? = null
+
+    /** 清空 CENC 声明（换集/换源/普通明文播放前必须调用，防上一集残留） */
+    fun clearCenc() {
+        cencKid = null
+        cencEncryption = null
+        cencUrl = null
+    }
+    /**
      * video-sniff-403-and-rss-classic-fix 4.8b（Z9）：嗅探前原始 URL（播放历史键）。
      * 记录原始链接（episode.url/文章链接/书源正文链接）而非嗅探后地址——
      * 源侧 token 轮换后原始链接仍可重嗅，嗅探后地址会永久失配导致进度记忆失效。

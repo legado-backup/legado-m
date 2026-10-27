@@ -269,3 +269,6 @@ git_log.txt
 
 # brooks-lint / 设备联调本地状态（工具产物，非项目产物，2026-10-24）
 /.trae-aicc/
+
+# Reverse-engineering local workspace (local only, never commit)
+/tools/reverse/

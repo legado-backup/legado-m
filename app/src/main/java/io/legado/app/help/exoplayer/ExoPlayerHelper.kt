@@ -23,6 +23,7 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.dash.DashMediaSource
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.smoothstreaming.SsMediaSource
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
@@ -824,7 +825,9 @@ object ExoPlayerHelper {
     fun createMediaItem(
         url: String,
         headers: Map<String, String>,
-        sniffedMimeType: String? = null
+        sniffedMimeType: String? = null,
+        cencKid: String? = null,
+        cencEncryption: String? = null
     ): MediaItem {
         val mediaItemBuilder = MediaItem.Builder().setUri(url)
         // exoplayer-resilience Layer 1：优先级链 sniffedMimeType > getMimeType(url) > null
@@ -854,7 +857,11 @@ object ExoPlayerHelper {
                 "hlsReferer=${effectiveHeaders.keys.any { it.equals("Referer", true) }}, " +
                 "headerKeys=${effectiveHeaders.keys}, urlPath=${sanitizeUrl(url)}"
         )
-        return mediaItemBuilder.build()
+        // CENC Clear-Key（AD-01）：仅当书源声明 encryption=cenc-aes-ctr 且 kid 合法时挂 DrmConfiguration
+        // 用 attach 的返回值 build，避免未来 Builder 改为不可变时丢失配置
+        return CencDrmSessionProvider
+            .attachCencIfNeeded(mediaItemBuilder, cencKid, cencEncryption)
+            .build()
     }
 
     /**
@@ -1130,7 +1137,17 @@ object ExoPlayerHelper {
                 DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true)
             ).setDataSourceFactory(resolvingDataSource)
                 .setLiveTargetOffsetMs(5000)
+                .setDrmSessionManagerProvider(cencDrmSessionProvider)
         ).build()
+    }
+
+    /**
+     * CENC Clear-Key 条件会话提供者（AD-01/AD-02）。
+     *
+     * 未声明 CENC 的 MediaItem 一律返回 DRM_UNSUPPORTED（与 Media3 默认 provider 等价）⇒ 存量播放零回归。
+     */
+    val cencDrmSessionProvider: DrmSessionManagerProvider by lazy {
+        CencDrmSessionProvider(CencKeyStore.provider)
     }
 
 

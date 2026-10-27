@@ -19,6 +19,7 @@ import com.shuyu.gsyvideoplayer.model.VideoOptionModel
 import com.shuyu.gsyvideoplayer.player.BasePlayerManager
 import io.legado.app.constant.AppLog
 import io.legado.app.help.exoplayer.ExoPlayerHelper
+import io.legado.app.model.VideoPlay
 import tv.danmaku.ijk.media.player.IMediaPlayer
 
 
@@ -57,6 +58,11 @@ class ExoPlayerManager : BasePlayerManager() {
                 return
             }
             mediaPlayer!!.currentUrl = model.getUrl()
+            // CENC Clear-Key（AD-05）：由采集链写入 VideoPlay，此处透传给播放器；
+            // 非 CENC 场景恒为 null ⇒ 与改造前行为一致
+            mediaPlayer!!.cencKid = VideoPlay.cencKid
+            mediaPlayer!!.cencEncryption = VideoPlay.cencEncryption
+            mediaPlayer!!.cencUrl = VideoPlay.cencUrl
             mediaPlayer!!.setLooping(model.isLooping)
             mediaPlayer!!.setPreview(!model.getMapHeadData().isNullOrEmpty())
             // R5 Header 修复：在 setDataSource 前注入 Header 到 okhttpDataFactory，
