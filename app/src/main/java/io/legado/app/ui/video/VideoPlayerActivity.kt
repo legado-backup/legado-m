@@ -189,6 +189,14 @@ internal fun resolveLegacyRssSubInfo(articleCount: Int, episodeCount: Int): Lega
     else -> LegacyRssSubInfo.NONE
 }
 
+/**
+ * `UP_VIDEO_INFO` 刷新信息区时是否应走订阅源绑定。
+ *
+ * 书源会话必须走 `showBook`（作者 + 播放列表篇数）；若无条件调用订阅源绑定，
+ * 会把书源的 tvAuthor 覆盖成 rssEpisodes 的集数（2026-10-28 真机实证）。
+ */
+internal fun shouldBindRssLegacyInfo(hasBook: Boolean): Boolean = !hasBook
+
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack, RssFavoritesDialog.Callback, VideoSettingsPanel.SettingsPanelCallback {
 
@@ -2639,7 +2647,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         }
                         // video-player-dual-layout W3（用户反馈①④）：线路/集数数据异步到达后
                         // 刷新信息区（封面/简介/计数行）与「上一部/下一部」按钮可见性
-                        showRssLegacyInfo()
+                        // 2026-10-28 真机修复：书源会话必须走 showBook（作者+篇数），
+                        // 否则会被订阅源绑定的集数覆盖 tvAuthor
+                        val currentBook = VideoPlay.book
+                        if (shouldBindRssLegacyInfo(currentBook != null)) {
+                            showRssLegacyInfo()
+                        } else {
+                            currentBook?.let { showBook(it) }
+                        }
                         upNextFilmVisible()
                     }
                 }
