@@ -174,6 +174,21 @@ import kotlinx.coroutines.withContext
 internal fun shouldClearCencForDirectUrl(videoUrlExtra: String?): Boolean =
     !videoUrlExtra.isNullOrBlank()
 
+/**
+ * 传统布局副信息行（tvAuthor）该显示哪种位置计数。
+ *
+ * 关键边界（2026-10-28 审计发现）：订阅源「单篇文章 + 多集」时，集数已由
+ * `tvEpisodeLabel` 单独承载；若副信息行再走 episodes 分支会重复显示集数。
+ * 故：文章总数 > 1 → 篇；无文章上下文（集数模式）→ 集；单篇文章 → 不显示。
+ */
+internal enum class LegacyRssSubInfo { ARTICLE, EPISODE, NONE }
+
+internal fun resolveLegacyRssSubInfo(articleCount: Int, episodeCount: Int): LegacyRssSubInfo = when {
+    articleCount > 1 -> LegacyRssSubInfo.ARTICLE
+    articleCount == 0 && episodeCount > 0 -> LegacyRssSubInfo.EPISODE
+    else -> LegacyRssSubInfo.NONE
+}
+
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack, RssFavoritesDialog.Callback, VideoSettingsPanel.SettingsPanelCallback {
 
@@ -1015,12 +1030,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         // 副信息行：列表计数
         val articles = VideoPlay.rssArticles
         val episodes = VideoPlay.rssEpisodes
-        val subInfo = when {
-            !articles.isNullOrEmpty() && articles.size > 1 ->
-                getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles.size)
-            !episodes.isNullOrEmpty() ->
-                getString(R.string.video_playlist_position_episode, VideoPlay.rssEpisodeIndex + 1, episodes.size)
-            else -> ""
+        val subInfo = when (
+            resolveLegacyRssSubInfo(articles?.size ?: 0, episodes?.size ?: 0)
+        ) {
+            LegacyRssSubInfo.ARTICLE ->
+                getString(R.string.video_playlist_position_article, VideoPlay.rssArticleIndex + 1, articles!!.size)
+            LegacyRssSubInfo.EPISODE ->
+                getString(R.string.video_playlist_position_episode, VideoPlay.rssEpisodeIndex + 1, episodes!!.size)
+            LegacyRssSubInfo.NONE -> ""
         }
         if (subInfo.isNotBlank()) {
             binding.tvAuthor.visible()
