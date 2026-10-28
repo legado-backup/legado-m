@@ -51,18 +51,18 @@ object DohDns : Dns {
     /**
      * DoH 服务器列表（按优先级排序）
      *
-     * P0-fix(2026-07-31): 增加国内 DoH 服务器（阿里/腾讯）并置顶，国外服务器作为备用
+     * P0-fix(2026-07-31): 增加国内 DoH 服务器（厂商A/厂商B）并置顶，国外服务器作为备用
      * - 根因：真机日志显示 cloudflare/google/quad9 的 bootstrap IP（1.1.1.1/8.8.8.8/9.9.9.9）
      *   在国内网络环境全部 UnknownHostException，导致 DoH 解析成功率 0%
-     * - 方案：增加阿里 DNS（223.5.5.5/223.6.6.6）和腾讯 DNS（119.29.29.29/119.28.28.28），
+     * - 方案：增加厂商A DNS（223.5.5.5/223.6.6.6）和厂商B DNS（119.29.29.29/119.28.28.28），
      *   国内优先解析，国外作为境外 CDN 域名备用
      */
     /**
      * sniff-result-pipeline-fix FR-5: DoH 服务器列表精简
      *
      * 根因：真机日志铁证 server#3/4/5（Cloudflare/Google/Quad9）全部 UnknownHostException
-     * 方案：移除国外服务器（国内不可达），保留国内双保险（阿里+腾讯）
-     * 已知上限：若阿里+腾讯同时故障，DoH 整体不可用，熔断后走系统 DNS（已实现）
+     * 方案：移除国外服务器（国内不可达），保留国内双保险（厂商A+厂商B）
+     * 已知上限：若厂商A+厂商B同时故障，DoH 整体不可用，熔断后走系统 DNS（已实现）
      * 升级路径：如需支持境外 CDN 域名解析，可恢复国外服务器并按地理位置选择
      */
     private val DOH_SERVERS = listOf(
@@ -300,7 +300,7 @@ object DohDns : Dns {
      * V-004-P0-1: 异步预热 DoH（冷启动熔断 30s 后尝试探测恢复）
      *
      * E7 整改: 探测域名从 cloudflare-dns.com 改为 www.baidu.com
-     * 原因：cloudflare-dns.com 是国外域名，国内 DoH 服务器（阿里+腾讯）可能不收录，
+     * 原因：cloudflare-dns.com 是国外域名，国内 DoH 服务器（厂商A+厂商B）可能不收录，
      *   导致探测失败误判 DoH 不可用；www.baidu.com 是国内域名，DoH 服务器必然收录
      *
      * 职责分工（与 preheatDohServers 互补）：
@@ -338,7 +338,7 @@ object DohDns : Dns {
      *
      * 触发时机：App.onCreate IO 协程块调用（参考 preInitCronetEngine 调用方式）
      * 作用：
-     * - 探测 2 个 DoH 服务器（阿里+腾讯）解析 www.baidu.com 的延迟
+     * - 探测 2 个 DoH 服务器（厂商A+厂商B）解析 www.baidu.com 的延迟
      * - 选择延迟更低的服务器作为 lastSuccessServer（后续 lookup 优先使用）
      * - 提前初始化 dohClients（lazy 触发），避免首次 lookup 时才初始化
      *

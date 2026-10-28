@@ -1769,7 +1769,7 @@ object VideoPlay : CoroutineScope by MainScope(){
      * - 格式②扁平JSON/多行URL：回退到 parseRssEpisodes，包装为单元素 List<RssRoute>
      * - 格式③单URL：返回null，交由现有逻辑处理
      *
-     * 详见 docs/specs/douyin-style-video-player/design.md ruleContent JS 标准数据格式
+     * 详见 docs/specs/video-player-style/design.md ruleContent JS 标准数据格式
      */
     fun parseRssRoutes(content: String, baseUrl: String): List<RssRoute>? {
         val trimmed = content.trim()

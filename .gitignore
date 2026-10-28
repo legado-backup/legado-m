@@ -272,3 +272,10 @@ git_log.txt
 
 # Reverse-engineering local workspace (local only, never commit)
 /tools/reverse/
+
+# === 本地专属目录远端剥离（2026-10-28 用户裁定）===
+# .trae（规则/记忆/Hook 状态）、临时目录与 app/src/test（单测与夹具）仅保留本地副本，不得出现在远端。
+/.trae/
+/temp/
+/.temp/
+/app/src/test/
