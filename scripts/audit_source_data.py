@@ -24,8 +24,9 @@ import re
 import subprocess
 import sys
 
-# App 内置默认源：随 APK 发布的产品数据，非抓取/收集产物，放行
-ALLOWLIST = {"app/src/main/assets/defaultData/bookSources.json"}
+# 白名单为空：内置默认源 `assets/defaultData/bookSources.json` 已于 2026-10-28 移除
+# （代码无任何引用，属死资产；且内含真实源地址，不符合"远端零真实源数据"口径）
+ALLOWLIST: set[str] = set()
 
 TEXT_EXT = (".json", ".txt", ".md", ".js", ".kt", ".java", ".xml", ".yaml", ".yml")
 
