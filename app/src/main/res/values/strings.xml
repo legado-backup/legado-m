@@ -3352,6 +3352,8 @@ Selected text or question:
     <string name="association_result_hint">弹窗已关闭的条目可在各管理页查看</string>
     <string name="import_bubble_failed">导入气泡失败\n%1$s</string>
     <string name="import_book_failed">导入书籍失败\n%1$s</string>
+    <string name="association_file_unreadable">无法读取该文件，请先保存到本地后再导入\n%1$s</string>
+    <string name="association_file_too_large">文件超过 32MB，请先保存到本地后再导入\n%1$s</string>
     <string name="books_dir_permission_denied">请重新设置书籍保存位置\nPermission Denial</string>
     <string name="tip_perm_request_storage_failed">请求存储权限失败</string>
     <string name="association_open_file_failed">无法打开文件\n%1$s</string>
