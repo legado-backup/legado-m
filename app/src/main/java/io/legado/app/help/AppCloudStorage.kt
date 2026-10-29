@@ -129,6 +129,8 @@ object AppCloudStorage {
         ensureNetwork()
         webDavBackend.upConfig()
         webDavBackend.upload(fileName, Backup.zipFilePath)
+        // R6：上传成功后按配置收敛旧备份（仅 WebDAV；失败只记日志，不影响本次备份结果）
+        AppWebDav.cleanupOldBackups(AppConfig.webDavBackupRetainCount)
     }
 
     fun listContainers(): List<S3Container> = S3ContainerManager.listContainers()

@@ -2120,6 +2120,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     const val defaultSpeechRate = 5
 
+    /** R6：云端备份保留数量默认值（可回滚 5 份） */
+    const val DEFAULT_WEBDAV_BACKUP_RETAIN = 5
+
     var ttsSpeechRate: Int
         get() = appCtx.getPrefInt(PreferKey.ttsSpeechRate, defaultSpeechRate)
         set(value) {
@@ -2786,6 +2789,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefInt(PreferKey.sourceEditMaxLine, value)
         }
+
+    /**
+     * R6：WebDAV 云端备份自动清理的保留数量（0 = 关闭自动清理）。
+     * 设置项以字符串存储（复用 choice 设置行的 valuesRes），故读取时容错解析。
+     */
+    var webDavBackupRetainCount: Int
+        get() = appCtx.getPrefString(PreferKey.webDavBackupRetainCount)
+            ?.toIntOrNull() ?: DEFAULT_WEBDAV_BACKUP_RETAIN
+        set(value) = appCtx.putPrefString(
+            PreferKey.webDavBackupRetainCount,
+            value.coerceAtLeast(0).toString()
+        )
 
     var audioPlayUseWakeLock: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.audioPlayWakeLock)

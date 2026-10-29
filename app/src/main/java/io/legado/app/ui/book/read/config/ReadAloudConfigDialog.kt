@@ -55,6 +55,7 @@ import io.legado.app.help.readaloud.role.ReadAloudQuotePair
 import io.legado.app.help.readaloud.role.ReadAloudRolePreprocessor
 import io.legado.app.help.readaloud.role.ReadAloudSoundEffectPreprocessor
 import io.legado.app.help.readaloud.speech.SpeechRoute
+import io.legado.app.help.readaloud.speech.TtsTuningDefaults
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.model.ReadAloud
@@ -94,6 +95,7 @@ private const val KEY_AI_READ_ALOUD_MODEL_ROUTING = "aiReadAloudModelRouting"
 private const val KEY_TTS_CASTING_TEMPLATE = "ttsCastingTemplate"
 private const val KEY_READ_ALOUD_SPEAKER_MANAGE = "readAloudSpeakerManage"
 private const val KEY_READ_ALOUD_LOUDNESS_RESET = "readAloudSpeakerLoudnessReset"
+private const val KEY_READ_ALOUD_TUNING_RESET = "readAloudTuningReset"
 private const val KEY_MEDIA_BUTTON_PER_NEXT = "mediaButtonPerNext"
 private const val KEY_SYS_TTS_CONFIG = "sysTtsConfig"
 private const val SPEAKER_MANAGE_SUMMARY =
@@ -753,7 +755,27 @@ class ReadAloudConfigDialog() : ComposeDialogFragment(),
                 title = getString(R.string.sys_tts_config),
                 summary = getString(R.string.sys_tts_config_summary),
                 onClick = { IntentHelp.openTTSSetting() }
+            ),
+            // R5：只重置数值/策略项，资产（引擎/密钥/音色/发言人分组）保持不变
+            action(
+                key = KEY_READ_ALOUD_TUNING_RESET,
+                title = "恢复默认参数",
+                summary = "重置语速、停顿、引擎语调音量与响度学习；引擎、密钥、音色、发言人分组保持不变",
+                onClick = ::confirmResetTuning
             )
+        )
+    }
+
+    private fun confirmResetTuning() {
+        showComposeConfirmDialog(
+            title = "恢复默认参数",
+            message = "将重置语速、段间停顿、引擎语调/音量与响度均衡学习数据。" +
+                "引擎选择、HttpTTS 密钥/请求头/音色、发言人分组与定时关闭设置保持不变。",
+            onPositive = {
+                TtsTuningDefaults.reset(requireContext())
+                refreshSettings()
+                toastOnUi("已恢复默认参数")
+            }
         )
     }
 

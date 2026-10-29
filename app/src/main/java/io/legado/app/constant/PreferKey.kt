@@ -245,6 +245,8 @@ object PreferKey {
     const val pullDownBookmark = "pullDownBookmark"
     const val noAnimScrollPage = "noAnimScrollPage"
     const val webDavDeviceName = "webDavDeviceName"
+    // R6：云端备份自动清理保留数量（字符串存储以复用 choice 设置项；0 = 关闭）
+    const val webDavBackupRetainCount = "webDavBackupRetainCount"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     // R13：听书跳过静音（默认关，用户主动开启）

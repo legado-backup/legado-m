@@ -19,6 +19,8 @@ import androidx.viewbinding.ViewBinding
 import io.legado.app.base.attachComposeContent
 import io.legado.app.base.composeShell
 import io.legado.app.help.AppCloudStorage
+import io.legado.app.help.book.OrphanChapterCacheCleaner
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.cloud.CloudStorageType
 import io.legado.app.lib.cloud.S3ContainerScope
 import io.legado.app.service.kernel.VideoCacheKernel
@@ -112,6 +114,7 @@ class CacheManageActivity :
                     onContainerSelect = ::showContainerSelector,
                     onUploadAll = ::uploadAll,
                     onDeleteAll = ::deleteAll,
+                    onCleanOrphan = ::cleanOrphanCache,
                     onItemAction = ::dispatchItemAction
                 )
             }
@@ -456,6 +459,42 @@ class CacheManageActivity :
             }
         }
         toastOnUi(getString(R.string.cache_manage_batch_upload_queued, queued))
+    }
+
+    /**
+     * R7：清理孤立章节缓存（先 dry-run 预估，确认后重新计算差集并执行）。
+     * 执行阶段不复用 dry-run 结果 —— 目录在两次扫描之间可能变化。
+     */
+    private fun cleanOrphanCache() {
+        Coroutine.async {
+            OrphanChapterCacheCleaner.run(dryRun = true)
+        }.onSuccess { report ->
+            if (report.deletedFiles == 0 && report.booksDeleted == 0 &&
+                report.wordsBackfilled == 0
+            ) {
+                toastOnUi("没有需要清理的孤立章节缓存")
+                return@onSuccess
+            }
+            showComposeConfirmDialog(
+                title = "清理孤立章节缓存",
+                message = report.summary() +
+                    "。\n仅清理「目录里存在、但当前章节表已不存在」的章节缓存，不动正在阅读的章节与图片。",
+                dangerPositive = true,
+                positiveText = "确认清理",
+                onPositive = {
+                    Coroutine.async {
+                        OrphanChapterCacheCleaner.run(dryRun = false)
+                    }.onSuccess { done ->
+                        toastOnUi(done.summary())
+                        viewModel.load(modeState)
+                    }.onError {
+                        toastOnUi("清理失败：${it.localizedMessage}")
+                    }
+                }
+            )
+        }.onError {
+            toastOnUi("扫描失败：${it.localizedMessage}")
+        }
     }
 
     private fun deleteAll() {

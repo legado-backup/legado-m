@@ -15,6 +15,27 @@
 		<item>S3</item>
 	</string-array>
 
+	<!-- R6：云端备份保留数量（0 = 关闭自动清理） -->
+	<string-array name="webdav_backup_retain_entries">
+		<item>1</item>
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+		<item>20</item>
+		<item>30</item>
+		<item>关闭</item>
+	</string-array>
+
+	<string-array name="webdav_backup_retain_values">
+		<item>1</item>
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+		<item>20</item>
+		<item>30</item>
+		<item>0</item>
+	</string-array>
+
 	<string-array name="ai_read_aloud_role_mode_title">
 		<item>全文批处理</item>
 		<item>并发查找模式</item>

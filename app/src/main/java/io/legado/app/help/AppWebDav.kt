@@ -168,6 +168,44 @@ object AppWebDav {
     }
 
     /**
+     * R6：按保留数量清理旧备份（上传成功后调用；失败不影响本次备份结果）。
+     *
+     * 只处理 `backup*`（[getBackupNames] 已过滤），且只删「清理前已存在 ∩ 当前仍在」的尾部，
+     * 避免误删其他设备并发上传的新备份。
+     */
+    suspend fun cleanupOldBackups(retain: Int) {
+        if (retain <= 0) return
+        kotlin.runCatching {
+            val existing = getBackupNames()
+            if (existing.size <= retain) return@runCatching
+            val targets = io.legado.app.help.storage.WebDavBackupRetention
+                .namesToDelete(existing, getBackupNames(), retain)
+            var deleted = 0
+            targets.forEach { name ->
+                kotlin.runCatching {
+                    if (deleteBackup(name)) deleted++
+                }.onFailure {
+                    AppLog.putDebugWithTag(
+                        AppLog.TAG_WEBDAV_BACKUP,
+                        "清理旧备份失败 $name: ${it.localizedMessage}",
+                        it,
+                        AppLog.Level.WARN
+                    )
+                }
+            }
+            if (deleted > 0) {
+                AppLog.putDebugWithTag(
+                    AppLog.TAG_WEBDAV_BACKUP,
+                    "清理旧备份完成 deleted=$deleted retain=$retain",
+                    level = AppLog.Level.INFO
+                )
+            }
+        }.onFailure {
+            AppLog.put("WebDAV 备份清理失败: ${it.localizedMessage}", it)
+        }
+    }
+
+    /**
      * 重命名云端备份文件
      * @throws WebDavException 服务器不支持 MOVE 方法时抛出
      */

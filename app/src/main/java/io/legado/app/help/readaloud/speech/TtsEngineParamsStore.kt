@@ -72,4 +72,9 @@ object TtsEngineParamsStore {
         map[engineValue] = TtsEngineParams(speechRate, pitch, volume)
         save(map)
     }
+
+    /** R5：恢复默认参数时整表清空（含内存缓存，避免旧值继续被读取） */
+    fun clearAll() {
+        save(mutableMapOf())
+    }
 }

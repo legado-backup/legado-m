@@ -200,6 +200,24 @@ class BackupConfigFragment : ComposeSettingFragment() {
                                 )
                             }
                         ),
+                        // R6：云端备份自动收敛（仅 WebDAV；0 = 关闭）
+                        SettingChoiceSpec(
+                            key = PreferKey.webDavBackupRetainCount,
+                            title = "保留云端备份数量",
+                            summary = "超过保留数量的旧备份会在备份上传成功后自动清理",
+                            options = choiceOptions(
+                                R.array.webdav_backup_retain_entries,
+                                R.array.webdav_backup_retain_values
+                            ),
+                            selectedValue = stringSetting(
+                                PreferKey.webDavBackupRetainCount,
+                                AppConfig.DEFAULT_WEBDAV_BACKUP_RETAIN.toString()
+                            ),
+                            visible = webDavVisible,
+                            onSelected = {
+                                updateStringSetting(PreferKey.webDavBackupRetainCount, it)
+                            }
+                        ),
                         SettingActionSpec(
                             key = KEY_S3_CONTAINER_MANAGE,
                             title = getString(R.string.s3_container_manage),

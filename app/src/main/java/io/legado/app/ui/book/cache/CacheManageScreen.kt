@@ -71,6 +71,7 @@ fun CacheManageScreen(
     onContainerSelect: () -> Unit,
     onUploadAll: () -> Unit,
     onDeleteAll: () -> Unit,
+    onCleanOrphan: () -> Unit,
     onItemAction: (CacheBookItem, CacheItemAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -85,6 +86,8 @@ fun CacheManageScreen(
         topActions = buildList {
             add(AppManagementAction(text = stringResource(R.string.cache_manage_search_book), iconRes = R.drawable.ic_search, onClick = onSearch))
             add(AppManagementAction(text = stringResource(R.string.cache_manage_sort_title), iconRes = R.drawable.ic_baseline_sort_24, onClick = onSortSelect))
+            // R7：孤立章节缓存清理（先 dry-run 预估，确认后执行）
+            add(AppManagementAction(text = "清理孤立缓存", iconRes = R.drawable.ic_outline_delete, onClick = onCleanOrphan))
             if (containerVisible) {
                 add(AppManagementAction(text = stringResource(R.string.s3_bucket), iconRes = R.drawable.ic_outline_cloud_24, onClick = onContainerSelect))
             }
