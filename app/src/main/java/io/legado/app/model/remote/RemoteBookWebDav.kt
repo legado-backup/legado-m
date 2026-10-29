@@ -8,6 +8,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.storage.LocalBookWebDavPlan
 import io.legado.app.lib.webdav.Authorization
 import io.legado.app.lib.webdav.WebDav
 import io.legado.app.lib.webdav.WebDavFile
@@ -80,6 +81,33 @@ class RemoteBookWebDav(
             .putAttribute("serverID", serverID)
             .toString()
         book.update()
+    }
+
+    /**
+     * R9：只上传文件、**不改写 origin** 的上传路径。
+     *
+     * [upload] 会把本地书改写为 WebDAV 书（`origin = webDavTag + ...` + 落库），
+     * 导入后自动上传若走它，"本地书"会当场变成"云端书"（本地查询、书架分类全部变动）。
+     *
+     * @return true = 已上传；false = 云端已存在同名文件（保守跳过，不覆盖用户文件）
+     */
+    suspend fun uploadFileOnly(book: Book): Boolean {
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
+        val localBookUri = Uri.parse(book.bookUrl)
+        val putUrl = LocalBookWebDavPlan.targetDir(rootBookUrl, book.originName)
+        val fileName = book.originName
+        val webDav = WebDav(putUrl, authorization)
+        val existingNames = kotlin.runCatching { webDav.listFiles() }
+            .getOrNull()?.map { it.displayName }.orEmpty()
+        if (LocalBookWebDavPlan.hasNameConflict(existingNames, fileName)) {
+            return false
+        }
+        if (localBookUri.isContentScheme()) {
+            webDav.upload(localBookUri)
+        } else {
+            webDav.upload(localBookUri.path!!)
+        }
+        return true
     }
 
     override suspend fun delete(remoteBookUrl: String) {

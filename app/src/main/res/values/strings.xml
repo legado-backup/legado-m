@@ -1330,6 +1330,7 @@
     <string name="read_aloud_wake_lock_summary">The wake-up lock is enabled when reading aloud is enabled, and the wake-up lock on some mobile phones will be killed in the background.</string>
     <string name="audio_play_wake_lock">Audio service wake-up lock</string>
     <string name="audio_skip_silence">Skip silence</string>
+    <string name="export_include_reader_style">Apply current reading style</string>
     <string name="audio_stop_play">Stop playing</string>
     <string name="audio_stop_play_confirm">Stopping closes the background audio service and cannot be undone.</string>
     <string name="audio_continue_play">Continue playing</string>

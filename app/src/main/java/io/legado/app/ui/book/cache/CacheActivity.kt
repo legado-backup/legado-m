@@ -571,6 +571,9 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
                         }
                     }
 
+                // R8：套用当前阅读样式（默认沿用上次选择，默认开）
+                cbIncludeReaderStyle.isChecked = AppConfig.epubIncludeReaderStyle
+
                 // 默认选择自定义导出
                 cbSelectExport.callOnClick()
             }
@@ -581,6 +584,8 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
         }
         alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             alertBinding.apply {
+                // R8：记住本次选择（同时决定全量导出与自定义导出的产物样式）
+                AppConfig.epubIncludeReaderStyle = cbIncludeReaderStyle.isChecked
                 if (cbAllExport.isChecked) {
                     startExport(path, book)
                     alertDialog.hide()
@@ -600,6 +605,7 @@ class CacheActivity : VMBaseActivity<ViewBinding, CacheViewModel>() {
                     putExtra("exportPath", path)
                     putExtra("epubSize", epubSize)
                     putExtra("epubScope", epubScope)
+                    putExtra("epubIncludeReaderStyle", AppConfig.epubIncludeReaderStyle)
                 }
                 alertDialog.hide()
             }

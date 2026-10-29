@@ -247,6 +247,10 @@ object PreferKey {
     const val webDavDeviceName = "webDavDeviceName"
     // R6：云端备份自动清理保留数量（字符串存储以复用 choice 设置项；0 = 关闭）
     const val webDavBackupRetainCount = "webDavBackupRetainCount"
+    // R8：EPUB 导出是否套用当前阅读样式（默认开）
+    const val epubIncludeReaderStyle = "epubIncludeReaderStyle"
+    // R9：本地导入书籍后自动上传 WebDAV（默认关）
+    const val autoUploadLocalBookToWebDav = "autoUploadLocalBookToWebDav"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     // R13：听书跳过静音（默认关，用户主动开启）

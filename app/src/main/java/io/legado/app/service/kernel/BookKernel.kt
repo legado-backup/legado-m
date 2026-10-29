@@ -9,6 +9,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
+import io.legado.app.constant.AppLog
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.CacheManager
@@ -17,6 +18,7 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.ImageLoader
+import io.legado.app.help.storage.LocalBookWebDavPlan
 import io.legado.app.model.BookCover
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
@@ -224,10 +226,37 @@ object BookKernel {
         return true
     }
 
-    /** 导入本地书籍（保存上传文件 + 入库）。 */
-    suspend fun addLocalBook(fileName: String, filePath: String) {
+    /** 导入本地书籍（保存上传文件 + 入库），返回导入后的书籍实体。 */
+    suspend fun addLocalBook(fileName: String, filePath: String): Book {
         val uri = LocalBook.saveBookFile(File(filePath).inputStream(), fileName)
-        LocalBook.importFile(uri)
+        val book = LocalBook.importFile(uri)
+        autoUploadLocalBook(book)
+        return book
+    }
+
+    /**
+     * R9：导入后按开关自动上传 WebDAV（只传文件、不改 origin）。
+     * 失败只记日志，不影响导入结果；同名冲突保守跳过。
+     */
+    private suspend fun autoUploadLocalBook(book: Book) {
+        if (!LocalBookWebDavPlan.shouldAutoUpload(
+                switchEnabled = AppConfig.autoUploadLocalBookToWebDav,
+                webDavConfigured = AppWebDav.defaultBookWebDav != null,
+                bookIsLocal = book.isLocal
+            )
+        ) {
+            return
+        }
+        val webDav = AppWebDav.defaultBookWebDav ?: return
+        kotlin.runCatching {
+            val uploaded = webDav.uploadFileOnly(book)
+            AppLog.putDebug(
+                if (uploaded) "本地书已上传 WebDAV: ${book.name}"
+                else "本地书同名文件已存在，跳过上传: ${book.name}"
+            )
+        }.onFailure {
+            AppLog.put("本地书自动上传 WebDAV 失败: ${it.localizedMessage}", it)
+        }
     }
 
     suspend fun saveWebReadConfig(json: String?) {

@@ -218,6 +218,17 @@ class BackupConfigFragment : ComposeSettingFragment() {
                                 updateStringSetting(PreferKey.webDavBackupRetainCount, it)
                             }
                         ),
+                        // R9：本地书导入后自动上传（只传文件，不改 origin；同名冲突跳过）
+                        SettingSwitchSpec(
+                            key = PreferKey.autoUploadLocalBookToWebDav,
+                            title = "本地导入后自动上传 WebDAV",
+                            summary = "仅上传书籍文件，不改变书籍来源；云端已有同名文件时跳过",
+                            checked = booleanSetting(PreferKey.autoUploadLocalBookToWebDav, false),
+                            visible = webDavVisible,
+                            onCheckedChange = {
+                                updateBooleanSetting(PreferKey.autoUploadLocalBookToWebDav, it)
+                            }
+                        ),
                         SettingActionSpec(
                             key = KEY_S3_CONTAINER_MANAGE,
                             title = getString(R.string.s3_container_manage),

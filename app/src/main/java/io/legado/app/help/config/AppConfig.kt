@@ -2802,6 +2802,25 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             value.coerceAtLeast(0).toString()
         )
 
+    /**
+     * R8：EPUB 导出时是否把当前阅读样式快照写入 `Styles/main.css`。默认开启；
+     * 关闭后导出产物与旧版一致（便于排查样式相关反馈）。
+     */
+    var epubIncludeReaderStyle: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.epubIncludeReaderStyle, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.epubIncludeReaderStyle, value)
+        }
+
+    /**
+     * R9：本地书导入后自动上传 WebDAV（只传文件、不改 origin）。默认关闭，避免无感上传。
+     */
+    var autoUploadLocalBookToWebDav: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.autoUploadLocalBookToWebDav, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.autoUploadLocalBookToWebDav, value)
+        }
+
     var audioPlayUseWakeLock: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.audioPlayWakeLock)
         set(value) {

@@ -93,12 +93,17 @@ class ExportBookService : BaseService() {
         val path: String,
         val type: String,
         val epubSize: Int = 1,
-        val epubScope: String? = null
+        val epubScope: String? = null,
+        /** R8：是否把当前阅读样式快照追加到导出的 `Styles/main.css`（关闭 ⇒ 与旧版产物一致） */
+        val epubIncludeReaderStyle: Boolean = true
     )
 
     private val groupKey = "${appCtx.packageName}.exportBook"
     private val waitExportBooks = linkedMapOf<String, ExportConfig>()
     private var exportJob: Job? = null
+
+    /** R8：本次导出是否内嵌当前阅读样式（由 ExportConfig 逐书下发） */
+    private var includeReaderStyle: Boolean = true
     private var notificationContentText = appCtx.getString(R.string.service_starting)
 
 
@@ -111,7 +116,11 @@ class ExportBookService : BaseService() {
                         path = intent.getStringExtra("exportPath")!!,
                         type = intent.getStringExtra("exportType")!!,
                         epubSize = intent.getIntExtra("epubSize", 1),
-                        epubScope = intent.getStringExtra("epubScope")
+                        epubScope = intent.getStringExtra("epubScope"),
+                        epubIncludeReaderStyle = intent.getBooleanExtra(
+                            "epubIncludeReaderStyle",
+                            AppConfig.epubIncludeReaderStyle
+                        )
                     )
                     waitExportBooks[bookUrl] = exportConfig
                     exportMsg[bookUrl] = getString(R.string.export_wait)
@@ -196,6 +205,8 @@ class ExportBookService : BaseService() {
                     )
                     upExportNotification()
                     if (exportConfig.type == "epub") {
+                        // R8：本次导出是否内嵌当前阅读样式（逐书配置，串行导出期间有效）
+                        includeReaderStyle = exportConfig.epubIncludeReaderStyle
                         if (exportConfig.epubScope.isNullOrBlank()) {
                             exportEpub(exportConfig.path, book)
                         } else {
@@ -469,12 +480,16 @@ class ExportBookService : BaseService() {
                 "Styles/fonts.css"
             )
         )
-        epubBook.resources.add(
-            Resource(
-                appCtx.assets.open("epub/main.css").readBytes(),
-                "Styles/main.css"
-            )
-        )
+        // R8：把当前阅读样式快照追加到 main.css（chapter.html 已引用该表 ⇒ 零模板改动）
+        val mainCssBytes = appCtx.assets.open("epub/main.css").readBytes()
+        val cssBytes = if (includeReaderStyle) {
+            mainCssBytes + io.legado.app.help.export.ReaderStyleCss
+                .build(io.legado.app.help.export.ReaderStyleCss.fromReadBookConfig())
+                .toByteArray(Charsets.UTF_8)
+        } else {
+            mainCssBytes
+        }
+        epubBook.resources.add(Resource(cssBytes, "Styles/main.css"))
         epubBook.resources.add(
             Resource(
                 appCtx.assets.open("epub/logo.png").readBytes(),
