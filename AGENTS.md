@@ -170,7 +170,7 @@ ai_tests\venv\Scripts\python.exe ai_tests/scripts/audit_gson_generic_signature.p
 **任何优化/修复批次收尾，必须产出对应的最新测试包并完成冒烟，否则视为未交付。** 起因是真实失守：17 项优化实施完、单测全绿、commit 门禁全 PASS，却**没出最新测试包**就报告完成，被用户当场追问「为什么没有打最新测试包」。
 - **唯一入口**：`ai_tests\venv\Scripts\python.exe ai_tests/scripts/build_and_smoke.py`（出包 → 溯源清单 → 安装启动冒烟 → 截图，一条命令）
 - **交付卡点**：`ai_tests\venv\Scripts\python.exe ai_tests/scripts/audit_delivery_smoke.py`（G-53，登记于 `gate_registry.json`，挂 `deliver`/`publish` 阻断）
-- **判据**：C1 最新测试包存在；C2 有 `<apk>.build.json` 溯源清单（由 `build-legado.bat` 每次出包自动写）；C3 清单中的**工作区源码签名**（HEAD + 源码面逐文件 sha256）== 当前签名；C4 冒烟 `installed/launched/FATAL=0` 且 sha256/签名一致；C5 截图 >1000 字节
+- **判据**：C1 最新测试包存在；C2 有 `<apk>.build.json` 溯源清单（由 `build-legado.bat` 每次出包自动写）；C3 清单中的**源码内容签名**（HEAD 中各源码 scope 的 tree/blob + 未提交改动逐文件 sha256）== 当前签名（文档/测试提交不会触发重打）；C4 冒烟 `installed/launched/FATAL=0` 且 sha256/签名一致；C5 截图 >1000 字节
 - **Trae Stop Hook**：会话起始 HEAD → 当前 HEAD 含 `app/src/main` 等源码提交且无 `delivery_ran` 标记 ⇒ 阻断回合并给出单命令处置；多批次开发中途可用 `--defer "<理由>"` 登记可审计暂缓（HEAD 前进即失效）
 - **禁止**：只跑单测/门禁就宣称完成；用「编译成功」代替「装得上、起得来、0 FATAL」；删除或改弱 G-53 判据
 
