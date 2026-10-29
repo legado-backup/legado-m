@@ -14,6 +14,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
+import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppCloudStorage
 import io.legado.app.help.book.BookHelp
@@ -21,6 +22,7 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.isNotShelf
+import io.legado.app.help.book.SourceSwitchHistory
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
@@ -331,9 +333,17 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
 
     /**
      * 换源
+     *
+     * @param rememberPrevious true=记录换源前快照（供「回滚上一书源」一次性使用）；
+     *   回滚自身传 false，避免把"当前新书"再记成可回滚目标形成无限抖动。
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, rememberPrevious: Boolean = true) {
         changeSourceCoroutine?.cancel()
+        if (rememberPrevious) {
+            ReadBook.book?.takeIf { it.bookUrl != book.bookUrl }?.let {
+                SourceSwitchHistory.remember(it)
+            }
+        }
         changeSourceCoroutine = execute {
             ReadBook.upMsg(context.getString(R.string.loading))
             ReadBook.book?.migrateTo(book, toc)
@@ -350,6 +360,20 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)
         }
+    }
+
+    /**
+     * R11：回滚时取「旧源」目录（与换源同一口径：书源缺失即失败；tocUrl 为空先取书籍信息）。
+     */
+    suspend fun fetchTocForRollback(
+        book: Book
+    ): Result<Pair<List<BookChapter>, BookSource>> = kotlin.runCatching {
+        val source = appDb.bookSourceDao.getBookSource(book.origin)
+            ?: throw NoStackTraceException("书源不存在")
+        if (book.tocUrl.isEmpty()) {
+            WebBook.getBookInfoAwait(source, book)
+        }
+        Pair(WebBook.getChapterListAwait(source, book).getOrThrow(), source)
     }
 
     /**

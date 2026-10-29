@@ -32,7 +32,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import io.legado.app.utils.toastOnUi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -141,6 +143,9 @@ class ChangeBookSourceDialog() : ComposeDialogFragment(),
     private var menuTarget by mutableStateOf<SearchBook?>(null)
     private var scoreTick by mutableIntStateOf(0)
 
+    /** R12：正文预览任务（单飞：新预览取消旧任务，防并发轰炸目标源） */
+    private var previewJob: kotlinx.coroutines.Job? = null
+
     private val searchFinishCallback: (isEmpty: Boolean) -> Unit = {
         if (it) {
             val searchGroup = AppConfig.searchGroup
@@ -173,6 +178,13 @@ class ChangeBookSourceDialog() : ComposeDialogFragment(),
                 }
             }
         }
+    }
+
+    override fun onDestroyView() {
+        // R12：关窗即取消预览（避免请求悬挂在后台继续抓目标源）
+        previewJob?.cancel()
+        previewJob = null
+        super.onDestroyView()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -322,6 +334,43 @@ class ChangeBookSourceDialog() : ComposeDialogFragment(),
 
     override fun getBookScore(searchBook: SearchBook): Int {
         return viewModel.getBookScore(searchBook)
+    }
+
+    /**
+     * R12：换源前正文预览（纯读：不落库、不写章节缓存），5 秒超时。
+     * 并发：单 `previewJob`，新预览先取消旧任务，避免对目标源并发轰炸。
+     */
+    private fun previewContent(searchBook: SearchBook) {
+        previewJob?.cancel()
+        waitDialog.setText("正在获取正文预览…")
+        waitDialog.show()
+        previewJob = lifecycleScope.launch {
+            val text = kotlinx.coroutines.withTimeoutOrNull(5_000L) {
+                val book = viewModel.bookMap[searchBook.primaryStr()] ?: searchBook.toBook()
+                val pair = viewModel.getToc(book).getOrNull() ?: return@withTimeoutOrNull null
+                val (toc, source) = pair
+                val chapter = toc.firstOrNull { it.index == (callBack?.oldBook?.durChapterIndex ?: 0) }
+                    ?: toc.firstOrNull()
+                    ?: return@withTimeoutOrNull null
+                // needSave=false：预览绝不写章节缓存（避免污染换源后的正文）
+                val content = io.legado.app.model.webBook.WebBook.getContentAwait(
+                    source, book, chapter, nextChapterUrl = null, needSave = false
+                )
+                io.legado.app.help.book.PreviewTextSanitizer.snippet(content).takeIf { it.isNotBlank() }
+            }
+            waitDialog.dismiss()
+            if (text.isNullOrBlank()) {
+                toastOnUi("预览超时或正文为空，可直接换源")
+            } else {
+                showComposeConfirmDialog(
+                    title = "正文预览 · ${searchBook.originName}",
+                    message = text,
+                    showNegative = false,
+                    messageInContent = true,
+                    onPositive = {}
+                )
+            }
+        }
     }
 
     private fun changeSource(searchBook: SearchBook, onSuccess: (() -> Unit)? = null) {
@@ -586,6 +635,16 @@ class ChangeBookSourceDialog() : ComposeDialogFragment(),
                 title = target.originName,
                 onDismiss = { menuTarget = null },
                 actions = listOf(
+                    // R12：换源前先看正文（纯读，5 秒超时）
+                    MenuAction(
+                        icon = Icons.Filled.Visibility,
+                        title = "预览正文",
+                        onClick = {
+                            val target = menuTarget ?: return@MenuAction
+                            menuTarget = null
+                            previewContent(target)
+                        }
+                    ),
                     MenuAction(
                         icon = Icons.Filled.KeyboardArrowUp,
                         title = stringResource(R.string.to_top),

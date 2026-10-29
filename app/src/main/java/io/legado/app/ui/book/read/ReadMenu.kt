@@ -400,6 +400,7 @@ class ReadMenu @JvmOverloads constructor(
                             onBookClick = { callBack.openBookInfoActivity() },
                             onChangeSourceClick = { callBack.changeSource() },
                             onChangeSourceLongClick = { callBack.changeSourceSingle() },
+                            onRollbackSourceClick = { callBack.rollbackSource() },
                             onRefreshClick = { callBack.refreshContent() },
                             onRefreshLongClick = { callBack.showRefreshOptions() },
                             onCacheClick = { callBack.showCacheDialog() },
@@ -831,6 +832,9 @@ class ReadMenu @JvmOverloads constructor(
         fun refreshContent()
         fun changeSource()
         fun changeSourceSingle()
+
+        /** R11：回滚上一书源 */
+        fun rollbackSource()
         fun showRefreshOptions()
         fun showCacheDialog()
         fun addBookmark()

@@ -83,6 +83,8 @@ data class ReadMenuTitleBarActions(
     val onBookClick: () -> Unit,
     val onChangeSourceClick: () -> Unit,
     val onChangeSourceLongClick: () -> Unit,
+    /** R11：回滚上一书源（进程级单槽快照，换源成功后一次性有效） */
+    val onRollbackSourceClick: () -> Unit,
     val onRefreshClick: () -> Unit,
     val onRefreshLongClick: () -> Unit,
     val onCacheClick: () -> Unit,
@@ -256,6 +258,7 @@ fun ReadMenuTitleBar(
                             onDelRubyTagClick = actions.onDelRubyTagClick,
                             onDelHTagClick = actions.onDelHTagClick,
                             onAiPurifyClick = actions.onAiPurifyClick,
+                            onRollbackSourceClick = actions.onRollbackSourceClick,
                             onEpubScheduleModeClick = actions.onEpubScheduleModeClick
                         )
                         popupHandle = ModernActionPopup.show(
@@ -853,7 +856,9 @@ private fun buildOverflowActions(
     onDelHTagClick: () -> Unit,
     onEpubScheduleModeClick: () -> Unit,
     /** Q-N4：AI 净化（读菜单溢出列表，紧邻「替换净化」） */
-    onAiPurifyClick: () -> Unit
+    onAiPurifyClick: () -> Unit,
+    /** R11：回滚上一书源 */
+    onRollbackSourceClick: () -> Unit
 ): List<ModernActionPopup.Action> {
     val actions = mutableListOf<ModernActionPopup.Action>()
     if (isLocalTxt) {
@@ -861,6 +866,10 @@ private fun buildOverflowActions(
     }
     if (isLocalBook) {
         actions.add(ModernActionPopup.Action(title = "设置字符集", invoke = onSetCharsetClick))
+    }
+    // R11：换源后一次性回滚入口（无快照时点击给出明确提示，不做静默失败）
+    if (!isLocalBook) {
+        actions.add(ModernActionPopup.Action(title = "回滚上一书源", invoke = onRollbackSourceClick))
     }
     actions.add(ModernActionPopup.Action(title = "添加书签", invoke = onAddBookmarkClick))
     actions.add(ModernActionPopup.Action(title = "高亮规则管理", invoke = onHighlightRuleClick))

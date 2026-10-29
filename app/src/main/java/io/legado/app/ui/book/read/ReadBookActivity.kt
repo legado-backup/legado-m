@@ -170,6 +170,7 @@ import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.bookmark.BookmarkDialog
+import io.legado.app.help.book.SourceSwitchHistory
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
 import io.legado.app.ui.book.character.BookCharacterManageActivity
@@ -6027,6 +6028,38 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)
             )
         }
+    }
+
+    /**
+     * R11：回滚上一书源（复用换源同一链路：取旧源目录 → changeTo 迁移进度）。
+     * 失败保留快照，可再次尝试；成功后清空（单次有效）。
+     */
+    override fun rollbackSource() {
+        binding.readMenu.runMenuOut()
+        val target = SourceSwitchHistory.peek()
+        if (target == null) {
+            toastOnUi("暂无可回滚的换源记录（换源成功后才会记录）")
+            return
+        }
+        showComposeConfirmDialog(
+            title = "回滚上一书源",
+            message = "将换回「${target.originName}」，并迁移当前阅读进度。",
+            positiveText = "回滚",
+            onPositive = {
+                lifecycleScope.launch {
+                    ReadBook.upMsg(getString(R.string.loading))
+                    val result = viewModel.fetchTocForRollback(target)
+                    ReadBook.upMsg(null)
+                    val toc = result.getOrNull()?.first
+                    if (toc == null) {
+                        toastOnUi("回滚失败：${result.exceptionOrNull()?.localizedMessage ?: "目录获取失败"}")
+                        return@launch
+                    }
+                    viewModel.changeTo(target, toc, rememberPrevious = false)
+                    SourceSwitchHistory.clear()
+                }
+            }
+        )
     }
 
     override fun showRefreshOptions() {
