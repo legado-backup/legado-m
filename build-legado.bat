@@ -235,6 +235,28 @@ if "!APK_FOUND!"=="1" (
     )
 )
 
+:: ============================================================
+::  交付溯源清单（G-53，2026-10-30 用户裁定「交付必出包+冒烟」）
+::  为每个交付产物写同名旁挂 `<apk>.build.json`：commit / branch / 工作区源码签名 /
+::  sha256 / 出包时间。没有这份清单，交付门禁无法证明「这个包对应哪次代码」⇒ 直接判失败。
+::  实现见 ai_tests/scripts/delivery_evidence.py（G-53 与 build_and_smoke.py 共用同一口径）。
+:: ============================================================
+if "!APK_FOUND!"=="1" (
+    set "PY_EXE=%PROJECT_DIR%\ai_tests\venv\Scripts\python.exe"
+    if exist "!PY_EXE!" (
+        for %%f in ("%DIST_DIR%\*.apk") do (
+            "!PY_EXE!" "%PROJECT_DIR%\ai_tests\scripts\delivery_evidence.py" --write-manifest --apk "%%f" --variant "%BUILD_TYPE%"
+            if errorlevel 1 (
+                echo   [WARN] delivery manifest FAILED: %%~nxf
+            ) else (
+                echo   [MANIFEST] %%~nxf.build.json
+            )
+        )
+    ) else (
+        echo   [WARN] ai_tests venv python not found, delivery manifest skipped
+    )
+)
+
 :: 2026-09-03 local-build-speedup：成功路径不再强制清场（原 call :STOP_DAEMON 已移除），
 :: daemon 复用是增量提速核心；内存由 idletimeout 空闲自退回收，daemon-stop 可手动清场
 echo [MEM-AFTER]
