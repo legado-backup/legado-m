@@ -2813,6 +2813,15 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     /**
+     * R1：眼动翻页开关（实验性；默认关闭，仅用户主动开启后才会加载模型并打开摄像头）。
+     */
+    var eyePageTurnEnabled: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.eyePageTurnEnabled, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.eyePageTurnEnabled, value)
+        }
+
+    /**
      * R9：本地书导入后自动上传 WebDAV（只传文件、不改 origin）。默认关闭，避免无感上传。
      */
     var autoUploadLocalBookToWebDav: Boolean

@@ -251,6 +251,10 @@ object PreferKey {
     const val epubIncludeReaderStyle = "epubIncludeReaderStyle"
     // R9：本地导入书籍后自动上传 WebDAV（默认关）
     const val autoUploadLocalBookToWebDav = "autoUploadLocalBookToWebDav"
+    // R1：眼动翻页（默认关，实验性）
+    const val eyePageTurnEnabled = "eyePageTurnEnabled"
+    const val eyePageTurnHelpShown = "eyePageTurnHelpShown"
+    const val eyePageCalibration = "eyePageCalibration"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     // R13：听书跳过静音（默认关，用户主动开启）

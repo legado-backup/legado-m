@@ -356,6 +356,8 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     //Archive UI 迁移（Phase 0 地基补齐）：4 个 Compose 生态库
     implementation(libs.miuix)
+    // R1 眼动翻页：MediaPipe Face Landmarker（全本地推理，不上传摄像头帧）
+    implementation(libs.mediapipe.tasks.vision)
     implementation(libs.reorderable)
     implementation(libs.liquidglass)
     implementation(libs.lazycolumnscrollbar)

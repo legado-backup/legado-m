@@ -14,6 +14,8 @@ import splitties.init.appCtx
 internal val DEVICE_LOCAL_IGNORE_PREF_KEYS = arrayOf(
     // 字体目录存 content URI 或绝对路径，换机后不可读
     PreferKey.fontFolder,
+    // R1：眼动校准绑定当次摄像头/握持姿势，换机后必然失效（写回会造成"看似已校准却翻不了页"）
+    PreferKey.eyePageCalibration,
 )
 
 /**
