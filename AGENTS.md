@@ -190,6 +190,7 @@ ai_tests\venv\Scripts\python.exe ai_tests/scripts/audit_gson_generic_signature.p
 | 打包构建/包名/APK发布 | `package-naming.md` + `build-apk-guide.md`（§第零章打包脚本强制规范必读：交付一律走 `build-legado.bat`） |
 | 改动功能前（门禁） | `global-thinking-checklist.md`（前端入口+后端接口+数据库+覆盖安装+使用场景+回填点 6 维盘点） |
 | 数据库变更 | `database-migration-safety.md` |
+| **物理 USB 真机接入**（安装/验证/通道异常/发布前真机抽查，区别于 MEmu 模拟器） | `physical-device-testing.md`（通道诊断四步 + 裸协议绕行 + ColorOS 拦截/锁屏处置 + 安装四件套/启动五件套） |
 | 大型任务（10+文件/多Issue） | `work-methodology.md` |
 | 错误发生后 | `spec-sedimentation-mechanism.md` |
 
