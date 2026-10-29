@@ -352,6 +352,9 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowser(url: String, title: String, html: String?) {
         rhinoContext.ensureActive()
+        // P0-S3 弹窗拦截：批量流程（搜索/换源）协程树挂载 policy 时拒绝打开内置浏览器。
+        // 与 startBrowserAwait 同语义——批处理中无人可操作浏览器，静默挂起比直接中断更糟。
+        requireSourceDialogAllowed("打开浏览器")
         SourceVerificationHelp.startBrowser(getSource(), url, title, html=html)
     }
 

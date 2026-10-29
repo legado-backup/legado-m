@@ -69,6 +69,8 @@ import io.legado.app.help.http.Cronet
 import io.legado.app.help.http.ObsoleteUrlFactory
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.rhino.BookScriptObject
+import io.legado.app.help.readaloud.TtsCacheSweep
+import io.legado.app.help.readaloud.prebuild.TtsPrebuildManager
 import io.legado.app.help.rhino.BookSourceGuardLog
 import io.legado.app.help.rhino.NativeBaseSource
 import io.legado.app.help.source.SourceHelp
@@ -77,6 +79,7 @@ import io.legado.app.model.AutoTask
 import io.legado.app.model.BookCover
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.LogUtils
+import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
@@ -85,9 +88,11 @@ import io.legado.app.utils.isDebuggable
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefString
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import splitties.systemservices.notificationManager
+import java.io.File
 import java.net.URL
 import java.util.concurrent.TimeUnit
 import java.util.logging.Level
@@ -203,6 +208,9 @@ class App : Application() {
             }
             RuleBigDataHelp.clearInvalid()
             BookHelp.clearInvalidCache()
+            // R17：TTS 混合缓存启动兜底清扫（保留各书持久化当前章 + 预合成保留名单），
+            // 与 HttpReadAloudService 换章清扫共用 TtsCacheSweep 单一判据
+            sweepTtsCacheOnStartup()
             Backup.clearCache()
             ReadBookConfig.clearBgAndCache()
 //            ThemeConfig.clearBg() //每次手动切换主题时清理多余图片
@@ -328,6 +336,34 @@ class App : Application() {
             }
         }
         oldConfig = Configuration(newConfig)
+    }
+
+    /**
+     * R17：启动期 TTS 缓存兜底清扫（在 IO 线程执行，失败静默并记日志）。
+     *
+     * 保留集必须来自**持久化进度**（`Book.durChapterIndex` 对应章节标题的 md5），
+     * 禁止用 `ReadBook` 内存态（启动时它是空的，会把当前章产物一起删掉）。
+     * 预合成保留名单（用户主动生成的资产）任何情况不删。
+     */
+    private suspend fun sweepTtsCacheOnStartup() {
+        kotlin.runCatching {
+            val keepStems = appDb.bookDao.flowAll().first().mapNotNull { book ->
+                val index = book.durChapterIndex
+                if (index < 0) return@mapNotNull null
+                appDb.bookChapterDao.getChapter(book.bookUrl, index)?.title
+                    ?.let { MD5Utils.md5Encode16(it) }
+            }.toSet()
+            val deleted = TtsCacheSweep.sweep(
+                File(cacheDir.absolutePath + File.separator + "httpTTS"),
+                keepStems = keepStems,
+                reserved = TtsPrebuildManager.reservedKeys.keys
+            )
+            if (deleted > 0) {
+                AppLog.putDebug("TtsCacheSweep 启动清扫: keep=${keepStems.size}, deleted=$deleted")
+            }
+        }.onFailure {
+            AppLog.put("TtsCacheSweep 启动清扫失败: ${it.localizedMessage}")
+        }
     }
 
     // B13 内存压力监控：启动定时轮询（小堆 3s / 大堆 10s）

@@ -19,6 +19,8 @@ object IntentAction {
     const val upTtsProgress = "upTtsProgress"
     const val adjustProgress = "adjustProgress"
     const val setSpeed = "setSpeed"
+    // R13：听书跳过静音开关实时生效（与 setSpeed 同属播放器参数下发）
+    const val setSkipSilence = "setSkipSilence"
     const val prev = "prev"
     const val next = "next"
     const val selectChapter = "selectChapter"

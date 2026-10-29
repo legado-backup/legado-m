@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.getValue
@@ -242,6 +243,17 @@ class AudioPlayActivity :
             checked = AppConfig.audioPlayUseWakeLock,
             onClick = {
                 AppConfig.audioPlayUseWakeLock = !AppConfig.audioPlayUseWakeLock
+            }
+        )
+        // R13：跳过静音（默认关，开启后对当前播放器实时生效）
+        actions += MenuAction(
+            icon = Icons.Filled.VolumeUp,
+            title = getString(R.string.audio_skip_silence),
+            checked = AppConfig.audioSkipSilence,
+            onClick = {
+                val enabled = !AppConfig.audioSkipSilence
+                AppConfig.audioSkipSilence = enabled
+                AudioPlay.setSkipSilence(enabled)
             }
         )
         // 跳过片头片尾

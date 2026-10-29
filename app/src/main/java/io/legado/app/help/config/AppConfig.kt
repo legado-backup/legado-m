@@ -2793,6 +2793,15 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.audioPlayWakeLock, value)
         }
 
+    /**
+     * R13：听书跳过静音。默认关闭（有声书/播客常有刻意停顿，默认开启会破坏演绎节奏）。
+     */
+    var audioSkipSilence: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.audioSkipSilence, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.audioSkipSilence, value)
+        }
+
     var brightnessVwPos: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.brightnessVwPos)
         set(value) {

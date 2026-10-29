@@ -14,6 +14,7 @@ import io.legado.app.data.entities.Cache
 import io.legado.app.data.entities.ReadAloudBgmTrack
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppCloudStorage
+import io.legado.app.help.AppWebDav
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.getFolderNameNoCache
@@ -384,22 +385,32 @@ object Backup {
     }
 
     fun autoBack(context: Context) {
-        if (shouldBackup()) {
-            Coroutine.async {
-                // R9：与恢复共用跨流程共享锁，避免定时备份与恢复并发清空工作目录
-                BackupRestoreLock.withStorageLock {
-                    if (shouldBackup()) {
-                        val backupZipFileName = getNowZipFileName()
-                        if (!AppCloudStorage.hasBackup(backupZipFileName)) {
-                            backup(context, AppConfig.backupPath)
-                        } else {
-                            LocalConfig.lastBackup = System.currentTimeMillis()
-                        }
+        if (!shouldBackup()) return
+        Coroutine.async {
+            // R9：与恢复共用跨流程共享锁，避免定时备份与恢复并发清空工作目录
+            BackupRestoreLock.withStorageLock {
+                // R16：先看云端最近备份（跨设备判据）；查询失败/未配置时回退原精确文件名判据
+                val now = System.currentTimeMillis()
+                val cloudLastModify = kotlin.runCatching { AppWebDav.lastBackUp() }
+                    .getOrNull()?.getOrNull()?.lastModify ?: 0L
+                if (AutoBackupDecision.shouldSkipByCloudLastModify(cloudLastModify, now)) {
+                    // 禁止把未来时间写进本地戳（防设备时间漂移导致此后长期不备份）
+                    LocalConfig.lastBackup =
+                        AutoBackupDecision.normalizeLastBackupTime(cloudLastModify, now)
+                    AppLog.put("BackupDiag 自动备份跳过: 云端已有 24h 内备份")
+                    return@withStorageLock
+                }
+                if (shouldBackup()) {
+                    val backupZipFileName = getNowZipFileName()
+                    if (!AppCloudStorage.hasBackup(backupZipFileName)) {
+                        backup(context, AppConfig.backupPath)
+                    } else {
+                        LocalConfig.lastBackup = System.currentTimeMillis()
                     }
                 }
-            }.onError {
-                AppLog.put("自动备份失败\n${it.localizedMessage}")
             }
+        }.onError {
+            AppLog.put("自动备份失败\n${it.localizedMessage}")
         }
     }
 

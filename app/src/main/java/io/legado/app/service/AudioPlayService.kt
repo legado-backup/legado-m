@@ -36,6 +36,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.glide.ImageLoader
+import io.legado.app.help.player.AudioTimerFade
 import io.legado.app.help.player.PlaybackErrorAction
 import io.legado.app.help.player.PlaybackErrorPolicy
 import io.legado.app.help.player.PlaybackErrorSession
@@ -129,6 +130,9 @@ class AudioPlayService : BaseService(),
     private var upNotificationJob: Coroutine<*>? = null
     private var upPlayProgressJob: Job? = null
 
+    /** R13：定时收尾渐弱任务（非空即表示正在渐弱，用于避免重复启动与漏恢复音量） */
+    private var fadeOutJob: Job? = null
+
     /** W2 / REQ-13：听书播放错误自愈记账（上限 3 次 + 冷却 60s；与播放会话同生命周期）。 */
     private val playbackErrorSession = PlaybackErrorSession()
     private var cover: Bitmap =
@@ -163,6 +167,8 @@ class AudioPlayService : BaseService(),
                 IntentAction.play, IntentAction.playNew -> {
                     exoPlayer.stop()
                     upPlayProgressJob?.cancel()
+                    // R13：切集/新播放会话一律取消渐弱并恢复音量（否则新集起播即静音）
+                    cancelFadeOut()
                     // W2 / REQ-13：新播放会话复位错误自愈记账（切章/切书不继承历史失败预算）
                     playbackErrorSession.reset()
                     pause = false
@@ -181,6 +187,7 @@ class AudioPlayService : BaseService(),
                 IntentAction.stopPlay -> {
                     exoPlayer.stop()
                     upPlayProgressJob?.cancel()
+                    cancelFadeOut()
                     AudioPlay.status = Status.STOP
                     upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
                     postEvent(EventBus.AUDIO_STATE, Status.STOP)
@@ -193,6 +200,9 @@ class AudioPlayService : BaseService(),
                 IntentAction.prev -> AudioPlay.prev()
                 IntentAction.next -> AudioPlay.next()
                 IntentAction.setSpeed -> upSpeed(intent.getFloatExtra("speed", 1f))
+                // R13：跳过静音开关对现有播放器实例实时生效（偏好已由 UI 侧落盘）
+                IntentAction.setSkipSilence ->
+                    upSkipSilence(intent.getBooleanExtra("enabled", AppConfig.audioSkipSilence))
                 IntentAction.addTimer -> addTimer()
                 IntentAction.setTimer -> setTimer(intent.getIntExtra("minute", 0))
                 IntentAction.adjustProgress -> {
@@ -213,6 +223,8 @@ class AudioPlayService : BaseService(),
             wakeLock.release()
             wifiLock?.release()
         }
+        // R13：服务销毁时取消渐弱任务（播放器即将释放，不再回写音量）
+        cancelFadeOut(restoreVolume = false)
         isRun = false
         abandonFocus()
         exoPlayer.release()
@@ -272,6 +284,8 @@ class AudioPlayService : BaseService(),
                 exoPlayer.setMediaItem(analyzeUrl.getMediaItem())
             }
             exoPlayer.playWhenReady = true
+            // R13：跳过静音参数在每次准备播放时下发（偏好可能在播放器实例创建后才被修改）
+            upSkipSilence(AppConfig.audioSkipSilence)
             //获取片头设定
             val skipStartMs = (book?.getOpenCredits() ?: 0) * 1000L
             val playtime = if (position == 0) skipStartMs else position.toLong()
@@ -294,6 +308,8 @@ class AudioPlayService : BaseService(),
         }
         try {
             pause = true
+            // R13：暂停即取消渐弱并恢复音量，避免「暂停后再播没声音」
+            cancelFadeOut()
             if (abandonFocus) {
                 abandonFocus()
             }
@@ -360,6 +376,48 @@ class AudioPlayService : BaseService(),
             exoPlayer.setPlaybackSpeed(playSpeed)
             postEvent(EventBus.AUDIO_SPEED, playSpeed)
         }
+    }
+
+    /**
+     * R13：下发「跳过静音」参数；失败只记日志不中断播放（部分设备/解码器不支持该 AudioProcessor）。
+     */
+    private fun upSkipSilence(enabled: Boolean) {
+        kotlin.runCatching {
+            exoPlayer.skipSilenceEnabled = enabled
+        }.onFailure {
+            AppLog.put("AudioPlaySkipSilence: 设置失败 ${it.localizedMessage}")
+        }
+    }
+
+    /**
+     * R13：开始定时收尾渐弱（仅最后 30 秒）。已在渐弱时重复调用直接忽略。
+     */
+    private fun startFadeOut() {
+        if (fadeOutJob != null) return
+        AppLog.putInfo("AudioTimerFade: start ${AudioTimerFade.DURATION_MS}ms")
+        fadeOutJob = lifecycleScope.launch {
+            var elapsed = 0L
+            while (isActive && elapsed < AudioTimerFade.DURATION_MS) {
+                delay(AudioTimerFade.STEP_MS)
+                elapsed += AudioTimerFade.STEP_MS
+                kotlin.runCatching {
+                    exoPlayer.volume = AudioTimerFade.volumeAt(elapsed)
+                }
+            }
+        }
+    }
+
+    /**
+     * R13：取消渐弱并（默认）恢复原始音量。未处于渐弱时直接返回，避免无谓创建播放器/写音量。
+     */
+    private fun cancelFadeOut(restoreVolume: Boolean = true) {
+        val job = fadeOutJob ?: return
+        job.cancel()
+        fadeOutJob = null
+        if (restoreVolume) {
+            kotlin.runCatching { exoPlayer.volume = 1f }
+        }
+        AppLog.putInfo("AudioTimerFade: cancel restoreVolume=$restoreVolume")
     }
 
     /**
@@ -489,6 +547,8 @@ class AudioPlayService : BaseService(),
         postEvent(EventBus.AUDIO_DS, timeMinute)
         upAudioPlayNotification()
         dsJob?.cancel()
+        // R13：定时值变更（含取消定时）一律撤销进行中的渐弱并恢复音量
+        cancelFadeOut()
         dsJob = lifecycleScope.launch {
             while (isActive) {
                 delay(60000)
@@ -496,7 +556,13 @@ class AudioPlayService : BaseService(),
                     if (timeMinute >= 0) {
                         timeMinute--
                     }
+                    // R13：剩最后 1 分钟 ⇒ 30 秒后开始渐弱，正好在 timeMinute 归零时收到 0
+                    if (timeMinute == 1) {
+                        startFadeOut()
+                    }
                     if (timeMinute == 0) {
+                        // 收敛到停止点：先取消渐弱任务（播放器马上停，无需回写音量）
+                        cancelFadeOut(restoreVolume = false)
                         AudioPlay.stop()
                         postEvent(EventBus.AUDIO_DS, timeMinute)
                         break

@@ -38,6 +38,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.player.PlaybackErrorAction
 import io.legado.app.help.player.PlaybackErrorPolicy
 import io.legado.app.help.player.PlaybackErrorSession
+import io.legado.app.help.readaloud.TtsCacheSweep
 import io.legado.app.help.readaloud.prebuild.TtsCacheKeys
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
@@ -646,34 +647,17 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     /**
-     * 移除缓存文件
+     * 移除缓存文件（R17：清扫判据抽到 [TtsCacheSweep]，与 App 启动兜底清扫共用单一来源）
      */
     private fun removeCacheFile() {
         val titleMd5 = MD5Utils.md5Encode16(textChapter?.title ?: "")
-        FileUtils.listDirsAndFiles(ttsFolderPath)?.forEach {
-            // 预合成保留名单（§3.7.1-7）：名单内产物任何情况不被清理驱逐（用户主动生成的资产）
-            val isReserved = io.legado.app.help.readaloud.prebuild.TtsPrebuildManager.reservedKeys
-                .containsKey(it.name.removeSuffix(".mp3"))
-            if (isReserved) {
-                // TtsTrace 真机联调：保留名单驱逐防护证据
-                AppLog.putDebugWithTag(
-                    AppLog.TAG_TTS_TRACE,
-                    "保留名单防护 file=${it.name.takeLast(20)} 跳过清理",
-                    level = AppLog.Level.INFO
-                )
-                return@forEach
-            }
-            val isSilentSound = it.length() == 2160L
-            // P2-15：残留 .part 半成品清理（超 10min 的陈旧临时文件；活跃写入中的 .part 因 lastModified 持续更新不受影响）
-            val isStalePart = it.name.endsWith(".part")
-                && System.currentTimeMillis() - it.lastModified() > 600000
-            if ((!it.name.startsWith(titleMd5)
-                        && System.currentTimeMillis() - it.lastModified() > 600000)
-                || isSilentSound
-                || isStalePart
-            ) {
-                FileUtils.delete(it.absolutePath)
-            }
+        val deleted = TtsCacheSweep.sweep(
+            File(ttsFolderPath),
+            keepStems = setOf(titleMd5),
+            reserved = io.legado.app.help.readaloud.prebuild.TtsPrebuildManager.reservedKeys.keys
+        )
+        if (deleted > 0) {
+            AppLog.putDebug("HttpTTS 换章清扫: deleted=$deleted")
         }
     }
 

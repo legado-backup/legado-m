@@ -350,6 +350,18 @@ object AudioPlay : CoroutineScope by MainScope() {
 
      
 
+    /**
+     * R13：下发「跳过静音」开关；偏好由调用方落盘，服务内对现有播放器实例实时生效。
+     */
+    fun setSkipSilence(enabled: Boolean) {
+        if (AudioPlayService.isRun) {
+            context.startService<AudioPlayService> {
+                action = IntentAction.setSkipSilence
+                putExtra("enabled", enabled)
+            }
+        }
+    }
+
     fun adjustProgress(position: Int) {
         durChapterPos = position
         saveRead()

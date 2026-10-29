@@ -247,6 +247,8 @@ object PreferKey {
     const val webDavDeviceName = "webDavDeviceName"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
+    // R13：听书跳过静音（默认关，用户主动开启）
+    const val audioSkipSilence = "audioSkipSilence"
     const val readAloudWakeLock = "readAloudWakeLock"
     const val showLastUpdateTime = "showLastUpdateTime"
     const val showWaitUpCount = "showWaitUpCount"

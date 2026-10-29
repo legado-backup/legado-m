@@ -31,6 +31,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.globalExecutor
+import io.legado.app.help.readaloud.ReadAloudPendingState
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
@@ -106,6 +107,9 @@ object ReadBook : CoroutineScope by MainScope() {
     var readStartTime: Long = System.currentTimeMillis()
     @Volatile
     private var readAloudPendingLoadChapterIndex = -1
+
+    /** R15：冷启动首点朗读时正文未排版 —— 待播状态机，章节排版完成后补播一次 */
+    private val pendingReadAloud = ReadAloudPendingState()
 
     /* 跳转进度前进度记录 */
     var lastBookProgress: BookProgress? = null
@@ -362,6 +366,8 @@ object ReadBook : CoroutineScope by MainScope() {
         curTextChapter = null
         nextTextChapter = null
         chapterLayoutKeys.clear()
+        // R15：章节槽整体清空（切书/重载）时待播标记必须失效，否则会误触发朗读
+        pendingReadAloud.cancel()
     }
 
     fun reloadCurrentContent(reason: String = "", keepPosition: Boolean = true) {
@@ -907,12 +913,29 @@ object ReadBook : CoroutineScope by MainScope() {
      */
     fun readAloud(play: Boolean = true, startPos: Int = 0) {
         book ?: return
-        val textChapter = curTextChapter ?: return
+        val textChapter = curTextChapter
+        if (textChapter == null) {
+            // R15：冷启动时正文尚未排版，原实现在此处静默返回 ⇒ 首点朗读"没反应"。
+            // 置待播标记，由当前章排版完成回调补播一次（不得把守卫放进 play() 入口，
+            // 否则章尾「空列表 → 下一章」的正常推进会被吞掉）。
+            pendingReadAloud.markPending()
+            AppLog.putDebug("readAloud-章节未排版,已置待播标记")
+            return
+        }
         if (textChapter.isCompleted) {
             // R4：新朗读会话启动 → 恢复跟随（跨章返回/重新发起朗读不再从页首重播）
             SpeechFollowState.restoreForNewSpeechSession()
             ReadAloud.play(appCtx, play, startPos = startPos)
         }
+    }
+
+    /**
+     * R15：当前章排版完成后补播一次待播朗读（状态机内部先清标记，防回调重入双播）。
+     */
+    private fun consumePendingReadAloud() {
+        if (!pendingReadAloud.consumeIfPending(curTextChapter != null)) return
+        AppLog.putDebug("readAloud-章节排版完成,补播待播朗读")
+        readAloud()
     }
 
     /**
@@ -1580,6 +1603,8 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                     curPageChanged(fromReadAloud = fromReadAloud)
                     callBack?.get()?.contentLoadFinish()
+                    // R15：当前章排版完成 → 补播冷启动时被吞掉的朗读请求
+                    if (chapter.index == durChapterIndex) consumePendingReadAloud()
                     isChapterLoadSlotCurrent(
                         book.bookUrl,
                         chapter.index,
@@ -1811,6 +1836,8 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                     curPageChanged(fromReadAloud = fromReadAloud)
                     callBack?.get()?.contentLoadFinish()
+                    // R15：当前章排版完成 → 补播冷启动时被吞掉的朗读请求
+                    if (chapter.index == durChapterIndex) consumePendingReadAloud()
                     isChapterLoadSlotCurrent(
                         book.bookUrl,
                         chapter.index,
