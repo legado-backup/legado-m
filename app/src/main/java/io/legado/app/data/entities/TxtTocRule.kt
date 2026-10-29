@@ -29,4 +29,18 @@ data class TxtTocRule(
         return false
     }
 
+    /**
+     * 导入比较：同 id 时判断业务字段是否完全一致。
+     * 不能用 [equals]（它只比主键 id），否则同 id 但内容更新的规则包永远被判"已存在"。
+     * 新增业务字段时必须同步补进这里。
+     */
+    fun hasSameImportContent(other: TxtTocRule): Boolean {
+        return name == other.name &&
+                rule == other.rule &&
+                replacement == other.replacement &&
+                example == other.example &&
+                serialNumber == other.serialNumber &&
+                enable == other.enable
+    }
+
 }

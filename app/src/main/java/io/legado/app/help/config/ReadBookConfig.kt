@@ -34,6 +34,12 @@ import splitties.init.appCtx
 import java.io.File
 import androidx.core.graphics.drawable.toDrawable
 
+internal const val MIN_TEXT_SIZE = 5
+internal const val MAX_TEXT_SIZE = 100
+
+/** 字号安全区间：防御历史脏数据/导入配置写出越界值 */
+internal fun clampTextSize(value: Int): Int = value.coerceIn(MIN_TEXT_SIZE, MAX_TEXT_SIZE)
+
 /**
  * 阅读界面配置
  */
@@ -56,7 +62,12 @@ object ReadBookConfig {
         }
 
     var isComic: Boolean = false
-    var bg: Drawable? = null
+    private val bgSlot = BackgroundSlot()
+    var bg: Drawable?
+        get() = bgSlot.drawable
+        set(value) {
+            bgSlot.drawable = value
+        }
     var bgMeanColor: Int = 0
     val textColor: Int get() = durConfig.curTextColor()
     val textAccentColor: Int get() = durConfig.curTextAccentColor()
@@ -113,14 +124,20 @@ object ReadBookConfig {
         } else if (drawable is ColorDrawable) {
             bgMeanColor = drawable.color
         }
-        val tmp = bg
-        bg = drawable
-        if (tmp is BitmapDrawable) { //太快执行，可能还正在被使用，延时防崩溃
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                tmp.bitmap?.recycle()
-            }
-        }
+        swapBackground(drawable)
     }
+
+    /**
+     * 替换共享背景 Drawable。
+     *
+     * 🔴 禁止回收旧位图：`bg` 是跨 ReadBookActivity 实例共享的单例字段，
+     * 旧窗口的 PageView.vwRoot 背景 LayerDrawable 仍引用同一 Bitmap；
+     * 手动 recycle 会造成 "Canvas: trying to use a recycled bitmap" 的 use-after-free 崩溃
+     * （竞品已在真机实锤；延时 post 只是把崩溃推迟一个消息）。
+     * Android 8+ Bitmap 由 GC 跟踪，交给 GC 即可。
+     */
+    internal fun swapBackground(newBg: Drawable?): Drawable? =
+        io.legado.app.help.config.swapBackground(bgSlot, newBg)
 
     fun save() {
         Coroutine.async {
@@ -316,9 +333,9 @@ object ReadBookConfig {
         }
 
     var textSize: Int
-        get() = config.textSize
+        get() = clampTextSize(config.textSize)
         set(value) {
-            config.textSize = value
+            config.textSize = clampTextSize(value)
         }
 
     var letterSpacing: Float

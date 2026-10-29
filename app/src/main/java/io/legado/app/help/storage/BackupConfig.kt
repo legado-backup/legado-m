@@ -8,6 +8,15 @@ import io.legado.app.utils.fromJsonObject
 import splitties.init.appCtx
 
 /**
+ * 设备本地偏好键：值绑定当前设备的路径/URI，跨设备恢复写回后必然失效。
+ * 独立成集合便于回归锁直接断言（见 BackupFontFolderIgnoreTest）。
+ */
+internal val DEVICE_LOCAL_IGNORE_PREF_KEYS = arrayOf(
+    // 字体目录存 content URI 或绝对路径，换机后不可读
+    PreferKey.fontFolder,
+)
+
+/**
  * 备份配置
  */
 @Suppress("ConstPropertyName")
@@ -64,6 +73,7 @@ object BackupConfig {
         PreferKey.webServiceWakeLock,
         PreferKey.readAloudWakeLock,
         PreferKey.audioPlayWakeLock,
+        *DEVICE_LOCAL_IGNORE_PREF_KEYS,
         // 已删除的旧键（2026-09-27 底栏悬浮搜索按钮裁决）：旧备份里的该键不得写回
         "floatingBottomBarHideSearch",
         // 已删除的旧键（2026-10-15 死件普查：两键全仓零读取，连字面量通道亦无）
